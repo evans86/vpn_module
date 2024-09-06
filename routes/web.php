@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Module\TestController;
 
 /*
 |--------------------------------------------------------------------------
@@ -12,7 +13,13 @@ use Illuminate\Support\Facades\Route;
 | contains the "web" middleware group. Now create something great!
 |
 */
+//
+//Route::group(['namespace' => 'Module', 'prefix' => 'module'], function () {
+//    Route::get('test', 'TestController@index')->name('module.test.index');
+//});
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/test', [TestController::class, 'index'])->name('test');
+
+//Route::get('/', function () {
+//    return view('welcome');
+//});
