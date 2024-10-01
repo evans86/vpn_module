@@ -7,7 +7,7 @@ use Faker\Provider\Uuid;
 class ServerUserDto
 {
     public uuid $id;
-    public int $server_id; // какому серверу принадлежит пользователь
+    public int $panel_id; // какой панели принадлежит пользователь
     public string $user_id; // из панели
     public bool $is_free;
 
@@ -15,7 +15,7 @@ class ServerUserDto
     {
         return [
             'id' => $this->id,
-            'server_id' => $this->server_id,
+            'panel_id' => $this->panel_id,
             'user_id' => $this->user_id,
             'is_free' => $this->is_free
         ];

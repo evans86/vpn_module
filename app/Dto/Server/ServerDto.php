@@ -6,20 +6,27 @@ class ServerDto
 {
     public int $id;
     public string $provider_id; //идентификатор провайдера
-    public int $ip;
+    public string $ip;
     public string $login;
     public string $password;
     public string $name; //имя из панели
     public string $host; //строка ssh подключения
     public string $provider; // vdsina
-    public string $panel; // Marzban
     public int $location_id; // ru/ne
-    public string $panel_adress;
-    public string $panel_login;
-    public string $panel_password;
-    public string $panel_key;
+    public int $server_status;
     public bool $is_free; // платный или бесплатный тариф
 
+
+    public function createArray(): array
+    {
+        return [
+            'provider_id' => $this->provider_id,
+            'location_id' => $this->location_id,
+            'provider' => $this->provider,
+            'server_status' => $this->server_status,
+            'is_free' => $this->is_free
+        ];
+    }
 
     public function getArray(): array
     {
@@ -32,12 +39,8 @@ class ServerDto
             'name' => $this->name,
             'host' => $this->host,
             'provider' => $this->provider,
-            'panel' => $this->panel,
             'location_id' => $this->location_id,
-            'panel_adress' => $this->panel_adress,
-            'panel_login' => $this->panel_login,
-            'panel_password' => $this->panel_password,
-            'panel_key' => $this->panel_key,
+            'server_status' => $this->server_status,
             'is_free' => $this->is_free
         ];
     }

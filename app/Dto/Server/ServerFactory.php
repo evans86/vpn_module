@@ -21,12 +21,8 @@ class ServerFactory
         $dto->name = $server->name;
         $dto->host = $server->host;
         $dto->provider = $server->provider;
-        $dto->panel = $server->panel;
         $dto->location_id = $server->location_id;
-        $dto->panel_adress = $server->panel_adress;
-        $dto->panel_login = $server->panel_login;
-        $dto->panel_password = $server->panel_password;
-        $dto->panel_key = $server->panel_key;
+        $dto->server_status = $server->server_status;
         $dto->is_free = $server->is_free;
 
         return $dto;

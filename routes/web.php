@@ -1,7 +1,9 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Module\ServerController;
+use App\Http\Controllers\Module\PanelController;
 use App\Http\Controllers\Module\TestController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -18,7 +20,17 @@ use App\Http\Controllers\Module\TestController;
 //    Route::get('test', 'TestController@index')->name('module.test.index');
 //});
 
-Route::get('/test', [TestController::class, 'index'])->name('test');
+//Route::get('/test', [TestController::class, 'index'])->name('test');
+//Route::get('/panel', [TestController::class, 'panel'])->name('panel');
+
+Route::get('/server/index', [ServerController::class, 'index'])->name('module.server.index');
+Route::get('/server/create', [ServerController::class, 'create'])->name('module.server.create');
+
+
+Route::get('/panel/index', [PanelController::class, 'index'])->name('module.panel.index');
+Route::get('/panel/create', [PanelController::class, 'create'])->name('module.panel.create');
+
+//Route::get('/panel', [ServerController::class, 'panel'])->name('panel');
 
 //Route::get('/', function () {
 //    return view('welcome');

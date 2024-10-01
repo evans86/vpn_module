@@ -14,7 +14,7 @@ class ServerUserFactory
     {
         $dto = new ServerUserDto();
         $dto->id = $serverUser->id;
-        $dto->server_id = $serverUser->server_id;
+        $dto->panel_id = $serverUser->panel_id;
         $dto->user_id = $serverUser->user_id;
         $dto->is_free = $serverUser->is_free;
 
