@@ -20,8 +20,18 @@ class ServerStrategy
         }
     }
 
-    public function create(): void
+    public function configure(int $location_id, string $provider, bool $isFree): void
     {
-        $this->strategy->create();
+        $this->strategy->configure($location_id, $provider, $isFree);
+    }
+
+    public function checkStatus()
+    {
+        $this->strategy->checkStatus();
+    }
+
+    public function setPanel(int $server_id, string $panel)
+    {
+        $this->strategy->setPanel($server_id, $panel);
     }
 }

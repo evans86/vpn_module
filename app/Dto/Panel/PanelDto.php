@@ -10,10 +10,9 @@ class PanelDto
     public string $panel_adress;
     public string $panel_login;
     public string $panel_password;
-    public string $panel_key;
     public int $panel_status;
-    public string $auth_token;
-    public int $token_died_time;
+    public ?string $auth_token;
+    public ?int $token_died_time;
 
     public function createArray(): array
     {
@@ -32,7 +31,6 @@ class PanelDto
             'panel_adress' => $this->panel_adress,
             'panel_login' => $this->panel_login,
             'panel_password' => $this->panel_password,
-            'panel_key' => $this->panel_key,
             'panel_status' => $this->panel_status,
             'auth_token' => $this->auth_token,
             'token_died_time' => $this->token_died_time,

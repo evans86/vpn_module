@@ -7,10 +7,7 @@ use GuzzleHttp\Psr7\Request;
 
 class MarzbanAPI
 {
-//    const HOST = 'https://server1nz.vpn-telegram.com:53004/api/';
     private $host;
-
-//    private $apiKey;
 
     public function __construct($host)
     {
@@ -31,11 +28,11 @@ class MarzbanAPI
         ];
 
         $client = new Client(['base_uri' => $this->host . '/api/']);
-        $response = $client->post($action, $requestParam);
 
+        $response = $client->post($action, $requestParam);
         $result = $response->getBody()->getContents();
         $result = (json_decode($result, true));
-//        dd($result);
+
         return $result['access_token'];
     }
 

@@ -15,7 +15,6 @@ class PanelFactory
         $dto->panel_adress = $server->panel_adress;
         $dto->panel_login = $server->panel_login;
         $dto->panel_password = $server->panel_password;
-        $dto->panel_key = $server->panel_key;
         $dto->panel_status = $server->panel_status;
         $dto->auth_token = $server->auth_token;
         $dto->token_died_time = $server->token_died_time;

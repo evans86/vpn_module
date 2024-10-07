@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\Module;
 
 use App\Services\Cloudflare\CloudflareService;
-use App\Services\Server\vdsina\ServerService;
+use App\Services\Server\vdsina\VdsinaService;
 
 class TestController
 {
     public function index()
     {
-        $server_service = new ServerService();
+        $server_service = new VdsinaService();
         $server_service->create();
 
         return view('module.test.index');

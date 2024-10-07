@@ -2,7 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Services\Server\vdsina\ServerService;
+use App\Models\Server\Server;
+use App\Services\Server\ServerStrategy;
+use App\Services\Server\vdsina\VdsinaService;
 use Illuminate\Console\Command;
 
 class ServerCron extends Command
@@ -38,8 +40,8 @@ class ServerCron extends Command
      */
     public function handle()
     {
-        $serverService = new ServerService();
-        $serverService->cronStatus();
+        $serverStrategy = new ServerStrategy(Server::VDSINA);
+        $serverStrategy->checkStatus();
         return 0;
     }
 }

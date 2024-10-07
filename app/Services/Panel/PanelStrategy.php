@@ -20,8 +20,14 @@ class PanelStrategy
         }
     }
 
-    public function create(): void
+    /**
+     * Создание панели
+     *
+     * @param int $server_id
+     * @return void
+     */
+    public function create(int $server_id): void
     {
-        $this->strategy->create();
+        $this->strategy->create($server_id);
     }
 }

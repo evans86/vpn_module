@@ -3,9 +3,7 @@
 namespace App\Http\Controllers\Module;
 
 use App\Models\Server\Server;
-use App\Services\Panel\marzban\PanelService;
 use App\Services\Server\ServerStrategy;
-use App\Services\Server\vdsina\ServerService;
 
 class ServerController
 {
@@ -17,7 +15,7 @@ class ServerController
     public function create()
     {
         $strategy = new ServerStrategy(Server::VDSINA);
-        $strategy->create();
+        $strategy->configure(1, Server::VDSINA, false);
 
         return redirect()->route('module.server.index');
     }
