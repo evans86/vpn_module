@@ -15,12 +15,15 @@ class PanelController
 
     public function create()
     {
-        $strategy = new PanelStrategy(Panel::MARZBAN);
-        $strategy->create(20);
+//        $strategy = new PanelStrategy(Panel::MARZBAN);
+//        $strategy->create(23);
+
+//        $service = new MarzbanService();
+//        $service->updateConfiguration(16);
 
         //проверить обновление токена +
 //        $service = new MarzbanService();
-//        $service->updateMarzbanToken(11);
+//        $service->createUser(16, 'testBot');
 
         return redirect()->route('module.panel.index');
     }

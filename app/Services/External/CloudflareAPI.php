@@ -58,12 +58,12 @@ class CloudflareAPI
     }
 
     //удалить dns запись
-    public function deleteRecord($id)
+    public function deleteRecord(string $dns_record_id): bool
     {
         $DNSRecord = new \Cloudflare\API\Endpoints\DNS(self::getAdapter());
 
         $zone_id = 'ecd4115fa760df3dd0a5f9c0e2caee2d'; //zone_id
-        $record_id = '1'; //id DNS-записи
+        $record_id = $dns_record_id; //id DNS-записи
 
         $record = $DNSRecord->deleteRecord($zone_id, $record_id); //удаление DNS-записи
 

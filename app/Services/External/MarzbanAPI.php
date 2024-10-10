@@ -36,19 +36,42 @@ class MarzbanAPI
         return $result['access_token'];
     }
 
+    public function modifyConfig($token, $json_config)
+    {
+        $action = 'core/config';
+
+        $requestParam = [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $token,
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json'
+            ],
+            'json' => $json_config
+        ];
+
+        $client = new Client(['base_uri' => $this->host . '/api/']);
+
+        $response = $client->put($action, $requestParam);
+        $result = $response->getBody()->getContents();
+        $result = (json_decode($result, true));
+
+//        dd($result);
+        return $result;
+    }
+
     //создание пользователя в панеле marzban
-    public function createUser()
+    public function createUser(string $token, string $username)
     {
         $action = 'user';
 
         $requestParam = [
             'headers' => [
-                'Authorization' => 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImFjY2VzcyI6InN1ZG8iLCJpYXQiOjE3MjYzMzA5NjgsImV4cCI6MTcyNjQxNzM2OH0.9L_J1AGWioylbepiGzIQ49QNntkMUYQi6WnpyDTGy3U',
+                'Authorization' => 'Bearer ' . $token,
                 'Content-Type' => 'application/json',
                 'Accept' => 'application/json'
             ],
             'json' => [
-                'username' => 'testbott',
+                'username' => $username,
                 'proxies' => [
                     "vmess" => [
 
@@ -73,6 +96,6 @@ class MarzbanAPI
         $result = (json_decode($result, true));
 
         dd($result);
-        return json_decode($result, true);
+        return $result;
     }
 }

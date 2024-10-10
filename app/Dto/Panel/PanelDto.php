@@ -14,14 +14,6 @@ class PanelDto
     public ?string $auth_token;
     public ?int $token_died_time;
 
-    public function createArray(): array
-    {
-        return [
-            'server_id' => $this->server_id,
-            'panel' => $this->panel,
-            'panel_status' => $this->panel_status
-        ];
-    }
     public function getArray(): array
     {
         return [

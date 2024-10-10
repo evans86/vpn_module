@@ -19,6 +19,9 @@ class MarzbanService
      */
     public function create(int $server_id): void
     {
+        /**
+         * @var Server $server
+         */
         $server = Server::query()->where('id', $server_id)->first();
 
         //команды для установки панели на сервер
@@ -40,7 +43,7 @@ class MarzbanService
 
         //проверка существования файла .env
         if (str_contains($ssh_connect->exec('stat /opt/marzban/.env'), 'No such file')) {
-            throw new \RuntimeException('No such panel'); //добавить исключение
+            throw new \RuntimeException('No such panel');
         } else {
             $settingFile = 'cat /opt/marzban/.env';
             $output = $ssh_connect->exec($settingFile);
@@ -74,16 +77,16 @@ class MarzbanService
      * Адаптер для работы SSH connect
      *
      * @param ServerDto $serverDto
-     * @return SSH2|string
+     * @return SSH2
      */
-    public function connectSshAdapter(ServerDto $serverDto)
+    public function connectSshAdapter(ServerDto $serverDto): SSH2
     {
         $ssh_connect = new SSH2($serverDto->ip);
         $ssh_connect->setTimeout(100000);
 
         //переделать
         if (!$ssh_connect->login($serverDto->login, $serverDto->password)) {
-            $output = 'SSH connection failed';
+            throw new \RuntimeException('SSH connection failed');
         } else {
             $output = $ssh_connect;
         }
@@ -99,6 +102,9 @@ class MarzbanService
      */
     public function updateMarzbanToken(int $panel_id)
     {
+        /**
+         * @var Panel $panel
+         */
         $panel = Panel::query()->where('id', $panel_id)->first();
 
         if (is_null($panel->auth_token) || $panel->token_died_time <= time()) {
@@ -107,5 +113,152 @@ class MarzbanService
             $panel->token_died_time = time() + 85400;
             $panel->save();
         }
+    }
+
+    public function updateConfiguration(int $panel_id)
+    {
+        /**
+         * @var Panel $panel
+         */
+        $panel = Panel::query()->where('id', $panel_id)->first();
+        self::updateMarzbanToken($panel->id);
+
+        $marzbanApi = new MarzbanAPI($panel->panel_adress);
+
+        $json_config = [
+            "inbounds" => [
+                [
+                    "tag" => "VLESS HTTPUPGRADE NoTLS",
+                    "listen" => "0.0.0.0",
+                    "port" => 2095,
+                    "protocol" => "vless",
+                    "settings" => [
+                        "clients" => [
+                        ],
+                        "decryption" => "none"
+                    ],
+                    "streamSettings" => [
+                        "network" => "httpupgrade",
+                        "httpupgradeSettings" => [
+                            "path" => "/",
+                            "host" => ""
+                        ],
+                        "security" => "none"
+                    ],
+                    "sniffing" => [
+                        "enabled" => true,
+                        "destOverride" => [
+                            "http",
+                            "tls",
+                            "quic"
+                        ]
+                    ]
+                ],
+                [
+                    "tag" => "VMESS HTTPUPGRADE NoTLS",
+                    "listen" => "0.0.0.0",
+                    "port" => 2095,
+                    "protocol" => "vmess",
+                    "settings" => [
+                        "clients" => [
+                        ]
+                    ],
+                    "streamSettings" => [
+                        "network" => "httpupgrade",
+                        "httpupgradeSettings" => [
+                            "path" => "/",
+                            "host" => ""
+                        ],
+                        "security" => "none"
+                    ],
+                    "sniffing" => [
+                        "enabled" => true,
+                        "destOverride" => [
+                            "http",
+                            "tls",
+                            "quic"
+                        ]
+                    ]
+                ],
+                [
+                    "tag" => "TROJAN WS NOTLS",
+                    "listen" => "0.0.0.0",
+                    "port" => 8080,
+                    "protocol" => "trojan",
+                    "settings" => [
+                        "clients" => [
+                        ]
+                    ],
+                    "streamSettings" => [
+                        "network" => "ws",
+                        "wsSettings" => [
+                            "path" => "/"
+                        ],
+                        "security" => "none"
+                    ],
+                    "sniffing" => [
+                        "enabled" => true,
+                        "destOverride" => [
+                            "http",
+                            "tls",
+                            "quic"
+                        ]
+                    ]
+                ],
+                [
+                    "tag" => "Shadowsocks TCP",
+                    "listen" => "0.0.0.0",
+                    "port" => 1080,
+                    "protocol" => "shadowsocks",
+                    "settings" => [
+                        "clients" => [
+                        ],
+                        "network" => "tcp,udp"
+                    ]
+                ]
+            ],
+            "outbounds" => [
+                [
+                    "protocol" => "freedom",
+                    "tag" => "DIRECT"
+                ],
+                [
+                    "protocol" => "blackhole",
+                    "tag" => "BLOCK"
+                ]
+            ],
+            "routing" => [
+                "rules" => [
+                    [
+                        "ip" => [
+                            "geoip:private"
+                        ],
+                        "domain" => [
+                            "geosite:private"
+                        ],
+                        "protocol" => [
+                            "bittorrent"
+                        ],
+                        "outboundTag" => "BLOCK",
+                        "type" => "field"
+                    ]
+                ]
+            ]
+        ];
+
+        $marzbanApi->modifyConfig($panel->auth_token, $json_config);
+    }
+
+    public function createUser(int $panel_id, string $username)
+    {
+        /**
+         * @var Panel $panel
+         */
+        $panel = Panel::query()->where('id', $panel_id)->first();
+        self::updateMarzbanToken($panel->id);
+
+        $marzbanApi = new MarzbanAPI($panel->panel_adress);
+
+        $marzbanApi->createUser($panel->auth_token, $username);
     }
 }

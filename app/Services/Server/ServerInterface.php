@@ -11,4 +11,6 @@ interface ServerInterface
     public function checkStatus(): void;
 
     public function setPanel(int $server_id, string $panel): void;
+
+    public function delete(): void;
 }

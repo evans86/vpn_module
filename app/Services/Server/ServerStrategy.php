@@ -34,4 +34,9 @@ class ServerStrategy
     {
         $this->strategy->setPanel($server_id, $panel);
     }
+
+    public function delete()
+    {
+        $this->strategy->delete();
+    }
 }

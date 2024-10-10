@@ -5,6 +5,17 @@ namespace App\Models\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property int $id
+ * @property int|null $server_id
+ * @property string|null $panel
+ * @property string|null $panel_adress
+ * @property string|null $panel_login
+ * @property string|null $panel_password
+ * @property string|null $panel_status
+ * @property string|null $auth_token
+ * @property int|null $token_died_time
+ */
 class Panel extends Model
 {
     use HasFactory;
@@ -16,14 +27,4 @@ class Panel extends Model
 
     protected $guarded = false;
     protected $table = 'panel';
-
-    public function isPanelCreated()
-    {
-        return $this->panel_status == self::PANEL_CREATED;
-    }
-
-    public function isPanelConfigured()
-    {
-        return $this->panel_status == self::PANEL_CONFIGURED;
-    }
 }

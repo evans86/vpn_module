@@ -19,6 +19,7 @@ class ServerFactory
         $dto->login = $server->login;
         $dto->password = $server->password;
         $dto->name = $server->name;
+        $dto->dns_record_id = $server->dns_record_id;
         $dto->host = $server->host;
         $dto->provider = $server->provider;
         $dto->location_id = $server->location_id;

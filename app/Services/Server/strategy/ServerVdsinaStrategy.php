@@ -50,4 +50,10 @@ class ServerVdsinaStrategy extends ServerMainStrategy implements ServerInterface
         $panelStrategy = new PanelStrategy($panel);
         $panelStrategy->create($server->id);
     }
+
+    public function delete(): void
+    {
+        $vdsinaService = new VdsinaService();
+        $vdsinaService->delete();
+    }
 }

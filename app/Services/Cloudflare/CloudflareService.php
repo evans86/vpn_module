@@ -18,6 +18,12 @@ class CloudflareService
         return $subdomain;
     }
 
+    public function deleteSubdomain(string $dns_record_id): bool
+    {
+        $cloudflare = new CloudflareAPI();
+        return $cloudflare->deleteRecord($dns_record_id);
+    }
+
     public function testAPI()
     {
         $cloudflare = new CloudflareAPI();
