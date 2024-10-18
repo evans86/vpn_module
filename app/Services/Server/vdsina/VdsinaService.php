@@ -129,6 +129,12 @@ class VdsinaService
         }
     }
 
+    /**
+     * Удаление сервера
+     * 
+     * @param $server_id
+     * @return void
+     */
     public function delete($server_id)
     {
         $server = Server::query()->where('id', $server_id)->first();
@@ -136,5 +142,17 @@ class VdsinaService
 
         //удаление субдомена
         $cloudflare_service->deleteSubdomain($server->dns_record_id);
+        $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
+
+        $deleteData = $vdsinaApi->deleteServer($server->provider_id);
+
+        if ($deleteData['status'] == 'ok') {
+            if (!$server->delete())
+                throw new \RuntimeException('Server dont delete');
+        } else {
+            throw new \RuntimeException('Error delete server in vdsina.');
+        }
+
+        dd('Success delete Server in vdsina.');
     }
 }

@@ -15,7 +15,8 @@ class ServerController
     public function create()
     {
         $strategy = new ServerStrategy(Server::VDSINA);
-        $strategy->configure(1, Server::VDSINA, false);
+        $strategy->delete(25);
+//        $strategy->configure(1, Server::VDSINA, false);
 
         return redirect()->route('module.server.index');
     }

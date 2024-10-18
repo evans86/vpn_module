@@ -4,9 +4,12 @@ namespace App\Services\Panel\marzban;
 
 use App\Dto\Server\ServerDto;
 use App\Dto\Server\ServerFactory;
+use App\Models\KeyProtocols\KeyProtocols;
 use App\Models\Panel\Panel;
 use App\Models\Server\Server;
+use App\Models\ServerUser\ServerUser;
 use App\Services\External\MarzbanAPI;
+use Illuminate\Support\Str;
 use phpseclib\Net\SSH2;
 
 class MarzbanService
@@ -98,7 +101,7 @@ class MarzbanService
      * Обновление bearer token для панели
      *
      * @param int $panel_id
-     * @return void
+     * @return Panel|null
      */
     public function updateMarzbanToken(int $panel_id)
     {
@@ -113,19 +116,26 @@ class MarzbanService
             $panel->token_died_time = time() + 85400;
             $panel->save();
         }
+
+        return $panel;
     }
 
+    /**
+     * Обновление конфигурации панели
+     *
+     * @param int $panel_id
+     * @return void
+     */
     public function updateConfiguration(int $panel_id)
     {
-        /**
-         * @var Panel $panel
-         */
-        $panel = Panel::query()->where('id', $panel_id)->first();
-        self::updateMarzbanToken($panel->id);
+        $panel = self::updateMarzbanToken($panel_id);
 
         $marzbanApi = new MarzbanAPI($panel->panel_adress);
 
         $json_config = [
+            "log" => [
+                "loglevel" => "info"
+            ],
             "inbounds" => [
                 [
                     "tag" => "VLESS HTTPUPGRADE NoTLS",
@@ -249,16 +259,54 @@ class MarzbanService
         $marzbanApi->modifyConfig($panel->auth_token, $json_config);
     }
 
-    public function createUser(int $panel_id, string $username)
+    public function addServerUser(int $panel_id)
     {
-        /**
-         * @var Panel $panel
-         */
-        $panel = Panel::query()->where('id', $panel_id)->first();
-        self::updateMarzbanToken($panel->id);
+        $panel = self::updateMarzbanToken($panel_id);
 
         $marzbanApi = new MarzbanAPI($panel->panel_adress);
+        $userId = Str::uuid();
 
-        $marzbanApi->createUser($panel->auth_token, $username);
+        $userData = $marzbanApi->createUser($panel->auth_token, $userId);
+
+        $serverUser = new ServerUser();
+        $serverUser->id = $userId;
+        $serverUser->panel_id = $panel->id;
+        $serverUser->is_free = false;
+
+        $serverUser->save();
+
+        $key_protocols = new KeyProtocols();
+        $key_protocols->user_id = $userId;
+        $key_protocols->key = $userData['subscription_url'];
+
+        $key_protocols->save();
+
+        dd($userData);
+    }
+
+    /**
+     * Удаление пользователя панели
+     *
+     * @param int $panel_id
+     * @param string $user_id
+     * @return void
+     */
+    public function deleteServerUser(int $panel_id, string $user_id)
+    {
+        $panel = self::updateMarzbanToken($panel_id);
+
+        $marzbanApi = new MarzbanAPI($panel->panel_adress);
+        $deleteData = $marzbanApi->deleteUser($panel->auth_token, $user_id);
+
+        $serverUser = ServerUser::query()->where('id', $user_id)->first();
+
+        if(empty($deleteData)){
+            if (!$serverUser->delete())
+                throw new \RuntimeException('Server User dont delete');
+        }else{
+            throw new \RuntimeException('Error delete user in the panel.');
+        }
+
+        dd('Success delete user in the panel.');
     }
 }

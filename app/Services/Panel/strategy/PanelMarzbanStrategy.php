@@ -18,4 +18,41 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
         $marzbanServer = new MarzbanService();
         $marzbanServer->create($server_id);
     }
+
+    /**
+     * Обновление конфигурации панели
+     *
+     * @param int $panel_id
+     * @return void
+     */
+    public function updateConfiguration(int $panel_id): void
+    {
+        $marzbanServer = new MarzbanService();
+        $marzbanServer->updateConfiguration($panel_id);
+    }
+
+    /**
+     * Добавление пользователя
+     *
+     * @param int $panel_id
+     * @return void
+     */
+    public function addServerUser(int $panel_id): void
+    {
+        $marzbanServer = new MarzbanService();
+        $marzbanServer->addServerUser($panel_id);
+    }
+
+    /**
+     * Удаление пользователя панели
+     *
+     * @param int $panel_id
+     * @param string $user_id
+     * @return void
+     */
+    public function deleteServerUser(int $panel_id, string $user_id): void
+    {
+        $marzbanServer = new MarzbanService();
+        $marzbanServer->deleteServerUser($panel_id, $user_id);
+    }
 }

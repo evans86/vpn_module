@@ -26,9 +26,10 @@ class ServerVdsinaStrategy extends ServerMainStrategy implements ServerInterface
     }
 
     /**
-     * Проверка статуса создания сервера
+     * Проверка статуса сервера и окончательная настройка
      *
      * @return void
+     * @throws GuzzleException
      */
     public function checkStatus(): void
     {
@@ -51,9 +52,15 @@ class ServerVdsinaStrategy extends ServerMainStrategy implements ServerInterface
         $panelStrategy->create($server->id);
     }
 
-    public function delete(): void
+    /**
+     * Удаление сервера
+     *
+     * @param int $server_id
+     * @return void
+     */
+    public function delete(int $server_id): void
     {
         $vdsinaService = new VdsinaService();
-        $vdsinaService->delete();
+        $vdsinaService->delete($server_id);
     }
 }

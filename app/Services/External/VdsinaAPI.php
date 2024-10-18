@@ -17,34 +17,34 @@ class VdsinaAPI
     }
 
     //тестовый на данный аккаунта
-    public function getAccount()
-    {
-        try {
-            $action = 'account';
-
-            $requestParam = [
-                RequestOptions::JSON => [
-//                'email' => 'support@vpn-telegram.com',
-//                'password' => 'QScM69NuRrVDEbsjR37G'
-                ]
-            ];
-            $headers = [
-                'headers' => [
-                    'Authorization' => $this->apiKey,
-                ]
-            ];
-
-            $client = new Client(['base_uri' => self::HOST_COM]);
-            $response = $client->get($action, $headers);
-
-            $result = $response->getBody()->getContents();
-//        dd($result);
-            return json_decode($result, true);
-        } catch (\RuntimeException $r) {
-            //запись в лог
-            throw new \RuntimeException('error');
-        }
-    }
+//    public function getAccount()
+//    {
+//        try {
+//            $action = 'account';
+//
+//            $requestParam = [
+//                RequestOptions::JSON => [
+////                'email' => 'support@vpn-telegram.com',
+////                'password' => 'QScM69NuRrVDEbsjR37G'
+//                ]
+//            ];
+//            $headers = [
+//                'headers' => [
+//                    'Authorization' => $this->apiKey,
+//                ]
+//            ];
+//
+//            $client = new Client(['base_uri' => self::HOST_COM]);
+//            $response = $client->get($action, $headers);
+//
+//            $result = $response->getBody()->getContents();
+////        dd($result);
+//            return json_decode($result, true);
+//        } catch (\RuntimeException $r) {
+//            //запись в лог
+//            throw new \RuntimeException('error');
+//        }
+//    }
 
     //интересут id = 2 Standard servers
     public function getServerGroup()
@@ -146,6 +146,31 @@ class VdsinaAPI
         }
     }
 
+    //получить список серверов
+    public function getServers()
+    {
+        try {
+            $action = 'server';
+
+            $headers = [
+                'headers' => [
+                    'Authorization' => $this->apiKey,
+                ]
+
+            ];
+
+            $client = new Client(['base_uri' => self::HOST_COM]);
+            $response = $client->get($action, $headers);
+
+            $result = $response->getBody()->getContents();
+//          dd(json_decode($result));
+            return json_decode($result, true);
+        } catch (\RuntimeException $r) {
+            //запись в лог
+            throw new \RuntimeException('error');
+        }
+    }
+
     //создание сервера на vdsina
     //Ответ:
     //{#307 ▼
@@ -200,51 +225,32 @@ class VdsinaAPI
 //        }
     }
 
-    //получить список серверов
-    public function getServers()
-    {
-        try {
-            $action = 'server';
-
-            $headers = [
-                'headers' => [
-                    'Authorization' => $this->apiKey,
-                ]
-
-            ];
-
-            $client = new Client(['base_uri' => self::HOST_COM]);
-            $response = $client->get($action, $headers);
-
-            $result = $response->getBody()->getContents();
-//          dd(json_decode($result));
-            return json_decode($result, true);
-        } catch (\RuntimeException $r) {
-            //запись в лог
-            throw new \RuntimeException('error');
-        }
-    }
-
+    /**
+     * @param int $provider_id
+     * @param string $password
+     * @return mixed
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
     public function updatePassword(int $provider_id, string $password)
     {
 //        try {
-            $action = 'server.password/'. $provider_id;
+        $action = 'server.password/' . $provider_id;
 
-            $requestParam = [
-                'headers' => [
-                    'Authorization' => $this->apiKey,
-                ],
-                'json' => [
-                    'password' => $password
-                ],
-            ];
+        $requestParam = [
+            'headers' => [
+                'Authorization' => $this->apiKey,
+            ],
+            'json' => [
+                'password' => $password
+            ],
+        ];
 
-            $client = new Client(['base_uri' => self::HOST_COM]);
-            $response = $client->put($action, $requestParam);
+        $client = new Client(['base_uri' => self::HOST_COM]);
+        $response = $client->put($action, $requestParam);
 
-            $result = $response->getBody()->getContents();
+        $result = $response->getBody()->getContents();
 //          dd(json_decode($result));
-            return json_decode($result, true);
+        return json_decode($result, true);
 //        } catch (\RuntimeException $r) {
 //            //запись в лог
 //            throw new \RuntimeException('error');
@@ -254,7 +260,7 @@ class VdsinaAPI
     //получить сервер по id
 
     /**
-     * @param $provider_id
+     * @param int $provider_id
      * @return mixed
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
@@ -279,5 +285,35 @@ class VdsinaAPI
             //запись в лог
             throw new \RuntimeException('error');
         }
+    }
+
+    /**
+     * @param int $provider_id
+     * @return mixed
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function deleteServer(int $provider_id)
+    {
+        //        try {
+        $action = 'server/' . $provider_id;
+
+        $requestParam = [
+            'headers' => [
+                'Authorization' => $this->apiKey,
+            ]
+        ];
+
+        $client = new Client(['base_uri' => self::HOST_COM]);
+        $response = $client->delete($action, $requestParam);
+
+        $result = $response->getBody()->getContents();
+//        dd($result);
+//        $result = '"{"status":"ok","status_msg":"Server deleted","data":null}"';
+//          dd(json_decode($result));
+        return json_decode($result, true);
+//        } catch (\RuntimeException $r) {
+//            //запись в лог ТГ
+//            throw new \RuntimeException('error create server');
+//        }
     }
 }

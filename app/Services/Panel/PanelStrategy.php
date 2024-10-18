@@ -30,4 +30,38 @@ class PanelStrategy
     {
         $this->strategy->create($server_id);
     }
+
+    /**
+     * Обновление конфига панели
+     *
+     * @param int $panel_id
+     * @return void
+     */
+    public function updateConfiguration(int $panel_id): void
+    {
+        $this->strategy->updateConfiguration($panel_id);
+    }
+
+    /**
+     * Добавление пользователя панели
+     *
+     * @param int $panel_id
+     * @return void
+     */
+    public function addServerUser(int $panel_id): void
+    {
+        $this->strategy->addServerUser($panel_id);
+    }
+
+    /**
+     * Удаление пользователя панели
+     *
+     * @param string $user_id
+     * @param int $panel_id
+     * @return void
+     */
+    public function deleteServerUser(int $panel_id, string $user_id): void
+    {
+        $this->strategy->deleteServerUser($panel_id, $user_id);
+    }
 }

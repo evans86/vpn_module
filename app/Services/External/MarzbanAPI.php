@@ -12,10 +12,16 @@ class MarzbanAPI
     public function __construct($host)
     {
         $this->host = $host;
-//        $this->apiKey = $apiKey;
     }
 
-    //Получение токена для авторизации, время жизни токена - 1 день
+    /**
+     * Получение токена для авторизации, время жизни токена - 1 день
+     *
+     * @param string $username
+     * @param string $password
+     * @return mixed
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
     public function getToken(string $username, string $password)
     {
         $action = 'admin/token';
@@ -36,6 +42,14 @@ class MarzbanAPI
         return $result['access_token'];
     }
 
+    /**
+     * Обновление конфига панели
+     *
+     * @param $token
+     * @param $json_config
+     * @return mixed
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
     public function modifyConfig($token, $json_config)
     {
         $action = 'core/config';
@@ -59,8 +73,15 @@ class MarzbanAPI
         return $result;
     }
 
-    //создание пользователя в панеле marzban
-    public function createUser(string $token, string $username)
+    /**
+     * Создание пользователя в панели marzban
+     *
+     * @param string $token
+     * @param string $userId
+     * @return mixed
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function createUser(string $token, string $userId)
     {
         $action = 'user';
 
@@ -71,7 +92,7 @@ class MarzbanAPI
                 'Accept' => 'application/json'
             ],
             'json' => [
-                'username' => $username,
+                'username' => $userId,
                 'proxies' => [
                     "vmess" => [
 
@@ -93,9 +114,35 @@ class MarzbanAPI
         $response = $client->post($action, $requestParam);
 
         $result = $response->getBody()->getContents();
-        $result = (json_decode($result, true));
 
-        dd($result);
-        return $result;
+        return (json_decode($result, true));
+    }
+
+    /**
+     * Удаление пользователя в панели marzban
+     *
+     * @param string $token
+     * @param string $userId
+     * @return mixed
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function deleteUser(string $token, string $userId)
+    {
+        $action = $userId;
+
+        $requestParam = [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $token,
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json'
+            ]
+        ];
+
+        $client = new Client(['base_uri' => $this->host . '/api/user/']);
+        $response = $client->delete($action, $requestParam);
+
+        $result = $response->getBody()->getContents();
+
+        return (json_decode($result, true));
     }
 }

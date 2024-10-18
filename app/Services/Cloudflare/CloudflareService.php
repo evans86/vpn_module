@@ -2,8 +2,6 @@
 
 namespace App\Services\Cloudflare;
 
-use App\Dto\Server\ServerDto;
-use App\Dto\Server\ServerFactory;
 use App\Services\External\CloudflareAPI;
 
 class CloudflareService

@@ -22,8 +22,11 @@ class PanelController
 //        $service->updateConfiguration(16);
 
         //проверить обновление токена +
-//        $service = new MarzbanService();
-//        $service->createUser(16, 'testBot');
+//        $strategy = new PanelStrategy(Panel::MARZBAN);
+//        $strategy->addServerUser(16);
+
+        $strategy = new PanelStrategy(Panel::MARZBAN);
+        $strategy->deleteServerUser(16, '13e048b5-910d-4eca-ae08-ee50abf20d22');
 
         return redirect()->route('module.panel.index');
     }
