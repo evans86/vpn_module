@@ -5,7 +5,8 @@ namespace App\Dto\KeyProtocols;
 class KeyProtocolsDto
 {
     public int $id;
-    public int $user_id; //к какому пользователю относится
+    public string $user_id; //к какому пользователю относится
+    public string $key_type; //тип протокола подключения
     public string $key; // ссылка подключения
 
     public function getArray(): array

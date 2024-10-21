@@ -44,6 +44,19 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
     }
 
     /**
+     * Проверка использования пользователя
+     *
+     * @param int $panel_id
+     * @param string $user_id
+     * @return void
+     */
+    public function checkOnline(int $panel_id, string $user_id): void
+    {
+        $marzbanServer = new MarzbanService();
+        $marzbanServer->checkOnline($panel_id, $user_id);
+    }
+
+    /**
      * Удаление пользователя панели
      *
      * @param int $panel_id

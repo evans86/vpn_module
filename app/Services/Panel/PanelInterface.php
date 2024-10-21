@@ -29,6 +29,15 @@ interface PanelInterface
     public function addServerUser(int $panel_id): void;
 
     /**
+     * Проверка использования пользователя
+     *
+     * @param int $panel_id
+     * @param string $user_id
+     * @return void
+     */
+    public function checkOnline(int $panel_id, string $user_id): void;
+
+    /**
      * Удаление пользователя панели
      *
      * @param string $user_id

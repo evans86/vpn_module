@@ -54,6 +54,18 @@ class PanelStrategy
     }
 
     /**
+     * Проверка использования пользователя
+     *
+     * @param int $panel_id
+     * @param string $user_id
+     * @return void
+     */
+    public function checkOnline(int $panel_id, string $user_id)
+    {
+        $this->strategy->checkOnline($panel_id, $user_id);
+    }
+
+    /**
      * Удаление пользователя панели
      *
      * @param string $user_id

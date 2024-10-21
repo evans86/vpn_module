@@ -9,6 +9,7 @@ use App\Models\Panel\Panel;
 use App\Models\Server\Server;
 use App\Models\ServerUser\ServerUser;
 use App\Services\External\MarzbanAPI;
+use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Str;
 use phpseclib\Net\SSH2;
 
@@ -259,6 +260,13 @@ class MarzbanService
         $marzbanApi->modifyConfig($panel->auth_token, $json_config);
     }
 
+    /**
+     * Добавление пользователи и протоколов подключения
+     *
+     * @param int $panel_id
+     * @return void
+     * @throws GuzzleException
+     */
     public function addServerUser(int $panel_id)
     {
         $panel = self::updateMarzbanToken($panel_id);
@@ -275,13 +283,43 @@ class MarzbanService
 
         $serverUser->save();
 
-        $key_protocols = new KeyProtocols();
-        $key_protocols->user_id = $userId;
-        $key_protocols->key = $userData['subscription_url'];
+        for ($protocol = 0; $protocol <= 3; $protocol++) {
+            $key_protocols = new KeyProtocols();
+            $key_protocols->user_id = $userId;
+            $key_protocols->key = $userData['links'][$protocol];
+            $protocol_array = explode(":", $userData['links'][$protocol]);
+            $key_protocols->key_type = current($protocol_array);
 
-        $key_protocols->save();
+            $key_protocols->save();
+        }
+    }
 
-        dd($userData);
+    /**
+     * @param int $panel_id
+     * @param string $user_id
+     * @return void
+     * @throws GuzzleException
+     */
+    public function checkOnline(int $panel_id, string $user_id)
+    {
+        $panel = self::updateMarzbanToken($panel_id);
+
+        $marzbanApi = new MarzbanAPI($panel->panel_adress);
+        $userData = $marzbanApi->getUser($panel->auth_token, $user_id);
+
+        $time_online = strtotime($userData['online_at']);
+//        dd($time_online);
+        if ($time_online == null) {
+            dd('пользователь еще не активирован - online_at = null');
+        }
+
+        if ($time_online < time() - 60) {
+            dd('пользователь уже не активен - online_at < time() + 60');
+        } else {
+            dd('пользователь активен - online_at = time() (каждые 30 секунд обновляется: 00:33:05, 00:33:35 ...)');
+        }
+
+//        dd($userData);
     }
 
     /**
@@ -290,6 +328,7 @@ class MarzbanService
      * @param int $panel_id
      * @param string $user_id
      * @return void
+     * @throws GuzzleException
      */
     public function deleteServerUser(int $panel_id, string $user_id)
     {
@@ -298,12 +337,14 @@ class MarzbanService
         $marzbanApi = new MarzbanAPI($panel->panel_adress);
         $deleteData = $marzbanApi->deleteUser($panel->auth_token, $user_id);
 
+//        dd($deleteData);
+
         $serverUser = ServerUser::query()->where('id', $user_id)->first();
 
-        if(empty($deleteData)){
+        if (empty($deleteData)) {
             if (!$serverUser->delete())
                 throw new \RuntimeException('Server User dont delete');
-        }else{
+        } else {
             throw new \RuntimeException('Error delete user in the panel.');
         }
 
