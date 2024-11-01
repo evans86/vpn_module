@@ -3,7 +3,8 @@
 namespace App\Services\External;
 
 use GuzzleHttp\Client;
-use GuzzleHttp\Psr7\Request;
+use Exception;
+use RuntimeException;
 
 class MarzbanAPI
 {
@@ -21,25 +22,32 @@ class MarzbanAPI
      * @param string $password
      * @return mixed
      * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws Exception
      */
     public function getToken(string $username, string $password)
     {
-        $action = 'admin/token';
+        try {
+            $action = 'admin/token';
 
-        $requestParam = [
-            'form_params' => [
-                'username' => $username,
-                'password' => $password,
-            ],
-        ];
+            $requestParam = [
+                'form_params' => [
+                    'username' => $username,
+                    'password' => $password,
+                ],
+            ];
 
-        $client = new Client(['base_uri' => $this->host . '/api/']);
+            $client = new Client(['base_uri' => $this->host . '/api/']);
 
-        $response = $client->post($action, $requestParam);
-        $result = $response->getBody()->getContents();
-        $result = (json_decode($result, true));
+            $response = $client->post($action, $requestParam);
+            $result = $response->getBody()->getContents();
+            $result = (json_decode($result, true));
 
-        return $result['access_token'];
+            return $result['access_token'];
+        } catch (RuntimeException $r) {
+            throw new RuntimeException($r->getMessage());
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage());
+        }
     }
 
     /**
@@ -49,28 +57,32 @@ class MarzbanAPI
      * @param $json_config
      * @return mixed
      * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws Exception
      */
     public function modifyConfig($token, $json_config)
     {
-        $action = 'core/config';
+        try {
+            $action = 'core/config';
 
-        $requestParam = [
-            'headers' => [
-                'Authorization' => 'Bearer ' . $token,
-                'Content-Type' => 'application/json',
-                'Accept' => 'application/json'
-            ],
-            'json' => $json_config
-        ];
+            $requestParam = [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json'
+                ],
+                'json' => $json_config
+            ];
 
-        $client = new Client(['base_uri' => $this->host . '/api/']);
+            $client = new Client(['base_uri' => $this->host . '/api/']);
 
-        $response = $client->put($action, $requestParam);
-        $result = $response->getBody()->getContents();
-        $result = (json_decode($result, true));
-
-//        dd($result);
-        return $result;
+            $response = $client->put($action, $requestParam);
+            $result = $response->getBody()->getContents();
+            return (json_decode($result, true));
+        } catch (RuntimeException $r) {
+            throw new RuntimeException($r->getMessage());
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage());
+        }
     }
 
     /**
@@ -80,44 +92,51 @@ class MarzbanAPI
      * @param string $userId
      * @return mixed
      * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws Exception
      */
-    public function createUser(string $token, string $userId)
+    public function createUser(string $token, string $userId, int $data_limit, int $expire)
     {
-        $action = 'user';
+        try {
+            $action = 'user';
 
-        $requestParam = [
-            'headers' => [
-                'Authorization' => 'Bearer ' . $token,
-                'Content-Type' => 'application/json',
-                'Accept' => 'application/json'
-            ],
-            'json' => [
-                'username' => $userId,
-                'data_limit' => 26843545600, //лимит 25 гигов
-                'expire' => time() + 2629743, //время окончания через 30 дней
-                'proxies' => [
-                    "vmess" => [
+            $requestParam = [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json'
+                ],
+                'json' => [
+                    'username' => $userId,
+                    'data_limit' => $data_limit, //лимит 25 гигов
+                    'expire' => time() + $expire, //время окончания через 30 дней
+                    'proxies' => [
+                        "vmess" => [
 
-                    ],
-                    'vless' => [
+                        ],
+                        'vless' => [
 
-                    ],
-                    'trojan' => [
+                        ],
+                        'trojan' => [
 
-                    ],
-                    'shadowsocks' => [
+                        ],
+                        'shadowsocks' => [
 
+                        ]
                     ]
-                ]
-            ],
-        ];
+                ],
+            ];
 
-        $client = new Client(['base_uri' => $this->host . '/api/']);
-        $response = $client->post($action, $requestParam);
+            $client = new Client(['base_uri' => $this->host . '/api/']);
+            $response = $client->post($action, $requestParam);
 
-        $result = $response->getBody()->getContents();
+            $result = $response->getBody()->getContents();
 
-        return (json_decode($result, true));
+            return (json_decode($result, true));
+        } catch (RuntimeException $r) {
+            throw new RuntimeException($r->getMessage());
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage());
+        }
     }
 
     /**
@@ -132,29 +151,36 @@ class MarzbanAPI
      * @param int $data_limit
      * @return mixed
      * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws Exception
      */
     public function updateUser(string $token, string $userId, int $expire, int $data_limit)
     {
-        $action = $userId;
+        try {
+            $action = $userId;
 
-        $requestParam = [
-            'headers' => [
-                'Authorization' => 'Bearer ' . $token,
-                'Content-Type' => 'application/json',
-                'Accept' => 'application/json'
-            ],
-            'json' => [
-                'data_limit' => $data_limit, //лимит трафика
-                'expire' => $expire, //время окончания
-            ],
-        ];
+            $requestParam = [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json'
+                ],
+                'json' => [
+                    'data_limit' => $data_limit, //лимит трафика
+                    'expire' => $expire, //время окончания
+                ],
+            ];
 
-        $client = new Client(['base_uri' => $this->host . '/api/user/']);
-        $response = $client->put($action, $requestParam);
+            $client = new Client(['base_uri' => $this->host . '/api/user/']);
+            $response = $client->put($action, $requestParam);
 
-        $result = $response->getBody()->getContents();
+            $result = $response->getBody()->getContents();
 
-        return (json_decode($result, true));
+            return (json_decode($result, true));
+        } catch (RuntimeException $r) {
+            throw new RuntimeException($r->getMessage());
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage());
+        }
     }
 
     /**
@@ -164,25 +190,32 @@ class MarzbanAPI
      * @param string $userId
      * @return mixed
      * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws Exception
      */
     public function getUser(string $token, string $userId)
     {
-        $action = $userId;
+        try {
+            $action = $userId;
 
-        $requestParam = [
-            'headers' => [
-                'Authorization' => 'Bearer ' . $token,
-                'Content-Type' => 'application/json',
-                'Accept' => 'application/json'
-            ]
-        ];
+            $requestParam = [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json'
+                ]
+            ];
 
-        $client = new Client(['base_uri' => $this->host . '/api/user/']);
-        $response = $client->get($action, $requestParam);
+            $client = new Client(['base_uri' => $this->host . '/api/user/']);
+            $response = $client->get($action, $requestParam);
 
-        $result = $response->getBody()->getContents();
+            $result = $response->getBody()->getContents();
 
-        return (json_decode($result, true));
+            return (json_decode($result, true));
+        } catch (RuntimeException $r) {
+            throw new RuntimeException($r->getMessage());
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage());
+        }
     }
 
     /**
@@ -192,24 +225,31 @@ class MarzbanAPI
      * @param string $userId
      * @return mixed
      * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws Exception
      */
     public function deleteUser(string $token, string $userId)
     {
-        $action = $userId;
+        try {
+            $action = $userId;
 
-        $requestParam = [
-            'headers' => [
-                'Authorization' => 'Bearer ' . $token,
-                'Content-Type' => 'application/json',
-                'Accept' => 'application/json'
-            ]
-        ];
+            $requestParam = [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json'
+                ]
+            ];
 
-        $client = new Client(['base_uri' => $this->host . '/api/user/']);
-        $response = $client->delete($action, $requestParam);
+            $client = new Client(['base_uri' => $this->host . '/api/user/']);
+            $response = $client->delete($action, $requestParam);
 
-        $result = $response->getBody()->getContents();
+            $result = $response->getBody()->getContents();
 
-        return (json_decode($result, true));
+            return (json_decode($result, true));
+        } catch (RuntimeException $r) {
+            throw new RuntimeException($r->getMessage());
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage());
+        }
     }
 }

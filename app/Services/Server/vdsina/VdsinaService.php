@@ -125,18 +125,22 @@ class VdsinaService
                 return true;
                 break;
             default:
-                throw new \DomainException('Undefind status ' . __FUNCTION__);
+                throw new \DomainException('Undefined status ' . __FUNCTION__);
         }
     }
 
     /**
      * Удаление сервера
-     * 
+     *
      * @param $server_id
      * @return void
+     * @throws GuzzleException
      */
-    public function delete($server_id)
+    public function delete($server_id): void
     {
+        /**
+         * @var Server $server
+         */
         $server = Server::query()->where('id', $server_id)->first();
         $cloudflare_service = new CloudflareService();
 
@@ -152,7 +156,5 @@ class VdsinaService
         } else {
             throw new \RuntimeException('Error delete server in vdsina.');
         }
-
-        dd('Success delete Server in vdsina.');
     }
 }

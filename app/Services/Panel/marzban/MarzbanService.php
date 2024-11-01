@@ -4,7 +4,6 @@ namespace App\Services\Panel\marzban;
 
 use App\Dto\Server\ServerDto;
 use App\Dto\Server\ServerFactory;
-use App\Models\KeyProtocols\KeyProtocols;
 use App\Models\Panel\Panel;
 use App\Models\Server\Server;
 use App\Models\ServerUser\ServerUser;
@@ -12,6 +11,8 @@ use App\Services\External\MarzbanAPI;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Str;
 use phpseclib\Net\SSH2;
+use Exception;
+use RuntimeException;
 
 class MarzbanService
 {
@@ -26,7 +27,7 @@ class MarzbanService
         /**
          * @var Server $server
          */
-        $server = Server::query()->where('id', $server_id)->first();
+        $server = Server::query()->where('id', $server_id)->firstOrFail();
 
         //команды для установки панели на сервер
         $firstCommand = 'wget https://raw.githubusercontent.com/mozaroc/bash-hooks/main/install_marzban.sh';
@@ -103,13 +104,14 @@ class MarzbanService
      *
      * @param int $panel_id
      * @return Panel|null
+     * @throws GuzzleException
      */
-    public function updateMarzbanToken(int $panel_id)
+    public function updateMarzbanToken(int $panel_id): ?Panel
     {
         /**
          * @var Panel $panel
          */
-        $panel = Panel::query()->where('id', $panel_id)->first();
+        $panel = Panel::query()->where('id', $panel_id)->firstOrFail();
 
         if (is_null($panel->auth_token) || $panel->token_died_time <= time()) {
             $marzbanApi = new MarzbanAPI($panel->panel_adress);
@@ -126,8 +128,9 @@ class MarzbanService
      *
      * @param int $panel_id
      * @return void
+     * @throws GuzzleException
      */
-    public function updateConfiguration(int $panel_id)
+    public function updateConfiguration(int $panel_id): void
     {
         $panel = self::updateMarzbanToken($panel_id);
 
@@ -264,37 +267,40 @@ class MarzbanService
      * Добавление пользователи и протоколов подключения
      *
      * @param int $panel_id
-     * @return void
+     * @param int $data_limit
+     * @param int $expire
+     * @return ServerUser
      * @throws GuzzleException
      */
-    public function addServerUser(int $panel_id)
+    public function addServerUser(int $panel_id, int $data_limit, int $expire): ServerUser
     {
-        $panel = self::updateMarzbanToken($panel_id);
+        try {
+            $panel = self::updateMarzbanToken($panel_id);
 
-        $marzbanApi = new MarzbanAPI($panel->panel_adress);
-        $userId = Str::uuid();
+            $marzbanApi = new MarzbanAPI($panel->panel_adress);
+            $userId = Str::uuid();
 
-        $userData = $marzbanApi->createUser($panel->auth_token, $userId);
+            $userData = $marzbanApi->createUser($panel->auth_token, $userId, $data_limit, $expire);
 
-        $serverUser = new ServerUser();
-        $serverUser->id = $userId;
-        $serverUser->panel_id = $panel->id;
-        $serverUser->is_free = false;
+            $serverUser = new ServerUser();
+            $serverUser->id = $userId;
+            $serverUser->panel_id = $panel->id;
+            $serverUser->is_free = false;
+            $serverUser->keys = json_encode($userData['links']);//добавить запись ключей в пользователя
 
-        $serverUser->save();
+            $serverUser->save();
 
-        for ($protocol = 0; $protocol <= 3; $protocol++) {
-            $key_protocols = new KeyProtocols();
-            $key_protocols->user_id = $userId;
-            $key_protocols->key = $userData['links'][$protocol];
-            $protocol_array = explode(":", $userData['links'][$protocol]);
-            $key_protocols->key_type = current($protocol_array);
-
-            $key_protocols->save();
+            return $serverUser;
+        } catch (RuntimeException $r) {
+            throw new RuntimeException($r->getMessage());
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage());
         }
     }
 
     /**
+     * TODO: доделать
+     *
      * @param int $panel_id
      * @param string $user_id
      * @return void
@@ -330,16 +336,14 @@ class MarzbanService
      * @return void
      * @throws GuzzleException
      */
-    public function deleteServerUser(int $panel_id, string $user_id)
+    public function deleteServerUser(int $panel_id, string $user_id): void
     {
         $panel = self::updateMarzbanToken($panel_id);
 
         $marzbanApi = new MarzbanAPI($panel->panel_adress);
         $deleteData = $marzbanApi->deleteUser($panel->auth_token, $user_id);
 
-//        dd($deleteData);
-
-        $serverUser = ServerUser::query()->where('id', $user_id)->first();
+        $serverUser = ServerUser::query()->where('id', $user_id)->firstOrFail();
 
         if (empty($deleteData)) {
             if (!$serverUser->delete())
@@ -347,7 +351,5 @@ class MarzbanService
         } else {
             throw new \RuntimeException('Error delete user in the panel.');
         }
-
-        dd('Success delete user in the panel.');
     }
 }

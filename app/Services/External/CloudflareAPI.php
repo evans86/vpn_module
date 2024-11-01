@@ -6,7 +6,11 @@ use Cloudflare\API\Adapter\Guzzle;
 
 class CloudflareAPI
 {
-    //Возвращает адаптер для работы с API
+    /**
+     * Возвращает адаптер для работы с API
+     *
+     * @return Guzzle
+     */
     public static function getAdapter(): Guzzle
     {
         //вынести в .env
@@ -18,8 +22,14 @@ class CloudflareAPI
         return $adapter;
     }
 
-    //создать dns запись
-    public function createDNSRecord(string $name, string $ip)
+    /**
+     * Cоздать dns запись
+     *
+     * @param string $name
+     * @param string $ip
+     * @return false
+     */
+    public function createDNSRecord(string $name, string $ip): bool
     {
         $DNSRecord = new \Cloudflare\API\Endpoints\DNS(self::getAdapter());
 
@@ -33,31 +43,12 @@ class CloudflareAPI
         return $dns;
     }
 
-    //получить id последней созданной записи
-    public function getRecordID()
-    {
-        $DNSRecord = new \Cloudflare\API\Endpoints\DNS(self::getAdapter());
-        $zone_id = 'ecd4115fa760df3dd0a5f9c0e2caee2d'; //zone_id
-
-        $dnsRecordId = $DNSRecord->getRecordID($zone_id); //получение DNS-записей
-
-        dd($dnsRecordId);
-        return $dnsRecordId;
-    }
-
-    //получить подробную информацию о DNS-записях в зоне
-    public function getRecords()
-    {
-        $DNSRecord = new \Cloudflare\API\Endpoints\DNS(self::getAdapter());
-
-        $zone_id = 'ecd4115fa760df3dd0a5f9c0e2caee2d'; //zone_id
-        $dnsList = $DNSRecord->listRecords($zone_id); //получение DNS-записей
-
-        dd($dnsList);
-        return $dnsList;
-    }
-
-    //удалить dns запись
+    /**
+     * Удалить dns запись
+     *
+     * @param string $dns_record_id
+     * @return bool
+     */
     public function deleteRecord(string $dns_record_id): bool
     {
         $DNSRecord = new \Cloudflare\API\Endpoints\DNS(self::getAdapter());
@@ -70,5 +61,35 @@ class CloudflareAPI
         return $record;
     }
 
+    /**
+     * Получить id последней созданной записи
+     *
+     * @return string
+     */
+    public function getRecordID()
+    {
+        $DNSRecord = new \Cloudflare\API\Endpoints\DNS(self::getAdapter());
+        $zone_id = 'ecd4115fa760df3dd0a5f9c0e2caee2d'; //zone_id
 
+        $dnsRecordId = $DNSRecord->getRecordID($zone_id); //получение DNS-записей
+
+        dd($dnsRecordId);
+        return $dnsRecordId;
+    }
+
+    /**
+     * Получить подробную информацию о DNS-записях в зоне
+     *
+     * @return \stdClass
+     */
+    public function getRecords()
+    {
+        $DNSRecord = new \Cloudflare\API\Endpoints\DNS(self::getAdapter());
+
+        $zone_id = 'ecd4115fa760df3dd0a5f9c0e2caee2d'; //zone_id
+        $dnsList = $DNSRecord->listRecords($zone_id); //получение DNS-записей
+
+        dd($dnsList);
+        return $dnsList;
+    }
 }

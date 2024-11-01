@@ -28,8 +28,8 @@ class PanelController
 //        $strategy = new PanelStrategy(Panel::MARZBAN);
 //        $strategy->addServerUser(16);
 
-        $strategy = new PanelStrategy(Panel::MARZBAN);
-        $strategy->checkOnline(16, '14252a15-865f-4241-944d-38fdb2e57c64');
+//        $strategy = new PanelStrategy(Panel::MARZBAN);
+//        $strategy->checkOnline(16, '14252a15-865f-4241-944d-38fdb2e57c64');
 
 //        $strategy = new PanelStrategy(Panel::MARZBAN);
 //        $strategy->deleteServerUser(16, '2e9af71c-45f7-4194-81f9-6976ee077f80');

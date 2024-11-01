@@ -2,8 +2,10 @@
 
 namespace App\Services\Panel\strategy;
 
+use App\Models\ServerUser\ServerUser;
 use App\Services\Panel\marzban\MarzbanService;
 use App\Services\Panel\PanelInterface;
+use GuzzleHttp\Exception\GuzzleException;
 
 class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
 {
@@ -24,6 +26,7 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
      *
      * @param int $panel_id
      * @return void
+     * @throws GuzzleException
      */
     public function updateConfiguration(int $panel_id): void
     {
@@ -35,12 +38,15 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
      * Добавление пользователя
      *
      * @param int $panel_id
-     * @return void
+     * @param int $data_limit
+     * @param int $expire
+     * @return ServerUser
+     * @throws GuzzleException
      */
-    public function addServerUser(int $panel_id): void
+    public function addServerUser(int $panel_id, int $data_limit, int $expire): ServerUser
     {
         $marzbanServer = new MarzbanService();
-        $marzbanServer->addServerUser($panel_id);
+        return $marzbanServer->addServerUser($panel_id, $data_limit, $expire);
     }
 
     /**
@@ -49,6 +55,7 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
      * @param int $panel_id
      * @param string $user_id
      * @return void
+     * @throws GuzzleException
      */
     public function checkOnline(int $panel_id, string $user_id): void
     {
@@ -62,6 +69,7 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
      * @param int $panel_id
      * @param string $user_id
      * @return void
+     * @throws GuzzleException
      */
     public function deleteServerUser(int $panel_id, string $user_id): void
     {

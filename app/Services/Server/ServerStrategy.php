@@ -4,6 +4,7 @@ namespace App\Services\Server;
 
 use App\Models\Server\Server;
 use App\Services\Server\strategy\ServerVdsinaStrategy;
+use GuzzleHttp\Exception\GuzzleException;
 
 class ServerStrategy
 {
@@ -38,8 +39,9 @@ class ServerStrategy
      * Проверка статуса сервера с окончательной настройкой сервера
      *
      * @return void
+     * @throws GuzzleException
      */
-    public function checkStatus()
+    public function checkStatus(): void
     {
         $this->strategy->checkStatus();
     }
@@ -51,7 +53,7 @@ class ServerStrategy
      * @param string $panel
      * @return void
      */
-    public function setPanel(int $server_id, string $panel)
+    public function setPanel(int $server_id, string $panel): void
     {
         $this->strategy->setPanel($server_id, $panel);
     }
@@ -62,7 +64,7 @@ class ServerStrategy
      * @param int $server_id
      * @return void
      */
-    public function delete(int $server_id)
+    public function delete(int $server_id): void
     {
         $this->strategy->delete($server_id);
     }

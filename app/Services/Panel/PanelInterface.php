@@ -2,6 +2,8 @@
 
 namespace App\Services\Panel;
 
+use App\Models\ServerUser\ServerUser;
+
 interface PanelInterface
 {
     /**
@@ -24,9 +26,11 @@ interface PanelInterface
      * Добавление пользователя панели
      *
      * @param int $panel_id
-     * @return void
+     * @param int $data_limit
+     * @param int $expire
+     * @return ServerUser
      */
-    public function addServerUser(int $panel_id): void;
+    public function addServerUser(int $panel_id, int $data_limit, int $expire): ServerUser;
 
     /**
      * Проверка использования пользователя

@@ -14,6 +14,9 @@ class Location extends Model
 {
     use HasFactory;
 
+    const NL = 1;
+    const RU = 2;
+
     protected $guarded = false;
     protected $table = 'location';
 }

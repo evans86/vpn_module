@@ -57,6 +57,7 @@ class ServerVdsinaStrategy extends ServerMainStrategy implements ServerInterface
      *
      * @param int $server_id
      * @return void
+     * @throws GuzzleException
      */
     public function delete(int $server_id): void
     {

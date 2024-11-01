@@ -3,7 +3,9 @@
 namespace App\Services\Panel;
 
 use App\Models\Panel\Panel;
+use App\Models\ServerUser\ServerUser;
 use App\Services\Panel\strategy\PanelMarzbanStrategy;
+use GuzzleHttp\Exception\GuzzleException;
 
 class PanelStrategy
 {
@@ -36,6 +38,7 @@ class PanelStrategy
      *
      * @param int $panel_id
      * @return void
+     * @throws GuzzleException
      */
     public function updateConfiguration(int $panel_id): void
     {
@@ -46,11 +49,14 @@ class PanelStrategy
      * Добавление пользователя панели
      *
      * @param int $panel_id
-     * @return void
+     * @param int $data_limit
+     * @param int $expire
+     * @return ServerUser
+     * @throws GuzzleException
      */
-    public function addServerUser(int $panel_id): void
+    public function addServerUser(int $panel_id, int $data_limit, int $expire): ServerUser
     {
-        $this->strategy->addServerUser($panel_id);
+      return $this->strategy->addServerUser($panel_id, $data_limit, $expire);
     }
 
     /**
@@ -59,8 +65,9 @@ class PanelStrategy
      * @param int $panel_id
      * @param string $user_id
      * @return void
+     * @throws GuzzleException
      */
-    public function checkOnline(int $panel_id, string $user_id)
+    public function checkOnline(int $panel_id, string $user_id): void
     {
         $this->strategy->checkOnline($panel_id, $user_id);
     }
@@ -71,6 +78,7 @@ class PanelStrategy
      * @param string $user_id
      * @param int $panel_id
      * @return void
+     * @throws GuzzleException
      */
     public function deleteServerUser(int $panel_id, string $user_id): void
     {

@@ -16,36 +16,6 @@ class VdsinaAPI
         $this->apiKey = $apiKey;
     }
 
-    //тестовый на данный аккаунта
-//    public function getAccount()
-//    {
-//        try {
-//            $action = 'account';
-//
-//            $requestParam = [
-//                RequestOptions::JSON => [
-////                'email' => 'support@vpn-telegram.com',
-////                'password' => 'QScM69NuRrVDEbsjR37G'
-//                ]
-//            ];
-//            $headers = [
-//                'headers' => [
-//                    'Authorization' => $this->apiKey,
-//                ]
-//            ];
-//
-//            $client = new Client(['base_uri' => self::HOST_COM]);
-//            $response = $client->get($action, $headers);
-//
-//            $result = $response->getBody()->getContents();
-////        dd($result);
-//            return json_decode($result, true);
-//        } catch (\RuntimeException $r) {
-//            //запись в лог
-//            throw new \RuntimeException('error');
-//        }
-//    }
-
     //интересут id = 2 Standard servers
     public function getServerGroup()
     {
@@ -62,7 +32,7 @@ class VdsinaAPI
             $response = $client->get($action, $headers);
 
             $result = $response->getBody()->getContents();
-//        dd(json_decode($result));
+
             return json_decode($result, true);
         } catch (\RuntimeException $r) {
             //запись в лог

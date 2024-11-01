@@ -7,7 +7,6 @@ use App\Services\External\CloudflareAPI;
 class CloudflareService
 {
     //Создание поддомена для созданного сервера
-    //Надо решить куда записать созданный поддомен
     public function createSubdomain(string $name, string $ip)
     {
         $cloudflare = new CloudflareAPI();
@@ -22,6 +21,9 @@ class CloudflareService
         return $cloudflare->deleteRecord($dns_record_id);
     }
 
+    /**
+     * TODO: Сервисный метод
+     */
     public function testAPI()
     {
         $cloudflare = new CloudflareAPI();
