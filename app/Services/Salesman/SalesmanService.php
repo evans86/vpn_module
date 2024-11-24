@@ -15,13 +15,13 @@ class SalesmanService
      *
      * @param int $telegram_id
      * @param string $username
-     * @param string $token
-     * @param string $bot_link
+     * @param string|null $token
+     * @param string|null $bot_link
      * @param bool $status активный или неактивный
      * @return SalesmanDto
      * @throws Exception
      */
-    public function create(int $telegram_id, string $username, string $token, string $bot_link, bool $status = Salesman::ACTIVE): SalesmanDto
+    public function create(int $telegram_id, string $username, ?string $token = null, ?string $bot_link = null, bool $status = Salesman::ACTIVE): SalesmanDto
     {
         try {
             $salesman = new Salesman();
@@ -59,6 +59,7 @@ class SalesmanService
             $salesman = Salesman::query()->where('id', $salesmanDto->id)->firstOrFail();
 
             $salesman->token = $salesmanDto->token;
+            $salesman->bot_link = $salesmanDto->bot_link;
 
             if (!$salesman->save())
                 throw new RuntimeException('Salesman dont update token');

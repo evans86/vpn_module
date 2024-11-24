@@ -2,9 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Server\Server;
-use App\Services\Server\ServerStrategy;
-use App\Services\Server\vdsina\VdsinaService;
+use App\Services\Telegram\ModuleBot\FatherBotController;
 use Illuminate\Console\Command;
 
 class ServerCron extends Command
@@ -40,8 +38,11 @@ class ServerCron extends Command
      */
     public function handle()
     {
-        $serverStrategy = new ServerStrategy(Server::VDSINA);
-        $serverStrategy->checkStatus();
+//        $serverStrategy = new ServerStrategy(Server::VDSINA);
+//        $serverStrategy->checkStatus();
+
+        $serverTG = new FatherBotController();
+        $serverTG->notifyTelegram('test');
         return 0;
     }
 }

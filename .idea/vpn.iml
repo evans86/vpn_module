@@ -240,6 +240,8 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/codeception/phpunit-wrapper" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/codeception/stub" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/symfony/yaml" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/irazasyed/telegram-bot-sdk" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/league/event" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

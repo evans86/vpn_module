@@ -9,7 +9,9 @@ class ServerController
 {
     public function index()
     {
-        return view('module.server.index');
+        $servers = Server::orderBy('id', 'desc')->limit(1000)->Paginate(10);
+
+        return view('module.server.index', compact('servers'));
     }
 
     public function create()

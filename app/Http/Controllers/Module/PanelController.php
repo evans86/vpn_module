@@ -10,7 +10,9 @@ class PanelController
 {
     public function index()
     {
-        return view('module.panel.index');
+        $panels = Panel::orderBy('id', 'desc')->limit(1000)->Paginate(10);
+
+        return view('module.panel.index', compact('panels'));
     }
 
     public function create()
