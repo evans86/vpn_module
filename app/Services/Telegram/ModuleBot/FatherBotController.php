@@ -101,7 +101,6 @@ class FatherBotController extends AbstractTelegramBot
      */
     private function isValidBotToken(string $token): bool
     {
-        // Пример простой валидации токена
         // Можно дополнить более сложной проверкой
         return preg_match('/^\d+:[\w-]{35}$/', $token);
     }
@@ -400,15 +399,6 @@ class FatherBotController extends AbstractTelegramBot
         $message .= "Остались вопросы? Пишите @support";
 
         $this->sendMessage($message, ['parse_mode' => 'Markdown']);
-    }
-
-    /**
-     * Generate unique key
-     */
-    private function generateUniqueKey(): string
-    {
-        // TODO: Implement proper key generation
-        return md5(uniqid(mt_rand(), true));
     }
 
     /**
