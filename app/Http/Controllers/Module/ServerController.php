@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
 use App\Models\Location\Location;
+use App\Models\Panel\Panel;
 use App\Models\Server\Server;
 use App\Services\Server\ServerStrategy;
 use Illuminate\Http\JsonResponse;
@@ -105,7 +106,6 @@ class ServerController extends Controller
             $strategy->delete($server);
 
             return response()->json([
-                'success' => true,
                 'message' => 'Сервер успешно удален'
             ]);
 
@@ -117,7 +117,6 @@ class ServerController extends Controller
             ]);
 
             return response()->json([
-                'success' => false,
                 'message' => 'Ошибка при удалении сервера: ' . $e->getMessage()
             ], 400);
         }

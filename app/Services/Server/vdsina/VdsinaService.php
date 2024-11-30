@@ -3,6 +3,7 @@
 namespace App\Services\Server\vdsina;
 
 use App\Models\Location\Location;
+use App\Models\Panel\Panel;
 use App\Models\Server\Server;
 use App\Services\Cloudflare\CloudflareService;
 use App\Services\External\VdsinaAPI;
@@ -405,7 +406,10 @@ class VdsinaService
                     ]);
                 }
             }
-            
+
+            // Обновляем статус всех связанных панелей на "удалена"
+            $server->panels()->update(['panel_status' => Panel::PANEL_DELETED]);
+
             // Обновляем статус сервера на "Удален"
             $server->server_status = Server::SERVER_DELETED;
             $server->save();

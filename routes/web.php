@@ -44,8 +44,8 @@ Route::middleware(['auth', 'admin'])->group(function () {
             Route::get('/', [PanelController::class, 'index'])->name('index');
             Route::post('/', [PanelController::class, 'store'])->name('store');
             Route::put('/{panel}', [PanelController::class, 'update'])->name('update');
-            Route::delete('/{panel}', [PanelController::class, 'destroy'])->name('destroy');
             Route::post('/{panel}/configure', [PanelController::class, 'configure'])->name('configure');
+            Route::post('/{panel}/update-config', [PanelController::class, 'updateConfig'])->name('update-config');
             Route::get('/{panel}/status', [PanelController::class, 'checkStatus'])->name('status');
         });
 
@@ -108,6 +108,14 @@ Route::middleware(['auth', 'admin'])->group(function () {
             Route::post('/', [FatherBotController::class, 'store'])->name('store');
             Route::put('/{fatherBot}', [FatherBotController::class, 'update'])->name('update');
             Route::delete('/{fatherBot}', [FatherBotController::class, 'destroy'])->name('destroy');
+        });
+
+        // Panel Routes
+        Route::prefix('panel')->name('panel.')->group(function () {
+            Route::post('/', [PanelController::class, 'index'])->name('index');
+            Route::post('/', [PanelController::class, 'store'])->name('store');
+            Route::post('/{panel}/configure', [PanelController::class, 'configure'])->name('configure');
+            Route::post('/{panel}/update-config', [PanelController::class, 'updateConfig'])->name('update-config');
         });
 
         // Dashboard

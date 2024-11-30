@@ -37,44 +37,52 @@
                 </x-slot>
 
                 <x-table :headers="['#', 'Название', 'IP', 'Логин', 'Хост', 'Локация', 'Статус', '']">
-                    @foreach($servers as $server)
+                    @if($servers->isEmpty())
                         <tr>
-                            <td><strong>{{ $server->id }}</strong></td>
-                            <td>{{ $server->name }}</td>
-                            <td>{{ $server->ip }}</td>
-                            <td>{{ $server->login }}</td>
-                            <td>{{ $server->host }}</td>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <img src="https://flagcdn.com/w40/{{ strtolower($server->location->code) }}.png" 
-                                         class="country-flag"
-                                         alt="{{ strtoupper($server->location->code) }}"
-                                         title="{{ strtoupper($server->location->code) }}">
-                                    <span>{{ strtoupper($server->location->code) }}</span>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="badge badge-{{ $server->status_badge_class }}">
-                                    {{ $server->status_label }}
-                                </span>
-                            </td>
-                            <td>
-                                @if($server->server_status !== \App\Models\Server\Server::SERVER_DELETED)
-                                    <div class="dropdown">
-                                        <button class="btn btn-link" type="button" data-toggle="dropdown">
-                                            <i class="fas fa-ellipsis-v"></i>
-                                        </button>
-                                        <div class="dropdown-menu">
-                                            <a class="dropdown-item text-danger" href="#"
-                                               onclick="deleteServer({{ $server->id }})">
-                                                <i class="fas fa-trash mr-2"></i>Удалить
-                                            </a>
-                                        </div>
-                                    </div>
-                                @endif
+                            <td colspan="8" class="text-center text-muted">
+                                <i class="fas fa-info-circle"></i> Серверы не найдены
                             </td>
                         </tr>
-                    @endforeach
+                    @else
+                        @foreach($servers as $server)
+                            <tr>
+                                <td><strong>{{ $server->id }}</strong></td>
+                                <td>{{ $server->name }}</td>
+                                <td>{{ $server->ip }}</td>
+                                <td>{{ $server->login }}</td>
+                                <td>{{ $server->host }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <img src="https://flagcdn.com/w40/{{ strtolower($server->location->code) }}.png" 
+                                             class="country-flag"
+                                             alt="{{ strtoupper($server->location->code) }}"
+                                             title="{{ strtoupper($server->location->code) }}">
+                                        <span>{{ strtoupper($server->location->code) }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge badge-{{ $server->status_badge_class }}">
+                                        {{ $server->status_label }}
+                                    </span>
+                                </td>
+                                <td>
+                                    @if($server->server_status !== \App\Models\Server\Server::SERVER_DELETED)
+                                        <div class="dropdown">
+                                            <button class="btn btn-link" type="button" data-toggle="dropdown">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <div class="dropdown-menu">
+                                                <a class="dropdown-item text-danger" href="#"
+                                                   onclick="deleteServer({{ $server->id }})">
+                                                    <i class="fas fa-trash mr-2"></i>Удалить
+                                                </a>
+                                            </div>
+                                        </div>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    @endif
                 </x-table>
 
                 <div class="d-flex justify-content-center mt-3">
@@ -105,20 +113,16 @@
 function deleteServer(id) {
     if (confirm('Вы уверены, что хотите удалить этот сервер?')) {
         $.ajax({
-            url: '/admin/module/server/' + id,
+            url: '{{ route('module.server.destroy', ['server' => ':id']) }}'.replace(':id', id),
             method: 'DELETE',
             data: {
                 _token: '{{ csrf_token() }}'
             },
             success: function(response) {
-                if (response.success) {
-                    toastr.success('Сервер успешно удален');
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1000);
-                } else {
-                    toastr.error(response.message || 'Произошла ошибка при удалении сервера');
-                }
+                toastr.success('Сервер успешно удален');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
             },
             error: function(xhr) {
                 let errorMessage = 'Произошла ошибка при удалении сервера';

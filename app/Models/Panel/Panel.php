@@ -23,6 +23,8 @@ use Illuminate\Support\Carbon;
  * @property-read string $status_label Текстовое описание статуса
  * @property-read string $status_badge_class CSS класс для бейджа статуса
  * @property-read string $panel_type_label Текстовое описание типа панели
+ * @property-read string $panel_api_address Форматированный адрес панели для API запросов
+ * @property-read string $api_address Форматированный адрес панели для API запросов
  */
 class Panel extends Model
 {
@@ -37,6 +39,8 @@ class Panel extends Model
     const PANEL_CONFIGURED = 2;
     /** @var int Статус: Ошибка настройки */
     const PANEL_ERROR = 3;
+    /** @var int Статус: Панель удалена */
+    const PANEL_DELETED = 4;
 
     protected $table = 'panel';
     
@@ -86,6 +90,8 @@ class Panel extends Model
                 return 'Настроена';
             case self::PANEL_ERROR:
                 return 'Ошибка';
+            case self::PANEL_DELETED:
+                return 'Удалена';
             default:
                 return 'Неизвестно';
         }
@@ -105,6 +111,8 @@ class Panel extends Model
                 return 'success';
             case self::PANEL_ERROR:
                 return 'danger';
+            case self::PANEL_DELETED:
+                return 'dark';
             default:
                 return 'secondary';
         }
@@ -146,6 +154,16 @@ class Panel extends Model
     }
 
     /**
+     * Check if panel is deleted
+     *
+     * @return bool
+     */
+    public function isDeleted(): bool
+    {
+        return $this->panel_status === self::PANEL_DELETED;
+    }
+
+    /**
      * Get formatted panel address.
      *
      * @return string
@@ -153,5 +171,42 @@ class Panel extends Model
     public function getFormattedAddressAttribute(): string
     {
         return parse_url($this->panel_adress, PHP_URL_HOST) ?: $this->panel_adress;
+    }
+
+    /**
+     * Get formatted panel address for API requests.
+     *
+     * @return string
+     */
+    public function getPanelApiAddressAttribute(): string
+    {
+        $address = rtrim($this->panel_adress, '/');
+        return preg_replace('#/dashboard/?$#', '', $address);
+    }
+
+    /**
+     * Get formatted panel address for API requests.
+     *
+     * @return string
+     */
+    public function getApiAddressAttribute(): string
+    {
+        $address = rtrim($this->panel_adress, '/');
+        return preg_replace('#/dashboard/?$#', '', $address);
+    }
+
+    /**
+     * Set the panel address.
+     *
+     * @param string $value
+     * @return void
+     */
+    public function setPanelAdressAttribute($value)
+    {
+        // Если адрес не содержит /dashboard/, добавляем его
+        if (!str_contains($value, '/dashboard')) {
+            $value = rtrim($value, '/') . '/dashboard';
+        }
+        $this->attributes['panel_adress'] = $value;
     }
 }

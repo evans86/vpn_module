@@ -27,26 +27,36 @@ class MarzbanAPI
     public function getToken(string $username, string $password)
     {
         try {
-            $action = 'admin/token';
+            $host = rtrim($this->host, '/');
 
-            $requestParam = [
+            $client = new Client([
+                'base_uri' => $host,
+                'verify' => false
+            ]);
+
+            $response = $client->post('api/admin/token', [
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/x-www-form-urlencoded'
+                ],
                 'form_params' => [
+                    'grant_type' => 'password',
                     'username' => $username,
                     'password' => $password,
+                    'scope' => '',
                 ],
-            ];
+                'verify' => false
+            ]);
 
-            $client = new Client(['base_uri' => $this->host . '/api/']);
+            $result = json_decode($response->getBody()->getContents(), true);
 
-            $response = $client->post($action, $requestParam);
-            $result = $response->getBody()->getContents();
-            $result = (json_decode($result, true));
+            if (!isset($result['access_token'])) {
+                throw new RuntimeException('Не удалось получить токен доступа');
+            }
 
             return $result['access_token'];
-        } catch (RuntimeException $r) {
-            throw new RuntimeException($r->getMessage());
-        } catch (Exception $e) {
-            throw new Exception($e->getMessage());
+        } catch (\Exception $e) {
+            throw new RuntimeException('Ошибка при получении токена: ' . $e->getMessage());
         }
     }
 
@@ -70,10 +80,14 @@ class MarzbanAPI
                     'Content-Type' => 'application/json',
                     'Accept' => 'application/json'
                 ],
-                'json' => $json_config
+                'json' => $json_config,
+                'verify' => false // Отключаем проверку SSL сертификата
             ];
 
-            $client = new Client(['base_uri' => $this->host . '/api/']);
+            $client = new Client([
+                'base_uri' => $this->host . '/api/',
+                'verify' => false // Отключаем проверку SSL сертификата
+            ]);
 
             $response = $client->put($action, $requestParam);
             $result = $response->getBody()->getContents();
@@ -124,9 +138,14 @@ class MarzbanAPI
                         ]
                     ]
                 ],
+                'verify' => false // Отключаем проверку SSL сертификата
             ];
 
-            $client = new Client(['base_uri' => $this->host . '/api/']);
+            $client = new Client([
+                'base_uri' => $this->host . '/api/',
+                'verify' => false // Отключаем проверку SSL сертификата
+            ]);
+
             $response = $client->post($action, $requestParam);
 
             $result = $response->getBody()->getContents();
@@ -168,9 +187,14 @@ class MarzbanAPI
                     'data_limit' => $data_limit, //лимит трафика
                     'expire' => $expire, //время окончания
                 ],
+                'verify' => false // Отключаем проверку SSL сертификата
             ];
 
-            $client = new Client(['base_uri' => $this->host . '/api/user/']);
+            $client = new Client([
+                'base_uri' => $this->host . '/api/user/',
+                'verify' => false // Отключаем проверку SSL сертификата
+            ]);
+
             $response = $client->put($action, $requestParam);
 
             $result = $response->getBody()->getContents();
@@ -202,10 +226,15 @@ class MarzbanAPI
                     'Authorization' => 'Bearer ' . $token,
                     'Content-Type' => 'application/json',
                     'Accept' => 'application/json'
-                ]
+                ],
+                'verify' => false // Отключаем проверку SSL сертификата
             ];
 
-            $client = new Client(['base_uri' => $this->host . '/api/user/']);
+            $client = new Client([
+                'base_uri' => $this->host . '/api/user/',
+                'verify' => false // Отключаем проверку SSL сертификата
+            ]);
+
             $response = $client->get($action, $requestParam);
 
             $result = $response->getBody()->getContents();
@@ -237,10 +266,15 @@ class MarzbanAPI
                     'Authorization' => 'Bearer ' . $token,
                     'Content-Type' => 'application/json',
                     'Accept' => 'application/json'
-                ]
+                ],
+                'verify' => false // Отключаем проверку SSL сертификата
             ];
 
-            $client = new Client(['base_uri' => $this->host . '/api/user/']);
+            $client = new Client([
+                'base_uri' => $this->host . '/api/user/',
+                'verify' => false // Отключаем проверку SSL сертификата
+            ]);
+
             $response = $client->delete($action, $requestParam);
 
             $result = $response->getBody()->getContents();

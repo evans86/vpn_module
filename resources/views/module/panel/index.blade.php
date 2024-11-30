@@ -23,7 +23,7 @@
                     </button>
                 </x-slot>
 
-                <x-table :headers="['#', 'Адрес панели', 'Тип', 'Логин', 'Сервер', 'Статус', '']">
+                <x-table :headers="['#', 'Адрес панели', 'Тип', 'Логин', 'Пароль', 'Сервер', 'Статус', '']">
                     @forelse($panels as $panel)
                         <tr>
                             <td><strong>{{ $panel->id }}</strong></td>
@@ -34,49 +34,71 @@
                                 </a>
                             </td>
                             <td>{{ $panel->panel_type_label }}</td>
-                            <td>{{ $panel->panel_login }}</td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <span>{{ $panel->panel_login }}</span>
+                                    <button class="btn btn-sm btn-link ml-2" 
+                                            data-clipboard-text="{{ $panel->panel_login }}"
+                                            title="Копировать логин">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <span>{{ $panel->panel_password }}</span>
+                                    <button class="btn btn-sm btn-link ml-2" 
+                                            data-clipboard-text="{{ $panel->panel_password }}"
+                                            title="Копировать пароль">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                            </td>
                             <td>
                                 @if($panel->server)
                                     <div class="d-flex align-items-center">
-                                        <span class="emoji-flag">{!! $panel->server->location->emoji !!}</span>
-                                        <span class="ml-2">{{ $panel->server->name }}</span>
+                                        <img src="https://flagcdn.com/w20/{{ strtolower($panel->server->location->code) }}.png" 
+                                             class="mr-2" 
+                                             alt="{{ strtoupper($panel->server->location->code) }}"
+                                             width="20">
+                                        <span>{{ $panel->server->name }}</span>
                                     </div>
                                 @else
                                     <span class="text-muted">Не назначен</span>
                                 @endif
                             </td>
                             <td>
-                                <span class="badge light badge-{{ $panel->status_badge_class }}">
+                                <span class="badge badge-{{ $panel->status_badge_class }}">
                                     {{ $panel->status_label }}
                                 </span>
                             </td>
                             <td>
-                                <div class="dropdown">
-                                    <button type="button" class="btn btn-link" data-toggle="dropdown">
-                                        <i class="fas fa-ellipsis-v"></i>
-                                    </button>
-                                    <div class="dropdown-menu dropdown-menu-right">
-                                        <a class="dropdown-item" href="#" data-toggle="modal" 
-                                           data-target="#editPanelModal{{ $panel->id }}">
-                                            <i class="fas fa-edit"></i> Редактировать
-                                        </a>
-                                        @if(!$panel->isConfigured())
-                                            <a class="dropdown-item" href="{{ route('module.panel.configure', $panel) }}"
-                                               onclick="return confirm('Вы уверены, что хотите настроить эту панель?')">
-                                                <i class="fas fa-cog"></i> Настроить
-                                            </a>
-                                        @endif
-                                        <div class="dropdown-divider"></div>
-                                        <form action="{{ route('module.panel.destroy', $panel) }}" method="POST" class="d-inline">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="dropdown-item text-danger" 
-                                                    onclick="return confirm('Вы уверены, что хотите удалить эту панель?')">
-                                                <i class="fas fa-trash-alt"></i> Удалить
-                                            </button>
-                                        </form>
+                                @if($panel->panel_status !== Panel::PANEL_DELETED)
+                                    <div class="dropdown">
+                                        <button type="button" class="btn btn-link" data-toggle="dropdown">
+                                            <i class="fas fa-ellipsis-v"></i>
+                                        </button>
+                                        <div class="dropdown-menu dropdown-menu-right">
+                                            @if(!$panel->isConfigured())
+                                                <form action="{{ route('module.panel.configure', $panel) }}" method="POST" class="d-inline">
+                                                    @csrf
+                                                    <button type="submit" class="dropdown-item"
+                                                            onclick="return confirm('Вы уверены, что хотите настроить эту панель?')">
+                                                        <i class="fas fa-cog"></i> Настроить
+                                                    </button>
+                                                </form>
+                                            @else
+                                                <form action="{{ route('module.panel.update-config', $panel) }}" method="POST" class="d-inline">
+                                                    @csrf
+                                                    <button type="submit" class="dropdown-item"
+                                                            onclick="return confirm('Вы уверены, что хотите обновить конфигурацию панели?')">
+                                                        <i class="fas fa-sync"></i> Обновить конфигурацию
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </div>
                                     </div>
-                                </div>
+                                @endif
                             </td>
                         </tr>
 
@@ -128,15 +150,11 @@
     <form action="{{ route('module.panel.store') }}" method="POST">
         @csrf
         
-        <x-input name="panel_adress" label="Адрес панели" type="url" required
-                 placeholder="https://example.com:8080" />
-        
-        <x-input name="panel_login" label="Логин" type="text" required
-                 placeholder="admin" />
-        
-        <x-input name="panel_password" label="Пароль" type="password" required />
-        
-        <x-select name="server_id" label="Сервер" :options="$servers" required />
+        <x-select name="server_id" 
+                  label="Выберите сервер" 
+                  :options="$servers" 
+                  required 
+                  help="Будет создана панель Marzban на выбранном сервере" />
 
         <div class="text-right">
             <button type="button" class="btn btn-secondary" data-dismiss="modal">
@@ -149,3 +167,28 @@
     </form>
 </x-modal>
 @endsection
+
+@push('css')
+    <style>
+        .btn-link { padding: 0 5px; }
+        .btn-link:hover { text-decoration: none; }
+    </style>
+@endpush
+
+@push('js')
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.8/clipboard.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            var clipboard = new ClipboardJS('[data-clipboard-text]');
+            
+            clipboard.on('success', function(e) {
+                toastr.success('Скопировано в буфер обмена');
+                e.clearSelection();
+            });
+
+            clipboard.on('error', function(e) {
+                toastr.error('Ошибка копирования');
+            });
+        });
+    </script>
+@endpush
