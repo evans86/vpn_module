@@ -32,6 +32,6 @@ class AddPackTable extends Migration
      */
     public function down()
     {
-        //
+        Schema::dropIfExists('pack');
     }
 }

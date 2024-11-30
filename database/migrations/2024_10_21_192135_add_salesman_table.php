@@ -15,7 +15,7 @@ class AddSalesmanTable extends Migration
     {
         Schema::create('salesman', function (Blueprint $table) {
             $table->id();
-            $table->integer('telegram_id')->nullable();
+            $table->bigInteger('telegram_id')->nullable();
             $table->string('username')->nullable();
             $table->string('token')->nullable();
             $table->boolean('status')->nullable();
@@ -31,6 +31,6 @@ class AddSalesmanTable extends Migration
      */
     public function down()
     {
-        //
+        Schema::dropIfExists('salesman');
     }
 }

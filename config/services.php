@@ -31,7 +31,13 @@ return [
     ],
 
     'api_keys' => [
-       'vdsina_key' => env('VDSINA_API_KEY'),
+        'vdsina_key' => env('VDSINA_API_KEY'),
+    ],
+
+    'cloudflare' => [
+        'email' => env('CLOUDFLARE_EMAIL', 'support@bot-t.ru'),
+        'api_key' => env('CLOUDFLARE_API_KEY', '1697f393d7d2fceb7866b0c7062d025b8cfe6'),
+        'zone_id' => env('CLOUDFLARE_ZONE_ID', 'ecd4115fa760df3dd0a5f9c0e2caee2d'),
     ],
 
 ];

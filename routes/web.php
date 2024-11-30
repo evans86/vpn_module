@@ -21,41 +21,106 @@ use Illuminate\Support\Facades\Route;
 | contains the "web" middleware group. Now create something great!
 |
 */
-//
-//Route::group(['namespace' => 'Module', 'prefix' => 'module'], function () {
-//    Route::get('test', 'TestController@index')->name('module.test.index');
-//});
 
-//Route::get('/test', [TestController::class, 'index'])->name('test');
-//Route::get('/panel', [TestController::class, 'panel'])->name('panel');
+// Authentication Routes
+Route::get('/login', [App\Http\Controllers\Auth\LoginController::class, 'showLoginForm'])->name('login');
+Route::post('/login', [App\Http\Controllers\Auth\LoginController::class, 'login']);
+Route::post('/logout', [App\Http\Controllers\Auth\LoginController::class, 'logout'])->name('logout');
 
-Route::get('/server/index', [ServerController::class, 'index'])->name('module.server.index');
-Route::get('/server/create', [ServerController::class, 'create'])->name('module.server.create');
+// Admin Routes
+Route::middleware(['auth', 'admin'])->group(function () {
+    Route::prefix('admin')->group(function () {
+        // Server Routes
+        Route::prefix('module/server')->name('module.server.')->group(function () {
+            Route::get('/', [ServerController::class, 'index'])->name('index');
+            Route::post('/', [ServerController::class, 'store'])->name('store');
+            Route::put('/{server}', [ServerController::class, 'update'])->name('update');
+            Route::delete('/{server}', [ServerController::class, 'destroy'])->name('destroy');
+            Route::get('/{server}/status', [ServerController::class, 'getStatus'])->name('status');
+        });
 
-Route::get('/panel/index', [PanelController::class, 'index'])->name('module.panel.index');
-Route::get('/panel/create', [PanelController::class, 'create'])->name('module.panel.create');
+        // Panel Routes
+        Route::prefix('module/panel')->name('module.panel.')->group(function () {
+            Route::get('/', [PanelController::class, 'index'])->name('index');
+            Route::post('/', [PanelController::class, 'store'])->name('store');
+            Route::put('/{panel}', [PanelController::class, 'update'])->name('update');
+            Route::delete('/{panel}', [PanelController::class, 'destroy'])->name('destroy');
+            Route::post('/{panel}/configure', [PanelController::class, 'configure'])->name('configure');
+            Route::get('/{panel}/status', [PanelController::class, 'checkStatus'])->name('status');
+        });
 
-Route::get('/salesman/index', [SalesmanController::class, 'index'])->name('module.salesman.index');
+        // Test Routes
+        Route::prefix('module/test')->name('module.test.')->group(function () {
+            Route::get('/', [TestController::class, 'index'])->name('index');
+            Route::post('/', [TestController::class, 'store'])->name('store');
+            Route::put('/{test}', [TestController::class, 'update'])->name('update');
+            Route::delete('/{test}', [TestController::class, 'destroy'])->name('destroy');
+            Route::get('/salesman', [TestController::class, 'salesman'])->name('salesman');
+            Route::get('/pack', [TestController::class, 'pack'])->name('pack');
+            Route::get('/pack-salesman', [TestController::class, 'packSalesman'])->name('pack-salesman');
+            Route::get('/key-activate', [TestController::class, 'keyActivate'])->name('key-activate');
+            Route::get('/key-user', [TestController::class, 'keyUser'])->name('key-user');
+        });
 
-Route::get('/pack/index', [PackController::class, 'index'])->name('module.pack.index');
+        // Salesman Routes
+        Route::prefix('module/salesman')->name('module.salesman.')->group(function () {
+            Route::get('/', [SalesmanController::class, 'index'])->name('index');
+            Route::post('/', [SalesmanController::class, 'store'])->name('store');
+            Route::put('/{salesman}', [SalesmanController::class, 'update'])->name('update');
+            Route::delete('/{salesman}', [SalesmanController::class, 'destroy'])->name('destroy');
+        });
 
-Route::get('/pack-salesman/index', [PackSalesmanController::class, 'index'])->name('module.pack-salesman.index');
+        // Pack Routes
+        Route::prefix('module/pack')->name('module.pack.')->group(function () {
+            Route::get('/', [PackController::class, 'index'])->name('index');
+            Route::post('/', [PackController::class, 'store'])->name('store');
+            Route::put('/{pack}', [PackController::class, 'update'])->name('update');
+            Route::delete('/{pack}', [PackController::class, 'destroy'])->name('destroy');
+        });
 
-Route::get('/key-activate/index', [KeyActivateController::class, 'index'])->name('module.key-activate.index');
+        // Pack Salesman Routes
+        Route::prefix('module/pack-salesman')->name('module.pack-salesman.')->group(function () {
+            Route::get('/', [PackSalesmanController::class, 'index'])->name('index');
+            Route::post('/', [PackSalesmanController::class, 'store'])->name('store');
+            Route::put('/{packSalesman}', [PackSalesmanController::class, 'update'])->name('update');
+            Route::delete('/{packSalesman}', [PackSalesmanController::class, 'destroy'])->name('destroy');
+        });
 
-Route::get('/bot/index', [BotController::class, 'index'])->name('module.bot.index');
-Route::post('/bot/update', [BotController::class, 'update'])->name('module.bot.update');
+        // Key Activate Routes
+        Route::prefix('module/key-activate')->name('module.key-activate.')->group(function () {
+            Route::get('/', [KeyActivateController::class, 'index'])->name('index');
+            Route::post('/', [KeyActivateController::class, 'store'])->name('store');
+            Route::put('/{keyActivate}', [KeyActivateController::class, 'update'])->name('update');
+            Route::delete('/{keyActivate}', [KeyActivateController::class, 'destroy'])->name('destroy');
+        });
 
-//Route::get('/father-bot/init', [FatherBotController::class, 'init'])->name('father-init');
+        // Bot Routes
+        Route::prefix('module/bot')->name('module.bot.')->group(function () {
+            Route::get('/', [BotController::class, 'index'])->name('index');
+            Route::post('/', [BotController::class, 'store'])->name('store');
+            Route::put('/{bot}', [BotController::class, 'update'])->name('update');
+            Route::delete('/{bot}', [BotController::class, 'destroy'])->name('destroy');
+        });
 
-Route::get('/test/salesman', [TestController::class, 'salesman'])->name('module.test.salesman');
-Route::get('/test/pack', [TestController::class, 'pack'])->name('module.test.pack');
-Route::get('/test/pack-salesman', [TestController::class, 'packSalesman'])->name('module.test.pack-salesman');
-Route::get('/test/key-activate', [TestController::class, 'keyActivate'])->name('module.test.key-activate');
-Route::get('/test/key-user', [TestController::class, 'keyUser'])->name('module.test.key-user');
+        // Father Bot Routes
+        Route::prefix('module/father-bot')->name('module.father-bot.')->group(function () {
+            Route::get('/', [FatherBotController::class, 'index'])->name('index');
+            Route::post('/', [FatherBotController::class, 'store'])->name('store');
+            Route::put('/{fatherBot}', [FatherBotController::class, 'update'])->name('update');
+            Route::delete('/{fatherBot}', [FatherBotController::class, 'destroy'])->name('destroy');
+        });
 
-//Route::get('/panel', [ServerController::class, 'panel'])->name('panel');
+        // Dashboard
+        Route::get('/', function () {
+            return view('dashboard');
+        })->name('dashboard');
+    });
+});
 
-//Route::get('/', function () {
-//    return view('welcome');
-//});
+// Redirect root to admin panel if authenticated
+Route::get('/', function () {
+    if (Auth::check()) {
+        return redirect()->route('module.server.index');
+    }
+    return redirect()->route('login');
+});

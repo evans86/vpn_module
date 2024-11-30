@@ -15,7 +15,7 @@ class AddPanel extends Migration
     {
         Schema::create('panel', function (Blueprint $table) {
             $table->id();
-            $table->bigInteger('server_id')->nullable();
+            $table->bigInteger('server_id')->unsigned()->nullable();
             $table->string('panel')->nullable();
             $table->string('panel_adress')->nullable();
             $table->string('panel_login')->nullable();
@@ -25,6 +25,12 @@ class AddPanel extends Migration
             $table->string('auth_token')->nullable();
             $table->string('token_died_time')->nullable();
             $table->timestamps();
+
+            $table->index('server_id', 'panel_server_idx');
+            $table->foreign('server_id', 'panel_server_fk')
+                  ->references('id')
+                  ->on('server')
+                  ->onDelete('cascade');
         });
     }
 
@@ -35,6 +41,6 @@ class AddPanel extends Migration
      */
     public function down()
     {
-        //
+        Schema::dropIfExists('panel');
     }
 }

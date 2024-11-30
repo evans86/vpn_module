@@ -13,10 +13,10 @@
 @import url("./../icons/avasta/css/style.css");
 @import url("./../icons/flaticon/flaticon.css");
 @import url("./../icons/icomoon/icomoon.css");
-@import url(centre/animate/animate.min.css);
-@import url(centre/aos/css/aos.min.css);
-@import url(centre/perfect-scrollbar/css/perfect-scrollbar.css);
-@import url(centre/metismenu/css/metisMenu.min.css);
+@import url("./../centre/animate/animate.min.css");
+@import url("./../centre/aos/css/aos.min.css");
+@import url("./../centre/perfect-scrollbar/css/perfect-scrollbar.css");
+@import url("./../centre/metismenu/css/metisMenu.min.css");
 .gradient_one {
   background-image: linear-gradient(to right, rgba(186, 1, 181, 0.85) 0%, rgba(103, 25, 255, 0.85) 100%); }
 

@@ -2,15 +2,17 @@
 
 namespace App\Services\Server;
 
+use App\Models\Server\Server;
+
 interface ServerInterface
 {
     /**
      * @param int $location_id
      * @param string $provider
      * @param bool $isFree
-     * @return void
+     * @return Server
      */
-    public function configure(int $location_id, string $provider, bool $isFree): void;
+    public function configure(int $location_id, string $provider, bool $isFree): Server;
 
     /**
      * @return void

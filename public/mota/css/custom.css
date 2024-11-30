@@ -1,0 +1,466 @@
+/* Custom styles */
+.header {
+    background: #fff;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    padding: 0 1.875rem;
+    height: 5rem;
+    position: fixed;
+    top: 0;
+    left: 17.1875rem;
+    right: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all .3s ease;
+}
+
+.header .header-content {
+    display: flex;
+    align-items: center;
+    height: 100%;
+}
+
+.header .search-area {
+    margin-right: 2rem;
+}
+
+.deznav {
+    background: #fff;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    width: 17.1875rem;
+    position: fixed;
+    top: 0;
+    padding-top: 5rem;
+    left: 0;
+    height: 100vh;
+    transition: all .3s ease;
+    z-index: 2;
+}
+
+.deznav .metismenu > li {
+    padding: 0 1.25rem;
+}
+
+.deznav .metismenu > li > a {
+    color: #2E2E2E;
+    font-size: 1rem;
+    padding: 0.925rem 1rem;
+    transition: all .3s ease;
+    position: relative;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    border-radius: 0.75rem;
+}
+
+.deznav .metismenu > li > a i {
+    font-size: 1.25rem;
+    margin-right: 0.875rem;
+    display: inline-block;
+    vertical-align: middle;
+    height: auto;
+    width: auto;
+    text-align: center;
+    line-height: 1;
+}
+
+.nav-header {
+    background: #fff;
+    height: 5rem;
+    padding: 0 1.875rem;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 17.1875rem;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #eee;
+}
+
+.nav-header .brand-logo {
+    padding-left: 20px;
+}
+
+.header-right {
+    padding-right: 20px;
+}
+
+.content-body {
+    margin-left: 17.1875rem;
+    padding: 1.875rem;
+    min-height: 100vh;
+    transition: all .3s ease;
+}
+
+.deznav-scroll {
+    position: relative;
+    height: calc(100vh - 120px);
+}
+
+.fas, .far, .fab {
+    font-family: "Font Awesome 5 Free" !important;
+    font-weight: 900;
+}
+
+.emoji-flag {
+    font-family: "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Symbol" !important;
+    font-size: 1.2em;
+    line-height: 1;
+    vertical-align: middle;
+}
+
+/* Menu styles */
+.nav.menu-tabs {
+    padding: 15px 0;
+    border-right: 1px solid rgba(0,0,0,0.1);
+}
+
+.nav.menu-tabs .nav-item {
+    margin-bottom: 10px;
+    display: block;
+    width: 100%;
+}
+
+.nav.menu-tabs .nav-link {
+    padding: 10px 15px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    position: relative;
+    color: #7e7e7e;
+}
+
+.nav.menu-tabs .nav-link:hover,
+.nav.menu-tabs .nav-link.active {
+    color: #2f4cdd;
+    background: rgba(47,76,221,0.1);
+}
+
+.nav.menu-tabs .nav-link svg {
+    margin-right: 5px;
+    width: 20px;
+    height: 20px;
+}
+
+/* Enhanced Menu Styles */
+.deznav .nav-item {
+    margin: 5px 0;
+    position: relative;
+}
+
+.deznav .nav-link {
+    padding: 12px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.deznav .nav-link:hover {
+    background: rgba(47, 76, 221, 0.1);
+    transform: translateY(-1px);
+}
+
+.deznav .nav-link.active {
+    background: #2f4cdd;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(47, 76, 221, 0.2);
+}
+
+.deznav .nav-link.active svg {
+    color: #fff;
+}
+
+/* Table styles */
+.table {
+    width: 100%;
+    margin-bottom: 0;
+    color: #333;
+    border-collapse: separate;
+    border-spacing: 0 8px;
+}
+
+.table th {
+    font-weight: 600;
+    color: #2E2E2E;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    border-bottom-width: 1px;
+    vertical-align: middle;
+    padding: 1rem;
+}
+
+.table td {
+    padding: 1rem;
+    vertical-align: middle;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.table thead th {
+    background: #f8f9fa;
+    border: none;
+    color: #6e6e6e;
+}
+
+.table tbody tr {
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
+    border-radius: 8px;
+}
+
+.table tbody tr:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+}
+
+/* Enhanced Icon Styles */
+.feather {
+    stroke-width: 2;
+    width: 24px;
+    height: 24px;
+    transition: all 0.3s ease;
+}
+
+.nav-link:hover .feather {
+    transform: scale(1.1);
+}
+
+/* Card styles */
+.card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 0 15px rgba(0,0,0,0.05);
+    margin-bottom: 1.875rem;
+}
+
+.card-header {
+    padding: 1.25rem;
+    background: #fff;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 12px 12px 0 0;
+}
+
+.card-body {
+    padding: 1.25rem;
+}
+
+/* Button styles */
+.btn {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-primary {
+    background: #2f4cdd;
+    color: #fff;
+    border: none;
+}
+
+.btn-primary:hover {
+    background: #2841bc;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(47,76,221,0.2);
+}
+
+/* Search bar styles */
+.search-wrapper {
+    position: relative;
+    max-width: 300px;
+    width: 100%;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    padding-right: 2.5rem;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    background: #fff;
+    transition: all 0.3s ease;
+}
+
+.search-input:focus {
+    border-color: #2f4cdd;
+    box-shadow: 0 0 0 3px rgba(47,76,221,0.1);
+    outline: none;
+}
+
+.search-icon {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6e6e6e;
+}
+
+/* Status badges */
+.badge {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 500;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge.light {
+    background: rgba(0,0,0,0.05);
+}
+
+.badge.light.badge-success {
+    color: #2bc155;
+    background: rgba(43,193,85,0.1);
+}
+
+.badge.light.badge-warning {
+    color: #ffb800;
+    background: rgba(255,184,0,0.1);
+}
+
+.badge.light.badge-danger {
+    color: #f94687;
+    background: rgba(249,70,135,0.1);
+}
+
+/* Icons in table */
+.table .feather {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2;
+    stroke: currentColor;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Action buttons */
+.btn-icon {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+}
+
+.btn-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Status colors */
+.status-configured { color: #2bc155; }
+.status-pending { color: #ffb800; }
+.status-error { color: #f35757; }
+
+/* Table row hover effect */
+.table tbody tr:hover {
+    background-color: rgba(47,76,221,0.05);
+}
+
+/* Tooltip styles */
+[data-toggle="tooltip"] {
+    position: relative;
+}
+
+/* Tooltip Enhancement */
+.tooltip {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.tooltip-inner {
+    padding: 6px 12px;
+    border-radius: 4px;
+    background: #2f4cdd;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .deznav {
+        width: 70px;
+    }
+    
+    .deznav .nav-link {
+        padding: 10px;
+    }
+    
+    .table td {
+        padding: 0.75rem;
+    }
+    
+    .table .action-buttons {
+        flex-direction: column;
+        gap: 4px;
+    }
+}
+
+@media (max-width: 767px) {
+    .content-body {
+        margin-left: 0;
+        padding: 1rem;
+    }
+    
+    .header {
+        left: 0;
+        padding: 0 1rem;
+    }
+    
+    .deznav {
+        left: -17.1875rem;
+    }
+    
+    .nav-header {
+        width: 100%;
+    }
+}
+
+/* Add these utility classes */
+.d-flex { display: flex !important; }
+.align-items-center { align-items: center !important; }
+.justify-content-between { justify-content: space-between !important; }
+.w-100 { width: 100% !important; }
+.mb-0 { margin-bottom: 0 !important; }
+.text-nowrap { white-space: nowrap !important; }
+
+/* Стили для кнопок действий */
+.btn-action {
+    padding: 0.5rem;
+    line-height: 1;
+    font-size: 1rem;
+    border-radius: 0.5rem;
+    margin: 0 0.25rem;
+}
+
+/* Стили для модальных окон */
+.modal-content {
+    border: none;
+    border-radius: 1rem;
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+}
+
+.modal-header {
+    border-bottom: 1px solid #eee;
+    padding: 1.5rem;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    border-top: 1px solid #eee;
+    padding: 1.5rem;
+}
