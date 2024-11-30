@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             AdminUserSeeder::class,
 //            ServerSeeder::class,
 //            PanelSeeder::class,
+//            PackSeeder::class,
         ]);
     }
 }

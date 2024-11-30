@@ -11,7 +11,7 @@
         "php": "^7.4",
         "ext-json": "*",
         "cloudflare/sdk": "^1.3.0",
-        "doctrine/dbal": "*",
+        "doctrine/dbal": "^3.9",
         "fideloper/proxy": "^4.2",
         "fruitcake/laravel-cors": "^2.0",
         "guzzlehttp/guzzle": "^7.0.1",

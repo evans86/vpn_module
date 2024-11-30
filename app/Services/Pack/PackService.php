@@ -5,103 +5,93 @@ namespace App\Services\Pack;
 use App\Dto\Pack\PackDto;
 use App\Dto\Pack\PackFactory;
 use App\Models\Pack\Pack;
+use App\Repositories\Pack\PackRepositoryInterface;
 use Exception;
+use Illuminate\Pagination\LengthAwarePaginator;
 use RuntimeException;
 
 class PackService
 {
+    /** @var PackRepositoryInterface */
+    private $packRepository;
+
     /**
-     * Создание пакета ключей
+     * @param PackRepositoryInterface $packRepository
+     */
+    public function __construct(PackRepositoryInterface $packRepository)
+    {
+        $this->packRepository = $packRepository;
+    }
+
+    /**
+     * Get all packs with pagination
      *
-     * @param int $price цена пакета
-     * @param int $period сколько дней действует ключ
-     * @param int $traffic_limit объем трафика
-     * @param int $count количество ключей в пакете
-     * @param int $activate_time время, за которое надо активировать ключи
-     * @param bool $status активный или архивный
+     * @param int $perPage
+     * @return LengthAwarePaginator
+     */
+    public function getAllPaginated(int $perPage = 10): LengthAwarePaginator
+    {
+        return $this->packRepository->getAllPaginated($perPage);
+    }
+
+    /**
+     * Create a new pack
+     *
+     * @param array $data
      * @return PackDto
      * @throws Exception
      */
-    public function create(int $price, int $period, int $traffic_limit, int $count, int $activate_time, bool $status = Pack::ACTIVE): PackDto
+    public function create(array $data): PackDto
     {
         try {
-            $pack = new Pack();
-
-            $pack->price = $price;
-            $pack->period = $period;
-            $pack->traffic_limit = $traffic_limit;
-            $pack->count = $count;
-            $pack->activate_time = $activate_time;
-            $pack->status = $status;
-
-            if (!$pack->save())
-                throw new \RuntimeException('Pack dont create');
-
+            $pack = $this->packRepository->create($data);
             return PackFactory::fromEntity($pack);
-        } catch (RuntimeException $r) {
-            throw new RuntimeException($r->getMessage());
         } catch (Exception $e) {
-            throw new Exception($e->getMessage());
+            throw new RuntimeException("Failed to create pack: {$e->getMessage()}");
         }
     }
 
     /**
-     * Обновление статуса пакета
+     * Update pack
      *
-     * @param PackDto $packDto
+     * @param int $id
+     * @param array $data
      * @return PackDto
      * @throws Exception
      */
-    public function updateStatus(PackDto $packDto): PackDto
+    public function update(int $id, array $data): PackDto
     {
         try {
-            /**
-             * @var Pack $pack
-             */
-            $pack = Pack::query()->where('id', $packDto->id)->firstOrFail();
+            $pack = $this->packRepository->findById($id);
+            if (!$pack) {
+                throw new RuntimeException("Pack not found");
+            }
 
-            $pack->status = $packDto->status;
-
-            if (!$pack->save())
-                throw new \RuntimeException('Pack dont update status');
-
+            $pack = $this->packRepository->update($pack, $data);
             return PackFactory::fromEntity($pack);
-        } catch (RuntimeException $r) {
-            throw new RuntimeException($r->getMessage());
         } catch (Exception $e) {
-            throw new Exception($e->getMessage());
+            throw new RuntimeException("Failed to update pack: {$e->getMessage()}");
         }
     }
 
     /**
-     * Обновление настроек пакета
+     * Delete pack
      *
-     * @param PackDto $packDto
-     * @return PackDto
+     * @param int $id
+     * @return bool
      * @throws Exception
      */
-    public function updateSettings(PackDto $packDto): PackDto
+    public function delete(int $id): bool
     {
         try {
-            /**
-             * @var Pack $pack
-             */
-            $pack = Pack::query()->where('id', $packDto->id)->firstOrFail();
+            $pack = $this->packRepository->findById($id);
+            if (!$pack) {
+                throw new RuntimeException("Pack not found");
+            }
 
-            $pack->price = $packDto->price;
-            $pack->period = $packDto->period;
-            $pack->traffic_limit = $packDto->traffic_limit;
-            $pack->count = $packDto->count;
-            $pack->activate_time = $packDto->activate_time;
-
-            if (!$pack->save())
-                throw new \RuntimeException('Pack dont update settings');
-
-            return PackFactory::fromEntity($pack);
-        } catch (RuntimeException $r) {
-            throw new RuntimeException($r->getMessage());
+            return $this->packRepository->delete($pack);
         } catch (Exception $e) {
-            throw new Exception($e->getMessage());
+            throw new RuntimeException("Failed to delete pack: {$e->getMessage()}");
         }
     }
 }

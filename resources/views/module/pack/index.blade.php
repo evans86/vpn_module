@@ -1,73 +1,177 @@
 @extends('layouts.app', ['page' => __('Пакеты'), 'pageSlug' => 'packs'])
 
+@php
+    use App\Models\Pack\Pack;
+@endphp
+
 @section('content')
     <div class="container-fluid">
+        @if(session('error'))
+            <x-alert type="danger">{{ session('error') }}</x-alert>
+        @endif
+
+        @if(session('success'))
+            <x-alert type="success">{{ session('success') }}</x-alert>
+        @endif
         <div class="row">
             <div class="col-lg-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h4 class="card-title">Список пакетов VPN</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-responsive-md">
-                                <thead>
+                <x-card title="Список пакетов VPN">
+                    <x-slot name="tools">
+                        <button type="button" class="btn btn-primary" data-toggle="modal"
+                                data-target="#createPackModal">
+                            <i class="fas fa-plus"></i> Добавить пакет
+                        </button>
+                    </x-slot>
+
+                    <x-table :headers="['#', 'Цена', 'Период', 'Трафик', 'Ключи', 'Время активации', 'Статус', '']">
+                        @if($packs->isEmpty())
+                            <tr>
+                                <td colspan="8" class="text-center text-muted">
+                                    <i class="fas fa-info-circle"></i> Пакеты не найдены
+                                </td>
+                            </tr>
+                        @else
+                            @foreach($packs as $pack)
                                 <tr>
-                                    <th style="width:80px;"><strong>#</strong></th>
-                                    <th><strong>PRICE</strong></th>
-                                    <th><strong>PERIOD</strong></th>
-                                    <th><strong>TRAFFIC LIMIT</strong></th>
-                                    <th><strong>KEY COUNT</strong></th>
-                                    <th><strong>ACTIVATE TIME</strong></th>
-                                    <th><strong>STATUS</strong></th>
-                                    <th></th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                @foreach($packs as $pack)
-                                    <tr>
-                                        <td><strong>{{ $pack->id }}</strong></td>
-                                        <td>{{ $pack->price }}</td>
-                                        <td>{{ $pack->period }}</td>
-                                        <td>{{ $pack->traffic_limit }}</td>
-                                        <td>{{ $pack->count }}</td>
-                                        <td>{{ $pack->activate_time }}</td>
-                                        <td><span class="badge light badge-success">{{ $pack->status }}</span></td>
-                                        <td>
-                                            <div class="dropdown">
-                                                <button type="button" class="btn btn-success light sharp"
-                                                        data-toggle="dropdown">
-                                                    <svg width="20px" height="20px" viewBox="0 0 24 24" version="1.1">
-                                                        <g stroke="none" stroke-width="1" fill="none"
-                                                           fill-rule="evenodd">
-                                                            <rect x="0" y="0" width="24" height="24"/>
-                                                            <circle fill="#000000" cx="5" cy="12" r="2"/>
-                                                            <circle fill="#000000" cx="12" cy="12" r="2"/>
-                                                            <circle fill="#000000" cx="19" cy="12" r="2"/>
-                                                        </g>
-                                                    </svg>
-                                                </button>
-                                                <div class="dropdown-menu">
-                                                    <a class="dropdown-item" href="#">Statistics</a>
-                                                    <a class="dropdown-item" href="#">Delete</a>
-                                                </div>
+                                    <td><strong>{{ $pack->id }}</strong></td>
+                                    <td>{{ number_format($pack->price, 0, '.', ' ') }} ₽</td>
+                                    <td>{{ $pack->period }} дней</td>
+                                    <td>{{ number_format($pack->traffic_limit / 1024 / 1024 / 1024, 0) }} GB</td>
+                                    <td>{{ $pack->count }} шт</td>
+                                    <td>{{ floor($pack->activate_time / 3600) }} часов</td>
+                                    <td>
+                                    <span class="badge badge-{{ $pack->status ? 'success' : 'danger' }}">
+                                        {{ $pack->status ? 'Активен' : 'Неактивен' }}
+                                    </span>
+                                    </td>
+                                    <td>
+                                        <div class="dropdown">
+                                            <button class="btn btn-link" type="button" data-toggle="dropdown">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <div class="dropdown-menu">
+                                                <a class="dropdown-item" href="#" data-toggle="modal"
+                                                   data-target="#editPackModal{{ $pack->id }}">
+                                                    <i class="fas fa-edit mr-2"></i>Редактировать
+                                                </a>
+                                                <a class="dropdown-item text-danger" href="#"
+                                                   onclick="deletePack({{ $pack->id }})">
+                                                    <i class="fas fa-trash mr-2"></i>Удалить
+                                                </a>
                                             </div>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-{{--                        <div class="d-grid gap-2 d-md-block mb-2">--}}
-{{--                            <a href="{{ route('module.panel.create') }}" class="btn btn-success">Создать пакет</a>--}}
-{{--                        </div>--}}
-                        {{--                        <div class="d-flex">--}}
-                        {{--                            {!! $panels->links() !!}--}}
-                        {{--                        </div>--}}
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        @endif
+                    </x-table>
+
+                    <div class="d-flex justify-content-center mt-3">
+                        {{ $packs->links() }}
                     </div>
-                </div>
+                </x-card>
             </div>
         </div>
     </div>
+
+    {{-- Модальное окно создания --}}
+    <x-modal id="createPackModal" title="Добавить пакет">
+        <form action="{{ route('module.pack.store') }}" method="POST">
+            @csrf
+
+            <x-form.input type="number" name="price" label="Цена (₽)" required min="0"/>
+            <x-form.input type="number" name="period" label="Период действия (дней)" required min="1" value="30"/>
+            <x-form.input type="number" name="traffic_limit" label="Лимит трафика (GB)" required min="1" value="10"/>
+            <x-form.input type="number" name="count" label="Количество ключей" required min="1" value="5"/>
+            <x-form.input type="number" name="activate_time" label="Время на активацию (часов)" required min="1"
+                          value="24"/>
+
+            <div class="text-right">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Создать
+                </button>
+            </div>
+        </form>
+    </x-modal>
 @endsection
 
+@foreach($packs as $pack)
+    {{-- Модальные окна редактирования --}}
+    <x-modal id="editPackModal{{ $pack->id }}" title="Редактировать пакет #{{ $pack->id }}">
+        <form action="{{ route('module.pack.update', $pack->id) }}" method="POST">
+            @csrf
+            @method('PUT')
+
+            <x-form.input type="number" name="price" label="Цена (₽)" required min="0" :value="$pack->price"/>
+            <x-form.input type="number" name="period" label="Период действия (дней)" required min="1"
+                          :value="$pack->period"/>
+            <x-form.input type="number" name="traffic_limit" label="Лимит трафика (GB)" required min="1"
+                          :value="round($pack->traffic_limit/1024/1024/1024)"/>
+            <x-form.input type="number" name="count" label="Количество ключей" required min="1" :value="$pack->count"/>
+            <x-form.input type="number" name="activate_time" label="Время на активацию (часов)" required min="1"
+                          :value="floor($pack->activate_time/3600)"/>
+
+            <x-form.select name="status" label="Статус" :options="[1 => 'Активен', 0 => 'Неактивен']"
+                           :value="$pack->status"/>
+
+            <div class="text-right">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Сохранить
+                </button>
+            </div>
+        </form>
+    </x-modal>
+@endforeach
+
+@push('js')
+    <script>
+        function deletePack(id) {
+            if (confirm('Вы уверены, что хотите удалить этот пакет?')) {
+                $.ajax({
+                    url: '{{ route('module.pack.destroy', ['pack' => ':id']) }}'.replace(':id', id),
+                    method: 'DELETE',
+                    data: {
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function (response) {
+                        toastr.success('Пакет успешно удален');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                    },
+                    error: function (xhr) {
+                        let errorMessage = 'Произошла ошибка при удалении пакета';
+                        if (xhr.responseJSON) {
+                            errorMessage = xhr.responseJSON.message || errorMessage;
+                        }
+                        toastr.error(errorMessage);
+                    }
+                });
+            }
+        }
+
+        $(document).ready(function () {
+            // Настройка toastr
+            toastr.options = {
+                "closeButton": true,
+                "progressBar": true,
+                "positionClass": "toast-top-right",
+                "timeOut": "3000"
+            };
+        });
+    </script>
+@endpush
+
+@push('css')
+    <style>
+        .btn-link {
+            padding: 0 5px;
+        }
+
+        .btn-link:hover {
+            text-decoration: none;
+        }
+    </style>
+@endpush
