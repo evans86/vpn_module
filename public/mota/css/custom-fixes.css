@@ -14,33 +14,17 @@
     transition: all .2s ease;
 }
 
-.nav-logo {
-    padding: 1.5rem;
-    border-bottom: 1px solid #eee;
-}
-
-.nav-logo .logo-abbr {
-    text-decoration: none;
-}
-
-.nav-logo .logo-text {
-    color: #2E2E2E;
-    font-size: 1.25rem;
-    margin: 0;
-    font-weight: 600;
-}
-
 .deznav .metismenu {
-    padding: 0.5rem;
+    padding: 1rem 0.5rem;
 }
 
 .deznav .metismenu > li {
-    margin: 0.25rem 0;
+    margin: 0.5rem 0;
 }
 
 .deznav .metismenu > li > a {
     color: #2E2E2E;
-    font-size: 0.9375rem;
+    font-size: 0.875rem;
     padding: 0.75rem 1rem;
     position: relative;
     font-weight: 500;
@@ -49,6 +33,7 @@
     border-radius: 0.75rem;
     transition: all .2s ease;
     text-decoration: none;
+    background: transparent;
 }
 
 .deznav .metismenu > li > a:hover,
@@ -57,22 +42,21 @@
     color: #3a7afe;
 }
 
-.deznav .metismenu > li > a svg,
-.deznav .metismenu > li > a i {
-    font-size: 1.25rem;
-    margin-right: 0.875rem;
+.deznav .metismenu > li > a svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-right: 1rem;
+    stroke-width: 1.5;
     flex-shrink: 0;
-    height: 1.25rem;
-    width: 1.25rem;
     color: inherit;
-    transition: all .2s ease;
 }
 
 .deznav .metismenu > li > a .nav-text {
     flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-weight: 500;
+    display: block;
+    color: inherit;
+    line-height: 1.4;
 }
 
 /* Исправление отображения шапки */
@@ -80,7 +64,7 @@
     background: #fff;
     box-shadow: 0 0 10px rgba(0,0,0,0.1);
     padding: 0 1.875rem;
-    height: 5rem;
+    height: 4rem;
     position: fixed;
     top: 0;
     left: 17.1875rem;
@@ -101,8 +85,9 @@
 /* Исправление отображения контента */
 .content-body {
     margin-left: 17.1875rem;
+    margin-top: 4rem;
     padding: 1.875rem;
-    min-height: 100vh;
+    min-height: calc(100vh - 4rem);
     background: #f3f6f9;
 }
 
@@ -146,29 +131,39 @@
 
 /* Стили для бейджей */
 .badge {
-    padding: 0.5rem 1rem;
-    border-radius: 20px;
+    padding: 0.5em 0.75em;
     font-weight: 500;
-    font-size: 0.75rem;
+    border-radius: 4px;
 }
 
-.badge.light {
-    background: rgba(0,0,0,0.05);
+.badge-success {
+    background-color: #2bc155;
+    color: #fff;
 }
 
-.badge.light.badge-success {
-    color: #2bc155;
-    background: rgba(43,193,85,0.1);
+.badge-warning {
+    background-color: #ffb800;
+    color: #000;
 }
 
-.badge.light.badge-warning {
-    color: #ffb800;
-    background: rgba(255,184,0,0.1);
+.badge-danger {
+    background-color: #f94687;
+    color: #fff;
 }
 
-.badge.light.badge-danger {
-    color: #f94687;
-    background: rgba(249,70,135,0.1);
+.badge-info {
+    background-color: #b8c3d9;
+    color: #000;
+}
+
+.badge-dark {
+    background-color: #6e6e6e;
+    color: #fff;
+}
+
+.badge-secondary {
+    background-color: #969ba0;
+    color: #fff;
 }
 
 /* Стили для кнопок */
@@ -191,29 +186,29 @@
     border-color: #1b60fe;
 }
 
-/* Стили для дропдаунов */
+/* Dropdown Menu */
 .dropdown-menu {
-    padding: 0.5rem 0;
     border: none;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    border-radius: 0.75rem;
+    box-shadow: 0 0 35px 0 rgba(154, 161, 171, 0.15);
+    border-radius: 4px;
 }
 
 .dropdown-item {
-    padding: 0.625rem 1.25rem;
-    font-size: 0.875rem;
-    color: #2E2E2E;
-    transition: all .2s ease;
+    padding: 8px 16px;
+    color: #3d4465;
+    font-size: 14px;
+    transition: all 0.3s ease;
 }
 
 .dropdown-item:hover {
-    background: #f3f6f9;
+    background-color: #f3f6f9;
 }
 
-.dropdown-item i,
-.dropdown-item svg {
-    margin-right: 0.5rem;
-    font-size: 1rem;
-    width: 1rem;
+.dropdown-item.text-danger:hover {
+    background-color: #fff1f1;
+}
+
+.dropdown-item i {
+    width: 20px;
     text-align: center;
 }

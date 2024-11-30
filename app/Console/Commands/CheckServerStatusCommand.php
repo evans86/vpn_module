@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Server\Server;
-use App\Services\Server\strategy\ServerStrategyFactory;
+use App\Services\Server\ServerStrategy;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -24,7 +24,7 @@ class CheckServerStatusCommand extends Command
 
             foreach ($servers as $server) {
                 try {
-                    $strategy = ServerStrategyFactory::create($server->provider);
+                    $strategy = new ServerStrategy($server->provider);
                     
                     $this->info("Checking server {$server->id} ({$server->provider})...");
                     $strategy->checkStatus();

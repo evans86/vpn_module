@@ -27,8 +27,11 @@ interface ServerInterface
     public function setPanel(int $server_id, string $panel): void;
 
     /**
-     * @param int $server_id
+     * Удаление сервера
+     *
+     * @param Server $server
      * @return void
+     * @throws \Exception
      */
-    public function delete(int $server_id): void;
+    public function delete(Server $server): void;
 }

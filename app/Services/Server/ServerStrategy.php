@@ -5,6 +5,7 @@ namespace App\Services\Server;
 use App\Models\Server\Server;
 use App\Services\Server\strategy\ServerVdsinaStrategy;
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Support\Facades\Log;
 
 class ServerStrategy
 {
@@ -27,12 +28,12 @@ class ServerStrategy
      * @param int $location_id
      * @param string $provider
      * @param bool $isFree
-     * @return void
+     * @return Server
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function configure(int $location_id, string $provider, bool $isFree): void
+    public function configure(int $location_id, string $provider, bool $isFree): Server
     {
-        $this->strategy->configure($location_id, $provider, $isFree);
+        return $this->strategy->configure($location_id, $provider, $isFree);
     }
 
     /**
@@ -61,11 +62,12 @@ class ServerStrategy
     /**
      * Удаление сервера
      *
-     * @param int $server_id
+     * @param Server $server
      * @return void
+     * @throws \Exception
      */
-    public function delete(int $server_id): void
+    public function delete(Server $server): void
     {
-        $this->strategy->delete($server_id);
+        $this->strategy->delete($server);
     }
 }

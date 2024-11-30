@@ -6,6 +6,7 @@ use App\Models\Server\Server;
 use App\Services\Panel\PanelStrategy;
 use App\Services\Server\vdsina\VdsinaService;
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Support\Facades\Log;
 
 class ServerVdsinaStrategy extends ServerMainStrategy
 {
@@ -59,12 +60,23 @@ class ServerVdsinaStrategy extends ServerMainStrategy
     /**
      * Удаление сервера
      *
-     * @param int $server_id
+     * @param Server $server
      * @return void
-     * @throws GuzzleException
+     * @throws \Exception
      */
-    public function delete(int $server_id): void
+    public function delete(Server $server): void
     {
-        $this->service->delete($server_id);
+        try {
+            if (!$this->service) {
+                $this->service = new VdsinaService();
+            }
+            $this->service->delete($server);
+        } catch (\Exception $e) {
+            Log::error('Error in ServerVdsinaStrategy::delete', [
+                'server_id' => $server->id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
     }
 }

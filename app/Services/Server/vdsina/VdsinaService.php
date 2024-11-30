@@ -20,35 +20,110 @@ class VdsinaService
      * @param bool $isFree
      * @return Server
      * @throws GuzzleException
+     * @throws \Exception
      */
     public function configure(int $location_id, string $provider, bool $isFree): Server
     {
-        /**
-         * @var Location $location
-         */
-        $location = Location::query()->where('id', $location_id)->first();
-        if (!$location) {
-            throw new \RuntimeException('Location not found');
+        try {
+            /**
+             * @var Location $location
+             */
+            $location = Location::query()->where('id', $location_id)->first();
+            if (!$location) {
+                throw new \RuntimeException('Location not found');
+            }
+
+            $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
+
+            // 1. Проверяем доступность дата-центров
+            $datacenters = $vdsinaApi->getDatacenter();
+            if (!isset($datacenters['data']) || !is_array($datacenters['data'])) {
+                throw new \RuntimeException('Invalid datacenter response from VDSina');
+            }
+
+            // Ищем датацентр Amsterdam (id = 1)
+            $datacenter = null;
+            foreach ($datacenters['data'] as $dc) {
+                if (isset($dc['id']) && $dc['id'] == 1) {
+                    $datacenter = $dc;
+                    break;
+                }
+            }
+
+            if (!$datacenter) {
+                throw new \RuntimeException('Amsterdam datacenter not found in VDSina');
+            }
+
+            // 2. Проверяем доступность шаблонов ОС
+            $templates = $vdsinaApi->getTemplate();
+            if (!isset($templates['data']) || !is_array($templates['data'])) {
+                throw new \RuntimeException('Invalid template response from VDSina');
+            }
+
+            // Ищем Ubuntu 24.04 (id = 23)
+            $template = null;
+            foreach ($templates['data'] as $tmpl) {
+                if (isset($tmpl['id']) && $tmpl['id'] == 23) {
+                    $template = $tmpl;
+                    break;
+                }
+            }
+
+            if (!$template) {
+                throw new \RuntimeException('Ubuntu 24.04 template not found in VDSina');
+            }
+
+            // 3. Проверяем доступность тарифных планов
+            $plans = $vdsinaApi->getServerPlan();
+            if (!isset($plans['data']) || !is_array($plans['data'])) {
+                throw new \RuntimeException('Invalid server plan response from VDSina');
+            }
+
+            // Ищем базовый тарифный план (id = 1)
+            $serverPlan = null;
+            foreach ($plans['data'] as $plan) {
+                if (isset($plan['id']) && $plan['id'] == 1) {
+                    $serverPlan = $plan;
+                    break;
+                }
+            }
+
+            if (!$serverPlan) {
+                throw new \RuntimeException('Basic server plan not found in VDSina');
+            }
+
+            // 4. Создаем сервер через API VDSina
+            $serverName = 'vpnserver' . time() . $location->code;
+            $serverResponse = $vdsinaApi->createServer(
+                $serverName,
+                $serverPlan['id'],
+                0, // autoprolong
+                $datacenter['id'],
+                $template['id']
+            );
+
+            if (!isset($serverResponse['data']['id']) || !isset($serverResponse['status']) || $serverResponse['status'] !== 'ok') {
+                throw new \RuntimeException('Failed to create server in VDSina: ' . ($serverResponse['status_msg'] ?? 'Unknown error'));
+            }
+
+            // 5. Создаем запись о сервере
+            $server = new Server();
+            $server->provider_id = $serverResponse['data']['id'];
+            $server->location_id = $location->id;
+            $server->provider = $provider;
+            $server->server_status = Server::SERVER_CREATED;
+            $server->is_free = $isFree;
+            $server->save();
+
+            return $server;
+
+        } catch (\Exception $e) {
+            Log::error('Failed to configure server', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
-
-        $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
-
-        // Создаем сервер через API VDSina
-        $serverResponse = $vdsinaApi->createServer('vpnserver' . time() . $location->code, 1);
-        if (!isset($serverResponse['data']['id'])) {
-            throw new \RuntimeException('Failed to create server in VDSina');
-        }
-
-        // Создаем запись о сервере
-        $server = new Server();
-        $server->provider_id = $serverResponse['data']['id'];
-        $server->location_id = $location->id;
-        $server->provider = $provider;
-        $server->server_status = Server::SERVER_CREATED;
-        $server->is_free = $isFree;
-        $server->save();
-
-        return $server;
     }
 
     /**
@@ -57,6 +132,7 @@ class VdsinaService
      * @param int $server_id
      * @return void
      * @throws GuzzleException
+     * @throws \Exception
      */
     public function finishConfigure(int $server_id)
     {
@@ -168,6 +244,7 @@ class VdsinaService
      *
      * @return void
      * @throws GuzzleException
+     * @throws \Exception
      */
     public function checkStatus()
     {
@@ -197,15 +274,15 @@ class VdsinaService
                     ]);
 
                     $status = $this->serverStatus($server->provider_id);
-                    
+
                     if ($status) {
                         Log::info('Server is ready for configuration', [
                             'server_id' => $server->id,
                             'provider_id' => $server->provider_id
                         ]);
-                        
+
                         $this->finishConfigure($server->id);
-                        
+
                         Log::info('Server configured successfully', [
                             'server_id' => $server->id,
                             'provider_id' => $server->provider_id
@@ -247,12 +324,13 @@ class VdsinaService
      * @param int $provider_id
      * @return bool
      * @throws GuzzleException
+     * @throws \Exception
      */
     public function serverStatus(int $provider_id): bool
     {
         try {
             Log::info('Checking server status in VDSina', ['provider_id' => $provider_id]);
-            
+
             $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
             $server = $vdsinaApi->getServerById($provider_id);
 
@@ -295,48 +373,52 @@ class VdsinaService
     /**
      * Удаление сервера
      *
-     * @param $server_id
+     * @param Server $server
      * @return void
-     * @throws GuzzleException
+     * @throws \Exception
      */
-    public function delete($server_id): void
+    public function delete(Server $server): void
     {
         try {
-            /**
-             * @var Server $server
-             */
-            $server = Server::query()->where('id', $server_id)->first();
-            if (!$server) {
-                throw new \RuntimeException('Server not found');
-            }
-
-            // Удаляем DNS запись
-            if ($server->dns_record_id) {
-                $cloudflare_service = new CloudflareService();
-                $cloudflare_service->deleteSubdomain($server->dns_record_id);
-            }
-
-            // Удаляем сервер у провайдера
             $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
-            $deleteData = $vdsinaApi->deleteServer($server->provider_id);
 
-            if ($deleteData['status'] !== 'ok') {
-                throw new \RuntimeException('Error deleting server in VDSina');
+            // Удаляем сервер через API VDSina
+            $response = $vdsinaApi->deleteServer($server->provider_id);
+
+            if (!isset($response['status']) || $response['status'] !== 'ok') {
+                throw new \RuntimeException(
+                    'Failed to delete server in VDSina: ' .
+                    ($response['description'] ?? $response['status_msg'] ?? 'Unknown error')
+                );
             }
 
-            // Удаляем запись из базы
-            if (!$server->delete()) {
-                throw new \RuntimeException('Failed to delete server from database');
+            // Удаляем DNS запись, если она существует
+            if ($server->dns_record_id) {
+                try {
+                    $cloudflare = new CloudflareService();
+                    $cloudflare->deleteSubdomain($server->dns_record_id);
+                } catch (\Exception $e) {
+                    Log::warning('Failed to delete DNS record', [
+                        'server_id' => $server->id,
+                        'dns_record_id' => $server->dns_record_id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
             }
+            
+            // Обновляем статус сервера на "Удален"
+            $server->server_status = Server::SERVER_DELETED;
+            $server->save();
 
-            Log::info('Server deleted successfully', [
-                'server_id' => $server_id,
+            Log::info('Successfully deleted server in VDSina', [
+                'server_id' => $server->id,
                 'provider_id' => $server->provider_id
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Failed to delete server', [
-                'server_id' => $server_id,
+            Log::error('Failed to delete server in VDSina', [
+                'server_id' => $server->id,
+                'provider_id' => $server->provider_id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);

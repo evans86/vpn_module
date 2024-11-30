@@ -39,8 +39,12 @@ abstract class ServerMainStrategy implements ServerInterface
     /**
      * Удаление сервера
      *
-     * @param int $server_id
+     * @param Server $server
      * @return void
+     * @throws \Exception
      */
-    abstract public function delete(int $server_id): void;
+    public function delete(Server $server): void
+    {
+        throw new \RuntimeException('Method not implemented');
+    }
 }

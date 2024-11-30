@@ -5,10 +5,11 @@ namespace App\Http\Controllers\Module;
 use App\Http\Controllers\Controller;
 use App\Models\Location\Location;
 use App\Models\Server\Server;
-use App\Services\Server\strategy\ServerStrategyFactory;
+use App\Services\Server\ServerStrategy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class ServerController extends Controller
 {
@@ -26,30 +27,6 @@ class ServerController extends Controller
     }
 
     /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        $locations = Location::pluck('code', 'id')->mapWithKeys(function ($code, $id) {
-            return [$id => $code . ' ' . Location::find($id)->emoji];
-        });
-        
-        return view('module.server.create', compact('locations'));
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Server $server)
-    {
-        $locations = Location::pluck('code', 'id')->mapWithKeys(function ($code, $id) {
-            return [$id => $code . ' ' . Location::find($id)->emoji];
-        });
-        
-        return view('module.server.edit', compact('server', 'locations'));
-    }
-
-    /**
      * Store a newly created resource in storage.
      *
      * @param Request $request
@@ -58,41 +35,92 @@ class ServerController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
-            $provider = $request->input('provider');
-            $location_id = $request->input('location_id', 1);
-            $is_free = $request->input('is_free', false);
+            // Валидация входных данных
+            $validated = $request->validate([
+                'location_id' => 'required|integer|exists:location,id',
+                'provider' => 'required|string|in:' . Server::VDSINA
+            ]);
 
-            $strategy = ServerStrategyFactory::create($provider);
-            $server = $strategy->configure($location_id, $provider, $is_free);
+            $strategy = new ServerStrategy($validated['provider']);
+            $server = $strategy->configure($validated['location_id'], $validated['provider'], false);
 
             return response()->json([
-                'status' => 'success',
-                'message' => 'Server created successfully',
+                'success' => true,
+                'message' => 'Сервер успешно создан',
                 'data' => $server
             ]);
 
-        } catch (\Exception $e) {
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ошибка валидации данных',
+                'errors' => $e->errors()
+            ], 422);
+
+        } catch (\RuntimeException $e) {
             Log::error('Server creation failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
 
+            $errorMessage = $e->getMessage();
+            if (str_contains($errorMessage, 'Server limit reached')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Достигнут максимум серверов в аккаунте VDSina (лимит: 5 серверов). ' .
+                                'Пожалуйста, удалите неиспользуемые серверы или пополните баланс.',
+                    'error_code' => 'SERVER_LIMIT_REACHED'
+                ], 400);
+            }
+
             return response()->json([
-                'status' => 'error',
+                'success' => false,
                 'message' => 'Failed to create server: ' . $e->getMessage()
+            ], 400);
+
+        } catch (\Exception $e) {
+            Log::error('Unexpected error during server creation', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'An unexpected error occurred while creating the server'
             ], 500);
         }
     }
 
     /**
-     * Update the specified resource in storage.
+     * Remove the specified resource from storage.
+     *
+     * @param Server $server
+     * @return JsonResponse
      */
-    public function update(Request $request, Server $server)
+    public function destroy(Server $server): JsonResponse
     {
-        $server->update($request->all());
+        try {
+            // Создаем стратегию для провайдера и удаляем сервер
+            $strategy = new ServerStrategy($server->provider);
+            $strategy->delete($server);
 
-        return redirect()->route('module.server.index')
-            ->with('success', 'Сервер успешно обновлен');
+            return response()->json([
+                'success' => true,
+                'message' => 'Сервер успешно удален'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to delete server', [
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Ошибка при удалении сервера: ' . $e->getMessage()
+            ], 400);
+        }
     }
 
     /**
@@ -107,29 +135,13 @@ class ServerController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Update the specified resource in storage.
      */
-    public function destroy(Server $server): JsonResponse
+    public function update(Request $request, Server $server)
     {
-        try {
-            // Выбираем стратегию в зависимости от провайдера
-            $strategy = null;
-            switch ($server->provider) {
-                case Server::VDSINA:
-                    $strategy = new ServerVdsinaStrategy();
-                    break;
-                default:
-                    throw new \InvalidArgumentException('Неподдерживаемый провайдер');
-            }
+        $server->update($request->all());
 
-            $strategy->delete($server->id);
-            $server->update(['server_status' => Server::SERVER_DELETED]);
-
-            return response()->json(['message' => 'Сервер успешно удален']);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Ошибка при удалении сервера: ' . $e->getMessage()
-            ], 400);
-        }
+        return redirect()->route('module.server.index')
+            ->with('success', 'Сервер успешно обновлен');
     }
 }

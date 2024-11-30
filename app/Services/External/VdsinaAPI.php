@@ -321,26 +321,29 @@ class VdsinaAPI
         try {
             $action = 'server';
 
-            $requestParam = [
+            $headers = [
                 'headers' => [
                     'Authorization' => $this->apiKey,
                 ],
-                'json' => [
+                RequestOptions::JSON => [
                     'name' => $server_name,
+                    'server-plan' => $server_plan,
                     'autoprolong' => $autoprolong,
                     'datacenter' => $datacenter,
-                    'server-plan' => $server_plan,
-                    'template' => $template
-                ],
+                    'template' => $template,
+                ]
             ];
 
             Log::info('Creating server in VDSina', [
-                'server_name' => $server_name,
-                'action' => $action
+                'action' => $action,
+                'name' => $server_name,
+                'server-plan' => $server_plan,
+                'datacenter' => $datacenter,
+                'template' => $template
             ]);
 
             $client = new Client(['base_uri' => self::HOST_COM]);
-            $response = $client->post($action, $requestParam);
+            $response = $client->post($action, $headers);
             $result = $response->getBody()->getContents();
             $data = json_decode($result, true);
 
@@ -359,7 +362,7 @@ class VdsinaAPI
             }
 
             Log::info('Successfully created server in VDSina', [
-                'server_name' => $server_name
+                'server_id' => $data['data']['id'] ?? null
             ]);
 
             return $data;

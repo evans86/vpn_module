@@ -4,6 +4,27 @@
     use App\Models\Server\Server;
 @endphp
 
+@section('styles')
+    <style>
+        .country-flag {
+            width: 24px;
+            height: 16px;
+            margin-right: 0.5rem;
+            display: inline-block;
+            vertical-align: middle;
+            object-fit: cover;
+        }
+        
+        .d-flex {
+            display: flex !important;
+        }
+        
+        .align-items-center {
+            align-items: center !important;
+        }
+    </style>
+@endsection
+
 @section('content')
 <div class="container-fluid">
     <div class="row">
@@ -24,30 +45,33 @@
                             <td>{{ $server->login }}</td>
                             <td>{{ $server->host }}</td>
                             <td>
-                                {{ $server->location->code }} 
-                                <span class="emoji-flag">{!! $server->location->emoji !!}</span>
+                                <div class="d-flex align-items-center">
+                                    <img src="https://flagcdn.com/w40/{{ strtolower($server->location->code) }}.png" 
+                                         class="country-flag"
+                                         alt="{{ strtoupper($server->location->code) }}"
+                                         title="{{ strtoupper($server->location->code) }}">
+                                    <span>{{ strtoupper($server->location->code) }}</span>
+                                </div>
                             </td>
                             <td>
-                                <span class="badge light badge-{{ $server->status_badge_class }}">
+                                <span class="badge badge-{{ $server->status_badge_class }}">
                                     {{ $server->status_label }}
                                 </span>
                             </td>
                             <td>
-                                <div class="dropdown">
-                                    <button type="button" class="btn btn-primary light sharp" data-toggle="dropdown">
-                                        <i class="fas fa-ellipsis-v"></i>
-                                    </button>
-                                    <div class="dropdown-menu">
-                                        <a class="dropdown-item" href="#" data-toggle="modal" 
-                                           data-target="#editServerModal{{ $server->id }}">
-                                            <i class="fas fa-edit mr-2"></i>Редактировать
-                                        </a>
-                                        <a class="dropdown-item text-danger" href="#" data-toggle="modal" 
-                                           data-target="#deleteServerModal{{ $server->id }}">
-                                            <i class="fas fa-trash mr-2"></i>Удалить
-                                        </a>
+                                @if($server->server_status !== \App\Models\Server\Server::SERVER_DELETED)
+                                    <div class="dropdown">
+                                        <button class="btn btn-link" type="button" data-toggle="dropdown">
+                                            <i class="fas fa-ellipsis-v"></i>
+                                        </button>
+                                        <div class="dropdown-menu">
+                                            <a class="dropdown-item text-danger" href="#"
+                                               onclick="deleteServer({{ $server->id }})">
+                                                <i class="fas fa-trash mr-2"></i>Удалить
+                                            </a>
+                                        </div>
                                     </div>
-                                </div>
+                                @endif
                             </td>
                         </tr>
                     @endforeach
@@ -67,59 +91,118 @@
         @csrf
         <x-form.select name="provider" id="createServerProvider" label="Провайдер" class="selectpicker"
                       :options="[Server::VDSINA => 'VDSina']" required />
-        
+
         <x-slot name="footer">
             <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
-            <button type="button" class="btn btn-primary" id="createServerBtn">Создать сервер</button>
+            <button type="button" class="btn btn-primary create-server" id="createServerBtn" data-provider="vdsina" data-location="1">Создать сервер</button>
         </x-slot>
     </form>
 </x-modal>
 
-{{-- Модальные окна редактирования --}}
-@foreach($servers as $server)
-    <x-modal id="editServerModal{{ $server->id }}" title="Редактировать сервер">
-        <form action="{{ route('module.server.update', $server->id) }}" method="POST">
-            @csrf
-            @method('PUT')
-            <x-form.input name="name" label="Название сервера" :value="$server->name" required />
-            <x-form.input name="ip" label="IP адрес" :value="$server->ip" required />
-            <x-form.input name="login" label="Логин" :value="$server->login" required />
-            <x-form.input name="password" label="Пароль" type="password" />
-            <x-form.input name="host" label="Хост" :value="$server->host" required />
-            <x-form.select name="provider" id="editServerProvider{{ $server->id }}" label="Провайдер" 
-                          :options="[Server::VDSINA => 'VDSina']" 
-                          :value="$server->provider" required />
-            <x-form.select name="location_id" id="editServerLocation{{ $server->id }}" label="Локация" 
-                          :options="$locations" 
-                          :value="$server->location_id" required />
-            <x-form.select name="server_status" id="editServerStatus{{ $server->id }}" label="Статус" 
-                          :options="[
-                              Server::SERVER_CREATED => 'Создан',
-                              Server::SERVER_CONFIGURED => 'Настроен',
-                              Server::SERVER_PASSWORD_UPDATE => 'Обновление пароля',
-                              Server::SERVER_ERROR => 'Ошибка'
-                          ]" 
-                          :value="$server->server_status" required />
-            <x-form.select name="is_free" id="editServerIsFree{{ $server->id }}" label="Свободен" 
-                          :options="['1' => 'Да', '0' => 'Нет']" 
-                          :value="$server->is_free" required />
-            <x-slot name="footer">
-                <button type="submit" class="btn btn-primary">Обновить</button>
-            </x-slot>
-        </form>
-    </x-modal>
+@push('js')
+<script>
+// Глобальная функция удаления сервера
+function deleteServer(id) {
+    if (confirm('Вы уверены, что хотите удалить этот сервер?')) {
+        $.ajax({
+            url: '/admin/module/server/' + id,
+            method: 'DELETE',
+            data: {
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                if (response.success) {
+                    toastr.success('Сервер успешно удален');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    toastr.error(response.message || 'Произошла ошибка при удалении сервера');
+                }
+            },
+            error: function(xhr) {
+                let errorMessage = 'Произошла ошибка при удалении сервера';
+                if (xhr.responseJSON) {
+                    errorMessage = xhr.responseJSON.message || errorMessage;
+                }
+                toastr.error(errorMessage);
+            }
+        });
+    }
+}
 
-    <x-modal id="deleteServerModal{{ $server->id }}" title="Удалить сервер">
-        <p>Вы уверены, что хотите удалить этот сервер?</p>
-        <form action="{{ route('module.server.destroy', $server->id) }}" method="POST">
-            @csrf
-            @method('DELETE')
-            <x-slot name="footer">
-                <button type="submit" class="btn btn-danger">Удалить</button>
-            </x-slot>
-        </form>
-    </x-modal>
-@endforeach
+$(document).ready(function() {
+    // Настройка toastr
+    toastr.options = {
+        "closeButton": true,
+        "progressBar": true,
+        "positionClass": "toast-top-right",
+        "timeOut": "3000"
+    };
+
+    console.log('Document ready');
+
+    // Обработчик создания сервера
+    $('.create-server').on('click', function() {
+        const btn = $(this);
+        const provider = btn.data('provider');
+        const location_id = btn.data('location');
+
+        if (!provider || !location_id) {
+            toastr.error('Не указан провайдер или локация');
+            return;
+        }
+
+        // Блокируем кнопку
+        btn.prop('disabled', true);
+
+        // Показываем индикатор загрузки
+        toastr.info('Создание сервера...', '', {timeOut: 0, extendedTimeOut: 0});
+
+        $.ajax({
+            url: '/admin/module/server',
+            method: 'POST',
+            data: {
+                provider: provider,
+                location_id: location_id,
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                if (response.success) {
+                    toastr.success(response.message || 'Сервер успешно создан');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    toastr.error(response.message || 'Произошла ошибка при создании сервера');
+                }
+            },
+            error: function(xhr) {
+                let errorMessage = 'Произошла ошибка при создании сервера';
+
+                if (xhr.responseJSON) {
+                    if (xhr.responseJSON.errors) {
+                        // Показываем ошибки валидации
+                        const errors = xhr.responseJSON.errors;
+                        errorMessage = Object.values(errors).flat().join('\n');
+                    } else if (xhr.responseJSON.message) {
+                        errorMessage = xhr.responseJSON.message;
+                    }
+                }
+
+                toastr.error(errorMessage);
+            },
+            complete: function() {
+                // Разблокируем кнопку
+                btn.prop('disabled', false);
+                // Скрываем индикатор загрузки
+                toastr.clear();
+            }
+        });
+    });
+});
+</script>
+@endpush
 
 @if(session('success'))
     <x-alert type="success">
@@ -137,83 +220,3 @@
     </x-alert>
 @endif
 @endsection
-
-@push('js')
-<script>
-$(document).ready(function() {
-    console.log('Document ready');
-    
-    // Инициализируем selectpicker при открытии модального окна
-    $('#createServerModal').on('shown.bs.modal', function () {
-        console.log('Modal shown');
-        $(this).find('.selectpicker').selectpicker('refresh');
-    });
-    
-    // Обработчик клика на кнопку создания
-    $('#createServerBtn').on('click', function(e) {
-        console.log('Create button clicked');
-        e.preventDefault();
-        
-        const form = $('#createServerForm');
-        const submitBtn = $(this);
-        console.log('Form found:', form.length > 0);
-        
-        // Проверяем, что провайдер выбран
-        const provider = $('#createServerProvider').val();
-        console.log('Selected provider:', provider);
-        if (!provider) {
-            alert('Пожалуйста, выберите провайдера');
-            return;
-        }
-        
-        // Блокируем кнопку и показываем индикатор загрузки
-        submitBtn.prop('disabled', true);
-        submitBtn.html('<i class="fas fa-spinner fa-spin mr-2"></i>Создание...');
-        
-        // Отправляем запрос
-        $.ajax({
-            url: '{{ route("module.server.store") }}',
-            type: 'POST',
-            data: form.serialize(),
-            success: function(response) {
-                console.log('Success response:', response);
-                if (response.status === 'success') {
-                    // Закрываем модальное окно
-                    $('#createServerModal').modal('hide');
-                    
-                    // Показываем уведомление об успехе
-                    $('body').append(`
-                        <div class="alert alert-success alert-dismissible fade show position-fixed" 
-                             style="top: 1rem; right: 1rem; z-index: 9999;" role="alert">
-                            ${response.message}
-                            <button type="button" class="close" data-dismiss="alert">
-                                <span>&times;</span>
-                            </button>
-                        </div>
-                    `);
-                    
-                    // Перезагружаем страницу через 2 секунды
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 2000);
-                } else {
-                    // Показываем ошибку
-                    alert(response.message || 'Произошла ошибка при создании сервера');
-                    submitBtn.prop('disabled', false);
-                    submitBtn.html('Создать сервер');
-                }
-            },
-            error: function(xhr) {
-                console.log('Error response:', xhr);
-                // Показываем ошибку
-                const errorMessage = xhr.responseJSON?.message || 'Произошла ошибка при создании сервера';
-                console.error('Error:', errorMessage);
-                alert(errorMessage);
-                submitBtn.prop('disabled', false);
-                submitBtn.html('Создать сервер');
-            }
-        });
-    });
-});
-</script>
-@endpush

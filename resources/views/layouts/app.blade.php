@@ -31,6 +31,7 @@
     <link href="{{ asset('mota/centre/jqvmap/css/jqvmap.min.css') }}" rel="stylesheet"/>
     <link href="{{ asset('mota/centre/chartist/css/chartist.min.css') }}" rel="stylesheet"/>
     <link href="https://cdn.lineicons.com/2.0/LineIcons.css" rel="stylesheet"/>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet"/>
 
     @stack('css')
 </head>
@@ -75,6 +76,7 @@
 <script src="{{ asset('mota/centre/apexchart/apexchart.js') }}"></script>
 <script src="{{ asset('mota/centre/peity/jquery.peity.min.js') }}"></script>
 <script src="{{ asset('mota/centre/chartist/js/chartist.min.js') }}"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 
 <!-- Initialize AOS -->
 <script>

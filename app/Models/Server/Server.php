@@ -109,17 +109,17 @@ class Server extends Model
     {
         switch ($this->server_status) {
             case self::SERVER_CREATED:
-                return 'badge-warning';
+                return 'warning';
             case self::SERVER_CONFIGURED:
-                return 'badge-success';
+                return 'success';
             case self::SERVER_ERROR:
-                return 'badge-danger';
+                return 'danger';
             case self::SERVER_DELETED:
-                return 'badge-secondary';
+                return 'dark';
             case self::SERVER_PASSWORD_UPDATE:
-                return 'badge-info';
+                return 'info';
             default:
-                return 'badge-dark';
+                return 'secondary';
         }
     }
 
