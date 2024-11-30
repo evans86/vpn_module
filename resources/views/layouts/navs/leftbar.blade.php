@@ -97,6 +97,12 @@
                     <span class="nav-text">Обновление токена бота</span>
                 </a>
             </li>
+            <li class="nav-item {{ request()->routeIs('logs.*') ? 'active' : '' }}">
+                <a href="{{ route('logs.index') }}" class="nav-link">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Логи приложения</span>
+                </a>
+            </li>
         </ul>
     </div>
 </div>

@@ -68,6 +68,7 @@ Route::middleware(['auth', 'admin'])->group(function () {
             Route::post('/', [SalesmanController::class, 'store'])->name('store');
             Route::put('/{salesman}', [SalesmanController::class, 'update'])->name('update');
             Route::delete('/{salesman}', [SalesmanController::class, 'destroy'])->name('destroy');
+            Route::post('/{id}/toggle-status', [SalesmanController::class, 'toggleStatus'])->name('toggle-status');
         });
 
         // Pack Routes
@@ -117,6 +118,10 @@ Route::middleware(['auth', 'admin'])->group(function () {
             Route::post('/{panel}/configure', [PanelController::class, 'configure'])->name('configure');
             Route::post('/{panel}/update-config', [PanelController::class, 'updateConfig'])->name('update-config');
         });
+
+        // Маршруты для логов
+        Route::get('/logs', [App\Http\Controllers\LogController::class, 'index'])->name('logs.index');
+        Route::get('/logs/{log}', [App\Http\Controllers\LogController::class, 'show'])->name('logs.show');
 
         // Dashboard
         Route::get('/', function () {

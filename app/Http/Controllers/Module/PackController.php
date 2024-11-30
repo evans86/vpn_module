@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Pack\StorePackRequest;
 use App\Http\Requests\Pack\UpdatePackRequest;
 use App\Services\Pack\PackService;
+use App\Logging\DatabaseLogger;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 
@@ -15,13 +15,18 @@ class PackController extends Controller
 {
     /** @var PackService */
     private $packService;
+    
+    /** @var DatabaseLogger */
+    private $logger;
 
     /**
      * @param PackService $packService
+     * @param DatabaseLogger $logger
      */
-    public function __construct(PackService $packService)
+    public function __construct(PackService $packService, DatabaseLogger $logger)
     {
         $this->packService = $packService;
+        $this->logger = $logger;
     }
 
     /**
@@ -33,9 +38,21 @@ class PackController extends Controller
     {
         try {
             $packs = $this->packService->getAllPaginated();
+            $this->logger->info('Просмотр списка пакетов', [
+                'source' => 'pack',
+                'action' => 'view',
+                'user_id' => auth()->id(),
+                'total_packs' => $packs->total()
+            ]);
             return view('module.pack.index', compact('packs'));
         } catch (\Exception $e) {
-            Log::error('Failed to fetch packs', ['error' => $e->getMessage()]);
+            $this->logger->error('Ошибка при загрузке списка пакетов', [
+                'source' => 'pack',
+                'action' => 'view',
+                'user_id' => auth()->id(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return back()->withErrors(['msg' => 'Ошибка при загрузке пакетов']);
         }
     }
@@ -49,11 +66,27 @@ class PackController extends Controller
     public function store(StorePackRequest $request)
     {
         try {
-            $this->packService->create($request->validated());
+            $data = $request->validated();
+            $this->packService->create($data);
+            
+            $this->logger->info('Пакет успешно создан', [
+                'source' => 'pack',
+                'action' => 'create',
+                'user_id' => auth()->id(),
+                'pack_data' => array_diff_key($data, array_flip(['password'])) // Исключаем чувствительные данные
+            ]);
+            
             return redirect()->route('module.pack.index')
                 ->with('success', 'Пакет успешно создан');
         } catch (\Exception $e) {
-            Log::error('Failed to create pack', ['error' => $e->getMessage()]);
+            $this->logger->error('Ошибка при создании пакета', [
+                'source' => 'pack',
+                'action' => 'create',
+                'user_id' => auth()->id(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => array_diff_key($request->validated(), array_flip(['password'])) // Исключаем чувствительные данные
+            ]);
             return back()->withErrors(['msg' => 'Ошибка при создании пакета']);
         }
     }
@@ -68,11 +101,29 @@ class PackController extends Controller
     public function update(UpdatePackRequest $request, int $id)
     {
         try {
-            $this->packService->update($id, $request->validated());
+            $data = $request->validated();
+            $this->packService->update($id, $data);
+            
+            $this->logger->info('Пакет успешно обновлен', [
+                'source' => 'pack',
+                'action' => 'update',
+                'user_id' => auth()->id(),
+                'pack_id' => $id,
+                'pack_data' => array_diff_key($data, array_flip(['password'])) // Исключаем чувствительные данные
+            ]);
+            
             return redirect()->route('module.pack.index')
                 ->with('success', 'Пакет успешно обновлен');
         } catch (\Exception $e) {
-            Log::error('Failed to update pack', ['error' => $e->getMessage(), 'pack_id' => $id]);
+            $this->logger->error('Ошибка при обновлении пакета', [
+                'source' => 'pack',
+                'action' => 'update',
+                'user_id' => auth()->id(),
+                'pack_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => array_diff_key($request->validated(), array_flip(['password'])) // Исключаем чувствительные данные
+            ]);
             return back()->withErrors(['msg' => 'Ошибка при обновлении пакета']);
         }
     }
@@ -87,9 +138,24 @@ class PackController extends Controller
     {
         try {
             $this->packService->delete($id);
+            
+            $this->logger->info('Пакет успешно удален', [
+                'source' => 'pack',
+                'action' => 'delete',
+                'user_id' => auth()->id(),
+                'pack_id' => $id
+            ]);
+            
             return response()->json(['success' => true]);
         } catch (\Exception $e) {
-            Log::error('Failed to delete pack', ['error' => $e->getMessage(), 'pack_id' => $id]);
+            $this->logger->error('Ошибка при удалении пакета', [
+                'source' => 'pack',
+                'action' => 'delete',
+                'user_id' => auth()->id(),
+                'pack_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Ошибка при удалении пакета'

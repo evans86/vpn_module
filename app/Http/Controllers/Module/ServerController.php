@@ -19,12 +19,28 @@ class ServerController extends Controller
      */
     public function index()
     {
-        $servers = Server::with('location')->paginate(10);
-        $locations = Location::pluck('code', 'id')->mapWithKeys(function ($code, $id) {
-            return [$id => $code . ' ' . Location::find($id)->emoji];
-        });
+        try {
+            Log::info('Accessing servers list', [
+                'source' => 'server',
+                'user_id' => auth()->id()
+            ]);
 
-        return view('module.server.index', compact('servers', 'locations'));
+            $servers = Server::with('location')->paginate(10);
+            $locations = Location::pluck('code', 'id')->mapWithKeys(function ($code, $id) {
+                return [$id => $code . ' ' . Location::find($id)->emoji];
+            });
+
+            return view('module.server.index', compact('servers', 'locations'));
+        } catch (\Exception $e) {
+            Log::error('Error accessing servers list', [
+                'source' => 'server',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id()
+            ]);
+
+            return back()->with('error', 'Error loading servers list: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -36,6 +52,13 @@ class ServerController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
+            Log::info('Creating new server', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'location_id' => $request->input('location_id'),
+                'provider' => $request->input('provider')
+            ]);
+
             // Валидация входных данных
             $validated = $request->validate([
                 'location_id' => 'required|integer|exists:location,id',
@@ -45,31 +68,49 @@ class ServerController extends Controller
             $strategy = new ServerStrategy($validated['provider']);
             $server = $strategy->configure($validated['location_id'], $validated['provider'], false);
 
+            Log::info('Server created successfully', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'server_id' => $server->id,
+                'location_id' => $server->location_id,
+                'provider' => $server->provider
+            ]);
+
             return response()->json([
                 'success' => true,
-                'message' => 'Сервер успешно создан',
+                'message' => 'Server created successfully',
                 'data' => $server
             ]);
 
         } catch (ValidationException $e) {
+            Log::warning('Server creation validation failed', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'errors' => $e->errors(),
+                'data' => $request->all()
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Ошибка валидации данных',
+                'message' => 'Validation error',
                 'errors' => $e->errors()
             ], 422);
 
         } catch (\RuntimeException $e) {
             Log::error('Server creation failed', [
+                'source' => 'server',
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id(),
+                'data' => $request->all()
             ]);
 
             $errorMessage = $e->getMessage();
             if (str_contains($errorMessage, 'Server limit reached')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Достигнут максимум серверов в аккаунте VDSina (лимит: 5 серверов). ' .
-                                'Пожалуйста, удалите неиспользуемые серверы или пополните баланс.',
+                    'message' => 'VDSina server limit reached (limit: 5 servers). ' .
+                                'Please delete unused servers or add funds.',
                     'error_code' => 'SERVER_LIMIT_REACHED'
                 ], 400);
             }
@@ -81,14 +122,55 @@ class ServerController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Unexpected error during server creation', [
+                'source' => 'server',
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id(),
+                'data' => $request->all()
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'An unexpected error occurred while creating the server'
             ], 500);
+        }
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, Server $server)
+    {
+        try {
+            Log::info('Updating server', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'server_id' => $server->id,
+                'data' => $request->except(['_token', '_method'])
+            ]);
+
+            $server->update($request->all());
+
+            Log::info('Server updated successfully', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'server_id' => $server->id
+            ]);
+
+            return redirect()->route('module.server.index')
+                ->with('success', 'Server updated successfully');
+        } catch (\Exception $e) {
+            Log::error('Error updating server', [
+                'source' => 'server',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id(),
+                'server_id' => $server->id,
+                'data' => $request->all()
+            ]);
+
+            return redirect()->route('module.server.index')
+                ->with('error', 'Error updating server: ' . $e->getMessage());
         }
     }
 
@@ -101,23 +183,38 @@ class ServerController extends Controller
     public function destroy(Server $server): JsonResponse
     {
         try {
+            Log::info('Deleting server', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'server_id' => $server->id,
+                'provider' => $server->provider
+            ]);
+
             // Создаем стратегию для провайдера и удаляем сервер
             $strategy = new ServerStrategy($server->provider);
             $strategy->delete($server);
 
+            Log::info('Server deleted successfully', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'server_id' => $server->id
+            ]);
+
             return response()->json([
-                'message' => 'Сервер успешно удален'
+                'message' => 'Server deleted successfully'
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Failed to delete server', [
-                'server_id' => $server->id,
+            Log::error('Error deleting server', [
+                'source' => 'server',
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id(),
+                'server_id' => $server->id
             ]);
 
             return response()->json([
-                'message' => 'Ошибка при удалении сервера: ' . $e->getMessage()
+                'message' => 'Error deleting server: ' . $e->getMessage()
             ], 400);
         }
     }
@@ -131,16 +228,5 @@ class ServerController extends Controller
             'status' => $server->server_status,
             'message' => $server->status_label
         ]);
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Server $server)
-    {
-        $server->update($request->all());
-
-        return redirect()->route('module.server.index')
-            ->with('success', 'Сервер успешно обновлен');
     }
 }

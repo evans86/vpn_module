@@ -14,53 +14,83 @@
                                 <thead>
                                 <tr>
                                     <th style="width:80px;"><strong>#</strong></th>
-                                    <th><strong>TG ID</strong></th>
-                                    <th><strong>USERNAME</strong></th>
-                                    <th><strong>BOT LINK</strong></th>
-                                    <th><strong>STATUS</strong></th>
-                                    <th></th>
+                                    <th><strong>Телеграм ID</strong></th>
+                                    <th><strong>Имя пользователя</strong></th>
+                                    <th><strong>Ссылка на бота</strong></th>
+                                    <th><strong>Статус</strong></th>
                                 </tr>
                                 </thead>
                                 <tbody>
-                                @foreach($salesmans as $salesman)
+                                @foreach($salesmen as $salesman)
                                     <tr>
                                         <td><strong>{{ $salesman->id }}</strong></td>
                                         <td>{{ $salesman->telegram_id }}</td>
                                         <td>{{ $salesman->username }}</td>
-                                        <td>{{ $salesman->bot_link }}</td>
-                                        <td><span class="badge light badge-success">{{ $salesman->status }}</span></td>
+                                        <td><a href="{{ $salesman->bot_link }}" target="_blank">{{ $salesman->bot_link }}</a></td>
                                         <td>
-                                            <div class="dropdown">
-                                                <button type="button" class="btn btn-success light sharp"
-                                                        data-toggle="dropdown">
-                                                    <svg width="20px" height="20px" viewBox="0 0 24 24" version="1.1">
-                                                        <g stroke="none" stroke-width="1" fill="none"
-                                                           fill-rule="evenodd">
-                                                            <rect x="0" y="0" width="24" height="24"/>
-                                                            <circle fill="#000000" cx="5" cy="12" r="2"/>
-                                                            <circle fill="#000000" cx="12" cy="12" r="2"/>
-                                                            <circle fill="#000000" cx="19" cy="12" r="2"/>
-                                                        </g>
-                                                    </svg>
-                                                </button>
-                                                <div class="dropdown-menu">
-                                                    <a class="dropdown-item" href="#">Statistics</a>
-                                                    <a class="dropdown-item" href="#">Delete</a>
-                                                </div>
-                                            </div>
+                                            <button class="btn btn-sm status-toggle {{ $salesman->status ? 'btn-success' : 'btn-danger' }}"
+                                                    data-id="{{ $salesman->id }}"
+                                                    onclick="toggleStatus({{ $salesman->id }})">
+                                                {{ $salesman->status ? 'Активен' : 'Неактивен' }}
+                                            </button>
                                         </td>
                                     </tr>
                                 @endforeach
                                 </tbody>
                             </table>
                         </div>
-                        {{--                        <div class="d-flex">--}}
-                        {{--                            {!! $panels->links() !!}--}}
-                        {{--                        </div>--}}
+                        <div class="d-flex">
+                            {{ $salesmen->links() }}
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-@endsection
 
+    @push('js')
+    <script>
+        // Настройка CSRF-токена для всех AJAX-запросов
+        $.ajaxSetup({
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            }
+        });
+
+        function toggleStatus(id) {
+            $.ajax({
+                url: `/admin/module/salesman/${id}/toggle-status`,
+                type: 'POST',
+                success: function(response) {
+                    if (response.success) {
+                        const button = $(`.status-toggle[data-id="${id}"]`);
+                        if (response.status) {
+                            button.removeClass('btn-danger').addClass('btn-success');
+                            button.text('Активен');
+                        } else {
+                            button.removeClass('btn-success').addClass('btn-danger');
+                            button.text('Неактивен');
+                        }
+                        // Показываем уведомление об успехе
+                        showNotification('success', response.message);
+                    } else {
+                        showNotification('error', response.message);
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Error:', xhr);
+                    showNotification('error', 'Произошла ошибка при изменении статуса');
+                }
+            });
+        }
+
+        function showNotification(type, message) {
+            if (typeof toastr !== 'undefined') {
+                toastr[type](message);
+            } else {
+                alert(message);
+            }
+        }
+    </script>
+    @endpush
+@endsection
