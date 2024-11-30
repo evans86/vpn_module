@@ -122,7 +122,7 @@ class MarzbanAPI
                 'json' => [
                     'username' => $userId,
                     'data_limit' => $data_limit, //лимит 25 гигов
-                    'expire' => time() + $expire, //время окончания через 30 дней
+                    'expire' => $expire, //время окончания через 30 дней
                     'proxies' => [
                         "vmess" => [
 

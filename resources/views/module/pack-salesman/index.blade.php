@@ -10,41 +10,64 @@
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table table-responsive-md">
+                            <table class="table">
                                 <thead>
                                 <tr>
-                                    <th style="width:80px;"><strong>#</strong></th>
-                                    <th><strong>PACK</strong></th>
-                                    <th><strong>SALESMAN</strong></th>
-                                    <th><strong>STATUS</strong></th>
-                                    <th></th>
+                                    <th><strong>#</strong></th>
+                                    <th><strong>Пакет</strong></th>
+                                    <th><strong>Продавец</strong></th>
+                                    <th><strong>Цена</strong></th>
+                                    <th><strong>Статус</strong></th>
+                                    <th><strong>Дата создания</strong></th>
+                                    <th><strong>Действия</strong></th>
                                 </tr>
                                 </thead>
                                 <tbody>
-                                @foreach($pack_salesmans as $packs_salesman)
+                                @foreach($pack_salesmans as $pack_salesman)
                                     <tr>
-                                        <td><strong>{{ $packs_salesman->id }}</strong></td>
-                                        <td>{{ $packs_salesman->pack_id }}</td>
-                                        <td>{{ $packs_salesman->salesman_id }}</td>
-                                        <td><span class="badge light badge-success">{{ $packs_salesman->status }}</span></td>
+                                        <td>{{ $pack_salesman->id }}</td>
                                         <td>
-                                            <div class="dropdown">
-                                                <button type="button" class="btn btn-success light sharp"
-                                                        data-toggle="dropdown">
-                                                    <svg width="20px" height="20px" viewBox="0 0 24 24" version="1.1">
-                                                        <g stroke="none" stroke-width="1" fill="none"
-                                                           fill-rule="evenodd">
-                                                            <rect x="0" y="0" width="24" height="24"/>
-                                                            <circle fill="#000000" cx="5" cy="12" r="2"/>
-                                                            <circle fill="#000000" cx="12" cy="12" r="2"/>
-                                                            <circle fill="#000000" cx="19" cy="12" r="2"/>
-                                                        </g>
-                                                    </svg>
-                                                </button>
-                                                <div class="dropdown-menu">
-                                                    <a class="dropdown-item" href="#">Statistics</a>
-                                                    <a class="dropdown-item" href="#">Delete</a>
-                                                </div>
+                                            @if($pack_salesman->pack)
+                                                {{ $pack_salesman->pack->name }}
+                                                <small class="d-block text-muted">
+                                                    Кол-во ключей: {{ $pack_salesman->pack->count_keys }}
+                                                </small>
+                                            @else
+                                                <span class="text-muted">Пакет удален</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if($pack_salesman->salesman)
+                                                {{ $pack_salesman->salesman->name }}
+                                                <small class="d-block text-muted">
+                                                    ID: {{ $pack_salesman->salesman->id }}
+                                                </small>
+                                            @else
+                                                <span class="text-muted">Продавец удален</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if($pack_salesman->pack)
+                                                {{ number_format($pack_salesman->pack->price, 2) }} ₽
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <span class="badge {{ $pack_salesman->getStatusBadgeClass() }}">
+                                                {{ $pack_salesman->getStatusText() }}
+                                            </span>
+                                        </td>
+                                        <td>{{ $pack_salesman->created_at->format('d.m.Y H:i') }}</td>
+                                        <td>
+                                            <div class="btn-group">
+                                                @if(!$pack_salesman->isPaid())
+                                                    <button type="button" 
+                                                            class="btn btn-sm btn-success" 
+                                                            onclick="markAsPaid({{ $pack_salesman->id }})">
+                                                        Отметить оплаченным
+                                                    </button>
+                                                @endif
                                             </div>
                                         </td>
                                     </tr>
@@ -52,17 +75,47 @@
                                 </tbody>
                             </table>
                         </div>
-                        {{--                        <div class="d-grid gap-2 d-md-block mb-2">--}}
-                        {{--                            <a href="{{ route('module.panel.create') }}" class="btn btn-success">Создать пакет</a>--}}
-                        {{--                        </div>--}}
-                        {{--                        <div class="d-flex">--}}
-                        {{--                            {!! $panels->links() !!}--}}
-                        {{--                        </div>--}}
+
+                        <div class="d-flex justify-content-center mt-4">
+                            {{ $pack_salesmans->links('vendor.pagination.bootstrap-4') }}
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Добавляем CSRF-токен в заголовки всех AJAX-запросов
+            $.ajaxSetup({
+                headers: {
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                }
+            });
+        });
+
+        function markAsPaid(id) {
+            if (confirm('Отметить пакет как оплаченный?')) {
+                $.ajax({
+                    url: `/admin/module/pack-salesman/${id}/mark-as-paid`,
+                    method: 'POST',
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success('Статус успешно обновлен');
+                            setTimeout(() => window.location.reload(), 1000);
+                        } else {
+                            toastr.error(response.message || 'Произошла ошибка');
+                        }
+                    },
+                    error: function(xhr) {
+                        toastr.error('Произошла ошибка при обновлении статуса');
+                        console.error('Error:', xhr);
+                    }
+                });
+            }
+        }
+    </script>
+    @endpush
 @endsection
-
-

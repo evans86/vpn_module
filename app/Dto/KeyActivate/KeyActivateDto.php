@@ -2,11 +2,11 @@
 
 namespace App\Dto\KeyActivate;
 
-use Faker\Provider\Uuid;
+use Ramsey\Uuid\UuidInterface;
 
 class KeyActivateDto
 {
-    public uuid $id;
+    public UuidInterface $id;
     public int $traffic_limit;
     public int $pack_salesman_id;
     public int $finish_at;

@@ -9,6 +9,7 @@ use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
 use App\Services\Key\KeyActivateService;
 use Exception;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class PackSalesmanService
@@ -89,23 +90,45 @@ class PackSalesmanService
      */
     private function successPaid(int $pack_salesman_id): void
     {
-        /**
-         * @var PackSalesman $pack_salesman
-         */
-        $pack_salesman = PackSalesman::query()->where('id', $pack_salesman_id)->firstOrFail();
-        /**
-         * @var Pack $pack
-         */
-        $pack = Pack::query()->where('id', $pack_salesman->pack_id)->firstOrFail();
-        $keyActivateService = new KeyActivateService();
+        try {
+            /**
+             * @var PackSalesman $pack_salesman
+             */
+            $pack_salesman = PackSalesman::query()->where('id', $pack_salesman_id)->firstOrFail();
+            /**
+             * @var Pack $pack
+             */
+            $pack = Pack::query()->where('id', $pack_salesman->pack_id)->firstOrFail();
+            $keyActivateService = new KeyActivateService();
 
-        /**
-         * @var $traffic_limit - лимит трафика 10 GB
-         * @var $finish_at - срок действия 7 дней (604800 секунд)
-         * @var $deleted_at - нужно активировать за 1 месяц (2629743 секунд)
-         */
-        for ($n = 0; $n < $pack->count; $n++) {
-            $keyActivateService->create(10737418240, $pack_salesman->id, 604800, null, time() + 2629743);
+            // Создаем ключи согласно параметрам пакета
+            for ($i = 0; $i < $pack->count; $i++) {
+                // Используем текущее время как базу
+                $now = time();
+
+                // Ограничиваем периоды до разумных значений
+                $period_days = min($pack->period, 365 * 2); // максимум 2 года
+                $activate_days = min($pack->activate_time, 90); // максимум 90 дней на активацию
+
+                // Вычисляем временные метки относительно текущего времени
+                $finish_at = $now + ($period_days * 24 * 60 * 60);
+                $deleted_at = $now + ($activate_days * 24 * 60 * 60);
+
+                try {
+                    $keyActivateService->create(
+                        $pack->traffic_limit,  // Лимит трафика из пакета
+                        $pack_salesman->id,    // ID связи пакет-продавец
+                        $finish_at,            // Дата окончания действия ключа
+                        null,                  // Время начала (null = начнется при активации)
+                        $deleted_at            // Дата, до которой нужно активировать ключ
+                    );
+                } catch (\Exception $e) {
+                    Log::error("Ошибка при создании ключа: " . $e->getMessage());
+                    throw new RuntimeException('Ошибка при создании ключа: ' . $e->getMessage());
+                }
+            }
+        } catch (Exception $e) {
+            throw new Exception('Ошибка при создании ключей: ' . $e->getMessage());
         }
     }
 

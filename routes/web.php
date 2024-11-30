@@ -90,9 +90,14 @@ Route::middleware(['auth', 'admin'])->group(function () {
         // Key Activate Routes
         Route::prefix('module/key-activate')->name('module.key-activate.')->group(function () {
             Route::get('/', [KeyActivateController::class, 'index'])->name('index');
-            Route::post('/', [KeyActivateController::class, 'store'])->name('store');
-            Route::put('/{keyActivate}', [KeyActivateController::class, 'update'])->name('update');
-            Route::delete('/{keyActivate}', [KeyActivateController::class, 'destroy'])->name('destroy');
+            Route::delete('/{key}', [KeyActivateController::class, 'destroy'])->name('destroy');
+            Route::post('/{key}/test-activate', [KeyActivateController::class, 'testActivate'])->name('test-activate');
+        });
+
+        // Key Activation Management Routes
+        Route::prefix('module/key-activate')->name('module.key-activate.')->group(function () {
+            Route::get('/', [KeyActivateController::class, 'index'])->name('index');
+            Route::delete('/{key}', [KeyActivateController::class, 'destroy'])->name('destroy');
         });
 
         // Bot Routes
@@ -127,6 +132,15 @@ Route::middleware(['auth', 'admin'])->group(function () {
         Route::get('/', function () {
             return view('dashboard');
         })->name('dashboard');
+    });
+});
+
+Route::prefix('admin')->middleware(['auth'])->group(function () {
+    Route::prefix('module')->group(function () {
+        Route::prefix('pack-salesman')->group(function () {
+            Route::get('/', [PackSalesmanController::class, 'index'])->name('module.pack-salesman.index');
+            Route::post('/{id}/mark-as-paid', [PackSalesmanController::class, 'markAsPaid'])->name('module.pack-salesman.mark-as-paid');
+        });
     });
 });
 

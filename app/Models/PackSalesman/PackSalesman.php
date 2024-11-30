@@ -21,4 +21,70 @@ class PackSalesman extends Model
 
     protected $guarded = false;
     protected $table = 'pack_salesman';
+
+    /**
+     * Отношение к пакету
+     */
+    public function pack()
+    {
+        return $this->belongsTo(\App\Models\Pack\Pack::class, 'pack_id');
+    }
+
+    /**
+     * Отношение к продавцу
+     */
+    public function salesman()
+    {
+        return $this->belongsTo(\App\Models\Salesman\Salesman::class, 'salesman_id');
+    }
+
+    /**
+     * Получить текстовое представление статуса
+     */
+    public function getStatusText(): string
+    {
+        switch ($this->status) {
+            case self::NOT_PAID:
+                return 'Не оплачен';
+            case self::PAID:
+                return 'Оплачен';
+            case self::EXPIRED:
+                return 'Истек срок';
+            default:
+                return 'Неизвестно';
+        }
+    }
+
+    /**
+     * Получить класс бейджа для статуса
+     */
+    public function getStatusBadgeClass(): string
+    {
+        switch ($this->status) {
+            case self::NOT_PAID:
+                return 'badge-warning';
+            case self::PAID:
+                return 'badge-success';
+            case self::EXPIRED:
+                return 'badge-danger';
+            default:
+                return 'badge-secondary';
+        }
+    }
+
+    /**
+     * Проверить, оплачен ли пакет
+     */
+    public function isPaid(): bool
+    {
+        return $this->status === self::PAID;
+    }
+
+    /**
+     * Проверить, истек ли срок пакета
+     */
+    public function isExpired(): bool
+    {
+        return $this->status === self::EXPIRED;
+    }
 }
