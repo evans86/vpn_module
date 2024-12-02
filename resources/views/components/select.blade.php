@@ -20,9 +20,9 @@
 
     <select name="{{ $name }}"
             id="{{ $name }}"
-            {{ $required ? 'required' : '' }}
-            {{ $attributes->merge(['class' => 'form-control ' . ($error ? 'is-invalid' : '')]) }}>
-        
+        {{ $required ? 'required' : '' }}
+        {{ $attributes->merge(['class' => 'form-control ' . ($error ? 'is-invalid' : '')]) }}>
+
         @if($placeholder)
             <option value="">{{ $placeholder }}</option>
         @endif

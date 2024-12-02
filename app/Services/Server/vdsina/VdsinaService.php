@@ -7,6 +7,8 @@ use App\Models\Panel\Panel;
 use App\Models\Server\Server;
 use App\Services\Cloudflare\CloudflareService;
 use App\Services\External\VdsinaAPI;
+use DomainException;
+use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -21,7 +23,7 @@ class VdsinaService
      * @param bool $isFree
      * @return Server
      * @throws GuzzleException
-     * @throws \Exception
+     * @throws Exception
      */
     public function configure(int $location_id, string $provider, bool $isFree): Server
     {
@@ -31,7 +33,7 @@ class VdsinaService
              */
             $location = Location::query()->where('id', $location_id)->first();
             if (!$location) {
-                throw new \RuntimeException('Location not found');
+                throw new RuntimeException('Location not found');
             }
 
             $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
@@ -39,7 +41,7 @@ class VdsinaService
             // 1. Проверяем доступность дата-центров
             $datacenters = $vdsinaApi->getDatacenter();
             if (!isset($datacenters['data']) || !is_array($datacenters['data'])) {
-                throw new \RuntimeException('Invalid datacenter response from VDSina');
+                throw new RuntimeException('Invalid datacenter response from VDSina');
             }
 
             // Ищем датацентр Amsterdam (id = 1)
@@ -52,13 +54,13 @@ class VdsinaService
             }
 
             if (!$datacenter) {
-                throw new \RuntimeException('Amsterdam datacenter not found in VDSina');
+                throw new RuntimeException('Amsterdam datacenter not found in VDSina');
             }
 
             // 2. Проверяем доступность шаблонов ОС
             $templates = $vdsinaApi->getTemplate();
             if (!isset($templates['data']) || !is_array($templates['data'])) {
-                throw new \RuntimeException('Invalid template response from VDSina');
+                throw new RuntimeException('Invalid template response from VDSina');
             }
 
             // Ищем Ubuntu 24.04 (id = 23)
@@ -71,13 +73,13 @@ class VdsinaService
             }
 
             if (!$template) {
-                throw new \RuntimeException('Ubuntu 24.04 template not found in VDSina');
+                throw new RuntimeException('Ubuntu 24.04 template not found in VDSina');
             }
 
             // 3. Проверяем доступность тарифных планов
             $plans = $vdsinaApi->getServerPlan();
             if (!isset($plans['data']) || !is_array($plans['data'])) {
-                throw new \RuntimeException('Invalid server plan response from VDSina');
+                throw new RuntimeException('Invalid server plan response from VDSina');
             }
 
             // Ищем базовый тарифный план (id = 1)
@@ -90,7 +92,7 @@ class VdsinaService
             }
 
             if (!$serverPlan) {
-                throw new \RuntimeException('Basic server plan not found in VDSina');
+                throw new RuntimeException('Basic server plan not found in VDSina');
             }
 
             // 4. Создаем сервер через API VDSina
@@ -104,7 +106,7 @@ class VdsinaService
             );
 
             if (!isset($serverResponse['data']['id']) || !isset($serverResponse['status']) || $serverResponse['status'] !== 'ok') {
-                throw new \RuntimeException('Failed to create server in VDSina: ' . ($serverResponse['status_msg'] ?? 'Unknown error'));
+                throw new RuntimeException('Failed to create server in VDSina: ' . ($serverResponse['status_msg'] ?? 'Unknown error'));
             }
 
             // 5. Создаем запись о сервере
@@ -118,7 +120,7 @@ class VdsinaService
 
             return $server;
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Failed to configure server', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -133,7 +135,7 @@ class VdsinaService
      * @param int $server_id
      * @return void
      * @throws GuzzleException
-     * @throws \Exception
+     * @throws Exception
      */
     public function finishConfigure(int $server_id)
     {
@@ -203,7 +205,7 @@ class VdsinaService
                     'host' => $host->name,
                     'dns_record_id' => $host->id
                 ]);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::error('Failed to configure DNS for server', [
                     'server_id' => $server_id,
                     'name' => $serverName,
@@ -223,7 +225,7 @@ class VdsinaService
                 throw $e;
             }
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Failed to configure server', [
                 'server_id' => $server_id,
                 'error' => $e->getMessage(),
@@ -245,7 +247,7 @@ class VdsinaService
      *
      * @return void
      * @throws GuzzleException
-     * @throws \Exception
+     * @throws Exception
      */
     public function checkStatus()
     {
@@ -294,7 +296,7 @@ class VdsinaService
                             'provider_id' => $server->provider_id
                         ]);
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::error('Error processing server', [
                         'server_id' => $server->id,
                         'provider_id' => $server->provider_id ?? 'unknown',
@@ -310,7 +312,7 @@ class VdsinaService
 
             Log::info('Finished checking VDSINA servers', ['count' => count($servers)]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error in checkStatus', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -325,7 +327,7 @@ class VdsinaService
      * @param int $provider_id
      * @return bool
      * @throws GuzzleException
-     * @throws \Exception
+     * @throws Exception
      */
     public function serverStatus(int $provider_id): bool
     {
@@ -340,7 +342,7 @@ class VdsinaService
                     'provider_id' => $provider_id,
                     'response' => $server
                 ]);
-                throw new \RuntimeException('Invalid server response: status not found');
+                throw new RuntimeException('Invalid server response: status not found');
             }
 
             $external_status = $server['data']['status'];
@@ -359,9 +361,9 @@ class VdsinaService
                         'provider_id' => $provider_id,
                         'status' => $external_status
                     ]);
-                    throw new \DomainException('Undefined status: ' . $external_status);
+                    throw new DomainException('Undefined status: ' . $external_status);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error checking server status in VDSina', [
                 'provider_id' => $provider_id,
                 'error' => $e->getMessage(),
@@ -376,7 +378,7 @@ class VdsinaService
      *
      * @param Server $server
      * @return void
-     * @throws \Exception
+     * @throws Exception
      */
     public function delete(Server $server): void
     {
@@ -387,7 +389,7 @@ class VdsinaService
             $response = $vdsinaApi->deleteServer($server->provider_id);
 
             if (!isset($response['status']) || $response['status'] !== 'ok') {
-                throw new \RuntimeException(
+                throw new RuntimeException(
                     'Failed to delete server in VDSina: ' .
                     ($response['description'] ?? $response['status_msg'] ?? 'Unknown error')
                 );
@@ -398,7 +400,7 @@ class VdsinaService
                 try {
                     $cloudflare = new CloudflareService();
                     $cloudflare->deleteSubdomain($server->dns_record_id);
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::warning('Failed to delete DNS record', [
                         'server_id' => $server->id,
                         'dns_record_id' => $server->dns_record_id,
@@ -419,7 +421,7 @@ class VdsinaService
                 'provider_id' => $server->provider_id
             ]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Failed to delete server in VDSina', [
                 'server_id' => $server->id,
                 'provider_id' => $server->provider_id,

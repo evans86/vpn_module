@@ -62,8 +62,8 @@
                                         <td>
                                             <div class="btn-group">
                                                 @if(!$pack_salesman->isPaid())
-                                                    <button type="button" 
-                                                            class="btn btn-sm btn-success" 
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-success"
                                                             onclick="markAsPaid({{ $pack_salesman->id }})">
                                                         Отметить оплаченным
                                                     </button>
@@ -86,36 +86,36 @@
     </div>
 
     @push('scripts')
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Добавляем CSRF-токен в заголовки всех AJAX-запросов
-            $.ajaxSetup({
-                headers: {
-                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                }
-            });
-        });
-
-        function markAsPaid(id) {
-            if (confirm('Отметить пакет как оплаченный?')) {
-                $.ajax({
-                    url: `/admin/module/pack-salesman/${id}/mark-as-paid`,
-                    method: 'POST',
-                    success: function(response) {
-                        if (response.success) {
-                            toastr.success('Статус успешно обновлен');
-                            setTimeout(() => window.location.reload(), 1000);
-                        } else {
-                            toastr.error(response.message || 'Произошла ошибка');
-                        }
-                    },
-                    error: function(xhr) {
-                        toastr.error('Произошла ошибка при обновлении статуса');
-                        console.error('Error:', xhr);
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                // Добавляем CSRF-токен в заголовки всех AJAX-запросов
+                $.ajaxSetup({
+                    headers: {
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                     }
                 });
+            });
+
+            function markAsPaid(id) {
+                if (confirm('Отметить пакет как оплаченный?')) {
+                    $.ajax({
+                        url: `/admin/module/pack-salesman/${id}/mark-as-paid`,
+                        method: 'POST',
+                        success: function (response) {
+                            if (response.success) {
+                                toastr.success('Статус успешно обновлен');
+                                setTimeout(() => window.location.reload(), 1000);
+                            } else {
+                                toastr.error(response.message || 'Произошла ошибка');
+                            }
+                        },
+                        error: function (xhr) {
+                            toastr.error('Произошла ошибка при обновлении статуса');
+                            console.error('Error:', xhr);
+                        }
+                    });
+                }
             }
-        }
-    </script>
+        </script>
     @endpush
 @endsection

@@ -39,10 +39,10 @@ class StorePackRequest extends FormRequest
      * @param mixed $default
      * @return array
      */
-    public function validated($key = null, $default = null): array
+    public function validated(string $key = null, $default = null): array
     {
         $validated = parent::validated();
-        
+
         // Конвертируем GB в байты
         $validated['traffic_limit'] = $validated['traffic_limit'] * 1024 * 1024 * 1024;
         // Конвертируем часы в секунды

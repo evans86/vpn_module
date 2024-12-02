@@ -5,12 +5,13 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 
 class LoginController extends Controller
 {
     use AuthenticatesUsers;
 
-    protected $redirectTo = '/admin/module/server';
+    protected string $redirectTo = '/admin/module/server';
 
     public function __construct()
     {
@@ -35,7 +36,7 @@ class LoginController extends Controller
         ]);
     }
 
-    protected function authenticated(Request $request, $user)
+    protected function authenticated(Request $request, $user): RedirectResponse
     {
         return redirect()->intended($this->redirectTo);
     }

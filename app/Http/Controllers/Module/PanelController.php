@@ -7,7 +7,9 @@ use App\Models\Panel\Panel;
 use App\Models\Server\Server;
 use App\Services\Panel\marzban\MarzbanAPI;
 use App\Services\Panel\PanelStrategy;
+use Exception;
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
@@ -41,7 +43,7 @@ class PanelController extends Controller
                 });
 
             return view('module.panel.index', compact('panels', 'servers'));
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error accessing panels list', [
                 'source' => 'panel',
                 'error' => $e->getMessage(),
@@ -56,7 +58,7 @@ class PanelController extends Controller
     /**
      * Store a newly created panel.
      */
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
         try {
             Log::info('Creating new panel', [
@@ -80,21 +82,19 @@ class PanelController extends Controller
 
             // Создаем панель через стратегию
             $strategy = new PanelStrategy(Panel::MARZBAN);
-            $panel = $strategy->create($validated['server_id']);
+            $strategy->create($validated['server_id']);
 
             DB::commit();
 
             Log::info('Panel created successfully', [
                 'source' => 'panel',
-                'user_id' => auth()->id(),
-                'panel_id' => $panel->id,
-                'server_id' => $panel->server_id
+                'user_id' => auth()->id()
             ]);
 
             return redirect()->route('module.panel.index')
                 ->with('success', 'Panel created successfully');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             Log::error('Error creating panel', [
                 'source' => 'panel',
@@ -112,7 +112,7 @@ class PanelController extends Controller
     /**
      * Configure the specified panel.
      */
-    public function configure(Panel $panel)
+    public function configure(Panel $panel): RedirectResponse
     {
         try {
             Log::info('Configuring panel', [
@@ -147,7 +147,7 @@ class PanelController extends Controller
                 ->route('module.panel.index')
                 ->with('error', 'Network connection error: ' . $e->getMessage());
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error configuring panel', [
                 'source' => 'panel',
                 'error' => $e->getMessage(),
@@ -165,7 +165,7 @@ class PanelController extends Controller
     /**
      * Update panel configuration.
      */
-    public function updateConfig(Panel $panel)
+    public function updateConfig(Panel $panel): RedirectResponse
     {
         try {
             Log::info('Updating panel configuration', [
@@ -187,7 +187,7 @@ class PanelController extends Controller
                 ->route('module.panel.index')
                 ->with('success', 'Configuration updated successfully');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error updating panel configuration', [
                 'source' => 'panel',
                 'error' => $e->getMessage(),
@@ -203,7 +203,7 @@ class PanelController extends Controller
     }
 
     /**
-     * Check the status of the specified panel.
+     * @TODO check panel status
      */
     public function checkStatus(Panel $panel)
     {
@@ -228,7 +228,7 @@ class PanelController extends Controller
                 'status' => $isOnline ? 'online' : 'offline'
             ]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error checking panel status', [
                 'source' => 'panel',
                 'error' => $e->getMessage(),

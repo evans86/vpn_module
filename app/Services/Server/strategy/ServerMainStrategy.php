@@ -5,6 +5,7 @@ namespace App\Services\Server\strategy;
 use App\Models\Server\Server;
 use App\Services\Server\ServerInterface;
 use GuzzleHttp\Exception\GuzzleException;
+use RuntimeException;
 
 abstract class ServerMainStrategy implements ServerInterface
 {
@@ -45,6 +46,6 @@ abstract class ServerMainStrategy implements ServerInterface
      */
     public function delete(Server $server): void
     {
-        throw new \RuntimeException('Method not implemented');
+        throw new RuntimeException('Method not implemented');
     }
 }

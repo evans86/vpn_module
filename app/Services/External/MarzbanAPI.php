@@ -4,6 +4,7 @@ namespace App\Services\External;
 
 use GuzzleHttp\Client;
 use Exception;
+use GuzzleHttp\Exception\GuzzleException;
 use RuntimeException;
 
 class MarzbanAPI
@@ -21,7 +22,7 @@ class MarzbanAPI
      * @param string $username
      * @param string $password
      * @return mixed
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      * @throws Exception
      */
     public function getToken(string $username, string $password)
@@ -66,7 +67,7 @@ class MarzbanAPI
      * @param $token
      * @param $json_config
      * @return mixed
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      * @throws Exception
      */
     public function modifyConfig($token, $json_config)
@@ -104,8 +105,10 @@ class MarzbanAPI
      *
      * @param string $token
      * @param string $userId
+     * @param int $data_limit
+     * @param int $expire
      * @return mixed
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      * @throws Exception
      */
     public function createUser(string $token, string $userId, int $data_limit, int $expire)
@@ -169,7 +172,7 @@ class MarzbanAPI
      * @param int $expire
      * @param int $data_limit
      * @return mixed
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      * @throws Exception
      */
     public function updateUser(string $token, string $userId, int $expire, int $data_limit)
@@ -213,7 +216,7 @@ class MarzbanAPI
      * @param string $token
      * @param string $userId
      * @return mixed
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      * @throws Exception
      */
     public function getUser(string $token, string $userId)
@@ -253,7 +256,7 @@ class MarzbanAPI
      * @param string $token
      * @param string $userId
      * @return mixed
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      * @throws Exception
      */
     public function deleteUser(string $token, string $userId)

@@ -2,8 +2,8 @@
 
 <div class="form-group">
     <label for="{{ $id ?? $name }}">{{ $label }}</label>
-    <select class="form-control selectpicker" 
-            id="{{ $id ?? $name }}" 
+    <select class="form-control selectpicker"
+            id="{{ $id ?? $name }}"
             name="{{ $name }}"
             @if($required) required @endif>
         <option value="">Выберите...</option>
@@ -14,8 +14,8 @@
         @endforeach
     </select>
     @error($name)
-        <div class="invalid-feedback d-block">
-            {{ $message }}
-        </div>
+    <div class="invalid-feedback d-block">
+        {{ $message }}
+    </div>
     @enderror
 </div>

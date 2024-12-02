@@ -4,6 +4,7 @@ namespace App\Logging;
 
 use App\Models\Log\ApplicationLog;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Monolog\Logger;
 use Monolog\Handler\AbstractProcessingHandler;
 use Throwable;
@@ -14,19 +15,19 @@ class DatabaseLogger
      * Create a custom Monolog instance.
      *
      * @param  array  $config
-     * @return \Monolog\Logger
+     * @return Logger
      */
-    public function __invoke(array $config)
+    public function __invoke(array $config): Logger
     {
         $logger = new Logger('database');
         $handler = new DatabaseLoggerHandler();
-        
+
         if (isset($config['level'])) {
             $handler->setLevel($config['level']);
         }
-        
+
         $logger->pushHandler($handler);
-        
+
         return $logger;
     }
 
@@ -53,7 +54,7 @@ class DatabaseLogger
             ]);
         } catch (\Exception $e) {
             // В случае ошибки записи в БД, логируем в файл
-            \Illuminate\Support\Facades\Log::error('Failed to write to database log: ' . $e->getMessage(), [
+            Log::error('Failed to write to database log: ' . $e->getMessage(), [
                 'original_message' => $message,
                 'original_context' => $context,
                 'error' => $e->getMessage(),
@@ -124,7 +125,7 @@ class DatabaseLoggerHandler extends AbstractProcessingHandler
         try {
             // Prepare context data
             $context = isset($record['context']) ? $record['context'] : [];
-            
+
             // If there's an exception in the context, format it properly
             if (isset($context['exception']) && $context['exception'] instanceof Throwable) {
                 $exception = $context['exception'];

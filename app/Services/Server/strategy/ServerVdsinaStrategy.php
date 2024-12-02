@@ -5,6 +5,7 @@ namespace App\Services\Server\strategy;
 use App\Models\Server\Server;
 use App\Services\Panel\PanelStrategy;
 use App\Services\Server\vdsina\VdsinaService;
+use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Log;
 
@@ -48,6 +49,7 @@ class ServerVdsinaStrategy extends ServerMainStrategy
      * @param int $server_id
      * @param string $panel
      * @return void
+     * @throws Exception
      */
     public function setPanel(int $server_id, string $panel): void
     {
@@ -62,16 +64,13 @@ class ServerVdsinaStrategy extends ServerMainStrategy
      *
      * @param Server $server
      * @return void
-     * @throws \Exception
+     * @throws Exception
      */
     public function delete(Server $server): void
     {
         try {
-            if (!$this->service) {
-                $this->service = new VdsinaService();
-            }
             $this->service->delete($server);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error in ServerVdsinaStrategy::delete', [
                 'server_id' => $server->id,
                 'error' => $e->getMessage()

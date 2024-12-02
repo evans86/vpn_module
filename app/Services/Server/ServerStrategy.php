@@ -4,8 +4,8 @@ namespace App\Services\Server;
 
 use App\Models\Server\Server;
 use App\Services\Server\strategy\ServerVdsinaStrategy;
+use Exception;
 use GuzzleHttp\Exception\GuzzleException;
-use Illuminate\Support\Facades\Log;
 
 class ServerStrategy
 {
@@ -29,7 +29,7 @@ class ServerStrategy
      * @param string $provider
      * @param bool $isFree
      * @return Server
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function configure(int $location_id, string $provider, bool $isFree): Server
     {
@@ -53,6 +53,7 @@ class ServerStrategy
      * @param int $server_id
      * @param string $panel
      * @return void
+     * @throws Exception
      */
     public function setPanel(int $server_id, string $panel): void
     {
@@ -64,7 +65,7 @@ class ServerStrategy
      *
      * @param Server $server
      * @return void
-     * @throws \Exception
+     * @throws Exception
      */
     public function delete(Server $server): void
     {

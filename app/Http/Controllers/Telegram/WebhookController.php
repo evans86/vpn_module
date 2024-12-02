@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Telegram;
 use App\Http\Controllers\Controller;
 use App\Services\Telegram\ModuleBot\FatherBotController;
 use App\Services\Telegram\ModuleBot\SalesmanBotController;
+use Exception;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response as ResponseAlias;
@@ -23,7 +25,7 @@ class WebhookController extends Controller
     /**
      * Обработка webhook-а для главного бота
      */
-    public function fatherBot(Request $request, string $token): \Illuminate\Http\JsonResponse
+    public function fatherBot(Request $request, string $token): JsonResponse
     {
         try {
             if (!$this->validateWebhookRequest($request)) {
@@ -33,7 +35,7 @@ class WebhookController extends Controller
             $bot = new FatherBotController($token);
             $bot->init();
             return response()->json(['status' => 'ok']);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Father bot webhook error: ' . $e->getMessage());
             return response()->json(['status' => 'error'], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
         }
@@ -42,7 +44,7 @@ class WebhookController extends Controller
     /**
      * Обработка webhook-а для бота продавца
      */
-    public function salesmanBot(Request $request, string $token): \Illuminate\Http\JsonResponse
+    public function salesmanBot(Request $request, string $token): JsonResponse
     {
         try {
             if (!$this->validateWebhookRequest($request)) {
@@ -52,7 +54,7 @@ class WebhookController extends Controller
             $bot = new SalesmanBotController($token);
             $bot->init();
             return response()->json(['status' => 'ok']);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Salesman bot webhook error: ' . $e->getMessage());
             return response()->json(['status' => 'error'], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
         }

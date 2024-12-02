@@ -78,7 +78,7 @@ class MarzbanService
         Log::info('Checking server status', ['server_id' => $server->id]);
 
         // TODO: Добавить проверку статуса сервера через провайдера
-        return $server->server_status === Server::SERVER_CONFIGURED;
+        return $server->server_status == Server::SERVER_CONFIGURED;
     }
 
     /**
@@ -218,6 +218,7 @@ class MarzbanService
      * @param int $panel_id
      * @return Panel
      * @throws GuzzleException
+     * @throws Exception
      */
     public function updateMarzbanToken(int $panel_id): Panel
     {
@@ -255,6 +256,7 @@ class MarzbanService
      * @param string $user_id
      * @return array
      * @throws GuzzleException
+     * @throws Exception
      */
     public function checkOnline(int $panel_id, string $user_id): array
     {
@@ -322,6 +324,7 @@ class MarzbanService
      * @param string $user_id
      * @return void
      * @throws GuzzleException
+     * @throws Exception
      */
     public function deleteServerUser(int $panel_id, string $user_id): void
     {

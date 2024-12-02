@@ -119,8 +119,8 @@ class PackSalesmanService
                         $pack->traffic_limit,  // Лимит трафика из пакета
                         $pack_salesman->id,    // ID связи пакет-продавец
                         $finish_at,            // Дата окончания действия ключа
-                        null,                  // Время начала (null = начнется при активации)
-                        $deleted_at            // Дата, до которой нужно активировать ключ
+                        $deleted_at,            // Дата, до которой нужно активировать ключ
+                        null                  // Время начала (null = начнется при активации)
                     );
                 } catch (\Exception $e) {
                     Log::error("Ошибка при создании ключа: " . $e->getMessage());

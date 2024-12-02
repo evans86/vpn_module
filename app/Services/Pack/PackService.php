@@ -4,7 +4,6 @@ namespace App\Services\Pack;
 
 use App\Dto\Pack\PackDto;
 use App\Dto\Pack\PackFactory;
-use App\Models\Pack\Pack;
 use App\Repositories\Pack\PackRepositoryInterface;
 use Exception;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -12,8 +11,10 @@ use RuntimeException;
 
 class PackService
 {
-    /** @var PackRepositoryInterface */
-    private $packRepository;
+    /**
+     * @var PackRepositoryInterface
+     */
+    private PackRepositoryInterface $packRepository;
 
     /**
      * @param PackRepositoryInterface $packRepository

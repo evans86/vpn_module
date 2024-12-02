@@ -24,8 +24,8 @@
            id="{{ $name }}"
            value="{{ old($name, $value) }}"
            placeholder="{{ $placeholder }}"
-           {{ $required ? 'required' : '' }}
-           {{ $attributes->merge(['class' => 'form-control ' . ($error ? 'is-invalid' : '')]) }}>
+        {{ $required ? 'required' : '' }}
+        {{ $attributes->merge(['class' => 'form-control ' . ($error ? 'is-invalid' : '')]) }}>
 
     @if($help)
         <small class="form-text text-muted">{{ $help }}</small>

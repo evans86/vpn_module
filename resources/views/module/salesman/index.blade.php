@@ -26,11 +26,13 @@
                                         <td><strong>{{ $salesman->id }}</strong></td>
                                         <td>{{ $salesman->telegram_id }}</td>
                                         <td>{{ $salesman->username }}</td>
-                                        <td><a href="{{ $salesman->bot_link }}" target="_blank">{{ $salesman->bot_link }}</a></td>
+                                        <td><a href="{{ $salesman->bot_link }}"
+                                               target="_blank">{{ $salesman->bot_link }}</a></td>
                                         <td>
-                                            <button class="btn btn-sm status-toggle {{ $salesman->status ? 'btn-success' : 'btn-danger' }}"
-                                                    data-id="{{ $salesman->id }}"
-                                                    onclick="toggleStatus({{ $salesman->id }})">
+                                            <button
+                                                class="btn btn-sm status-toggle {{ $salesman->status ? 'btn-success' : 'btn-danger' }}"
+                                                data-id="{{ $salesman->id }}"
+                                                onclick="toggleStatus({{ $salesman->id }})">
                                                 {{ $salesman->status ? 'Активен' : 'Неактивен' }}
                                             </button>
                                         </td>
@@ -49,48 +51,48 @@
     </div>
 
     @push('js')
-    <script>
-        // Настройка CSRF-токена для всех AJAX-запросов
-        $.ajaxSetup({
-            headers: {
-                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-            }
-        });
-
-        function toggleStatus(id) {
-            $.ajax({
-                url: `/admin/module/salesman/${id}/toggle-status`,
-                type: 'POST',
-                success: function(response) {
-                    if (response.success) {
-                        const button = $(`.status-toggle[data-id="${id}"]`);
-                        if (response.status) {
-                            button.removeClass('btn-danger').addClass('btn-success');
-                            button.text('Активен');
-                        } else {
-                            button.removeClass('btn-success').addClass('btn-danger');
-                            button.text('Неактивен');
-                        }
-                        // Показываем уведомление об успехе
-                        showNotification('success', response.message);
-                    } else {
-                        showNotification('error', response.message);
-                    }
-                },
-                error: function(xhr) {
-                    console.error('Error:', xhr);
-                    showNotification('error', 'Произошла ошибка при изменении статуса');
+        <script>
+            // Настройка CSRF-токена для всех AJAX-запросов
+            $.ajaxSetup({
+                headers: {
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                 }
             });
-        }
 
-        function showNotification(type, message) {
-            if (typeof toastr !== 'undefined') {
-                toastr[type](message);
-            } else {
-                alert(message);
+            function toggleStatus(id) {
+                $.ajax({
+                    url: `/admin/module/salesman/${id}/toggle-status`,
+                    type: 'POST',
+                    success: function (response) {
+                        if (response.success) {
+                            const button = $(`.status-toggle[data-id="${id}"]`);
+                            if (response.status) {
+                                button.removeClass('btn-danger').addClass('btn-success');
+                                button.text('Активен');
+                            } else {
+                                button.removeClass('btn-success').addClass('btn-danger');
+                                button.text('Неактивен');
+                            }
+                            // Показываем уведомление об успехе
+                            showNotification('success', response.message);
+                        } else {
+                            showNotification('error', response.message);
+                        }
+                    },
+                    error: function (xhr) {
+                        console.error('Error:', xhr);
+                        showNotification('error', 'Произошла ошибка при изменении статуса');
+                    }
+                });
             }
-        }
-    </script>
+
+            function showNotification(type, message) {
+                if (typeof toastr !== 'undefined') {
+                    toastr[type](message);
+                } else {
+                    alert(message);
+                }
+            }
+        </script>
     @endpush
 @endsection

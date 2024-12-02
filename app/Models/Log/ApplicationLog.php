@@ -31,7 +31,7 @@ class ApplicationLog extends Model
      * @param string|array $level
      * @return Builder
      */
-    public function scopeByLevel($query, $level)
+    public function scopeByLevel(Builder $query, $level): Builder
     {
         if (is_array($level)) {
             return $query->whereIn('level', $level);
@@ -46,7 +46,7 @@ class ApplicationLog extends Model
      * @param string|array $source
      * @return Builder
      */
-    public function scopeBySource($query, $source)
+    public function scopeBySource(Builder $query, $source): Builder
     {
         if (is_array($source)) {
             return $query->whereIn('source', $source);
@@ -61,7 +61,7 @@ class ApplicationLog extends Model
      * @param string $search
      * @return Builder
      */
-    public function scopeSearchMessage($query, $search)
+    public function scopeSearchMessage(Builder $query, string $search): Builder
     {
         return $query->where('message', 'LIKE', "%{$search}%");
     }
@@ -73,7 +73,7 @@ class ApplicationLog extends Model
      * @param int|array $userId
      * @return Builder
      */
-    public function scopeByUser($query, $userId)
+    public function scopeByUser(Builder $query, $userId): Builder
     {
         if (is_array($userId)) {
             return $query->whereIn('user_id', $userId);
@@ -89,7 +89,7 @@ class ApplicationLog extends Model
      * @param string|null $endDate
      * @return Builder
      */
-    public function scopeByDateRange($query, $startDate, $endDate = null)
+    public function scopeByDateRange(Builder $query, string $startDate, string $endDate = null): Builder
     {
         if ($endDate) {
             return $query->whereBetween('created_at', [
@@ -108,7 +108,7 @@ class ApplicationLog extends Model
      * @param mixed $value
      * @return Builder
      */
-    public function scopeByContext($query, $key, $value)
+    public function scopeByContext(Builder $query, string $key, $value): Builder
     {
         return $query->where('context', 'LIKE', "%\"{$key}\":\"{$value}\"%");
     }
@@ -118,7 +118,7 @@ class ApplicationLog extends Model
      *
      * @return string
      */
-    public function getLevelColorClass()
+    public function getLevelColorClass(): string
     {
         $colors = [
             'emergency' => 'danger',
@@ -138,7 +138,7 @@ class ApplicationLog extends Model
      *
      * @return string
      */
-    public function getLevelIcon()
+    public function getLevelIcon(): string
     {
         $icons = [
             'emergency' => 'fa-skull',
@@ -155,11 +155,11 @@ class ApplicationLog extends Model
 
     /**
      * Clean old logs
-     * 
+     *
      * @param int $days Number of days to keep logs
      * @return int Number of deleted records
      */
-    public static function cleanOldLogs($days = 30)
+    public static function cleanOldLogs(int $days = 30): int
     {
         return static::where('created_at', '<', Carbon::now()->subDays($days))->delete();
     }
@@ -169,7 +169,7 @@ class ApplicationLog extends Model
      *
      * @return array
      */
-    public static function getSourcesList()
+    public static function getSourcesList(): array
     {
         return static::distinct()->pluck('source')->toArray();
     }
@@ -179,7 +179,7 @@ class ApplicationLog extends Model
      *
      * @return array
      */
-    public static function getLevelsList()
+    public static function getLevelsList(): array
     {
         return static::distinct()->pluck('level')->toArray();
     }

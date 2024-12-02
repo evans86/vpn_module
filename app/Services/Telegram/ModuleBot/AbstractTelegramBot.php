@@ -2,6 +2,7 @@
 
 namespace App\Services\Telegram\ModuleBot;
 
+use Exception;
 use Telegram\Bot\Api;
 use Telegram\Bot\Objects\Update;
 use Telegram\Bot\Exceptions\TelegramSDKException;
@@ -38,7 +39,7 @@ abstract class AbstractTelegramBot
             $this->username = $this->update->getChat()->username;
 
             $this->processUpdate();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error(static::class . ' initialization error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
@@ -59,7 +60,7 @@ abstract class AbstractTelegramBot
                 'certificate' => storage_path('app/certificates/public_key_certificate.pub')
             ]);
             return $response->getResult();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Webhook setting error: ' . $e->getMessage());
             return false;
         }
@@ -100,7 +101,7 @@ abstract class AbstractTelegramBot
             }
 
             $this->telegram->sendMessage($params);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Send message error: ' . $e->getMessage());
         }
     }

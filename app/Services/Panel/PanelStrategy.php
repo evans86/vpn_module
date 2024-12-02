@@ -5,6 +5,7 @@ namespace App\Services\Panel;
 use App\Models\Panel\Panel;
 use App\Models\ServerUser\ServerUser;
 use App\Services\Panel\strategy\PanelMarzbanStrategy;
+use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 
 class PanelStrategy
@@ -27,6 +28,7 @@ class PanelStrategy
      *
      * @param int $server_id
      * @return void
+     * @throws Exception
      */
     public function create(int $server_id): void
     {

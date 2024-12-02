@@ -5,14 +5,18 @@ namespace App\Http\Controllers\Module;
 use App\Models\PackSalesman\PackSalesman;
 use App\Logging\DatabaseLogger;
 use App\Http\Controllers\Controller;
+use Exception;
+use Illuminate\Http\JsonResponse;
 use Psr\Log\LoggerInterface;
 use App\Services\Pack\PackSalesmanService;
 
 class PackSalesmanController extends Controller
 {
-    /** @var DatabaseLogger */
+    /**
+     * @var DatabaseLogger
+     */
     private $logger;
-    private $packSalesmanService;
+    private PackSalesmanService $packSalesmanService;
 
     public function __construct(LoggerInterface $logger, PackSalesmanService $packSalesmanService)
     {
@@ -20,6 +24,9 @@ class PackSalesmanController extends Controller
         $this->packSalesmanService = $packSalesmanService;
     }
 
+    /**
+     * @throws Exception
+     */
     public function index()
     {
         try {
@@ -36,7 +43,7 @@ class PackSalesmanController extends Controller
             ]);
 
             return view('module.pack-salesman.index', compact('pack_salesmans'));
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger->error('Ошибка при загрузке списка связей пакет-продавец', [
                 'source' => 'pack_salesman',
                 'action' => 'view_list',
@@ -51,7 +58,7 @@ class PackSalesmanController extends Controller
     /**
      * Отметить пакет как оплаченный
      */
-    public function markAsPaid($id)
+    public function markAsPaid($id): JsonResponse
     {
         try {
             $this->packSalesmanService->success($id);
@@ -60,7 +67,7 @@ class PackSalesmanController extends Controller
                 'success' => true,
                 'message' => 'Пакет успешно отмечен как оплаченный'
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger->error('Ошибка при изменении статуса пакета', [
                 'source' => 'pack_salesman',
                 'action' => 'mark_as_paid',

@@ -2,10 +2,12 @@
 
 namespace App\Services\External;
 
+use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\RequestOptions;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 
 class VdsinaAPI
 {
@@ -18,7 +20,11 @@ class VdsinaAPI
         $this->apiKey = $apiKey;
     }
 
-    //интересут id = 2 Standard servers
+    //интересуют id = 2 Standard servers
+
+    /**
+     * @throws GuzzleException
+     */
     public function getServerGroup(): array
     {
         try {
@@ -43,14 +49,14 @@ class VdsinaAPI
                 Log::error('Invalid JSON response from VDSina', [
                     'response' => $result
                 ]);
-                throw new \RuntimeException('Invalid JSON response from VDSina');
+                throw new RuntimeException('Invalid JSON response from VDSina');
             }
 
             if (!isset($data['status']) || $data['status'] !== 'ok') {
                 Log::error('Error response from VDSina', [
                     'response' => $data
                 ]);
-                throw new \RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
+                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
             }
 
             Log::info('Successfully got server group from VDSina');
@@ -63,17 +69,20 @@ class VdsinaAPI
                 'code' => $e->getCode()
             ]);
             throw $e;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error while getting server group from VDSina', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            throw new \RuntimeException('Error getting server group from VDSina: ' . $e->getMessage());
+            throw new RuntimeException('Error getting server group from VDSina: ' . $e->getMessage());
         }
     }
 
     //Возвращается список дата-центров
     //id = 1 - Amsterdam
+    /**
+     * @throws GuzzleException
+     */
     public function getDatacenter(): array
     {
         try {
@@ -98,14 +107,14 @@ class VdsinaAPI
                 Log::error('Invalid JSON response from VDSina', [
                     'response' => $result
                 ]);
-                throw new \RuntimeException('Invalid JSON response from VDSina');
+                throw new RuntimeException('Invalid JSON response from VDSina');
             }
 
             if (!isset($data['status']) || $data['status'] !== 'ok') {
                 Log::error('Error response from VDSina', [
                     'response' => $data
                 ]);
-                throw new \RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
+                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
             }
 
             Log::info('Successfully got datacenter from VDSina');
@@ -118,17 +127,20 @@ class VdsinaAPI
                 'code' => $e->getCode()
             ]);
             throw $e;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error while getting datacenter from VDSina', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            throw new \RuntimeException('Error getting datacenter from VDSina: ' . $e->getMessage());
+            throw new RuntimeException('Error getting datacenter from VDSina: ' . $e->getMessage());
         }
     }
 
     //Список шаблонов операционных систем, доступных для установки или переустановки сервера
     //Интересует id = 23, Ubuntu 24.04
+    /**
+     * @throws GuzzleException
+     */
     public function getTemplate(): array
     {
         try {
@@ -153,14 +165,14 @@ class VdsinaAPI
                 Log::error('Invalid JSON response from VDSina', [
                     'response' => $result
                 ]);
-                throw new \RuntimeException('Invalid JSON response from VDSina');
+                throw new RuntimeException('Invalid JSON response from VDSina');
             }
 
             if (!isset($data['status']) || $data['status'] !== 'ok') {
                 Log::error('Error response from VDSina', [
                     'response' => $data
                 ]);
-                throw new \RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
+                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
             }
 
             Log::info('Successfully got template from VDSina');
@@ -173,18 +185,21 @@ class VdsinaAPI
                 'code' => $e->getCode()
             ]);
             throw $e;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error while getting template from VDSina', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            throw new \RuntimeException('Error getting template from VDSina: ' . $e->getMessage());
+            throw new RuntimeException('Error getting template from VDSina: ' . $e->getMessage());
         }
     }
 
     //Список тарифных планов, доступен по ID группы сервера
     //Интересует Standard Server id = 2
     //Из полученного списка тарифных планов выбираем по индексу 0 с id = 1
+    /**
+     * @throws GuzzleException
+     */
     public function getServerPlan(): array
     {
         try {
@@ -209,14 +224,14 @@ class VdsinaAPI
                 Log::error('Invalid JSON response from VDSina', [
                     'response' => $result
                 ]);
-                throw new \RuntimeException('Invalid JSON response from VDSina');
+                throw new RuntimeException('Invalid JSON response from VDSina');
             }
 
             if (!isset($data['status']) || $data['status'] !== 'ok') {
                 Log::error('Error response from VDSina', [
                     'response' => $data
                 ]);
-                throw new \RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
+                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
             }
 
             Log::info('Successfully got server plan from VDSina');
@@ -229,16 +244,20 @@ class VdsinaAPI
                 'code' => $e->getCode()
             ]);
             throw $e;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error while getting server plan from VDSina', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            throw new \RuntimeException('Error getting server plan from VDSina: ' . $e->getMessage());
+            throw new RuntimeException('Error getting server plan from VDSina: ' . $e->getMessage());
         }
     }
 
     //получить список серверов
+
+    /**
+     * @throws GuzzleException
+     */
     public function getServers(): array
     {
         try {
@@ -263,14 +282,14 @@ class VdsinaAPI
                 Log::error('Invalid JSON response from VDSina', [
                     'response' => $result
                 ]);
-                throw new \RuntimeException('Invalid JSON response from VDSina');
+                throw new RuntimeException('Invalid JSON response from VDSina');
             }
 
             if (!isset($data['status']) || $data['status'] !== 'ok') {
                 Log::error('Error response from VDSina', [
                     'response' => $data
                 ]);
-                throw new \RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
+                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
             }
 
             Log::info('Successfully got servers from VDSina');
@@ -283,24 +302,15 @@ class VdsinaAPI
                 'code' => $e->getCode()
             ]);
             throw $e;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error while getting servers from VDSina', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            throw new \RuntimeException('Error getting servers from VDSina: ' . $e->getMessage());
+            throw new RuntimeException('Error getting servers from VDSina: ' . $e->getMessage());
         }
     }
 
-    //создание сервера на vdsina
-    //Ответ:
-    //{#307 ▼
-    //  +"status": "ok"
-    //  +"status_msg": "Server created"
-    //  +"data": {#305 ▼
-    //    +"id": 138828
-    //  }
-    //}
     /**
      * @param string $server_name //имя сервера
      * @param int $server_plan //id = 1 - базовый тарифный план
@@ -351,14 +361,14 @@ class VdsinaAPI
                 Log::error('Invalid JSON response from VDSina', [
                     'response' => $result
                 ]);
-                throw new \RuntimeException('Invalid JSON response from VDSina');
+                throw new RuntimeException('Invalid JSON response from VDSina');
             }
 
             if (!isset($data['status']) || $data['status'] !== 'ok') {
                 Log::error('Error response from VDSina', [
                     'response' => $data
                 ]);
-                throw new \RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
+                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
             }
 
             Log::info('Successfully created server in VDSina', [
@@ -373,12 +383,12 @@ class VdsinaAPI
                 'code' => $e->getCode()
             ]);
             throw $e;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error while creating server in VDSina', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            throw new \RuntimeException('Error creating server in VDSina: ' . $e->getMessage());
+            throw new RuntimeException('Error creating server in VDSina: ' . $e->getMessage());
         }
     }
 
@@ -413,7 +423,7 @@ class VdsinaAPI
                     'provider_id' => $provider_id,
                     'response' => $result
                 ]);
-                throw new \RuntimeException('Invalid JSON response from VDSina');
+                throw new RuntimeException('Invalid JSON response from VDSina');
             }
 
             if (!isset($data['status']) || $data['status'] !== 'ok') {
@@ -421,7 +431,7 @@ class VdsinaAPI
                     'provider_id' => $provider_id,
                     'response' => $data
                 ]);
-                throw new \RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
+                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
             }
 
             if (!isset($data['data']) || !is_array($data['data'])) {
@@ -429,7 +439,7 @@ class VdsinaAPI
                     'provider_id' => $provider_id,
                     'response' => $data
                 ]);
-                throw new \RuntimeException('Invalid data structure from VDSina');
+                throw new RuntimeException('Invalid data structure from VDSina');
             }
 
             Log::info('Successfully got server from VDSina', [
@@ -446,13 +456,13 @@ class VdsinaAPI
                 'code' => $e->getCode()
             ]);
             throw $e;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error while getting server from VDSina', [
                 'provider_id' => $provider_id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            throw new \RuntimeException('Error getting server from VDSina: ' . $e->getMessage());
+            throw new RuntimeException('Error getting server from VDSina: ' . $e->getMessage());
         }
     }
 
@@ -491,7 +501,7 @@ class VdsinaAPI
                     'provider_id' => $provider_id,
                     'response' => $result
                 ]);
-                throw new \RuntimeException('Invalid JSON response from VDSina');
+                throw new RuntimeException('Invalid JSON response from VDSina');
             }
 
             if (!isset($data['status']) || $data['status'] !== 'ok') {
@@ -499,7 +509,7 @@ class VdsinaAPI
                     'provider_id' => $provider_id,
                     'response' => $data
                 ]);
-                throw new \RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
+                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
             }
 
             Log::info('Successfully updated server password in VDSina', [
@@ -515,13 +525,13 @@ class VdsinaAPI
                 'code' => $e->getCode()
             ]);
             throw $e;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error while updating password in VDSina', [
                 'provider_id' => $provider_id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            throw new \RuntimeException('Error updating password in VDSina: ' . $e->getMessage());
+            throw new RuntimeException('Error updating password in VDSina: ' . $e->getMessage());
         }
     }
 
@@ -556,7 +566,7 @@ class VdsinaAPI
                     'provider_id' => $provider_id,
                     'response' => $result
                 ]);
-                throw new \RuntimeException('Invalid JSON response from VDSina');
+                throw new RuntimeException('Invalid JSON response from VDSina');
             }
 
             if (!isset($data['status']) || $data['status'] !== 'ok') {
@@ -564,7 +574,7 @@ class VdsinaAPI
                     'provider_id' => $provider_id,
                     'response' => $data
                 ]);
-                throw new \RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
+                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
             }
 
             Log::info('Successfully deleted server from VDSina', [
@@ -580,13 +590,13 @@ class VdsinaAPI
                 'code' => $e->getCode()
             ]);
             throw $e;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error while deleting server from VDSina', [
                 'provider_id' => $provider_id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            throw new \RuntimeException('Error deleting server from VDSina: ' . $e->getMessage());
+            throw new RuntimeException('Error deleting server from VDSina: ' . $e->getMessage());
         }
     }
 }

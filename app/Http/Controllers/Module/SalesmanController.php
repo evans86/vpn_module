@@ -5,11 +5,16 @@ namespace App\Http\Controllers\Module;
 use App\Http\Controllers\Controller;
 use App\Models\Salesman\Salesman;
 use App\Services\Salesman\SalesmanService;
+use Exception;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class SalesmanController extends Controller
 {
+    /**
+     * @var SalesmanService
+     */
     private SalesmanService $salesmanService;
 
     public function __construct(SalesmanService $salesmanService)
@@ -30,7 +35,7 @@ class SalesmanController extends Controller
                 ->paginate(20);
 
             return view('module.salesman.index', compact('salesmen'));
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error accessing salesman list', [
                 'source' => 'salesman',
                 'error' => $e->getMessage(),
@@ -49,7 +54,7 @@ class SalesmanController extends Controller
      * @param int $id
      * @return JsonResponse
      */
-    public function toggleStatus(Request $request, int $id)
+    public function toggleStatus(Request $request, int $id): JsonResponse
     {
         try {
             Log::info('Toggling salesman status', [
@@ -65,7 +70,7 @@ class SalesmanController extends Controller
                 'message' => 'Status updated successfully',
                 'status' => $salesman->status
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error toggling salesman status', [
                 'source' => 'salesman',
                 'error' => $e->getMessage(),

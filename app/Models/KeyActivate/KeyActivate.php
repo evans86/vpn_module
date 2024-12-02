@@ -5,6 +5,7 @@ namespace App\Models\KeyActivate;
 use App\Models\PackSalesman\PackSalesman;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use phpseclib\Math\BigInteger;
 
 /**
@@ -30,35 +31,17 @@ class KeyActivate extends Model
     protected $guarded = false;
     protected $table = 'key_activate';
 
-    public function packSalesman()
+    public function packSalesman(): BelongsTo
     {
         return $this->belongsTo(PackSalesman::class, 'pack_salesman_id');
     }
 
     /**
-     * Активация ключа пользователем
-     * 
-     * @param string|int $userTgId
-     * @return bool
-     */
-    public function activate($userTgId)
-    {
-        if ($this->status !== self::PAID) {
-            return false;
-        }
-
-        $this->user_tg_id = $userTgId;
-        $this->status = self::ACTIVE;
-        $this->deleted_at = null; // Обнуляем дату для активации
-        return $this->save();
-    }
-
-    /**
      * Получить текстовое описание статуса
-     * 
+     *
      * @return string
      */
-    public function getStatusText()
+    public function getStatusText(): string
     {
         switch ($this->status) {
             case self::EXPIRED:
@@ -76,10 +59,10 @@ class KeyActivate extends Model
 
     /**
      * Получить класс бейджа для статуса
-     * 
+     *
      * @return string
      */
-    public function getStatusBadgeClass()
+    public function getStatusBadgeClass(): string
     {
         switch ($this->status) {
             case self::EXPIRED:

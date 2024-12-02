@@ -5,21 +5,11 @@ namespace App\Services\Salesman;
 use App\Dto\Salesman\SalesmanDto;
 use App\Dto\Salesman\SalesmanFactory;
 use App\Models\Salesman\Salesman;
-use App\Logging\DatabaseLogger;
 use Exception;
-use Illuminate\Support\Str;
-use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 
 class SalesmanService
 {
-    /** @var DatabaseLogger */
-    private $logger;
-
-    public function __construct(DatabaseLogger $logger)
-    {
-        $this->logger = $logger;
-    }
-
     /**
      * Добавление продавца (надо вызвать из слоя телеграмма)
      *
@@ -31,7 +21,7 @@ class SalesmanService
     public function create(int $telegram_id, string $username): SalesmanDto
     {
         try {
-            $this->logger->info('Создание нового продавца', [
+            Log::info('Создание нового продавца', [
                 'source' => 'salesman',
                 'action' => 'create',
                 'telegram_id' => $telegram_id,
@@ -43,7 +33,7 @@ class SalesmanService
             $salesman->username = $username;
             $salesman->save();
 
-            $this->logger->info('Продавец успешно создан', [
+            Log::info('Продавец успешно создан', [
                 'source' => 'salesman',
                 'action' => 'create_success',
                 'salesman_id' => $salesman->id,
@@ -53,7 +43,7 @@ class SalesmanService
 
             return SalesmanFactory::fromEntity($salesman);
         } catch (Exception $e) {
-            $this->logger->error('Ошибка при создании продавца', [
+            Log::error('Ошибка при создании продавца', [
                 'source' => 'salesman',
                 'action' => 'create_error',
                 'telegram_id' => $telegram_id,
@@ -80,7 +70,7 @@ class SalesmanService
              */
             $salesman = Salesman::query()->where('id', $salesmanDto->id)->firstOrFail();
 
-            $this->logger->info('Обновление токена продавца', [
+            Log::info('Обновление токена продавца', [
                 'source' => 'salesman',
                 'action' => 'update_token',
                 'salesman_id' => $salesman->id,
@@ -90,7 +80,7 @@ class SalesmanService
             $salesman->token = $salesmanDto->token;
             $salesman->save();
 
-            $this->logger->info('Токен продавца успешно обновлен', [
+            Log::info('Токен продавца успешно обновлен', [
                 'source' => 'salesman',
                 'action' => 'update_token_success',
                 'salesman_id' => $salesman->id,
@@ -99,7 +89,7 @@ class SalesmanService
 
             return SalesmanFactory::fromEntity($salesman);
         } catch (Exception $e) {
-            $this->logger->error('Ошибка при обновлении токена продавца', [
+            Log::error('Ошибка при обновлении токена продавца', [
                 'source' => 'salesman',
                 'action' => 'update_token_error',
                 'salesman_id' => $salesmanDto->id,
@@ -124,7 +114,7 @@ class SalesmanService
             /** @var Salesman $salesman */
             $salesman = Salesman::query()->findOrFail($id);
 
-            $this->logger->info('Обновление статуса продавца', [
+            Log::info('Обновление статуса продавца', [
                 'source' => 'salesman',
                 'action' => 'update_status',
                 'salesman_id' => $salesman->id,
@@ -136,7 +126,7 @@ class SalesmanService
             $salesman->status = $status ?? !$salesman->status;
             $salesman->save();
 
-            $this->logger->info('Статус продавца успешно обновлен', [
+            Log::info('Статус продавца успешно обновлен', [
                 'source' => 'salesman',
                 'action' => 'update_status_success',
                 'salesman_id' => $salesman->id,
@@ -146,7 +136,7 @@ class SalesmanService
 
             return SalesmanFactory::fromEntity($salesman);
         } catch (Exception $e) {
-            $this->logger->error('Ошибка при обновлении статуса продавца', [
+            Log::error('Ошибка при обновлении статуса продавца', [
                 'source' => 'salesman',
                 'action' => 'update_status_error',
                 'salesman_id' => $id,
@@ -167,7 +157,7 @@ class SalesmanService
     public function getByToken(string $token): ?SalesmanDto
     {
         try {
-            $this->logger->info('Поиск продавца по токену', [
+            Log::info('Поиск продавца по токену', [
                 'source' => 'salesman',
                 'action' => 'get_by_token'
             ]);
@@ -175,7 +165,7 @@ class SalesmanService
             $salesman = Salesman::where('token', $token)->first();
 
             if ($salesman) {
-                $this->logger->info('Продавец найден по токену', [
+                Log::info('Продавец найден по токену', [
                     'source' => 'salesman',
                     'action' => 'get_by_token_success',
                     'salesman_id' => $salesman->id
@@ -183,13 +173,13 @@ class SalesmanService
                 return SalesmanFactory::fromEntity($salesman);
             }
 
-            $this->logger->warning('Продавец не найден по токену', [
+            Log::warning('Продавец не найден по токену', [
                 'source' => 'salesman',
                 'action' => 'get_by_token_not_found'
             ]);
             return null;
         } catch (Exception $e) {
-            $this->logger->error('Ошибка при поиске продавца по токену', [
+            Log::error('Ошибка при поиске продавца по токену', [
                 'source' => 'salesman',
                 'action' => 'get_by_token_error',
                 'error' => $e->getMessage(),

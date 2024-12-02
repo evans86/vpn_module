@@ -7,7 +7,7 @@ use phpseclib\Math\BigInteger;
 
 class ServerUserDto
 {
-    public uuid $id;
+    public string $id;
     public BigInteger $panel_id; // какой панели принадлежит пользователь
     public string $keys;
     public bool $is_free;

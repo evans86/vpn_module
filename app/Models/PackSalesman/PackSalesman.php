@@ -2,8 +2,11 @@
 
 namespace App\Models\PackSalesman;
 
+use App\Models\Pack\Pack;
+use App\Models\Salesman\Salesman;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property int $id
@@ -25,17 +28,17 @@ class PackSalesman extends Model
     /**
      * Отношение к пакету
      */
-    public function pack()
+    public function pack(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Pack\Pack::class, 'pack_id');
+        return $this->belongsTo(Pack::class, 'pack_id');
     }
 
     /**
      * Отношение к продавцу
      */
-    public function salesman()
+    public function salesman(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Salesman\Salesman::class, 'salesman_id');
+        return $this->belongsTo(Salesman::class, 'salesman_id');
     }
 
     /**

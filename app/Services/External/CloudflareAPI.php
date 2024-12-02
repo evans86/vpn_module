@@ -3,7 +3,9 @@
 namespace App\Services\External;
 
 use Cloudflare\API\Adapter\Guzzle;
+use Cloudflare\API\Auth\APIKey;
 use Cloudflare\API\Endpoints\DNS;
+use Exception;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use stdClass;
@@ -30,9 +32,9 @@ class CloudflareAPI
         }
 
         try {
-            $key = new \Cloudflare\API\Auth\APIKey($email, $api_key);
-            return new \Cloudflare\API\Adapter\Guzzle($key);
-        } catch (\Exception $e) {
+            $key = new APIKey($email, $api_key);
+            return new Guzzle($key);
+        } catch (Exception $e) {
             Log::error('Failed to create Cloudflare adapter', [
                 'error' => $e->getMessage()
             ]);
@@ -85,7 +87,7 @@ class CloudflareAPI
             ]);
 
             return $result;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Failed to create DNS record', [
                 'name' => $name,
                 'ip' => $ip,
@@ -149,7 +151,7 @@ class CloudflareAPI
             ]);
 
             return $result;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Failed to update DNS record', [
                 'record_id' => $record_id,
                 'name' => $name,
@@ -187,7 +189,7 @@ class CloudflareAPI
             ]);
 
             return $result;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Failed to delete DNS record', [
                 'record_id' => $dns_record_id,
                 'error' => $e->getMessage(),
@@ -216,7 +218,7 @@ class CloudflareAPI
             ]);
 
             return $result;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Failed to get DNS records', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()

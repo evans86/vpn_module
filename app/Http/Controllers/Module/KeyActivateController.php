@@ -6,13 +6,14 @@ use App\Models\KeyActivate\KeyActivate;
 use App\Logging\DatabaseLogger;
 use App\Http\Controllers\Controller;
 use App\Services\Key\KeyActivateService;
+use Illuminate\Http\JsonResponse;
 use Exception;
 use RuntimeException;
 
 class KeyActivateController extends Controller
 {
-    private $logger;
-    private $keyActivateService;
+    private DatabaseLogger $logger;
+    private KeyActivateService $keyActivateService;
 
     public function __construct(DatabaseLogger $logger, KeyActivateService $keyActivateService)
     {
@@ -20,6 +21,9 @@ class KeyActivateController extends Controller
         $this->keyActivateService = $keyActivateService;
     }
 
+    /**
+     * @throws Exception
+     */
     public function index()
     {
         try {
@@ -48,7 +52,7 @@ class KeyActivateController extends Controller
         }
     }
 
-    public function destroy(KeyActivate $key)
+    public function destroy(KeyActivate $key): JsonResponse
     {
         try {
             $key->delete();
@@ -77,7 +81,7 @@ class KeyActivateController extends Controller
     /**
      * Тестовая активация ключа (только для разработки)
      */
-    public function testActivate(KeyActivate $key)
+    public function testActivate(KeyActivate $key): JsonResponse
     {
         try {
             // Проверяем статус ключа

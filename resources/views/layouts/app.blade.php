@@ -47,7 +47,6 @@
 
 <div class="wrapper">
     @include('layouts.navs.header')
-{{--    @include('layouts.navs.start')--}}
     @include('layouts.navs.leftbar')
 
     <div class="content-body">

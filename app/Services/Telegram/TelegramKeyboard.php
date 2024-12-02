@@ -4,10 +4,10 @@ namespace App\Services\Telegram;
 
 class TelegramKeyboard
 {
-    private $menu;
+    private array $menu;
     private $resize_keyboard;
     private $one_time_keyboard;
-    private $lineButtons = [];
+    private array $lineButtons = [];
 
     public function __construct($resize = true, $one_time = false)
     {
@@ -44,7 +44,7 @@ class TelegramKeyboard
         return $this->menu;
     }
 
-    public function addInLine(array $button)
+    public function addInLine(array $button): TelegramKeyboard
     {
         array_push($this->lineButtons, $button);
         return $this;

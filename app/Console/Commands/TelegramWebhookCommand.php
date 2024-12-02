@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use Exception;
 use Illuminate\Console\Command;
 use Telegram\Bot\Laravel\Facades\Telegram;
 
@@ -39,7 +40,7 @@ class TelegramWebhookCommand extends Command
             } else {
                 $this->error('Something went wrong');
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error($e->getMessage());
         }
     }
@@ -54,7 +55,7 @@ class TelegramWebhookCommand extends Command
             } else {
                 $this->error('Something went wrong');
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error($e->getMessage());
         }
     }

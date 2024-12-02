@@ -7,17 +7,22 @@ use App\Http\Requests\Pack\StorePackRequest;
 use App\Http\Requests\Pack\UpdatePackRequest;
 use App\Services\Pack\PackService;
 use App\Logging\DatabaseLogger;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 
 class PackController extends Controller
 {
-    /** @var PackService */
-    private $packService;
-    
-    /** @var DatabaseLogger */
-    private $logger;
+    /**
+     * @var PackService
+     */
+    private PackService $packService;
+
+    /**
+     * @var DatabaseLogger
+     */
+    private DatabaseLogger $logger;
 
     /**
      * @param PackService $packService
@@ -63,22 +68,22 @@ class PackController extends Controller
      * @param StorePackRequest $request
      * @return RedirectResponse
      */
-    public function store(StorePackRequest $request)
+    public function store(StorePackRequest $request): RedirectResponse
     {
         try {
             $data = $request->validated();
             $this->packService->create($data);
-            
+
             $this->logger->info('Пакет успешно создан', [
                 'source' => 'pack',
                 'action' => 'create',
                 'user_id' => auth()->id(),
                 'pack_data' => array_diff_key($data, array_flip(['password'])) // Исключаем чувствительные данные
             ]);
-            
+
             return redirect()->route('module.pack.index')
                 ->with('success', 'Пакет успешно создан');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger->error('Ошибка при создании пакета', [
                 'source' => 'pack',
                 'action' => 'create',
@@ -98,12 +103,12 @@ class PackController extends Controller
      * @param int $id
      * @return RedirectResponse
      */
-    public function update(UpdatePackRequest $request, int $id)
+    public function update(UpdatePackRequest $request, int $id): RedirectResponse
     {
         try {
             $data = $request->validated();
             $this->packService->update($id, $data);
-            
+
             $this->logger->info('Пакет успешно обновлен', [
                 'source' => 'pack',
                 'action' => 'update',
@@ -111,10 +116,10 @@ class PackController extends Controller
                 'pack_id' => $id,
                 'pack_data' => array_diff_key($data, array_flip(['password'])) // Исключаем чувствительные данные
             ]);
-            
+
             return redirect()->route('module.pack.index')
                 ->with('success', 'Пакет успешно обновлен');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger->error('Ошибка при обновлении пакета', [
                 'source' => 'pack',
                 'action' => 'update',
@@ -138,16 +143,16 @@ class PackController extends Controller
     {
         try {
             $this->packService->delete($id);
-            
+
             $this->logger->info('Пакет успешно удален', [
                 'source' => 'pack',
                 'action' => 'delete',
                 'user_id' => auth()->id(),
                 'pack_id' => $id
             ]);
-            
+
             return response()->json(['success' => true]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger->error('Ошибка при удалении пакета', [
                 'source' => 'pack',
                 'action' => 'delete',

@@ -2,13 +2,13 @@
 
 use App\Http\Controllers\Module\ServerController;
 use App\Http\Controllers\Module\PanelController;
-use App\Http\Controllers\Module\TestController;
 use App\Http\Controllers\Module\SalesmanController;
 use App\Http\Controllers\Module\PackController;
 use App\Http\Controllers\Module\PackSalesmanController;
 use App\Http\Controllers\Module\KeyActivateController;
 use App\Http\Controllers\Module\BotController;
 use App\Services\Telegram\ModuleBot\FatherBotController;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -47,19 +47,6 @@ Route::middleware(['auth', 'admin'])->group(function () {
             Route::post('/{panel}/configure', [PanelController::class, 'configure'])->name('configure');
             Route::post('/{panel}/update-config', [PanelController::class, 'updateConfig'])->name('update-config');
             Route::get('/{panel}/status', [PanelController::class, 'checkStatus'])->name('status');
-        });
-
-        // Test Routes
-        Route::prefix('module/test')->name('module.test.')->group(function () {
-            Route::get('/', [TestController::class, 'index'])->name('index');
-            Route::post('/', [TestController::class, 'store'])->name('store');
-            Route::put('/{test}', [TestController::class, 'update'])->name('update');
-            Route::delete('/{test}', [TestController::class, 'destroy'])->name('destroy');
-            Route::get('/salesman', [TestController::class, 'salesman'])->name('salesman');
-            Route::get('/pack', [TestController::class, 'pack'])->name('pack');
-            Route::get('/pack-salesman', [TestController::class, 'packSalesman'])->name('pack-salesman');
-            Route::get('/key-activate', [TestController::class, 'keyActivate'])->name('key-activate');
-            Route::get('/key-user', [TestController::class, 'keyUser'])->name('key-user');
         });
 
         // Salesman Routes

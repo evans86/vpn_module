@@ -5,6 +5,7 @@ namespace App\Models\Panel;
 use App\Models\Server\Server;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
@@ -30,20 +31,29 @@ class Panel extends Model
 {
     use HasFactory;
 
-    /** @var string Тип панели Marzban */
+    /**
+     * @var string Тип панели Marzban
+     */
     const MARZBAN = 'marzban';
-
-    /** @var int Статус: Панель создана */
+    /**
+     * @var int Статус: Панель создана
+     */
     const PANEL_CREATED = 1;
-    /** @var int Статус: Панель настроена */
+    /**
+     * @var int Статус: Панель настроена
+     */
     const PANEL_CONFIGURED = 2;
-    /** @var int Статус: Ошибка настройки */
+    /**
+     * @var int Статус: Ошибка настройки
+     */
     const PANEL_ERROR = 3;
-    /** @var int Статус: Панель удалена */
+    /**
+     * @var int Статус: Панель удалена
+     */
     const PANEL_DELETED = 4;
 
     protected $table = 'panel';
-    
+
     protected $fillable = [
         'panel',
         'panel_adress',
@@ -69,7 +79,7 @@ class Panel extends Model
     /**
      * Get the server associated with the panel.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo
      */
     public function server()
     {

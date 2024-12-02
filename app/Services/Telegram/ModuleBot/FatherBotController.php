@@ -66,10 +66,10 @@ class FatherBotController extends AbstractTelegramBot
             $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
 
             //Нужна ли валидация токена?
-            if (!$this->isValidBotToken($token)) {
-                $this->sendMessage('Неверный формат токена. Пожалуйста, отправьте корректный токен бота.');
-                return;
-            }
+//            if (!$this->isValidBotToken($token)) {
+//                $this->sendMessage('Неверный формат токена. Пожалуйста, отправьте корректный токен бота.');
+//                return;
+//            }
 
             // Устанавливаем webhook для бота продавца
             $webhookPath = 'salesman-bot/init';
@@ -82,6 +82,7 @@ class FatherBotController extends AbstractTelegramBot
             $salesmanDto->token = $token;
             $salesmanDto->bot_link = $this->getBotLinkFromToken($token);
 
+            //@todo: Удалить конструктор
             $salesmanService = new SalesmanService();
             $salesmanService->updateToken($salesmanDto);
 
@@ -99,11 +100,11 @@ class FatherBotController extends AbstractTelegramBot
      * @param string $token
      * @return bool
      */
-    private function isValidBotToken(string $token): bool
-    {
-        // Можно дополнить более сложной проверкой
-        return preg_match('/^\d+:[\w-]{35}$/', $token);
-    }
+//    private function isValidBotToken(string $token): bool
+//    {
+//        // Можно дополнить более сложной проверкой
+//        return preg_match('/^\d+:[\w-]{35}$/', $token);
+//    }
 
     /**
      * Get bot link from token
@@ -123,6 +124,7 @@ class FatherBotController extends AbstractTelegramBot
     protected function start(): void
     {
         try {
+            //@todo: Удалить конструктор
             $salesmanService = new SalesmanService();
 
             // Проверяем существование пользователя

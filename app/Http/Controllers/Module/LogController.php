@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
 use App\Models\Log\ApplicationLog;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class LogController extends Controller
 {
@@ -70,9 +72,9 @@ class LogController extends Controller
     /**
      * Очистить все логи
      *
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
-    public function clear()
+    public function clear(): RedirectResponse
     {
         try {
             ApplicationLog::truncate();
@@ -98,9 +100,9 @@ class LogController extends Controller
      * Экспорт логов в CSV
      *
      * @param Request $request
-     * @return \Symfony\Component\HttpFoundation\StreamedResponse
+     * @return StreamedResponse
      */
-    public function export(Request $request)
+    public function export(Request $request): StreamedResponse
     {
         $headers = [
             'Content-Type' => 'text/csv',
@@ -137,9 +139,9 @@ class LogController extends Controller
             })
             ->orderBy('created_at', 'desc');
 
-        $callback = function() use ($query) {
+        $callback = function () use ($query) {
             $file = fopen('php://output', 'w');
-            
+
             // Заголовки CSV
             fputcsv($file, [
                 'ID',
@@ -155,7 +157,7 @@ class LogController extends Controller
             ]);
 
             // Записываем данные
-            $query->chunk(1000, function($logs) use ($file) {
+            $query->chunk(1000, function ($logs) use ($file) {
                 foreach ($logs as $log) {
                     fputcsv($file, [
                         $log->id,

@@ -4,13 +4,16 @@ namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
 use App\Models\Location\Location;
-use App\Models\Panel\Panel;
 use App\Models\Server\Server;
 use App\Services\Server\ServerStrategy;
+use Exception;
+use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class ServerController extends Controller
 {
@@ -31,7 +34,7 @@ class ServerController extends Controller
             });
 
             return view('module.server.index', compact('servers', 'locations'));
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error accessing servers list', [
                 'source' => 'server',
                 'error' => $e->getMessage(),
@@ -48,6 +51,7 @@ class ServerController extends Controller
      *
      * @param Request $request
      * @return JsonResponse
+     * @throws GuzzleException
      */
     public function store(Request $request): JsonResponse
     {
@@ -96,7 +100,7 @@ class ServerController extends Controller
                 'errors' => $e->errors()
             ], 422);
 
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             Log::error('Server creation failed', [
                 'source' => 'server',
                 'error' => $e->getMessage(),
@@ -120,7 +124,7 @@ class ServerController extends Controller
                 'message' => 'Failed to create server: ' . $e->getMessage()
             ], 400);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Unexpected error during server creation', [
                 'source' => 'server',
                 'error' => $e->getMessage(),
@@ -139,7 +143,7 @@ class ServerController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Server $server)
+    public function update(Request $request, Server $server): RedirectResponse
     {
         try {
             Log::info('Updating server', [
@@ -159,7 +163,7 @@ class ServerController extends Controller
 
             return redirect()->route('module.server.index')
                 ->with('success', 'Server updated successfully');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error updating server', [
                 'source' => 'server',
                 'error' => $e->getMessage(),
@@ -204,7 +208,7 @@ class ServerController extends Controller
                 'message' => 'Server deleted successfully'
             ]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error deleting server', [
                 'source' => 'server',
                 'error' => $e->getMessage(),
