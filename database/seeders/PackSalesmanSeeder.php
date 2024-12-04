@@ -21,12 +21,12 @@ class PackSalesmanSeeder extends Seeder
         }
 
         // Создаем тестовые записи
-        for ($i = 0; $i < 50; $i++) {
+        for ($i = 0; $i < 10; $i++) {
             $pack_id = $packIds[array_rand($packIds)];
             $salesman_id = $salesmanIds[array_rand($salesmanIds)];
-            
+
             // Генерируем случайный статус с разным распределением вероятностей
-            $status = random_int(1, 10) <= 7 ? PackSalesman::PAID : 
+            $status = random_int(1, 10) <= 7 ? PackSalesman::PAID :
                      (random_int(1, 10) <= 7 ? PackSalesman::NOT_PAID : PackSalesman::EXPIRED);
 
             PackSalesman::create([
