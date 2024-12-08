@@ -8,6 +8,7 @@ use App\Models\Panel\Panel;
 use App\Models\Server\Server;
 use App\Models\ServerUser\ServerUser;
 use App\Services\External\MarzbanAPI;
+use App\Services\Key\KeyActivateUserService;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -509,33 +510,75 @@ class MarzbanService
      * @param int $panel_id
      * @param int $data_limit
      * @param int $expire
+     * @param string $key_activate_id
      * @return ServerUser
      * @throws GuzzleException
-     * @throws Exception
      */
-    public function addServerUser(int $panel_id, int $data_limit, int $expire): ServerUser
+    public function addServerUser(int $panel_id, int $data_limit, int $expire, string $key_activate_id): ServerUser
     {
         try {
+            Log::info('Creating server user', [
+                'panel_id' => $panel_id,
+                'data_limit' => $data_limit,
+                'expire' => $expire,
+                'key_activate_id' => $key_activate_id
+            ]);
+
             $panel = self::updateMarzbanToken($panel_id);
+            if (!$panel->server) {
+                throw new RuntimeException('Server not found for panel');
+            }
 
             $marzbanApi = new MarzbanAPI($panel->api_address);
             $userId = Str::uuid();
 
             $userData = $marzbanApi->createUser($panel->auth_token, $userId, $data_limit, $expire);
+            if (empty($userData['links'])) {
+                throw new RuntimeException('Failed to get user links from Marzban API');
+            }
 
             $serverUser = new ServerUser();
             $serverUser->id = $userId;
             $serverUser->panel_id = $panel->id;
             $serverUser->is_free = false;
-            $serverUser->keys = json_encode($userData['links']);//добавить запись ключей в пользователя
+            $serverUser->keys = json_encode($userData['links']);
 
-            $serverUser->save();
+            if (!$serverUser->save()) {
+                throw new RuntimeException('Failed to save server user');
+            }
+
+            // Создаем запись key_activate_user
+            $keyActivateUserService = new KeyActivateUserService();
+            try {
+                $keyActivateUserService->create(
+                    $serverUser->id,
+                    $key_activate_id,
+                    $panel->server->location_id
+                );
+            } catch (Exception $e) {
+                // Если не удалось создать key_activate_user, удаляем созданного пользователя
+                $serverUser->delete();
+                throw new RuntimeException('Failed to create key activate user: ' . $e->getMessage());
+            }
+
+            Log::info('Server user created successfully', [
+                'user_id' => $userId,
+                'panel_id' => $panel_id
+            ]);
 
             return $serverUser;
         } catch (RuntimeException $r) {
-            throw new RuntimeException($r->getMessage());
+            Log::error('Runtime error while creating server user', [
+                'error' => $r->getMessage(),
+                'trace' => $r->getTraceAsString()
+            ]);
+            throw $r;
         } catch (Exception $e) {
-            throw new Exception($e->getMessage());
+            Log::error('Error while creating server user', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw new RuntimeException($e->getMessage());
         }
     }
 }

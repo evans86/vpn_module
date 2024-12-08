@@ -110,7 +110,8 @@ class KeyActivateService
             $serverUser = $this->panelStrategy->addServerUser(
                 $panel->id,
                 $key->traffic_limit,
-                $key->finish_at
+                $key->finish_at,
+                $key->id
             );
 
             // Устанавливаем данные активации

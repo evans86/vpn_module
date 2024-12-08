@@ -7,6 +7,7 @@ use App\Http\Controllers\Module\PackController;
 use App\Http\Controllers\Module\PackSalesmanController;
 use App\Http\Controllers\Module\KeyActivateController;
 use App\Http\Controllers\Module\BotController;
+use App\Http\Controllers\VpnConfigController;
 use App\Services\Telegram\ModuleBot\FatherBotController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -26,6 +27,14 @@ use Illuminate\Support\Facades\Route;
 Route::get('/login', [App\Http\Controllers\Auth\LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [App\Http\Controllers\Auth\LoginController::class, 'login']);
 Route::post('/logout', [App\Http\Controllers\Auth\LoginController::class, 'logout'])->name('logout');
+
+// Public routes
+Route::get('/', function () {
+    return view('welcome');
+})->name('home');
+
+Route::get('/config/{key_activate_id}', [VpnConfigController::class, 'show'])
+    ->name('vpn.config');
 
 // Admin Routes
 Route::middleware(['auth', 'admin'])->group(function () {

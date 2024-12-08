@@ -57,7 +57,7 @@ abstract class AbstractTelegramBot
         try {
             $response = Telegram::setWebhook([
                 'url' => self::WEBHOOK_BASE_URL . $token . '/' . $path,
-                'certificate' => storage_path('app/certificates/public_key_certificate.pub')
+//                'certificate' => storage_path('app/certificates/public_key_certificate.pub')
             ]);
             return $response->getResult();
         } catch (Exception $e) {

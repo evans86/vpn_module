@@ -42,13 +42,14 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
      * @param int $panel_id
      * @param int $data_limit
      * @param int $expire
+     * @param string $key_activate_id
      * @return ServerUser
      * @throws GuzzleException
      */
-    public function addServerUser(int $panel_id, int $data_limit, int $expire): ServerUser
+    public function addServerUser(int $panel_id, int $data_limit, int $expire, string $key_activate_id): ServerUser
     {
         $marzbanServer = new MarzbanService();
-        return $marzbanServer->addServerUser($panel_id, $data_limit, $expire);
+        return $marzbanServer->addServerUser($panel_id, $data_limit, $expire, $key_activate_id);
     }
 
     /**

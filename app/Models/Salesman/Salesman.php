@@ -7,17 +7,14 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * @property int $id
- * @property int|null $telegram_id
- * @property string|null $username
- * @property string|null $token
- * @property bool|null $status
- * @property string|null $bot_link
+ * @property string $name
+ * @property string $telegram_id
+ * @property string $status
+ * @property string $created_at
+ * @property string $updated_at
  */
 class Salesman extends Model
 {
-    const INACTIVE = 0;
-    const ACTIVE = 1;
-
     use HasFactory;
 
     protected $guarded = false;

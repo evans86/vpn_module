@@ -12,6 +12,8 @@ class SalesmanBotController extends AbstractTelegramBot
 {
     private ?Salesman $salesman = null;
     private ?KeyActivate $currentPack = null;
+    private const STATE_WAITING_KEY = 'waiting_key';
+    private ?string $userState = null;
 
     /**
      * обработка update
@@ -24,7 +26,14 @@ class SalesmanBotController extends AbstractTelegramBot
                 return;
             }
 
+            $message = $this->update->getMessage();
             $callbackQuery = $this->update->getCallbackQuery();
+
+            // Проверяем состояние ожидания ключа
+            if ($this->userState === self::STATE_WAITING_KEY && $message) {
+                $this->handleKeyActivation($message->getText());
+                return;
+            }
 
             if ($callbackQuery) {
                 $this->processCallback($callbackQuery->getData());
@@ -79,22 +88,22 @@ class SalesmanBotController extends AbstractTelegramBot
             ->setOneTimeKeyboard(true)
             ->row([
                 Keyboard::inlineButton([
-                    'text' => 'Помощь',
-                    'callback_data' => 'support',
-                ])
-            ])
-            ->row([
+                    'text' => 'Активировать',
+                    'callback_data' => 'activate',
+                ]),
                 Keyboard::inlineButton([
                     'text' => 'Статус',
                     'callback_data' => 'status',
                 ]),
+            ])
+            ->row([
                 Keyboard::inlineButton([
-                    'text' => 'Активировать доступ',
-                    'callback_data' => 'activate',
-                ]),
+                    'text' => 'Помощь',
+                    'callback_data' => 'support',
+                ])
             ]);
 
-        $this->sendMessage('Добро пожаловать в бот для управления VPN доступом', $keyboard);
+        $this->sendMessage('Выберите действие:', $keyboard);
     }
 
     /**
@@ -118,14 +127,30 @@ class SalesmanBotController extends AbstractTelegramBot
     private function actionStatus(): void
     {
         try {
-            // TODO: Здесь наличие доступа у пользователя и его статус $this->currentPack = keyActivate
+            // Получаем ID пользователя из Telegram
+            $userId = $this->update->getCallbackQuery()->getFrom()->getId();
+            
+            // Находим активные ключи, которые были выданы текущим продавцом
+            $this->currentPack = KeyActivate::whereHas('packSalesman', function ($query) {
+                $query->where('salesman_id', $this->salesman->id);
+            })
+            ->where('user_tg_id', $userId)
+            ->whereIn('status', [KeyActivate::ACTIVE, KeyActivate::PAID])
+            ->latest()
+            ->first();
+
+            if (!$this->currentPack) {
+                $this->sendMessage("У вас нет активных VPN-доступов. Для приобретения обратитесь к менеджеру @{$this->getSalesmanUsername()}");
+                return;
+            }
 
             $text = "
-                <b>Информация о вашем пакете:</b>\n
-                ID пакета: {$this->currentPack->id}\n
-                Статус: " . ($this->currentPack->status === PackSalesman::PAID ? 'активен' : 'неактивен') . "\n
-                Дата покупки: {$this->currentPack->created_at->format('d.m.Y')}
-            ";
+                <b>Информация о вашем VPN-доступе:</b>\n
+                ID доступа: {$this->currentPack->id}\n
+                Статус: {$this->currentPack->getStatusText()}\n
+                Дата покупки: {$this->currentPack->created_at->format('d.m.Y')}\n
+                Действителен до: {$this->currentPack->finish_at->format('d.m.Y')}\n" .
+                ($this->currentPack->traffic_limit ? "Остаток трафика: " . round($this->currentPack->traffic_limit / 1024 / 1024 / 1024, 2) . " GB" : "Безлимитный трафик");
 
             $this->sendMessage($text);
         } catch (\Exception $e) {
@@ -140,18 +165,76 @@ class SalesmanBotController extends AbstractTelegramBot
     private function actionActivate(): void
     {
         try {
-            // TODO: Здесь будет вызов доступа $this->currentPack = keyActivate
+            $userId = $this->update->getCallbackQuery()->getFrom()->getId();
+
+            // Проверяем, есть ли уже активный доступ у пользователя у этого продавца
+            $existingPack = KeyActivate::whereHas('packSalesman', function ($query) {
+                $query->where('salesman_id', $this->salesman->id);
+            })
+            ->where('user_tg_id', $userId)
+            ->where('status', KeyActivate::ACTIVE)
+            ->first();
+
+            if ($existingPack) {
+                $this->sendMessage("У вас уже есть активный VPN-доступ до {$existingPack->finish_at->format('d.m.Y')}.\nДля покупки дополнительного доступа обратитесь к менеджеру @{$this->getSalesmanUsername()}");
+                return;
+            }
+
+            // Устанавливаем состояние ожидания ключа
+            $this->userState = self::STATE_WAITING_KEY;
+            $this->sendMessage("Пожалуйста, введите ключ активации, который вы получили от продавца:");
+
+        } catch (\Exception $e) {
+            Log::error('Activation error: ' . $e->getMessage());
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Handle key activation
+     */
+    private function handleKeyActivation(string $keyId): void
+    {
+        try {
+            $userId = $this->update->getMessage()->getFrom()->getId();
+
+            // Находим ключ по ID
+            $key = KeyActivate::whereHas('packSalesman', function ($query) {
+                $query->where('salesman_id', $this->salesman->id);
+            })
+            ->where('id', $keyId)
+            ->where('status', KeyActivate::PAID)
+            ->whereNull('user_tg_id')
+            ->first();
+
+            if (!$key) {
+                $this->sendMessage("❌ Неверный ключ активации или ключ уже использован.\nПожалуйста, проверьте ключ и попробуйте снова, либо обратитесь к менеджеру @{$this->getSalesmanUsername()}");
+                $this->userState = null;
+                return;
+            }
+
+            // Активируем ключ для пользователя
+            $key->update([
+                'user_tg_id' => $userId,
+                'status' => KeyActivate::ACTIVE
+            ]);
+
+            $this->currentPack = $key;
+            $this->userState = null;
 
             $text = "
-                <b>Доступ успешно создан!</b>\n
-                Срок действия: {$this->currentPack->finish_at}\n
-            ";
+                <b>🎉 VPN-доступ успешно активирован!</b>\n
+                ID доступа: {$this->currentPack->id}\n
+                Действителен до: {$this->currentPack->finish_at->format('d.m.Y')}\n" .
+                ($this->currentPack->traffic_limit ? "Доступный трафик: " . round($this->currentPack->traffic_limit / 1024 / 1024 / 1024, 2) . " GB" : "Безлимитный трафик") . "\n\n" .
+                "Сейчас я отправлю вам инструкцию по настройке.";
 
             $this->sendMessage($text);
             $this->sendSetupInstructions();
         } catch (\Exception $e) {
-            Log::error('Confirm sale error: ' . $e->getMessage());
+            Log::error('Key activation error: ' . $e->getMessage());
             $this->sendErrorMessage();
+            $this->userState = null;
         }
     }
 
@@ -160,25 +243,33 @@ class SalesmanBotController extends AbstractTelegramBot
      */
     private function sendSetupInstructions(): void
     {
-        $text = "<b>📱 Инструкция по настройке VPN:</b>\n\n";
+        // Формируем ссылку на конфигурацию VPN
+        $configUrl = config('app.url') . '/config/' . $this->currentPack->key;
+
+        $text = "<b>🔐 Ваш VPN успешно активирован!</b>\n\n";
+        $text .= "📱 <b>Инструкция по настройке:</b>\n\n";
+        $text .= "1. Откройте ссылку для загрузки конфигурации:\n";
+        $text .= "<code>$configUrl</code>\n\n";
+        
+        // iOS
+        $text .= "🍎 <b>iOS:</b>\n";
+        $text .= "1. Установите приложение WireGuard из App Store\n";
+        $text .= "2. Откройте ссылку выше\n";
+        $text .= "3. Нажмите 'Добавить туннель'\n\n";
 
         // Android
         $text .= "🤖 <b>Android:</b>\n";
-        $text .= "1. Установите приложение ...\n";
-        $text .= "2. Откройте файл конфигурации\n";
-        $text .= "3. Нажмите 'Import'\n\n";
-
-        // iOS
-        $text .= "🍎 <b>iOS:</b>\n";
-        $text .= "1. Установите приложение ...\n";
-        $text .= "2. Откройте файл конфигурации\n";
-        $text .= "3. Нажмите 'Add'\n\n";
+        $text .= "1. Установите приложение WireGuard из Google Play\n";
+        $text .= "2. Откройте ссылку выше\n";
+        $text .= "3. Разрешите добавление конфигурации\n\n";
 
         // Windows
         $text .= "💻 <b>Windows:</b>\n";
-        $text .= "1. Установите ...\n";
+        $text .= "1. Установите WireGuard с официального сайта\n";
+        $text .= "2. Откройте ссылку выше\n";
+        $text .= "3. Импортируйте конфигурацию\n\n";
 
-        $text .= "❓ Если возникли вопросы, обратитесь в поддержку";
+        $text .= "❓ Если возникли вопросы, обратитесь к менеджеру @{$this->getSalesmanUsername()}";
 
         $this->sendMessage($text);
     }

@@ -124,7 +124,6 @@ class FatherBotController extends AbstractTelegramBot
     protected function start(): void
     {
         try {
-            //@todo: Удалить конструктор
             $salesmanService = new SalesmanService();
 
             // Проверяем существование пользователя
@@ -313,6 +312,11 @@ class FatherBotController extends AbstractTelegramBot
             // Создаем записи ключей активации
             $packSalesmanService->success($packSalesman->id);
 
+            // Получаем все ключи пакета
+            $keys = KeyActivate::where('pack_salesman_id', $packSalesman->id)
+                ->where('status', KeyActivate::PAID)
+                ->get();
+
             $this->userState = null;
             $this->pendingPackId = null;
 
@@ -320,6 +324,14 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "🔑 Количество ключей: {$pack->count}\n";
             $message .= "⏱ Срок действия: {$pack->period} дней\n";
             $message .= "📊 Трафик на ключи: {$pack->traffic_limit} GB\n\n";
+            
+            // Отправляем список ключей
+            $message .= "*Ваши VPN ключи для продажи:*\n\n";
+            foreach ($keys as $key) {
+                $message .= "🔑 `{$key->id}`\n";
+            }
+            $message .= "\nℹ️ Эти ключи вы можете продавать через своего бота.\n";
+            $message .= "Клиенты смогут активировать их через команду /activate\n\n";
 
             if (!$salesman->token) {
                 $message .= "❗️ *Важно:* Привяжите своего бота для начала продаж\n";
