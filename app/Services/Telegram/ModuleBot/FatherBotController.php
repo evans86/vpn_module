@@ -209,7 +209,7 @@ class FatherBotController extends AbstractTelegramBot
         $message = "🛍 *Доступные пакеты ключей:*\n\n";
         $message .= "Выберите пакет для покупки:";
 
-        $this->sendMessage($message, ['parse_mode' => 'Markdown', 'reply_markup' => $keyboard->getInline()]);
+        $this->sendMessage($message, $keyboard->getInline());
     }
 
     /**
@@ -238,7 +238,7 @@ class FatherBotController extends AbstractTelegramBot
         $message .= "📊 Трафик на ключ: {$pack->traffic_limit} GB\n";
         $message .= "💵 Стоимость: {$pack->price}₽\n\n";
 
-        $this->sendMessage($message, ['parse_mode' => 'Markdown', 'reply_markup' => $keyboard->getInline()]);
+        $this->sendMessage($message, $keyboard->getInline());
     }
 
     /**
@@ -269,7 +269,7 @@ class FatherBotController extends AbstractTelegramBot
             "callback_data" => "checkPayment?id={$id}"
         ]]);
 
-        $this->sendMessage($message, ['parse_mode' => 'Markdown', 'reply_markup' => $keyboard->getInline()]);
+        $this->sendMessage($message, $keyboard->getInline());
     }
 
     /**
@@ -333,7 +333,7 @@ class FatherBotController extends AbstractTelegramBot
                 $message .= $salesman->bot_link;
             }
 
-            $this->sendMessage($message, ['parse_mode' => 'Markdown']);
+            $this->sendMessage($message);
         } catch (\Exception $e) {
             Log::error('Pack purchase error: ' . $e->getMessage());
             $this->sendErrorMessage();
@@ -380,7 +380,7 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "🔑 Всего ключей: {$totalKeys}\n";
             $message .= "✅ Продано ключей: {$soldKeys}\n";
 
-            $this->sendMessage($message, ['parse_mode' => 'Markdown']);
+            $this->sendMessage($message);
         } catch (\Exception $e) {
             Log::error('Profile error: ' . $e->getMessage());
             $this->sendErrorMessage();
