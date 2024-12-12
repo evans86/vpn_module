@@ -121,8 +121,8 @@ class FatherBotController extends AbstractTelegramBot
             if (!$existingSalesman) {
                 $this->salesmanService->create($this->chatId, $this->username);
             }
-
-            $this->generateMenu();
+            $this->sendMessage("TEEEEEECNNNN");
+//            $this->generateMenu();
         } catch (\Exception $e) {
             Log::error('Start command error: ' . $e->getMessage());
             $this->sendErrorMessage();
