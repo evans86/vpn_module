@@ -277,10 +277,10 @@ class FatherBotController extends AbstractTelegramBot
      */
     private function actionCheckPayment(int $id): void
     {
-        if ($this->userState !== self::STATE_WAITING_PAYMENT || $this->pendingPackId !== $id) {
-            $this->sendMessage('❌ Ошибка проверки оплаты. Начните покупку заново.');
-            return;
-        }
+//        if ($this->userState !== self::STATE_WAITING_PAYMENT || $this->pendingPackId !== $id) {
+//            $this->sendMessage('❌ Ошибка проверки оплаты. Начните покупку заново.');
+//            return;
+//        }
 
         try {
             /**
