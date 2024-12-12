@@ -139,7 +139,7 @@ class FatherBotController extends AbstractTelegramBot
         $keyboard = Keyboard::make()
             ->setResizeKeyboard(true)
             ->setOneTimeKeyboard(true)
-            ->row([
+            ->row(
                 Keyboard::inlineButton([
                     'text' => '🛍 Купить пакет',
                     'callback_data' => 'packs'
@@ -148,7 +148,7 @@ class FatherBotController extends AbstractTelegramBot
                     'text' => '🤖 Мой бот',
                     'callback_data' => 'bindBot'
                 ])
-            ]);
+            );
 //            ->row([
 //                Keyboard::inlineButton([
 //                    'text' => '👤 Профиль',
