@@ -44,7 +44,7 @@ class CloudflareService
             // Проверяем существующие записи
             $records = $this->api->getRecords();
             foreach ($records as $record) {
-                if ($record->name === $name || $record->name === $name . '.bot-t.ru') {
+                if ($record->name === $name || $record->name === $name . '.vpn-telegram.com') {
                     // Если запись существует и IP тот же - возвращаем существующую запись
                     if ($record->content === $ip) {
                         Log::info('DNS record already exists with same IP', [
@@ -70,7 +70,7 @@ class CloudflareService
                 'name' => $name,
                 'ip' => $ip
             ]);
-            
+
             $result = $this->api->createDNSRecord($name, $ip);
 
             if (!isset($result->id) || !isset($result->name)) {
