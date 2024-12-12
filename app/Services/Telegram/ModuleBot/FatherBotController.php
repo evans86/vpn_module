@@ -404,7 +404,7 @@ class FatherBotController extends AbstractTelegramBot
         $message .= "📊 Статистика доступна в профиле\n\n";
         $message .= "Остались вопросы? Пишите @support";
 
-        $this->sendMessage($message, ['parse_mode' => 'Markdown']);
+        $this->sendMessage($message);
     }
 
     /**
