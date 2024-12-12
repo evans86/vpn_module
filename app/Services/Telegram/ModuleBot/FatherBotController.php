@@ -26,7 +26,11 @@ class FatherBotController extends AbstractTelegramBot
     protected function processUpdate(): void
     {
         try {
-            if ($this->update->getMessage()->text === '/start') {
+            $this->sendMessage($this->update->getMessage());
+            Log::debug('Send message: ' . $this->update->getMessage());
+            return;
+
+            if ($this->update->getMessage()->getText() === '/start') {
                 $this->userState = null;
                 $this->start();
                 return;
@@ -165,13 +169,7 @@ class FatherBotController extends AbstractTelegramBot
 
         Log::debug('Send message: ' . $message . $keyboard);
 
-        $this->sendMessage(
-            $message,
-//            [
-//                'parse_mode' => 'Markdown',
-//                'reply_markup' => $keyboard
-//            ]
-        );
+        $this->sendMessage($message, $keyboard);
     }
 
     /**
