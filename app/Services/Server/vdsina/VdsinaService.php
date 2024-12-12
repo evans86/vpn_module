@@ -15,6 +15,13 @@ use RuntimeException;
 
 class VdsinaService
 {
+    private VdsinaAPI $vdsinaApi;
+
+    public function __construct()
+    {
+        $this->vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
+    }
+
     /**
      * Первоначальная настройка сервера
      *
@@ -36,10 +43,10 @@ class VdsinaService
                 throw new RuntimeException('Location not found');
             }
 
-            $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
+//            $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
 
             // 1. Проверяем доступность дата-центров
-            $datacenters = $vdsinaApi->getDatacenter();
+            $datacenters = $this->vdsinaApi->getDatacenter();
             if (!isset($datacenters['data']) || !is_array($datacenters['data'])) {
                 throw new RuntimeException('Invalid datacenter response from VDSina');
             }
@@ -58,7 +65,7 @@ class VdsinaService
             }
 
             // 2. Проверяем доступность шаблонов ОС
-            $templates = $vdsinaApi->getTemplate();
+            $templates = $this->vdsinaApi->getTemplate();
             if (!isset($templates['data']) || !is_array($templates['data'])) {
                 throw new RuntimeException('Invalid template response from VDSina');
             }
@@ -77,7 +84,7 @@ class VdsinaService
             }
 
             // 3. Проверяем доступность тарифных планов
-            $plans = $vdsinaApi->getServerPlan();
+            $plans = $this->vdsinaApi->getServerPlan();
             if (!isset($plans['data']) || !is_array($plans['data'])) {
                 throw new RuntimeException('Invalid server plan response from VDSina');
             }
@@ -97,7 +104,7 @@ class VdsinaService
 
             // 4. Создаем сервер через API VDSina
             $serverName = 'vpnserver' . time() . $location->code;
-            $serverResponse = $vdsinaApi->createServer(
+            $serverResponse = $this->vdsinaApi->createServer(
                 $serverName,
                 $serverPlan['id'],
                 0, // autoprolong
@@ -155,8 +162,8 @@ class VdsinaService
             }
 
             // Получаем информацию о сервере от провайдера
-            $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
-            $vdsina_server = $vdsinaApi->getServerById($server->provider_id);
+//            $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
+            $vdsina_server = $this->vdsinaApi->getServerById($server->provider_id);
 
             if (!isset($vdsina_server['data']['ip'][0]['ip'])) {
                 throw new RuntimeException('Server IP not found in provider response');
@@ -168,7 +175,7 @@ class VdsinaService
                 'server_id' => $server_id,
                 'provider_id' => $server->provider_id
             ]);
-            $vdsinaApi->updatePassword($server->provider_id, $new_password);
+            $this->vdsinaApi->updatePassword($server->provider_id, $new_password);
 
             // Создаем или обновляем DNS запись
             $serverName = $vdsina_server['data']['name'];
@@ -334,8 +341,8 @@ class VdsinaService
         try {
             Log::info('Checking server status in VDSina', ['provider_id' => $provider_id]);
 
-            $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
-            $server = $vdsinaApi->getServerById($provider_id);
+//            $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
+            $server = $this->vdsinaApi->getServerById($provider_id);
 
             if (!isset($server['data']['status'])) {
                 Log::error('Invalid server response from VDSina', [
@@ -383,10 +390,10 @@ class VdsinaService
     public function delete(Server $server): void
     {
         try {
-            $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
+//            $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
 
             // Удаляем сервер через API VDSina
-            $response = $vdsinaApi->deleteServer($server->provider_id);
+            $response = $this->vdsinaApi->deleteServer($server->provider_id);
 
             if (!isset($response['status']) || $response['status'] !== 'ok') {
                 throw new RuntimeException(

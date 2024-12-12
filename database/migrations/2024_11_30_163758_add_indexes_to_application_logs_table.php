@@ -14,10 +14,10 @@ class AddIndexesToApplicationLogsTable extends Migration
     public function up()
     {
         Schema::table('application_logs', function (Blueprint $table) {
-            $table->index('level');
-            $table->index('source');
-            $table->index('user_id');
-            $table->index('created_at');
+//            $table->index('level');
+//            $table->index('source');
+//            $table->index('user_id');
+//            $table->index('created_at');
         });
     }
 

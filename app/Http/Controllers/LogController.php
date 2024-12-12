@@ -3,19 +3,32 @@
 namespace App\Http\Controllers;
 
 use App\Models\Log\ApplicationLog;
+use App\Repositories\Log\LogRepository;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\View\View;
+use Illuminate\Http\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 class LogController extends Controller
 {
+    private LogRepository $logRepository;
+
+    public function __construct(LogRepository $logRepository)
+    {
+        $this->logRepository = $logRepository;
+    }
+
     /**
      * Display logs list
+     * @param Request $request
+     * @return Response
      */
-    public function index(Request $request)
+    public function index(Request $request): Response
     {
         try {
             // Clean old logs (older than 30 days)
-            $deletedCount = ApplicationLog::cleanOldLogs(30);
+            $deletedCount = $this->logRepository->cleanOldLogs(30);
             if ($deletedCount > 0) {
                 Log::info('Cleaned old logs', [
                     'source' => 'system',
@@ -23,52 +36,25 @@ class LogController extends Controller
                 ]);
             }
 
-            $query = ApplicationLog::query();
-
-            // Filter by level if specified
-            if ($request->filled('level')) {
-                $query->byLevel($request->get('level'));
-            }
-
-            // Filter by source if specified
-            if ($request->filled('source')) {
-                $query->bySource($request->get('source'));
-            }
-
-            // Filter by date range if specified
-            if ($request->filled('date_from') || $request->filled('date_to')) {
-                $query->byDateRange(
-                    $request->get('date_from', now()->subDays(7)->toDateString()),
-                    $request->get('date_to')
-                );
-            }
-
-            // Search by message if specified
-            if ($request->filled('search')) {
-                $searchTerm = $request->get('search');
-                $query->where(function($q) use ($searchTerm) {
-                    $q->where('message', 'like', '%' . $searchTerm . '%')
-                      ->orWhere('context', 'like', '%' . $searchTerm . '%');
-                });
-            }
+            // Get logs with filters and pagination
+            $logs = $this->logRepository->getPaginatedWithFilters([
+                'level' => $request->get('level'),
+                'source' => $request->get('source'),
+                'date_from' => $request->get('date_from'),
+                'date_to' => $request->get('date_to'),
+                'search' => $request->get('search'),
+            ]);
 
             // Get unique sources for filter with caching
             $sources = cache()->remember('log_sources', 60, function() {
-                return ApplicationLog::distinct()
-                    ->orderBy('source')
-                    ->pluck('source');
+                return $this->logRepository->getUniqueSources();
             });
-            
-            // Get logs with pagination
-            $logs = $query->orderBy('created_at', 'desc')
-                         ->paginate(50)
-                         ->withQueryString();
 
             if ($request->ajax()) {
-                return view('logs.partials.table', compact('logs'));
+                return response()->view('logs.partials.table', compact('logs'));
             }
 
-            return view('logs.index', [
+            return response()->view('logs.index', [
                 'logs' => $logs,
                 'sources' => $sources,
                 'filters' => [
@@ -94,8 +80,12 @@ class LogController extends Controller
         }
     }
 
-    public function show(ApplicationLog $log)
+    /**
+     * @param ApplicationLog $log
+     * @return Response
+     */
+    public function show(ApplicationLog $log): Response
     {
-        return view('logs.show', compact('log'));
+        return response()->view('logs.show', compact('log'));
     }
 }

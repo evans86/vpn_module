@@ -7,7 +7,6 @@ use App\Models\KeyActivate\KeyActivate;
 use App\Models\Pack\Pack;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
-use App\Services\Pack\PackSalesmanService;
 use App\Services\Salesman\SalesmanService;
 use App\Services\Telegram\TelegramKeyboard;
 use Telegram\Bot\Keyboard\Keyboard;
@@ -65,12 +64,6 @@ class FatherBotController extends AbstractTelegramBot
         try {
             $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
 
-            //Нужна ли валидация токена?
-//            if (!$this->isValidBotToken($token)) {
-//                $this->sendMessage('Неверный формат токена. Пожалуйста, отправьте корректный токен бота.');
-//                return;
-//            }
-
             // Устанавливаем webhook для бота продавца
             $webhookPath = 'salesman-bot/init';
             if (!$this->setWebhook($token, $webhookPath)) {
@@ -82,9 +75,7 @@ class FatherBotController extends AbstractTelegramBot
             $salesmanDto->token = $token;
             $salesmanDto->bot_link = $this->getBotLinkFromToken($token);
 
-            //@todo: Удалить конструктор
-            $salesmanService = new SalesmanService();
-            $salesmanService->updateToken($salesmanDto);
+            $this->salesmanService->updateToken($salesmanDto);
 
             $this->userState = null;
             $this->sendMessage("Бот успешно привязан!\nТокен: {$token}\nСсылка на бота: {$salesmanDto->bot_link}");
@@ -124,13 +115,11 @@ class FatherBotController extends AbstractTelegramBot
     protected function start(): void
     {
         try {
-            $salesmanService = new SalesmanService();
-
             // Проверяем существование пользователя
             $existingSalesman = Salesman::where('telegram_id', $this->chatId)->first();
 
             if (!$existingSalesman) {
-                $salesmanService->create($this->chatId, $this->username);
+                $this->salesmanService->create($this->chatId, $this->username);
             }
 
             $this->generateMenu();
@@ -305,12 +294,10 @@ class FatherBotController extends AbstractTelegramBot
 
             // TODO: Проверка оплаты через платежную систему
 
-            // Создаем пакет для продавца
-            $packSalesmanService = new PackSalesmanService();
             // Создаем пакет продавца
-            $packSalesman = $packSalesmanService->create($pack->id, $salesman->id);
+            $packSalesman = $this->packSalesmanService->create($pack->id, $salesman->id);
             // Создаем записи ключей активации
-            $packSalesmanService->success($packSalesman->id);
+            $this->packSalesmanService->success($packSalesman->id);
 
             // Получаем все ключи пакета
             $keys = KeyActivate::where('pack_salesman_id', $packSalesman->id)
@@ -324,7 +311,7 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "🔑 Количество ключей: {$pack->count}\n";
             $message .= "⏱ Срок действия: {$pack->period} дней\n";
             $message .= "📊 Трафик на ключи: {$pack->traffic_limit} GB\n\n";
-            
+
             // Отправляем список ключей
             $message .= "*Ваши VPN ключи для продажи:*\n\n";
             foreach ($keys as $key) {

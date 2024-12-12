@@ -4,9 +4,10 @@ namespace App\Services\Pack;
 
 use App\Dto\PackSalesman\PackSalesmanDto;
 use App\Dto\PackSalesman\PackSalesmanFactory;
-use App\Models\Pack\Pack;
 use App\Models\PackSalesman\PackSalesman;
-use App\Models\Salesman\Salesman;
+use App\Repositories\Pack\PackRepository;
+use App\Repositories\PackSalesman\PackSalesmanRepository;
+use App\Repositories\Salesman\SalesmanRepository;
 use App\Services\Key\KeyActivateService;
 use Exception;
 use Illuminate\Support\Facades\Log;
@@ -14,6 +15,25 @@ use RuntimeException;
 
 class PackSalesmanService
 {
+    private PackRepository $packRepository;
+    private SalesmanRepository $salesmanRepository;
+    private PackSalesmanRepository $packSalesmanRepository;
+
+    private KeyActivateService $keyActivateService;
+
+    public function __construct(
+        PackRepository $packRepository,
+        SalesmanRepository $salesmanRepository,
+        PackSalesmanRepository $packSalesmanRepository,
+        KeyActivateService $keyActivateService
+    )
+    {
+        $this->packRepository = $packRepository;
+        $this->salesmanRepository = $salesmanRepository;
+        $this->packSalesmanRepository = $packSalesmanRepository;
+        $this->keyActivateService = $keyActivateService;
+    }
+
     /**
      * Пакет ключей, купленный продавцом
      *
@@ -26,14 +46,9 @@ class PackSalesmanService
     public function create(int $pack_id, int $salesman_id, int $status = PackSalesman::NOT_PAID): PackSalesmanDto
     {
         try {
-            /**
-             * @var Pack $pack
-             */
-            $pack = Pack::query()->where('id', $pack_id)->firstOrFail();
-            /**
-             * @var Salesman $salesman
-             */
-            $salesman = Salesman::query()->where('id', $salesman_id)->firstOrFail();
+            $pack = $this->packRepository->findByIdOrFail($pack_id);
+
+            $salesman = $this->salesmanRepository->findByIdOrFail($salesman_id);
 
             $pack_salesman = new PackSalesman();
 
@@ -63,10 +78,7 @@ class PackSalesmanService
     public function success(int $pack_salesman_id): void
     {
         try {
-            /**
-             * @var PackSalesman $pack_salesman
-             */
-            $pack_salesman = PackSalesman::query()->where('id', $pack_salesman_id)->firstOrFail();
+            $pack_salesman = $this->packSalesmanRepository->findByIdOrFail($pack_salesman_id);
 
             //Должна появиться логика оплаты и после этого статус PAID, пока сразу для тестов
 
@@ -91,15 +103,9 @@ class PackSalesmanService
     private function successPaid(int $pack_salesman_id): void
     {
         try {
-            /**
-             * @var PackSalesman $pack_salesman
-             */
-            $pack_salesman = PackSalesman::query()->where('id', $pack_salesman_id)->firstOrFail();
-            /**
-             * @var Pack $pack
-             */
-            $pack = Pack::query()->where('id', $pack_salesman->pack_id)->firstOrFail();
-            $keyActivateService = new KeyActivateService();
+            $pack_salesman = $this->packSalesmanRepository->findByIdOrFail($pack_salesman_id);
+
+            $pack = $this->packRepository->findByIdOrFail($pack_salesman->pack_id);
 
             // Создаем ключи согласно параметрам пакета
             for ($i = 0; $i < $pack->count; $i++) {
@@ -115,7 +121,7 @@ class PackSalesmanService
                 $deleted_at = $now + ($activate_days * 24 * 60 * 60);
 
                 try {
-                    $keyActivateService->create(
+                    $this->keyActivateService->create(
                         $pack->traffic_limit,  // Лимит трафика из пакета
                         $pack_salesman->id,    // ID связи пакет-продавец
                         $finish_at,            // Дата окончания действия ключа

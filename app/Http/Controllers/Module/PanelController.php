@@ -5,63 +5,68 @@ namespace App\Http\Controllers\Module;
 use App\Http\Controllers\Controller;
 use App\Models\Panel\Panel;
 use App\Models\Server\Server;
-use App\Services\Panel\marzban\MarzbanAPI;
 use App\Services\Panel\PanelStrategy;
+use App\Repositories\Panel\PanelRepository;
+use App\Logging\DatabaseLogger;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\View\View;
+use Illuminate\Http\JsonResponse;
 
 class PanelController extends Controller
 {
+    private PanelRepository $panelRepository;
+    private DatabaseLogger $logger;
+
+    public function __construct(
+        PanelRepository $panelRepository,
+        DatabaseLogger $logger
+    ) {
+        $this->panelRepository = $panelRepository;
+        $this->logger = $logger;
+    }
+
     /**
      * Display a listing of panels.
+     * @return View|RedirectResponse
      */
     public function index()
     {
         try {
-            Log::info('Accessing panels list', [
+            $this->logger->info('Accessing panels list', [
                 'source' => 'panel',
                 'user_id' => auth()->id()
             ]);
 
-            $panels = Panel::with(['server.location'])
-                ->orderBy('id', 'desc')
-                ->paginate(10);
-
-            // Получаем только настроенные серверы без панелей
-            $servers = Server::where('server_status', Server::SERVER_CONFIGURED)
-                ->whereDoesntHave('panels')
-                ->with('location')
-                ->get()
-                ->mapWithKeys(function ($server) {
-                    $locationName = $server->location ? " ({$server->location->name})" : '';
-                    return [$server->id => "{$server->name}{$locationName}"];
-                });
+            $panels = $this->panelRepository->getPaginatedWithRelations();
+            $servers = $this->panelRepository->getConfiguredServersWithoutPanels();
 
             return view('module.panel.index', compact('panels', 'servers'));
         } catch (Exception $e) {
-            Log::error('Error accessing panels list', [
+            $this->logger->error('Error accessing panels list', [
                 'source' => 'panel',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'user_id' => auth()->id()
             ]);
 
-            return back()->with('error', 'Error loading panels list: ' . $e->getMessage());
+            return back()->withErrors(['msg' => 'Error loading panels list: ' . $e->getMessage()]);
         }
     }
 
     /**
      * Store a newly created panel.
+     * @param Request $request
+     * @return RedirectResponse
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request)
     {
         try {
-            Log::info('Creating new panel', [
+            $this->logger->info('Creating new panel', [
                 'source' => 'panel',
                 'user_id' => auth()->id(),
                 'server_id' => $request->input('server_id')
@@ -82,13 +87,14 @@ class PanelController extends Controller
 
             // Создаем панель через стратегию
             $strategy = new PanelStrategy(Panel::MARZBAN);
-            $strategy->create($validated['server_id']);
+            $panel = $strategy->create($validated['server_id']);
 
             DB::commit();
 
-            Log::info('Panel created successfully', [
+            $this->logger->info('Panel created successfully', [
                 'source' => 'panel',
-                'user_id' => auth()->id()
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id
             ]);
 
             return redirect()->route('module.panel.index')
@@ -96,7 +102,7 @@ class PanelController extends Controller
 
         } catch (Exception $e) {
             DB::rollBack();
-            Log::error('Error creating panel', [
+            $this->logger->error('Error creating panel', [
                 'source' => 'panel',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -105,17 +111,19 @@ class PanelController extends Controller
             ]);
 
             return redirect()->route('module.panel.index')
-                ->with('error', 'Error creating panel: ' . $e->getMessage());
+                ->withErrors(['msg' => 'Error creating panel: ' . $e->getMessage()]);
         }
     }
 
     /**
      * Configure the specified panel.
+     * @param Panel $panel
+     * @return RedirectResponse
      */
-    public function configure(Panel $panel): RedirectResponse
+    public function configure(Panel $panel)
     {
         try {
-            Log::info('Configuring panel', [
+            $this->logger->info('Configuring panel', [
                 'source' => 'panel',
                 'user_id' => auth()->id(),
                 'panel_id' => $panel->id
@@ -124,7 +132,7 @@ class PanelController extends Controller
             $strategy = new PanelStrategy(Panel::MARZBAN);
             $strategy->updateConfiguration($panel->id);
 
-            Log::info('Panel configured successfully', [
+            $this->logger->info('Panel configured successfully', [
                 'source' => 'panel',
                 'user_id' => auth()->id(),
                 'panel_id' => $panel->id
@@ -135,7 +143,7 @@ class PanelController extends Controller
                 ->with('success', 'Panel configured successfully');
 
         } catch (GuzzleException $e) {
-            Log::error('Network error configuring panel', [
+            $this->logger->error('Network error configuring panel', [
                 'source' => 'panel',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -145,10 +153,10 @@ class PanelController extends Controller
 
             return redirect()
                 ->route('module.panel.index')
-                ->with('error', 'Network connection error: ' . $e->getMessage());
+                ->withErrors(['msg' => 'Network connection error: ' . $e->getMessage()]);
 
         } catch (Exception $e) {
-            Log::error('Error configuring panel', [
+            $this->logger->error('Error configuring panel', [
                 'source' => 'panel',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -158,17 +166,20 @@ class PanelController extends Controller
 
             return redirect()
                 ->route('module.panel.index')
-                ->with('error', 'Error configuring panel: ' . $e->getMessage());
+                ->withErrors(['msg' => 'Error configuring panel: ' . $e->getMessage()]);
         }
     }
 
     /**
      * Update panel configuration.
+     * @param Panel $panel
+     * @return RedirectResponse
+     * @throws GuzzleException
      */
-    public function updateConfig(Panel $panel): RedirectResponse
+    public function updateConfig(Panel $panel)
     {
         try {
-            Log::info('Updating panel configuration', [
+            $this->logger->info('Updating panel configuration', [
                 'source' => 'panel',
                 'user_id' => auth()->id(),
                 'panel_id' => $panel->id
@@ -177,7 +188,7 @@ class PanelController extends Controller
             $strategy = new PanelStrategy(Panel::MARZBAN);
             $strategy->updateConfiguration($panel->id);
 
-            Log::info('Panel configuration updated successfully', [
+            $this->logger->info('Panel configuration updated successfully', [
                 'source' => 'panel',
                 'user_id' => auth()->id(),
                 'panel_id' => $panel->id
@@ -188,7 +199,7 @@ class PanelController extends Controller
                 ->with('success', 'Configuration updated successfully');
 
         } catch (Exception $e) {
-            Log::error('Error updating panel configuration', [
+            $this->logger->error('Error updating panel configuration', [
                 'source' => 'panel',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -198,17 +209,19 @@ class PanelController extends Controller
 
             return redirect()
                 ->route('module.panel.index')
-                ->with('error', 'Error updating configuration: ' . $e->getMessage());
+                ->withErrors(['msg' => 'Error updating configuration: ' . $e->getMessage()]);
         }
     }
 
     /**
-     * @TODO check panel status
+     * Check panel status
+     * @param Panel $panel
+     * @return JsonResponse
      */
     public function checkStatus(Panel $panel)
     {
         try {
-            Log::info('Checking panel status', [
+            $this->logger->info('Checking panel status', [
                 'source' => 'panel',
                 'user_id' => auth()->id(),
                 'panel_id' => $panel->id
@@ -217,7 +230,7 @@ class PanelController extends Controller
             $marzbanApi = new MarzbanAPI($panel->panel_api_address);
             $isOnline = $marzbanApi->checkOnline($panel->id);
 
-            Log::info('Panel status checked', [
+            $this->logger->info('Panel status checked', [
                 'source' => 'panel',
                 'user_id' => auth()->id(),
                 'panel_id' => $panel->id,
@@ -229,7 +242,7 @@ class PanelController extends Controller
             ]);
 
         } catch (Exception $e) {
-            Log::error('Error checking panel status', [
+            $this->logger->error('Error checking panel status', [
                 'source' => 'panel',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),

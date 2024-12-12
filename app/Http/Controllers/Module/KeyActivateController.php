@@ -5,31 +5,39 @@ namespace App\Http\Controllers\Module;
 use App\Models\KeyActivate\KeyActivate;
 use App\Logging\DatabaseLogger;
 use App\Http\Controllers\Controller;
+use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Services\Key\KeyActivateService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\View\View;
 use Exception;
 use RuntimeException;
+use Illuminate\Http\RedirectResponse;
 
 class KeyActivateController extends Controller
 {
     private DatabaseLogger $logger;
     private KeyActivateService $keyActivateService;
+    private KeyActivateRepository $keyActivateRepository;
 
-    public function __construct(DatabaseLogger $logger, KeyActivateService $keyActivateService)
-    {
+    public function __construct(
+        DatabaseLogger $logger,
+        KeyActivateService $keyActivateService,
+        KeyActivateRepository $keyActivateRepository
+    ) {
         $this->logger = $logger;
         $this->keyActivateService = $keyActivateService;
+        $this->keyActivateRepository = $keyActivateRepository;
     }
 
     /**
+     * Display a listing of key activates
+     * @return View|RedirectResponse
      * @throws Exception
      */
     public function index()
     {
         try {
-            $activate_keys = KeyActivate::with(['packSalesman.pack'])
-                ->orderBy('created_at', 'desc')
-                ->paginate(10);
+            $activate_keys = $this->keyActivateRepository->getPaginatedWithPack();
 
             $this->logger->info('Просмотр списка активированных ключей', [
                 'source' => 'key_activate',
@@ -45,17 +53,23 @@ class KeyActivateController extends Controller
                 'source' => 'key_activate',
                 'action' => 'view_list',
                 'user_id' => auth()->id(),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
-            throw $e;
+            return back()->withErrors(['msg' => $e->getMessage()]);
         }
     }
 
-    public function destroy(KeyActivate $key): JsonResponse
+    /**
+     * Remove the specified key activate
+     * @param KeyActivate $key
+     * @return JsonResponse
+     */
+    public function destroy(KeyActivate $key)
     {
         try {
-            $key->delete();
+            $this->keyActivateRepository->delete($key);
 
             $this->logger->info('Удаление ключа активации', [
                 'source' => 'key_activate',
@@ -71,7 +85,8 @@ class KeyActivateController extends Controller
                 'action' => 'delete',
                 'user_id' => auth()->id(),
                 'key_id' => $key->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json(['message' => 'Ошибка при удалении ключа'], 500);
@@ -79,13 +94,15 @@ class KeyActivateController extends Controller
     }
 
     /**
-     * Тестовая активация ключа (только для разработки)
+     * Test activation of the key (development only)
+     * @param KeyActivate $key
+     * @return JsonResponse
      */
-    public function testActivate(KeyActivate $key): JsonResponse
+    public function testActivate(KeyActivate $key)
     {
         try {
             // Проверяем статус ключа
-            if ($key->status != KeyActivate::PAID) {
+            if (!$this->keyActivateRepository->hasCorrectStatusForActivation($key)) {
                 $this->logger->warning('Попытка активации ключа с неверным статусом', [
                     'source' => 'key_activate',
                     'action' => 'test_activate',
@@ -137,6 +154,7 @@ class KeyActivateController extends Controller
                 'user_id' => auth()->id(),
                 'key_id' => $key->id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'key_status' => $key->status,
                 'deleted_at' => $key->deleted_at
             ]);

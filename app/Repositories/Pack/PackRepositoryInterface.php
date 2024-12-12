@@ -3,6 +3,7 @@
 namespace App\Repositories\Pack;
 
 use App\Models\Pack\Pack;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 interface PackRepositoryInterface
@@ -34,17 +35,17 @@ interface PackRepositoryInterface
     /**
      * Update pack
      * 
-     * @param Pack $pack
+     * @param Model $model
      * @param array $data
-     * @return Pack
+     * @return bool
      */
-    public function update(Pack $pack, array $data): Pack;
+    public function update(Model $model, array $data): bool;
 
     /**
      * Delete pack
      * 
-     * @param Pack $pack
+     * @param Model $model
      * @return bool
      */
-    public function delete(Pack $pack): bool;
+    public function delete(Model $model): bool;
 }

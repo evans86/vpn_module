@@ -4,25 +4,34 @@ namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
 use App\Models\Salesman\Salesman;
+use App\Repositories\Salesman\SalesmanRepository;
 use App\Services\Salesman\SalesmanService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\View\View;
+use RuntimeException;
 
 class SalesmanController extends Controller
 {
-    /**
-     * @var SalesmanService
-     */
     private SalesmanService $salesmanService;
+    private SalesmanRepository $salesmanRepository;
 
-    public function __construct(SalesmanService $salesmanService)
-    {
+    public function __construct(
+        SalesmanService $salesmanService,
+        SalesmanRepository $salesmanRepository
+    ) {
         $this->salesmanService = $salesmanService;
+        $this->salesmanRepository = $salesmanRepository;
     }
 
-    public function index()
+    /**
+     * Display a listing of salesmen
+     * @return View
+     * @throws Exception
+     */
+    public function index(): View
     {
         try {
             Log::info('Accessing salesman list', [
@@ -30,9 +39,7 @@ class SalesmanController extends Controller
                 'user_id' => auth()->id()
             ]);
 
-            $salesmen = Salesman::query()
-                ->orderBy('created_at', 'desc')
-                ->paginate(20);
+            $salesmen = $this->salesmanRepository->getPaginated();
 
             return view('module.salesman.index', compact('salesmen'));
         } catch (Exception $e) {
@@ -43,13 +50,12 @@ class SalesmanController extends Controller
                 'user_id' => auth()->id()
             ]);
 
-            return back()->with('error', 'Error loading salesman list: ' . $e->getMessage());
+            throw $e;
         }
     }
 
     /**
      * Toggle salesman status
-     *
      * @param Request $request
      * @param int $id
      * @return JsonResponse
@@ -70,7 +76,7 @@ class SalesmanController extends Controller
                 'message' => 'Status updated successfully',
                 'status' => $salesman->status
             ]);
-        } catch (Exception $e) {
+        } catch (RuntimeException $e) {
             Log::error('Error toggling salesman status', [
                 'source' => 'salesman',
                 'error' => $e->getMessage(),
@@ -81,7 +87,7 @@ class SalesmanController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Error updating status: ' . $e->getMessage()
+                'message' => $e->getMessage()
             ], 500);
         }
     }

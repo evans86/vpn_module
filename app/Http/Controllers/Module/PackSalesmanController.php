@@ -5,34 +5,37 @@ namespace App\Http\Controllers\Module;
 use App\Models\PackSalesman\PackSalesman;
 use App\Logging\DatabaseLogger;
 use App\Http\Controllers\Controller;
+use App\Repositories\PackSalesman\PackSalesmanRepository;
 use Exception;
 use Illuminate\Http\JsonResponse;
-use Psr\Log\LoggerInterface;
+use Illuminate\View\View;
+use RuntimeException;
 use App\Services\Pack\PackSalesmanService;
 
 class PackSalesmanController extends Controller
 {
-    /**
-     * @var DatabaseLogger
-     */
-    private $logger;
+    private DatabaseLogger $logger;
     private PackSalesmanService $packSalesmanService;
+    private PackSalesmanRepository $packSalesmanRepository;
 
-    public function __construct(LoggerInterface $logger, PackSalesmanService $packSalesmanService)
-    {
+    public function __construct(
+        DatabaseLogger $logger,
+        PackSalesmanService $packSalesmanService,
+        PackSalesmanRepository $packSalesmanRepository
+    ) {
         $this->logger = $logger;
         $this->packSalesmanService = $packSalesmanService;
+        $this->packSalesmanRepository = $packSalesmanRepository;
     }
 
     /**
+     * Display a listing of pack-salesman relations
      * @throws Exception
      */
-    public function index()
+    public function index(): View
     {
         try {
-            $pack_salesmans = PackSalesman::with(['pack', 'salesman'])
-                ->orderBy('created_at', 'desc')
-                ->paginate(15);
+            $pack_salesmans = $this->packSalesmanRepository->getPaginatedWithRelations();
 
             $this->logger->info('Просмотр списка связей пакет-продавец', [
                 'source' => 'pack_salesman',
@@ -56,9 +59,12 @@ class PackSalesmanController extends Controller
     }
 
     /**
-     * Отметить пакет как оплаченный
+     * Mark pack as paid
+     * @param int $id
+     * @return JsonResponse
+     * @throws Exception
      */
-    public function markAsPaid($id): JsonResponse
+    public function markAsPaid(int $id): JsonResponse
     {
         try {
             $this->packSalesmanService->success($id);
@@ -67,7 +73,7 @@ class PackSalesmanController extends Controller
                 'success' => true,
                 'message' => 'Пакет успешно отмечен как оплаченный'
             ]);
-        } catch (Exception $e) {
+        } catch (RuntimeException $e) {
             $this->logger->error('Ошибка при изменении статуса пакета', [
                 'source' => 'pack_salesman',
                 'action' => 'mark_as_paid',
@@ -78,7 +84,7 @@ class PackSalesmanController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Ошибка при изменении статуса: ' . $e->getMessage()
+                'message' => $e->getMessage()
             ], 500);
         }
     }

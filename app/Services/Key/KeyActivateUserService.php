@@ -11,6 +11,7 @@ use RuntimeException;
 
 class KeyActivateUserService
 {
+
     /**
      * @param string $server_user_id
      * @param string $key_activate_id

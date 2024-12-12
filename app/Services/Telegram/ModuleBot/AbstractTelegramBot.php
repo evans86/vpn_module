@@ -2,6 +2,11 @@
 
 namespace App\Services\Telegram\ModuleBot;
 
+use App\Repositories\KeyActivate\KeyActivateRepository;
+use App\Repositories\PackSalesman\PackSalesmanRepository;
+use App\Repositories\Salesman\SalesmanRepository;
+use App\Services\Pack\PackSalesmanService;
+use App\Services\Salesman\SalesmanService;
 use Exception;
 use Telegram\Bot\Api;
 use Telegram\Bot\Objects\Update;
@@ -16,12 +21,29 @@ abstract class AbstractTelegramBot
     protected ?int $chatId = null;
     protected ?string $username = null;
     protected const WEBHOOK_BASE_URL = 'https://myserver.com/';
+    protected PackSalesmanService $packSalesmanService;
+    protected SalesmanService $salesmanService;
+    protected KeyActivateRepository $keyActivateRepository;
+    protected PackSalesmanRepository $packSalesmanRepository;
+    protected SalesmanRepository $salesmanRepository;
 
     /**
      * @throws TelegramSDKException
      */
-    public function __construct(string $token)
+    public function __construct(
+        string              $token,
+        PackSalesmanService $packSalesmanService,
+        SalesmanService     $salesmanService,
+        KeyActivateRepository $keyActivateRepository,
+        PackSalesmanRepository $packSalesmanRepository,
+        SalesmanRepository $salesmanRepository
+    )
     {
+        $this->packSalesmanService = $packSalesmanService;
+        $this->salesmanService = $salesmanService;
+        $this->keyActivateRepository = $keyActivateRepository;
+        $this->packSalesmanRepository = $packSalesmanRepository;
+        $this->salesmanRepository = $salesmanRepository;
         if (empty($token)) {
             throw new \RuntimeException('Telegram bot token not configured');
         }

@@ -3,18 +3,37 @@
 namespace App\Services\Key;
 
 use App\Models\KeyActivate\KeyActivate;
-use App\Models\PackSalesman\PackSalesman;
 use App\Models\Panel\Panel;
+use App\Repositories\Panel\PanelRepository;
 use App\Services\Panel\PanelStrategy;
+use App\Repositories\KeyActivate\KeyActivateRepository;
+use App\Repositories\PackSalesman\PackSalesmanRepository;
+use App\Logging\DatabaseLogger;
 use GuzzleHttp\Exception\GuzzleException;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Exception;
 
 class KeyActivateService
 {
-    private $panelStrategy;
+    private PanelStrategy $panelStrategy;
+    private KeyActivateRepository $keyActivateRepository;
+    private PackSalesmanRepository $packSalesmanRepository;
+    private DatabaseLogger $logger;
+    private PanelRepository $panelRepository;
+
+    public function __construct(
+        KeyActivateRepository  $keyActivateRepository,
+        PackSalesmanRepository $packSalesmanRepository,
+        PanelRepository        $panelRepository,
+        DatabaseLogger         $logger
+    )
+    {
+        $this->keyActivateRepository = $keyActivateRepository;
+        $this->packSalesmanRepository = $packSalesmanRepository;
+        $this->panelRepository = $panelRepository;
+        $this->logger = $logger;
+    }
 
     /**
      * Создание ключа
@@ -29,41 +48,48 @@ class KeyActivateService
     public function create(?int $traffic_limit, int $pack_salesman_id, int $finish_at, int $deleted_at): KeyActivate
     {
         try {
-            /**
-             * @var PackSalesman $packSalesman
-             */
-            $packSalesman = PackSalesman::query()->where('id', $pack_salesman_id)->firstOrFail();
+            $packSalesman = $this->packSalesmanRepository->findByIdOrFail($pack_salesman_id);
 
-            $keyActivate = new KeyActivate();
+            $keyData = [
+                'id' => Str::uuid()->toString(),
+                'traffic_limit' => $traffic_limit,
+                'pack_salesman_id' => $packSalesman->id,
+                'finish_at' => $finish_at,
+                'deleted_at' => $deleted_at,
+                'status' => KeyActivate::PAID
+            ];
 
-            $keyActivate->id = Str::uuid()->toString();
-            $keyActivate->traffic_limit = $traffic_limit;
-            $keyActivate->pack_salesman_id = $packSalesman->id;
-            $keyActivate->finish_at = $finish_at;
-            $keyActivate->deleted_at = $deleted_at;
-            $keyActivate->status = KeyActivate::PAID;
+            $keyActivate = $this->keyActivateRepository->createKey($keyData);
 
-            if (!$keyActivate->save())
-                throw new RuntimeException('Key Activate dont create');
-
-            Log::info('Ключ успешно создан', [
+            $this->logger->info('Ключ успешно создан', [
                 'source' => 'key_activate',
-                'action' => 'activate',
+                'action' => 'create',
                 'key_id' => $keyActivate->id,
-                'pack_salesman_id' => $packSalesman->id
+                'pack_salesman_id' => $packSalesman->id,
+                'traffic_limit' => $traffic_limit,
+                'finish_at' => $finish_at,
+                'deleted_at' => $deleted_at
             ]);
 
             return $keyActivate;
-        } catch (RuntimeException $r) {
-            throw new RuntimeException($r->getMessage());
-        } catch (Exception $e) {
-            Log::error('Ошибка при активации ключа', [
+        } catch (RuntimeException $e) {
+            $this->logger->error('Ошибка при создании ключа (RuntimeException)', [
                 'source' => 'key_activate',
-                'action' => 'activate',
-                'pack_salesman_id' => $packSalesman->id,
-                'error' => $e->getMessage()
+                'action' => 'create',
+                'pack_salesman_id' => $pack_salesman_id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
-            throw new Exception($e->getMessage());
+            throw $e;
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при создании ключа', [
+                'source' => 'key_activate',
+                'action' => 'create',
+                'pack_salesman_id' => $pack_salesman_id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
     }
 
@@ -79,25 +105,22 @@ class KeyActivateService
     {
         try {
             // Проверяем текущий статус
-            if ($key->status != KeyActivate::PAID) {
+            if (!$this->keyActivateRepository->hasCorrectStatusForActivation($key)) {
                 throw new RuntimeException('Ключ не может быть активирован (неверный статус)');
             }
 
             // Проверяем, не истек ли срок для активации
-            if ($key->deleted_at && time() > $key->deleted_at) {
+            if ($this->keyActivateRepository->isActivationPeriodExpired($key)) {
                 throw new RuntimeException('Срок активации ключа истек');
             }
 
             // Проверяем, не занят ли уже ключ другим пользователем
-            if ($key->user_tg_id && $key->user_tg_id !== $userTgId) {
+            if ($this->keyActivateRepository->isUsedByAnotherUser($key, $userTgId)) {
                 throw new RuntimeException('Ключ уже используется другим пользователем');
             }
 
-            //проверка пользователей на панели и выбираю с наименьшим количеством пользователей
-            //Получаем активную панель Marzban
-            $panel = Panel::where('panel_status', Panel::PANEL_CONFIGURED)
-                ->where('panel', Panel::MARZBAN)
-                ->first();
+            // Получаем активную панель Marzban
+            $panel = $this->panelRepository->getConfiguredMarzbanPanel();
 
             if (!$panel) {
                 throw new RuntimeException('Активная панель Marzban не найдена');
@@ -114,31 +137,33 @@ class KeyActivateService
                 $key->id
             );
 
-            // Устанавливаем данные активации
-            $key->user_tg_id = $userTgId;
-            $key->status = KeyActivate::ACTIVE;
-            $key->deleted_at = null;
+            // Обновляем данные активации
+            $activatedKey = $this->keyActivateRepository->updateActivationData(
+                $key,
+                $userTgId,
+                KeyActivate::ACTIVE
+            );
 
-            if (!$key->save()) {
-                throw new RuntimeException('Ошибка при сохранении ключа');
-            }
-
-            Log::info('Ключ успешно активирован', [
+            $this->logger->info('Ключ успешно активирован', [
                 'source' => 'key_activate',
                 'action' => 'activate',
-                'key_id' => $key->id,
+                'key_id' => $activatedKey->id,
                 'user_tg_id' => $userTgId,
-                'server_user_id' => $serverUser->id
+                'server_user_id' => $serverUser->id,
+                'panel_id' => $panel->id,
+                'traffic_limit' => $key->traffic_limit,
+                'finish_at' => $key->finish_at
             ]);
 
-            return $key;
+            return $activatedKey;
         } catch (Exception $e) {
-            Log::error('Ошибка при активации ключа', [
+            $this->logger->error('Ошибка при активации ключа', [
                 'source' => 'key_activate',
                 'action' => 'activate',
                 'key_id' => $key->id,
                 'user_tg_id' => $userTgId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
             throw new RuntimeException($e->getMessage());
@@ -153,32 +178,49 @@ class KeyActivateService
      */
     public function checkAndUpdateStatus(KeyActivate $key): KeyActivate
     {
-        $currentTime = time();
+        $originalStatus = $key->status;
 
-        // Проверяем срок действия для активных ключей
-        if ($key->status === KeyActivate::ACTIVE && $currentTime > $key->finish_at) {
-            $key->status = KeyActivate::EXPIRED;
-            $key->save();
+        try {
+            // Проверяем срок действия для активных ключей
+            if ($key->status === KeyActivate::ACTIVE && $this->keyActivateRepository->isExpiredByTime($key)) {
+                $key = $this->keyActivateRepository->updateStatus($key, KeyActivate::EXPIRED);
 
-            Log::info('Статус ключа обновлен на EXPIRED (истек срок действия)', [
+                $this->logger->info('Статус ключа обновлен на EXPIRED (истек срок действия)', [
+                    'source' => 'key_activate',
+                    'action' => 'update_status',
+                    'key_id' => $key->id,
+                    'old_status' => $originalStatus,
+                    'new_status' => $key->status,
+                    'finish_at' => $key->finish_at
+                ]);
+            }
+
+            // Проверяем срок активации для оплаченных ключей
+            if ($key->status === KeyActivate::PAID && $this->keyActivateRepository->isActivationPeriodExpired($key)) {
+                $key = $this->keyActivateRepository->updateStatus($key, KeyActivate::EXPIRED);
+
+                $this->logger->info('Статус ключа обновлен на EXPIRED (истек срок активации)', [
+                    'source' => 'key_activate',
+                    'action' => 'update_status',
+                    'key_id' => $key->id,
+                    'old_status' => $originalStatus,
+                    'new_status' => $key->status,
+                    'deleted_at' => $key->deleted_at
+                ]);
+            }
+
+            return $key;
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при обновлении статуса ключа', [
                 'source' => 'key_activate',
                 'action' => 'update_status',
-                'key_id' => $key->id
+                'key_id' => $key->id,
+                'old_status' => $originalStatus,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
+
+            throw new RuntimeException('Ошибка при обновлении статуса ключа: ' . $e->getMessage());
         }
-
-        // Проверяем срок активации для оплаченных ключей
-        if ($key->status === KeyActivate::PAID && $key->deleted_at && $currentTime > $key->deleted_at) {
-            $key->status = KeyActivate::EXPIRED;
-            $key->save();
-
-            Log::info('Статус ключа обновлен на EXPIRED (истек срок активации)', [
-                'source' => 'key_activate',
-                'action' => 'update_status',
-                'key_id' => $key->id
-            ]);
-        }
-
-        return $key;
     }
 }

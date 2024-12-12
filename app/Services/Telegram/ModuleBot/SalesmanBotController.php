@@ -3,7 +3,6 @@
 namespace App\Services\Telegram\ModuleBot;
 
 use App\Models\KeyActivate\KeyActivate;
-use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
 use Telegram\Bot\Keyboard\Keyboard;
 use Illuminate\Support\Facades\Log;
@@ -127,17 +126,13 @@ class SalesmanBotController extends AbstractTelegramBot
     private function actionStatus(): void
     {
         try {
-            // Получаем ID пользователя из Telegram
             $userId = $this->update->getCallbackQuery()->getFrom()->getId();
-            
-            // Находим активные ключи, которые были выданы текущим продавцом
-            $this->currentPack = KeyActivate::whereHas('packSalesman', function ($query) {
-                $query->where('salesman_id', $this->salesman->id);
-            })
-            ->where('user_tg_id', $userId)
-            ->whereIn('status', [KeyActivate::ACTIVE, KeyActivate::PAID])
-            ->latest()
-            ->first();
+
+            // Находим активные ключи через репозиторий
+            $this->currentPack = $this->keyActivateRepository->findActiveKeyByUserAndSalesman(
+                $userId,
+                $this->salesman->id
+            );
 
             if (!$this->currentPack) {
                 $this->sendMessage("У вас нет активных VPN-доступов. Для приобретения обратитесь к менеджеру @{$this->getSalesmanUsername()}");
@@ -167,13 +162,11 @@ class SalesmanBotController extends AbstractTelegramBot
         try {
             $userId = $this->update->getCallbackQuery()->getFrom()->getId();
 
-            // Проверяем, есть ли уже активный доступ у пользователя у этого продавца
-            $existingPack = KeyActivate::whereHas('packSalesman', function ($query) {
-                $query->where('salesman_id', $this->salesman->id);
-            })
-            ->where('user_tg_id', $userId)
-            ->where('status', KeyActivate::ACTIVE)
-            ->first();
+            // Проверяем наличие активного ключа через репозиторий
+            $existingPack = $this->keyActivateRepository->findActiveKeyByUserAndSalesman(
+                $userId,
+                $this->salesman->id
+            );
 
             if ($existingPack) {
                 $this->sendMessage("У вас уже есть активный VPN-доступ до {$existingPack->finish_at->format('d.m.Y')}.\nДля покупки дополнительного доступа обратитесь к менеджеру @{$this->getSalesmanUsername()}");
@@ -198,14 +191,11 @@ class SalesmanBotController extends AbstractTelegramBot
         try {
             $userId = $this->update->getMessage()->getFrom()->getId();
 
-            // Находим ключ по ID
-            $key = KeyActivate::whereHas('packSalesman', function ($query) {
-                $query->where('salesman_id', $this->salesman->id);
-            })
-            ->where('id', $keyId)
-            ->where('status', KeyActivate::PAID)
-            ->whereNull('user_tg_id')
-            ->first();
+            // Находим ключ через репозиторий
+            $key = $this->keyActivateRepository->findAvailableKeyForActivation(
+                $keyId,
+                $this->salesman->id
+            );
 
             if (!$key) {
                 $this->sendMessage("❌ Неверный ключ активации или ключ уже использован.\nПожалуйста, проверьте ключ и попробуйте снова, либо обратитесь к менеджеру @{$this->getSalesmanUsername()}");
@@ -214,7 +204,7 @@ class SalesmanBotController extends AbstractTelegramBot
             }
 
             // Активируем ключ для пользователя
-            $key->update([
+            $this->keyActivateRepository->update($key, [
                 'user_tg_id' => $userId,
                 'status' => KeyActivate::ACTIVE
             ]);
@@ -250,7 +240,7 @@ class SalesmanBotController extends AbstractTelegramBot
         $text .= "📱 <b>Инструкция по настройке:</b>\n\n";
         $text .= "1. Откройте ссылку для загрузки конфигурации:\n";
         $text .= "<code>$configUrl</code>\n\n";
-        
+
         // iOS
         $text .= "🍎 <b>iOS:</b>\n";
         $text .= "1. Установите приложение WireGuard из App Store\n";
@@ -281,7 +271,7 @@ class SalesmanBotController extends AbstractTelegramBot
     private function getSalesmanUsername(): string
     {
         if (!$this->salesman) {
-            $this->salesman = Salesman::where('token', $this->telegram->getAccessToken())->first();
+            $this->salesman = $this->salesmanRepository->findByToken($this->telegram->getAccessToken());
         }
         return $this->salesman->username ?? 'support';
     }

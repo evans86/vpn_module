@@ -3,46 +3,53 @@
 namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
-use App\Models\Location\Location;
 use App\Models\Server\Server;
 use App\Services\Server\ServerStrategy;
+use App\Repositories\Server\ServerRepository;
+use App\Logging\DatabaseLogger;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class ServerController extends Controller
 {
+    private ServerRepository $serverRepository;
+    private DatabaseLogger $logger;
+
+    public function __construct(ServerRepository $serverRepository, DatabaseLogger $logger)
+    {
+        $this->serverRepository = $serverRepository;
+        $this->logger = $logger;
+    }
+
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
         try {
-            Log::info('Accessing servers list', [
+            $this->logger->info('Accessing servers list', [
                 'source' => 'server',
                 'user_id' => auth()->id()
             ]);
 
-            $servers = Server::with('location')->paginate(10);
-            $locations = Location::pluck('code', 'id')->mapWithKeys(function ($code, $id) {
-                return [$id => $code . ' ' . Location::find($id)->emoji];
-            });
+            $servers = $this->serverRepository->getPaginatedWithRelations();
+            $locations = $this->serverRepository->getLocationsForDropdown();
 
             return view('module.server.index', compact('servers', 'locations'));
         } catch (Exception $e) {
-            Log::error('Error accessing servers list', [
+            $this->logger->error('Error accessing servers list', [
                 'source' => 'server',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'user_id' => auth()->id()
             ]);
 
-            return back()->with('error', 'Error loading servers list: ' . $e->getMessage());
+            return back()->withErrors('Error loading servers list: ' . $e->getMessage());
         }
     }
 
@@ -56,7 +63,7 @@ class ServerController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
-            Log::info('Creating new server', [
+            $this->logger->info('Creating new server', [
                 'source' => 'server',
                 'user_id' => auth()->id(),
                 'location_id' => $request->input('location_id'),
@@ -72,7 +79,7 @@ class ServerController extends Controller
             $strategy = new ServerStrategy($validated['provider']);
             $server = $strategy->configure($validated['location_id'], $validated['provider'], false);
 
-            Log::info('Server created successfully', [
+            $this->logger->info('Server created successfully', [
                 'source' => 'server',
                 'user_id' => auth()->id(),
                 'server_id' => $server->id,
@@ -87,7 +94,7 @@ class ServerController extends Controller
             ]);
 
         } catch (ValidationException $e) {
-            Log::warning('Server creation validation failed', [
+            $this->logger->warning('Server creation validation failed', [
                 'source' => 'server',
                 'user_id' => auth()->id(),
                 'errors' => $e->errors(),
@@ -101,7 +108,7 @@ class ServerController extends Controller
             ], 422);
 
         } catch (RuntimeException $e) {
-            Log::error('Server creation failed', [
+            $this->logger->error('Server creation failed', [
                 'source' => 'server',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -125,7 +132,7 @@ class ServerController extends Controller
             ], 400);
 
         } catch (Exception $e) {
-            Log::error('Unexpected error during server creation', [
+            $this->logger->error('Unexpected error during server creation', [
                 'source' => 'server',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -146,16 +153,16 @@ class ServerController extends Controller
     public function update(Request $request, Server $server): RedirectResponse
     {
         try {
-            Log::info('Updating server', [
+            $this->logger->info('Updating server', [
                 'source' => 'server',
                 'user_id' => auth()->id(),
                 'server_id' => $server->id,
                 'data' => $request->except(['_token', '_method'])
             ]);
 
-            $server->update($request->all());
+            $server = $this->serverRepository->updateConfiguration($server, $request->all());
 
-            Log::info('Server updated successfully', [
+            $this->logger->info('Server updated successfully', [
                 'source' => 'server',
                 'user_id' => auth()->id(),
                 'server_id' => $server->id
@@ -164,7 +171,7 @@ class ServerController extends Controller
             return redirect()->route('module.server.index')
                 ->with('success', 'Server updated successfully');
         } catch (Exception $e) {
-            Log::error('Error updating server', [
+            $this->logger->error('Error updating server', [
                 'source' => 'server',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -174,7 +181,7 @@ class ServerController extends Controller
             ]);
 
             return redirect()->route('module.server.index')
-                ->with('error', 'Error updating server: ' . $e->getMessage());
+                ->withErrors('Error updating server: ' . $e->getMessage());
         }
     }
 
@@ -187,7 +194,7 @@ class ServerController extends Controller
     public function destroy(Server $server): JsonResponse
     {
         try {
-            Log::info('Deleting server', [
+            $this->logger->info('Deleting server', [
                 'source' => 'server',
                 'user_id' => auth()->id(),
                 'server_id' => $server->id,
@@ -198,7 +205,7 @@ class ServerController extends Controller
             $strategy = new ServerStrategy($server->provider);
             $strategy->delete($server);
 
-            Log::info('Server deleted successfully', [
+            $this->logger->info('Server deleted successfully', [
                 'source' => 'server',
                 'user_id' => auth()->id(),
                 'server_id' => $server->id
@@ -209,7 +216,7 @@ class ServerController extends Controller
             ]);
 
         } catch (Exception $e) {
-            Log::error('Error deleting server', [
+            $this->logger->error('Error deleting server', [
                 'source' => 'server',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),

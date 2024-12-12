@@ -44,6 +44,7 @@ class MarzbanService
              */
             $server = Server::query()->where('id', $server_id)->firstOrFail();
 
+
             // Проверяем статус сервера
             if (!$this->checkServerStatus($server)) {
                 throw new RuntimeException('Server is not ready for panel installation');
