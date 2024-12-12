@@ -26,11 +26,8 @@ class FatherBotController extends AbstractTelegramBot
     protected function processUpdate(): void
     {
         try {
-            $this->sendMessage($this->update->getMessage()->text);
-            Log::debug('Send message: ' . $this->update->getMessage()->text);
-            return;
-
-            if ($this->update->getMessage()->getText() === '/start') {
+            if ($this->update->getMessage()->text === '/start') {
+                Log::debug('Send message: ' . $this->update->getMessage()->text);
                 $this->userState = null;
                 $this->start();
                 return;
@@ -121,12 +118,13 @@ class FatherBotController extends AbstractTelegramBot
         try {
             // Проверяем существование пользователя
             $existingSalesman = Salesman::where('telegram_id', $this->chatId)->first();
+            Log::debug('existingSalesman: ' . $existingSalesman);
 
             if (!$existingSalesman) {
                 $this->salesmanService->create($this->chatId, $this->username);
             }
-            $this->sendMessage("TEEEEEECNNNN");
-//            $this->generateMenu();
+//            $this->sendMessage("TEEEEEECNNNN");
+            $this->generateMenu();
         } catch (\Exception $e) {
             Log::error('Start command error: ' . $e->getMessage());
             $this->sendErrorMessage();
