@@ -141,11 +141,11 @@ class FatherBotController extends AbstractTelegramBot
             ->setResizeKeyboard(true)
             ->setOneTimeKeyboard(false)
             ->row(
-                Keyboard::button([
+                Keyboard::inlineButton([
                     'text' => '🛍 Купить пакет',
                     'callback_data' => 'packs'
                 ]),
-                Keyboard::button([
+                Keyboard::inlineButton([
                     'text' => '🤖 Мой бот',
                     'callback_data' => 'bindBot'
                 ])
@@ -166,7 +166,7 @@ class FatherBotController extends AbstractTelegramBot
         $message .= "🔸 Создавайте своего бота\n";
         $message .= "🔸 Продавайте VPN доступы\n";
 
-        Log::debug('Send message: ' . $message . $keyboard);
+        Log::debug('Send message: ' . $message . json_encode($keyboard));
 
         $this->sendMessage($message, $keyboard);
     }
