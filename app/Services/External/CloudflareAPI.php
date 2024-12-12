@@ -14,7 +14,7 @@ class CloudflareAPI
 {
     private const ZONE_ID = 'ecd4115fa760df3dd0a5f9c0e2caee2d';
     private const RECORD_TYPE = 'A';
-    private const DOMAIN = 'vpn-telegram.com';
+    private const DOMAIN = 'bot-t.ru';
 
     /**
      * Возвращает адаптер для работы с API
@@ -77,7 +77,7 @@ class CloudflareAPI
             $result = $DNSRecord->addRecord(self::ZONE_ID, self::RECORD_TYPE, $name, $ip);
 
             if (!isset($result->id) || !isset($result->name)) {
-                throw new RuntimeException('Invalid response from Cloudflare API: missing id or name ');
+                throw new RuntimeException('Invalid response from Cloudflare API: missing id or name');
             }
 
             Log::info('DNS record created successfully', [
