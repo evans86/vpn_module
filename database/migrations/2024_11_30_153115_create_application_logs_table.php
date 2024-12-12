@@ -16,7 +16,7 @@ class CreateApplicationLogsTable extends Migration
         Schema::create('application_logs', function (Blueprint $table) {
             $table->id();
             $table->string('level', 20)->index()->charset('utf8mb4')->collate('utf8mb4_unicode_ci');  // info, error, warning, critical, debug
-            $table->string('source')->index()->charset('utf8mb4')->collate('utf8mb4_unicode_ci'); // модуль или компонент, откуда пришел лог
+            $table->string('source')->default('project')->index()->charset('utf8mb4')->collate('utf8mb4_unicode_ci'); // модуль или компонент, откуда пришел лог
             $table->text('message')->charset('utf8mb4')->collate('utf8mb4_unicode_ci');           // сообщение лога
             $table->json('context')->nullable(); // дополнительные данные в формате JSON
             $table->string('user_id')->nullable()->index(); // ID пользователя, если применимо
