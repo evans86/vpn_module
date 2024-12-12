@@ -61,7 +61,7 @@ class CloudflareService
                         'new_ip' => $ip,
                         'record_id' => $record->id
                     ]);
-                    return $this->api->updateDNSRecord($record->id, $name, $ip);
+//                    return $this->api->updateDNSRecord($record->id, $name, $ip);
                 }
             }
 

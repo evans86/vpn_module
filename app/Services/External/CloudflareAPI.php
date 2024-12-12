@@ -77,7 +77,7 @@ class CloudflareAPI
             $result = $DNSRecord->addRecord(self::ZONE_ID, self::RECORD_TYPE, $name, $ip);
 
             if (!isset($result->id) || !isset($result->name)) {
-                throw new RuntimeException('Invalid response from Cloudflare API: missing id or name ' . $result->name);
+                throw new RuntimeException('Invalid response from Cloudflare API: missing id or name ');
             }
 
             Log::info('DNS record created successfully', [
