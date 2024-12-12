@@ -30,25 +30,20 @@ abstract class AbstractTelegramBot
     /**
      * @throws TelegramSDKException
      */
-    public function __construct(
-        string              $token,
-        PackSalesmanService $packSalesmanService,
-        SalesmanService     $salesmanService,
-        KeyActivateRepository $keyActivateRepository,
-        PackSalesmanRepository $packSalesmanRepository,
-        SalesmanRepository $salesmanRepository
-    )
+    public function __construct(string $token)
     {
-        $this->packSalesmanService = $packSalesmanService;
-        $this->salesmanService = $salesmanService;
-        $this->keyActivateRepository = $keyActivateRepository;
-        $this->packSalesmanRepository = $packSalesmanRepository;
-        $this->salesmanRepository = $salesmanRepository;
+        $this->packSalesmanService = app(PackSalesmanService::class);
+        $this->salesmanService = app(SalesmanService::class);
+        $this->keyActivateRepository = app(KeyActivateRepository::class);
+        $this->packSalesmanRepository = app(PackSalesmanRepository::class);
+        $this->salesmanRepository = app(SalesmanRepository::class);
+
         if (empty($token)) {
             throw new \RuntimeException('Telegram bot token not configured');
         }
         $this->telegram = new Api($token);
     }
+
 
     /**
      * Инициализация бота
