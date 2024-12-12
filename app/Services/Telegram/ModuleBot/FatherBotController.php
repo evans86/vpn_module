@@ -34,7 +34,7 @@ class FatherBotController extends AbstractTelegramBot
             }
 
             $message = $this->update->getMessage();
-            $callbackQuery = $this->update->getCallbackQuery();
+            $callbackQuery = $this->update->callbackQuery;
 
             // Проверяем состояние ожидания токена
             if ($this->userState === self::STATE_WAITING_TOKEN && $message) {
@@ -123,7 +123,7 @@ class FatherBotController extends AbstractTelegramBot
             if (!$existingSalesman) {
                 $this->salesmanService->create($this->chatId, $this->username);
             }
-//            $this->sendMessage("TEEEEEECNNNN");
+
             $this->generateMenu();
         } catch (\Exception $e) {
             Log::error('Start command error: ' . $e->getMessage());
