@@ -14,7 +14,7 @@ class CloudflareAPI
 {
     private const ZONE_ID = 'ecd4115fa760df3dd0a5f9c0e2caee2d';
     private const RECORD_TYPE = 'A';
-    private const DOMAIN = 'bot-t.ru';
+    private const DOMAIN = 'vpn-telegram.com';
 
     /**
      * Возвращает адаптер для работы с API
