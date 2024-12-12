@@ -119,7 +119,7 @@ abstract class AbstractTelegramBot
 
             $this->telegram->sendMessage($params);
         } catch (Exception $e) {
-            Log::error('Send message error: ' . $e->getMessage());
+            Log::error('Send message error: ' . $e->getMessage() . $text);
         }
     }
 
