@@ -116,7 +116,6 @@ abstract class AbstractTelegramBot
 
             if ($keyboard) {
                 $params['reply_markup'] = $keyboard;
-                $params['parse_mode'] = 'Markdown';
             }
 
             $this->telegram->sendMessage($params);
