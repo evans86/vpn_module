@@ -20,7 +20,7 @@ abstract class AbstractTelegramBot
     protected ?Update $update = null;
     protected ?int $chatId = null;
     protected ?string $username = null;
-    protected const WEBHOOK_BASE_URL = 'https://myserver.com/';
+    protected const WEBHOOK_BASE_URL = 'https://vpn-telegram.com/';
     protected PackSalesmanService $packSalesmanService;
     protected SalesmanService $salesmanService;
     protected KeyActivateRepository $keyActivateRepository;
