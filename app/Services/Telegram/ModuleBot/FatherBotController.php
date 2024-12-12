@@ -9,6 +9,7 @@ use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
 use App\Services\Salesman\SalesmanService;
 use App\Services\Telegram\TelegramKeyboard;
+use Telegram\Bot\Keyboard\Button;
 use Telegram\Bot\Keyboard\Keyboard;
 use Illuminate\Support\Facades\Log;
 
@@ -138,13 +139,13 @@ class FatherBotController extends AbstractTelegramBot
     {
         $keyboard = Keyboard::make()
             ->setResizeKeyboard(true)
-            ->setOneTimeKeyboard(true)
+            ->setOneTimeKeyboard(false)
             ->row(
-                Keyboard::inlineButton([
+                Keyboard::button([
                     'text' => '🛍 Купить пакет',
                     'callback_data' => 'packs'
                 ]),
-                Keyboard::inlineButton([
+                Keyboard::button([
                     'text' => '🤖 Мой бот',
                     'callback_data' => 'bindBot'
                 ])
