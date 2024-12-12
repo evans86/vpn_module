@@ -118,7 +118,7 @@ class FatherBotController extends AbstractTelegramBot
         try {
             // Проверяем существование пользователя
             $existingSalesman = Salesman::where('telegram_id', $this->chatId)->first();
-            Log::debug('existingSalesman: ' . $existingSalesman);
+            Log::debug('existingSalesman: ' . $this->chatId);
 
             if (!$existingSalesman) {
                 $this->salesmanService->create($this->chatId, $this->username);
