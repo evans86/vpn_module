@@ -28,9 +28,9 @@ class WebhookController extends Controller
     public function fatherBot(Request $request, string $token): JsonResponse
     {
         try {
-            if (!$this->validateWebhookRequest($request)) {
-                return response()->json(['status' => 'error', 'message' => 'Invalid secret token'], ResponseAlias::HTTP_FORBIDDEN);
-            }
+//            if (!$this->validateWebhookRequest($request)) {
+//                return response()->json(['status' => 'error', 'message' => 'Invalid secret token'], ResponseAlias::HTTP_FORBIDDEN);
+//            }
 
             $bot = new FatherBotController($token);
             $bot->init();
@@ -47,9 +47,9 @@ class WebhookController extends Controller
     public function salesmanBot(Request $request, string $token): JsonResponse
     {
         try {
-            if (!$this->validateWebhookRequest($request)) {
-                return response()->json(['status' => 'error', 'message' => 'Invalid secret token'], ResponseAlias::HTTP_FORBIDDEN);
-            }
+//            if (!$this->validateWebhookRequest($request)) {
+//                return response()->json(['status' => 'error', 'message' => 'Invalid secret token'], ResponseAlias::HTTP_FORBIDDEN);
+//            }
 
             $bot = new SalesmanBotController($token);
             $bot->init();
