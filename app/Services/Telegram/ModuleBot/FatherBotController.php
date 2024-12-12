@@ -38,17 +38,17 @@ class FatherBotController extends AbstractTelegramBot
 
             // Проверяем состояние ожидания токена
             if ($this->userState === self::STATE_WAITING_TOKEN && $message) {
-                $this->handleBotToken($message->getText());
+                $this->handleBotToken($message->text);
                 return;
             }
 
             if ($this->userState === self::STATE_WAITING_PAYMENT && $callbackQuery) {
-                $this->processCallback($callbackQuery->getData());
+                $this->processCallback($callbackQuery->data);
                 return;
             }
 
             if ($callbackQuery) {
-                $this->processCallback($callbackQuery->getData());
+                $this->processCallback($callbackQuery->data);
             }
         } catch (\Exception $e) {
             Log::error('Error processing update: ' . $e->getMessage());
