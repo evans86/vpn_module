@@ -167,10 +167,11 @@ class FatherBotController extends AbstractTelegramBot
 
         $this->sendMessage(
             $message,
-            [
-                'parse_mode' => 'Markdown',
-                'reply_markup' => $keyboard
-            ]);
+//            [
+//                'parse_mode' => 'Markdown',
+//                'reply_markup' => $keyboard
+//            ]
+        );
     }
 
     /**
