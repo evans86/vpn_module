@@ -20,6 +20,7 @@ abstract class AbstractTelegramBot
     protected ?Update $update = null;
     protected ?int $chatId = null;
     protected ?string $username = null;
+    protected ?string $firstName = null;
     protected const WEBHOOK_BASE_URL = 'https://vpn-telegram.com/';
     protected PackSalesmanService $packSalesmanService;
     protected SalesmanService $salesmanService;
@@ -54,6 +55,7 @@ abstract class AbstractTelegramBot
             $this->update = $this->telegram->getWebhookUpdate();
             $this->chatId = $this->update->getChat()->id;
             $this->username = $this->update->getChat()->username;
+            $this->firstName = $this->update->getChat()->firstName;
 
 //            Log::debug('callbackQuery: ' . $this->update);
             $this->processUpdate();

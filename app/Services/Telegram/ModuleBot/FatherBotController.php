@@ -123,7 +123,7 @@ class FatherBotController extends AbstractTelegramBot
             Log::debug('existingSalesman: ' . $this->username);
 
             if (!$existingSalesman) {
-                $this->salesmanService->create($this->chatId, $this->username);
+                $this->salesmanService->create($this->chatId, $this->username == null ? null : $this->firstName);
             }
 
             $this->generateMenu();
@@ -138,7 +138,7 @@ class FatherBotController extends AbstractTelegramBot
      */
     protected function generateMenu(): void
     {
-        $keyboard = Keyboard::make()->inline()
+        $keyboard = Keyboard::make()
             ->setResizeKeyboard(true)
             ->setOneTimeKeyboard(false)
             ->row(
