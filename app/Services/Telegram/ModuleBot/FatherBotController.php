@@ -120,6 +120,7 @@ class FatherBotController extends AbstractTelegramBot
             // Проверяем существование пользователя
             $existingSalesman = Salesman::where('telegram_id', $this->chatId)->first();
             Log::debug('existingSalesman: ' . $this->chatId);
+            Log::debug('existingSalesman: ' . $this->username);
 
             if (!$existingSalesman) {
                 $this->salesmanService->create($this->chatId, $this->username);
@@ -315,7 +316,7 @@ class FatherBotController extends AbstractTelegramBot
             $message = "✅ *Пакет успешно куплен!*\n\n";
             $message .= "🔑 Количество ключей: {$pack->count}\n";
             $message .= "⏱ Срок действия: {$pack->period} дней\n";
-            $message .= "📊 Трафик на ключи: {$pack->traffic_limit} GB\n\n";
+            $message .= "📊 Трафик на ключи: {$pack->traffic_limit} GB\n\n"; // TODO: Добавить трафик
 
             // Отправляем список ключей
             $message .= "*Ваши VPN ключи для продажи:*\n\n";

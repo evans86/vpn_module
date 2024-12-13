@@ -78,11 +78,11 @@ class SalesmanService
      * Добавление продавца (надо вызвать из слоя телеграмма)
      *
      * @param int $telegram_id
-     * @param string $username
+     * @param string|null $username
      * @return SalesmanDto
      * @throws Exception
      */
-    public function create(int $telegram_id, string $username): SalesmanDto
+    public function create(int $telegram_id, ?string $username): SalesmanDto
     {
         try {
             $this->logger->info('Creating new salesman', [
