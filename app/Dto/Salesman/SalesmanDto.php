@@ -6,7 +6,7 @@ class SalesmanDto
 {
     public int $id;
     public int $telegram_id;
-    public string $username;
+    public ?string $username;
     public ?string $token;
     public bool $status;
     public ?string $bot_link;
