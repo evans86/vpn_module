@@ -45,6 +45,8 @@ class FatherBotController extends AbstractTelegramBot
             $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
             // Проверяем состояние ожидания токена
             if ($salesman->token === self::STATE_WAITING_TOKEN && $message) {
+                $salesman->token = null;
+                $salesman->save();
                 $this->handleBotToken($message->text);
                 return;
             }
@@ -74,6 +76,7 @@ class FatherBotController extends AbstractTelegramBot
 
             // Устанавливаем webhook для бота продавца
             $webhookPath = 'salesman-bot/init';
+
             if (!$this->setWebhook($token, $webhookPath)) {
                 $this->sendMessage('Ошибка при настройке бота. Пожалуйста, проверьте токен и попробуйте снова.');
                 return;
