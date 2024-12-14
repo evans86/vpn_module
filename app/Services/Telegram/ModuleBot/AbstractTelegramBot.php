@@ -79,7 +79,7 @@ abstract class AbstractTelegramBot
             $responce = Telegram::setWebhookWithoutCertificate([
                 'url' => self::WEBHOOK_BASE_URL . $token . '/' . $path
             ]);
-
+            return $responce;
         } catch (Exception $e) {
             Log::error('Webhook setting error: ' . $e->getMessage());
             return false;
