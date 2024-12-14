@@ -57,7 +57,7 @@ abstract class AbstractTelegramBot
             $this->username = $this->update->getChat()->username;
             $this->firstName = $this->update->getChat()->firstName;
 
-//            Log::debug('callbackQuery: ' . $this->update);
+            Log::debug('USER STATE: ' . $this->update);
             $this->processUpdate();
         } catch (Exception $e) {
             Log::error(static::class . ' initialization error: ' . $e->getMessage());
