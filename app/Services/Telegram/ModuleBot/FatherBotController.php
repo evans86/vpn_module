@@ -138,7 +138,7 @@ class FatherBotController extends AbstractTelegramBot
      */
     protected function generateMenu(): void
     {
-        $keyboard = Keyboard::make()
+        $keyboard = Keyboard::make()->inline()
             ->setResizeKeyboard(true)
             ->setOneTimeKeyboard(false)
             ->row(
