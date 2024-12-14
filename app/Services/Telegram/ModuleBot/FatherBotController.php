@@ -430,6 +430,7 @@ class FatherBotController extends AbstractTelegramBot
             }
 
             $this->userState = self::STATE_WAITING_TOKEN;
+            Log::debug('userState: ' . $this->userState);
             $this->sendMessage($text);
         } catch (\Exception $e) {
             Log::error('Bot binding error: ' . $e->getMessage());
