@@ -39,8 +39,12 @@ class FatherBotController extends AbstractTelegramBot
 
             Log::debug('UserState: ' . $this->userState);
 
+            /**
+             * @var Salesman $salesman
+             */
+            $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
             // Проверяем состояние ожидания токена
-            if ($this->userState === self::STATE_WAITING_TOKEN && $message) {
+            if ($salesman->token === self::STATE_WAITING_TOKEN && $message) {
                 $this->handleBotToken($message->text);
                 return;
             }
@@ -421,7 +425,7 @@ class FatherBotController extends AbstractTelegramBot
              */
             $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
 
-            if ($salesman->token) {
+            if ($salesman->token && $salesman->token != self::STATE_WAITING_TOKEN) {
                 $text = "У вас уже привязан бот:\nТокен: {$salesman->token}\nСсылка: {$salesman->bot_link}\n\n";
                 $text .= "Хотите привязать другого бота? Отправьте новый токен.";
             } else {
@@ -429,8 +433,9 @@ class FatherBotController extends AbstractTelegramBot
                 $text .= "Токен можно получить у @BotFather после создания нового бота.";
             }
 
-            $this->userState = self::STATE_WAITING_TOKEN;
-            Log::debug('userState: ' . $this->userState);
+            $salesman->token = self::STATE_WAITING_TOKEN;
+            $salesman->save();
+            Log::debug('userState: ' . $salesman->token );
             $this->sendMessage($text);
         } catch (\Exception $e) {
             Log::error('Bot binding error: ' . $e->getMessage());
