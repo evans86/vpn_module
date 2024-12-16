@@ -6,7 +6,7 @@ use App\Dto\Salesman\SalesmanFactory;
 use App\Models\Pack\Pack;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
-use App\Services\KeyActivateService;
+use App\Services\Key\KeyActivateService;
 use Telegram\Bot\Api;
 use Telegram\Bot\Keyboard\Keyboard;
 use Illuminate\Support\Facades\Log;
@@ -288,10 +288,15 @@ class FatherBotController extends AbstractTelegramBot
 
             // Создаем ключи для продавца
             $keys = [];
+            $finish_at = time() + ($pack->period * 24 * 60 * 60); // период в днях переводим в секунды
+            $deleted_at = $finish_at + (7 * 24 * 60 * 60); // добавляем неделю для удаления
+
             for ($i = 0; $i < $pack->count; $i++) {
                 $key = $this->keyActivateService->create(
+                    $pack->traffic_limit,
                     $packSalesman->id,
-                    $pack->period
+                    $finish_at,
+                    $deleted_at
                 );
                 $keys[] = $key->key;
             }
@@ -300,6 +305,9 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "📦 Пакет: {$pack->name}\n";
             $message .= "🔑 Количество ключей: {$pack->count}\n";
             $message .= "⏱ Срок действия: {$pack->period} дней\n";
+            if ($pack->traffic_limit) {
+                $message .= "📊 Лимит трафика: {$pack->traffic_limit} GB\n";
+            }
             $message .= "💰 Стоимость: {$pack->price} руб.\n\n";
             $message .= "🔐 *Ваши ключи:*\n";
             foreach ($keys as $index => $key) {

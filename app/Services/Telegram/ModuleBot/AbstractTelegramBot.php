@@ -120,10 +120,12 @@ abstract class AbstractTelegramBot
             $params = [
                 'chat_id' => $this->chatId,
                 'text' => $text,
-                'parse_mode' => 'HTML'
+                'parse_mode' => 'Markdown'  // Изменяем на Markdown для поддержки * и `
             ];
 
-            if ($keyboard) {
+            if (is_array($keyboard)) {
+                $params = array_merge($params, $keyboard);
+            } elseif ($keyboard instanceof Keyboard) {
                 $params['reply_markup'] = $keyboard;
             }
 
