@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Module\ServerController;
+use App\Http\Controllers\Telegram\WebhookController;
 
 /*
 |--------------------------------------------------------------------------
@@ -23,4 +24,10 @@ Route::prefix('servers')->group(function () {
     Route::post('create', [ServerController::class, 'store']);
     Route::get('{server}/status', [ServerController::class, 'getStatus']);
     Route::delete('{server}', [ServerController::class, 'destroy']);
+});
+
+// Telegram Webhook Routes
+Route::prefix('telegram')->group(function () {
+    Route::post('father-bot/{token}/init', [WebhookController::class, 'fatherBot']);
+    Route::post('salesman-bot/{token}/init', [WebhookController::class, 'salesmanBot']);
 });

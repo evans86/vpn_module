@@ -14,6 +14,19 @@ class SalesmanBotController extends AbstractTelegramBot
     private const STATE_WAITING_KEY = 'waiting_key';
     private ?string $userState = null;
 
+    public function __construct(string $token)
+    {
+        // Находим продавца по токену
+        $salesman = Salesman::where('token', $token)->first();
+        if (!$salesman) {
+            Log::error('Salesman not found for token: ' . substr($token, 0, 10) . '...');
+            throw new \RuntimeException('Salesman not found');
+        }
+        $this->salesman = $salesman;
+
+        parent::__construct($token);
+    }
+
     /**
      * обработка update
      */
@@ -107,7 +120,7 @@ class SalesmanBotController extends AbstractTelegramBot
     private function actionSupport(): void
     {
         $text = "
-            <b>Как использовать VPN:</b>\n
+            *Как использовать VPN:*\n
             1. Активируйте доступ через меню\n
             2. Следуйте инструкциям для настройки\n
             3. Проверьте статус подключения\n
@@ -136,7 +149,7 @@ class SalesmanBotController extends AbstractTelegramBot
             }
 
             $text = "
-                <b>Информация о вашем VPN-доступе:</b>\n
+                *Информация о вашем VPN-доступе:*\n
                 ID доступа: {$this->currentPack->id}\n
                 Статус: {$this->currentPack->getStatusText()}\n
                 Дата покупки: {$this->currentPack->created_at->format('d.m.Y')}\n
@@ -209,7 +222,7 @@ class SalesmanBotController extends AbstractTelegramBot
             $this->userState = null;
 
             $text = "
-                <b>🎉 VPN-доступ успешно активирован!</b>\n
+                *🎉 VPN-доступ успешно активирован!*\n
                 ID доступа: {$this->currentPack->id}\n
                 Действителен до: {$this->currentPack->finish_at->format('d.m.Y')}\n" .
                 ($this->currentPack->traffic_limit ? "Доступный трафик: " . round($this->currentPack->traffic_limit / 1024 / 1024 / 1024, 2) . " GB" : "Безлимитный трафик") . "\n\n" .
@@ -232,25 +245,25 @@ class SalesmanBotController extends AbstractTelegramBot
         // Формируем ссылку на конфигурацию VPN
         $configUrl = config('app.url') . '/config/' . $this->currentPack->key;
 
-        $text = "<b>🔐 Ваш VPN успешно активирован!</b>\n\n";
-        $text .= "📱 <b>Инструкция по настройке:</b>\n\n";
+        $text = "*🔐 Ваш VPN успешно активирован!*\n\n";
+        $text .= "*📱 Инструкция по настройке:*\n\n";
         $text .= "1. Откройте ссылку для загрузки конфигурации:\n";
-        $text .= "<code>$configUrl</code>\n\n";
+        $text .= "`$configUrl`\n\n";
 
         // iOS
-        $text .= "🍎 <b>iOS:</b>\n";
+        $text .= "*🍎 iOS:*\n";
         $text .= "1. Установите приложение WireGuard из App Store\n";
         $text .= "2. Откройте ссылку выше\n";
         $text .= "3. Нажмите 'Добавить туннель'\n\n";
 
         // Android
-        $text .= "🤖 <b>Android:</b>\n";
+        $text .= "*🤖 Android:*\n";
         $text .= "1. Установите приложение WireGuard из Google Play\n";
         $text .= "2. Откройте ссылку выше\n";
         $text .= "3. Разрешите добавление конфигурации\n\n";
 
         // Windows
-        $text .= "💻 <b>Windows:</b>\n";
+        $text .= "*💻 Windows:*\n";
         $text .= "1. Установите WireGuard с официального сайта\n";
         $text .= "2. Откройте ссылку выше\n";
         $text .= "3. Импортируйте конфигурацию\n\n";
@@ -266,9 +279,6 @@ class SalesmanBotController extends AbstractTelegramBot
      */
     private function getSalesmanUsername(): string
     {
-        if (!$this->salesman) {
-            $this->salesman = $this->salesmanRepository->findByToken($this->telegram->getAccessToken());
-        }
         return $this->salesman->username ?? 'support';
     }
 }
