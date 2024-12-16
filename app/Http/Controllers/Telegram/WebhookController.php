@@ -68,6 +68,12 @@ class WebhookController extends Controller
     public function salesmanBot(Request $request, string $token): JsonResponse
     {
         try {
+            Log::debug('Received webhook for salesman bot', [
+                'token' => substr($token, 0, 10) . '...',
+                'request' => $request->all(),
+                'headers' => $request->headers->all()
+            ]);
+
             // Проверяем секретный токен webhook'а
 //            if (!$this->validateWebhookRequest($request)) {
 //                Log::error('Invalid webhook secret token');
@@ -78,7 +84,10 @@ class WebhookController extends Controller
             $bot->init();
             return response()->json(['status' => 'ok']);
         } catch (Exception $e) {
-            Log::error('Salesman bot webhook error: ' . $e->getMessage());
+            Log::error('Salesman bot webhook error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json(['status' => 'error'], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

@@ -120,7 +120,7 @@ class SalesmanBotController extends AbstractTelegramBot
     private function actionSupport(): void
     {
         $text = "
-            *Как использовать VPN:*\n
+            <b>Как использовать VPN:</b>\n
             1. Активируйте доступ через меню\n
             2. Следуйте инструкциям для настройки\n
             3. Проверьте статус подключения\n
@@ -149,7 +149,7 @@ class SalesmanBotController extends AbstractTelegramBot
             }
 
             $text = "
-                *Информация о вашем VPN-доступе:*\n
+                <b>Информация о вашем VPN-доступе:</b>\n
                 ID доступа: {$this->currentPack->id}\n
                 Статус: {$this->currentPack->getStatusText()}\n
                 Дата покупки: {$this->currentPack->created_at->format('d.m.Y')}\n
@@ -184,7 +184,7 @@ class SalesmanBotController extends AbstractTelegramBot
 
             // Устанавливаем состояние ожидания ключа
             $this->userState = self::STATE_WAITING_KEY;
-            $this->sendMessage("Пожалуйста, введите ключ активации, который вы получили от продавца:");
+            $this->sendMessage("<b>Введите ключ активации:</b>");
 
         } catch (\Exception $e) {
             Log::error('Activation error: ' . $e->getMessage());
@@ -201,28 +201,31 @@ class SalesmanBotController extends AbstractTelegramBot
             $userId = $this->update->getMessage()->getFrom()->getId();
 
             // Находим ключ через репозиторий
-            $key = $this->keyActivateRepository->findAvailableKeyForActivation(
+            $this->currentPack = $this->keyActivateRepository->findKeyByIdAndSalesman(
                 $keyId,
                 $this->salesman->id
             );
 
-            if (!$key) {
-                $this->sendMessage("❌ Неверный ключ активации или ключ уже использован.\nПожалуйста, проверьте ключ и попробуйте снова, либо обратитесь к менеджеру @{$this->getSalesmanUsername()}");
-                $this->userState = null;
+            if (!$this->currentPack) {
+                $this->sendMessage("❌ Неверный ключ активации. Попробуйте еще раз или обратитесь к менеджеру @{$this->getSalesmanUsername()}");
                 return;
             }
 
-            // Активируем ключ для пользователя
-            $this->keyActivateRepository->update($key, [
-                'user_tg_id' => $userId,
-                'status' => KeyActivate::ACTIVE
-            ]);
+            if ($this->currentPack->isActivated()) {
+                $this->sendMessage("❌ Этот ключ уже был активирован");
+                return;
+            }
 
-            $this->currentPack = $key;
+            // Активируем ключ
+            $this->currentPack->user_id = $userId;
+            $this->currentPack->activated_at = now();
+            $this->currentPack->finish_at = now()->addDays($this->currentPack->duration);
+            $this->currentPack->save();
+
             $this->userState = null;
 
             $text = "
-                *🎉 VPN-доступ успешно активирован!*\n
+                <b>🎉 VPN-доступ успешно активирован!</b>\n
                 ID доступа: {$this->currentPack->id}\n
                 Действителен до: {$this->currentPack->finish_at->format('d.m.Y')}\n" .
                 ($this->currentPack->traffic_limit ? "Доступный трафик: " . round($this->currentPack->traffic_limit / 1024 / 1024 / 1024, 2) . " GB" : "Безлимитный трафик") . "\n\n" .
@@ -233,7 +236,6 @@ class SalesmanBotController extends AbstractTelegramBot
         } catch (\Exception $e) {
             Log::error('Key activation error: ' . $e->getMessage());
             $this->sendErrorMessage();
-            $this->userState = null;
         }
     }
 
@@ -245,25 +247,25 @@ class SalesmanBotController extends AbstractTelegramBot
         // Формируем ссылку на конфигурацию VPN
         $configUrl = config('app.url') . '/config/' . $this->currentPack->key;
 
-        $text = "*🔐 Ваш VPN успешно активирован!*\n\n";
-        $text .= "*📱 Инструкция по настройке:*\n\n";
+        $text = "<b>🔐 Ваш VPN успешно активирован!</b>\n\n";
+        $text .= "<b>📱 Инструкция по настройке:</b>\n\n";
         $text .= "1. Откройте ссылку для загрузки конфигурации:\n";
-        $text .= "`$configUrl`\n\n";
+        $text .= "<code>$configUrl</code>\n\n";
 
         // iOS
-        $text .= "*🍎 iOS:*\n";
+        $text .= "🍎 <b>iOS:</b>\n";
         $text .= "1. Установите приложение WireGuard из App Store\n";
         $text .= "2. Откройте ссылку выше\n";
         $text .= "3. Нажмите 'Добавить туннель'\n\n";
 
         // Android
-        $text .= "*🤖 Android:*\n";
+        $text .= "🤖 <b>Android:</b>\n";
         $text .= "1. Установите приложение WireGuard из Google Play\n";
         $text .= "2. Откройте ссылку выше\n";
         $text .= "3. Разрешите добавление конфигурации\n\n";
 
         // Windows
-        $text .= "*💻 Windows:*\n";
+        $text .= "💻 <b>Windows:</b>\n";
         $text .= "1. Установите WireGuard с официального сайта\n";
         $text .= "2. Откройте ссылку выше\n";
         $text .= "3. Импортируйте конфигурацию\n\n";
