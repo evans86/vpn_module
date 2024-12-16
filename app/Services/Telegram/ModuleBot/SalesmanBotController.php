@@ -37,26 +37,58 @@ class SalesmanBotController extends AbstractTelegramBot
     public function processUpdate(): void
     {
         try {
-            if ($this->update->getMessage()->getText() === '/start') {
+            $message = $this->update->getMessage();
+            if (!$message) {
+                Log::warning('Received update without message', [
+                    'update' => $this->update
+                ]);
+                return;
+            }
+
+            $text = $message->getText();
+            if (!$text) {
+                Log::warning('Received message without text', [
+                    'message' => $message
+                ]);
+                return;
+            }
+
+            if ($text === '/start') {
                 $this->start();
                 return;
             }
 
-            $message = $this->update->getMessage();
+            // Проверяем состояние пользователя
+            // $state = $this->getUserState($this->chatId);
 
-            if ($message) {
-                $text = $message->getText();
-                switch ($text) {
-                    case '🔑 Активировать':
-                        $this->actionActivate();
-                        break;
-                    case '📊 Статус':
-                        $this->actionStatus();
-                        break;
-                    case '❓ Помощь':
-                        $this->actionSupport();
-                        break;
-                }
+            switch ($text) {
+                // case 'waiting_for_payment':
+                //     $this->handlePaymentConfirmation($text);
+                //     break;
+                case '🔑 Активировать':
+                    $this->actionActivate();
+                    break;
+                case '📊 Статус':
+                    $this->actionStatus();
+                    break;
+                case '❓ Помощь':
+                    $this->actionSupport();
+                    break;
+                default:
+                    // Обработка команд меню
+                    // switch ($text) {
+                    //     case self::MENU_ACTIVATE_KEY:
+                    //         $this->handleActivateKey();
+                    //         break;
+                    //     case self::MENU_SUPPORT:
+                    //         $this->handleSupport();
+                    //         break;
+                    //     case self::MENU_HELP:
+                    //         $this->handleHelp();
+                    //         break;
+                    //     default:
+                    //         $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню для выбора действия.');
+                    // }
             }
 
             // Проверяем состояние ожидания ключа
@@ -65,7 +97,11 @@ class SalesmanBotController extends AbstractTelegramBot
                 return;
             }
         } catch (\Exception $e) {
-            Log::error('Error processing update: ' . $e->getMessage());
+            Log::error('Error processing update in SalesmanBot', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'update' => $this->update
+            ]);
             $this->sendErrorMessage();
         }
     }

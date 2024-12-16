@@ -36,16 +36,35 @@ abstract class AbstractTelegramBot
      */
     public function __construct(string $token)
     {
-        $this->packSalesmanService = app(PackSalesmanService::class);
-        $this->salesmanService = app(SalesmanService::class);
-        $this->keyActivateRepository = app(KeyActivateRepository::class);
-        $this->packSalesmanRepository = app(PackSalesmanRepository::class);
-        $this->salesmanRepository = app(SalesmanRepository::class);
+        try {
+            $this->packSalesmanService = app(PackSalesmanService::class);
+            $this->salesmanService = app(SalesmanService::class);
+            $this->keyActivateRepository = app(KeyActivateRepository::class);
+            $this->packSalesmanRepository = app(PackSalesmanRepository::class);
+            $this->salesmanRepository = app(SalesmanRepository::class);
 
-        if (empty($token)) {
-            throw new \RuntimeException('Telegram bot token not configured');
+            $this->telegram = new Api($token);
+            $this->update = json_decode(file_get_contents('php://input'));
+
+            if ($this->update) {
+                $this->chatId = $this->update->message->chat->id ??
+                               $this->update->callback_query->message->chat->id;
+
+                Log::debug('Telegram update received', [
+                    'chat_id' => $this->chatId,
+                    'update_type' => $this->update->message ? 'message' :
+                                   ($this->update->callback_query ? 'callback_query' : 'unknown')
+                ]);
+            } else {
+                Log::warning('Empty update received from Telegram');
+            }
+        } catch (Exception $e) {
+            Log::error('Error initializing Telegram bot', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
-        $this->telegram = new Api($token);
     }
 
 
@@ -60,18 +79,15 @@ abstract class AbstractTelegramBot
                 'update_raw' => request()->all()
             ]);
 
-            $this->update = $this->telegram->getWebhookUpdate();
-
             Log::debug('Parsed update', [
                 'update' => $this->update,
-                'chat_id' => $this->update->getChat()->id ?? null,
-                'username' => $this->update->getChat()->username ?? null,
-                'first_name' => $this->update->getChat()->firstName ?? null
+                'chat_id' => $this->chatId,
+                'username' => $this->update->message->from->username ?? null,
+                'first_name' => $this->update->message->from->firstName ?? null
             ]);
 
-            $this->chatId = $this->update->getChat()->id;
-            $this->username = $this->update->getChat()->username;
-            $this->firstName = $this->update->getChat()->firstName;
+            $this->username = $this->update->message->from->username;
+            $this->firstName = $this->update->message->from->firstName;
 
             $this->processUpdate();
         } catch (Exception $e) {
@@ -98,7 +114,7 @@ abstract class AbstractTelegramBot
                 "api/telegram/salesman-bot/{$token}/init";
 
             $webhookUrl = rtrim(self::WEBHOOK_BASE_URL, '/') . '/' . $path;
-            
+
             Log::debug('Setting webhook URL', [
                 'url' => $webhookUrl,
                 'bot_type' => $botType,
@@ -109,7 +125,7 @@ abstract class AbstractTelegramBot
             sleep(1);
 
             $response = $this->telegram->setWebhook(['url' => $webhookUrl]);
-            
+
             Log::debug('Webhook set response', [
                 'response' => $response,
                 'bot_type' => $botType

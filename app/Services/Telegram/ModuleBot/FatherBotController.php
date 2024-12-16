@@ -32,21 +32,32 @@ class FatherBotController extends AbstractTelegramBot
     public function processUpdate(): void
     {
         try {
-            if ($this->update->getMessage()->text === '/start') {
-                $this->clearState();
-                $this->start();
+            $message = $this->update->getMessage();
+            if (!$message) {
+                Log::warning('Received update without message', [
+                    'update' => $this->update
+                ]);
                 return;
             }
 
-            $message = $this->update->getMessage();
-            if (!$message) {
+            $text = $message->getText();
+            if (!$text) {
+                Log::warning('Received message without text', [
+                    'message' => $message
+                ]);
+                return;
+            }
+
+            if ($text === '/start') {
+                $this->clearState();
+                $this->start();
                 return;
             }
 
             // Получаем состояние из базы данных
             $salesman = Salesman::where('telegram_id', $this->chatId)->first();
             if ($salesman && $salesman->state === self::STATE_WAITING_TOKEN) {
-                $this->handleBotToken($message->text);
+                $this->handleBotToken($text);
                 return;
             }
 
@@ -57,7 +68,7 @@ class FatherBotController extends AbstractTelegramBot
             }
 
             // Обработка команд меню
-            switch ($message->text) {
+            switch ($text) {
                 case '📦 Купить пакет':
                     $this->showPacksList();
                     break;
@@ -75,7 +86,11 @@ class FatherBotController extends AbstractTelegramBot
                     $this->generateMenu();
             }
         } catch (\Exception $e) {
-            Log::error('Process update error: ' . $e->getMessage());
+            Log::error('Process update error: ' . $e->getMessage(), [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'update' => $this->update
+            ]);
             $this->sendErrorMessage();
         }
     }
@@ -115,7 +130,10 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->sendMessage($message, $keyboard);
         } catch (\Exception $e) {
-            Log::error('Show packs error: ' . $e->getMessage());
+            Log::error('Show packs error: ' . $e->getMessage(), [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             $this->sendErrorMessage();
         }
     }
@@ -158,7 +176,10 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->sendMessage($message);
         } catch (\Exception $e) {
-            Log::error('Show bot info error: ' . $e->getMessage());
+            Log::error('Show bot info error: ' . $e->getMessage(), [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             $this->sendErrorMessage();
         }
     }
@@ -182,7 +203,10 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->sendMessage($message);
         } catch (\Exception $e) {
-            Log::error('Show profile error: ' . $e->getMessage());
+            Log::error('Show profile error: ' . $e->getMessage(), [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             $this->sendErrorMessage();
         }
     }
@@ -218,7 +242,10 @@ class FatherBotController extends AbstractTelegramBot
                     }
                     break;
                 default:
-                    Log::error('Unknown callback action: ' . $action);
+                    Log::error('Unknown callback action: ' . $action, [
+                        'action' => $action,
+                        'params' => $params
+                    ]);
                     $this->sendErrorMessage();
             }
 
@@ -229,7 +256,10 @@ class FatherBotController extends AbstractTelegramBot
                 ]);
             }
         } catch (\Exception $e) {
-            Log::error('Process callback error: ' . $e->getMessage());
+            Log::error('Process callback error: ' . $e->getMessage(), [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             $this->sendErrorMessage();
         }
     }
@@ -262,7 +292,10 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->sendMessage($message, ['reply_markup' => json_encode($keyboard)]);
         } catch (\Exception $e) {
-            Log::error('Buy pack error: ' . $e->getMessage());
+            Log::error('Buy pack error: ' . $e->getMessage(), [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             $this->sendErrorMessage();
         }
     }
@@ -293,7 +326,10 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->sendMessage($message, ['reply_markup' => json_encode($keyboard)]);
         } catch (\Exception $e) {
-            Log::error('Confirm purchase error: ' . $e->getMessage());
+            Log::error('Confirm purchase error: ' . $e->getMessage(), [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             $this->sendErrorMessage();
         }
     }
@@ -353,7 +389,10 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->sendMessage($message);
         } catch (\Exception $e) {
-            Log::error('Check payment error: ' . $e->getMessage());
+            Log::error('Check payment error: ' . $e->getMessage(), [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             $this->sendErrorMessage();
         }
     }
@@ -434,7 +473,10 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->generateMenu();
         } catch (\Exception $e) {
-            Log::error('Start command error: ' . $e->getMessage());
+            Log::error('Start command error: ' . $e->getMessage(), [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             $this->sendErrorMessage();
         }
     }
@@ -502,7 +544,10 @@ class FatherBotController extends AbstractTelegramBot
                 $salesman->save();
             }
         } catch (\Exception $e) {
-            Log::error('Clear state error: ' . $e->getMessage());
+            Log::error('Clear state error: ' . $e->getMessage(), [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
         }
     }
 }
