@@ -34,7 +34,7 @@ class SalesmanBotController extends AbstractTelegramBot
     /**
      * обработка update
      */
-    protected function processUpdate(): void
+    public function processUpdate(): void
     {
         try {
             if ($this->update->getMessage()->getText() === '/start') {
