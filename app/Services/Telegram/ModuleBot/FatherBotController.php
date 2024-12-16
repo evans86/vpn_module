@@ -29,46 +29,50 @@ class FatherBotController extends AbstractTelegramBot
     protected function processUpdate(): void
     {
         try {
-            if ($this->update->getMessage()->text === '/start') {
+            if ($this->update->getMessage()?->text === '/start') {
                 Log::debug('Send message: ' . $this->update->getMessage()->text);
                 $this->userState = null;
                 $this->start();
                 return;
             }
 
-            $message = $this->update->getMessage();
-
-            // Проверяем состояние ожидания токена
-            if ($this->userState === self::STATE_WAITING_TOKEN && $message) {
-                $this->handleBotToken($message->text);
-                return;
-            }
-
-            // Обработка выбора пакета
-            if ($this->userState === self::STATE_WAITING_PAYMENT && $this->update->callbackQuery) {
+            // Обработка callback'ов
+            if ($this->update->callbackQuery) {
                 $this->processCallback($this->update->callbackQuery->data);
                 return;
             }
 
-            if ($message) {
-                $text = $message->text;
-                switch ($text) {
-                    case '🛍 Купить пакет':
-                        $this->showPacksList();
-                        break;
-                    case '🤖 Мой бот':
-                        $this->showBotInfo();
-                        break;
-                    case '👤 Профиль':
-                        $this->showProfile();
-                        break;
-                    case '❓ Помощь':
-                        $this->actionHelp();
-                        break;
-                }
+            $message = $this->update->getMessage();
+            if (!$message) {
+                return;
+            }
+
+            // Проверяем состояние ожидания токена
+            if ($this->userState === self::STATE_WAITING_TOKEN) {
+                $this->handleBotToken($message->text);
+                return;
+            }
+
+            // Обработка команд меню
+            switch ($message->text) {
+                case '🛍 Купить пакет':
+                    $this->showPacksList();
+                    break;
+                case '🤖 Мой бот':
+                    $this->showBotInfo();
+                    break;
+                case '👤 Профиль':
+                    $this->showProfile();
+                    break;
+                case '❓ Помощь':
+                    $this->actionHelp();
+                    break;
+                default:
+                    $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню.');
+                    $this->generateMenu();
             }
         } catch (\Exception $e) {
-            Log::error('Error processing update: ' . $e->getMessage());
+            Log::error('Process update error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
     }
@@ -164,6 +168,137 @@ class FatherBotController extends AbstractTelegramBot
     }
 
     /**
+     * Process callback queries
+     */
+    private function processCallback(string $data): void
+    {
+        try {
+            $params = [];
+            if (str_contains($data, '?')) {
+                [$action, $queryString] = explode('?', $data);
+                parse_str($queryString, $params);
+            } else {
+                $action = $data;
+            }
+
+            switch ($action) {
+                case 'buy':
+                    $this->handleBuyPack($params['id']);
+                    break;
+                case 'confirm':
+                    $this->handleConfirmPurchase($params['id']);
+                    break;
+                case 'checkPayment':
+                    $this->handleCheckPayment($params['id']);
+                    break;
+            }
+        } catch (\Exception $e) {
+            Log::error('Process callback error: ' . $e->getMessage());
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Handle buy pack action
+     */
+    private function handleBuyPack(int $packId): void
+    {
+        try {
+            $pack = Pack::findOrFail($packId);
+            
+            $message = "💎 *Подтверждение покупки пакета*\n\n";
+            $message .= "📦 Пакет: {$pack->name}\n";
+            $message .= "🔑 Количество ключей: {$pack->count}\n";
+            $message .= "⏱ Срок действия: {$pack->period} дней\n";
+            $message .= "💰 Стоимость: {$pack->price} руб.\n\n";
+            $message .= "Для подтверждения покупки нажмите кнопку ниже:";
+
+            $keyboard = Keyboard::make()->inline()
+                ->row([
+                    Keyboard::inlineButton([
+                        'text' => "💳 Оплатить {$pack->price} руб.",
+                        'callback_data' => "confirm?id={$packId}"
+                    ])
+                ]);
+
+            $this->sendMessage($message, $keyboard);
+        } catch (\Exception $e) {
+            Log::error('Buy pack error: ' . $e->getMessage());
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Handle confirm purchase action
+     */
+    private function handleConfirmPurchase(int $packId): void
+    {
+        try {
+            $pack = Pack::findOrFail($packId);
+            
+            $message = "💳 *Оплата пакета*\n\n";
+            $message .= "Сумма к оплате: {$pack->price} руб.\n\n";
+            $message .= "Для оплаты переведите указанную сумму по реквизитам:\n";
+            $message .= "💠 Сбербанк: `1234 5678 9012 3456`\n";
+            $message .= "💠 Тинькофф: `9876 5432 1098 7654`\n\n";
+            $message .= "❗️ В комментарии укажите: `VPN_{$this->chatId}`\n\n";
+            $message .= "После оплаты нажмите кнопку ниже:";
+
+            $keyboard = Keyboard::make()->inline()
+                ->row([
+                    Keyboard::inlineButton([
+                        'text' => "✅ Я оплатил",
+                        'callback_data' => "checkPayment?id={$packId}"
+                    ])
+                ]);
+
+            $this->sendMessage($message, $keyboard);
+        } catch (\Exception $e) {
+            Log::error('Confirm purchase error: ' . $e->getMessage());
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Handle check payment action
+     */
+    private function handleCheckPayment(int $packId): void
+    {
+        try {
+            $pack = Pack::findOrFail($packId);
+            $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
+
+            // Создаем пакет продавца
+            $packSalesman = new PackSalesman();
+            $packSalesman->pack_id = $pack->id;
+            $packSalesman->salesman_id = $salesman->id;
+            $packSalesman->status = 1; // Исправляем значение статуса на числовое (1) вместо строкового ('paid')
+            $packSalesman->save();
+
+            $message = "✅ *Пакет успешно куплен!*\n\n";
+            $message .= "📦 Пакет: {$pack->name}\n";
+            $message .= "🔑 Количество ключей: {$pack->count}\n";
+            $message .= "⏱ Срок действия: {$pack->period} дней\n";
+            $message .= "💰 Стоимость: {$pack->price} руб.\n\n";
+
+            if (!$salesman->token) {
+                $message .= "❗️ *Важно:* Привяжите своего бота для начала продаж\n";
+                $message .= "Нажмите кнопку '🤖 Мой бот' в меню";
+            } else {
+                $message .= "🤖 Перейдите в своего бота для продажи ключей:\n";
+                $message .= $salesman->bot_link;
+            }
+
+            $this->userState = null;
+            $this->sendMessage($message);
+            $this->generateMenu();
+        } catch (\Exception $e) {
+            Log::error('Check payment error: ' . $e->getMessage());
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
      * Handle bot token from user
      */
     private function handleBotToken(string $token): void
@@ -177,38 +312,28 @@ class FatherBotController extends AbstractTelegramBot
                 return;
             }
 
-            $salesmanDto = SalesmanFactory::fromEntity($salesman);
-            $salesmanDto->token = $token;
-            $salesmanDto->bot_link = $this->getBotLinkFromToken($token);
+            // Проверяем валидность токена через Telegram API
+            try {
+                $telegram = new Api($token);
+                $botInfo = $telegram->getMe();
+                $botLink = '@' . $botInfo->username;
+            } catch (\Exception $e) {
+                Log::error('Invalid bot token: ' . $e->getMessage());
+                $this->sendMessage('❌ Неверный токен бота. Пожалуйста, проверьте токен и попробуйте снова.');
+                return;
+            }
 
-            $this->salesmanService->updateToken($salesmanDto);
+            // Обновляем данные продавца
+            $salesman->token = $token;
+            $salesman->bot_link = $botLink;
+            $salesman->save();
 
             $this->userState = null;
-            $this->sendMessage("✅ Бот успешно привязан!\nСсылка на бота: {$salesmanDto->bot_link}");
+            $this->sendMessage("✅ Бот успешно привязан!\nСсылка на бота: {$botLink}");
             $this->generateMenu();
         } catch (\Exception $e) {
             Log::error('Bot token handling error: ' . $e->getMessage());
             $this->sendErrorMessage();
-        }
-    }
-
-    /**
-     * Process callback queries
-     * @param string $data
-     */
-    private function processCallback(string $data): void
-    {
-        $params = [];
-        if (str_contains($data, '?')) {
-            [$action, $queryString] = explode('?', $data);
-            parse_str($queryString, $params);
-        } else {
-            $action = $data;
-        }
-
-        $methodName = 'action' . ucfirst($action);
-        if (method_exists($this, $methodName)) {
-            $this->$methodName($params['id'] ?? null);
         }
     }
 
