@@ -29,8 +29,7 @@ class FatherBotController extends AbstractTelegramBot
     protected function processUpdate(): void
     {
         try {
-            if ($this->update->getMessage()->text === '/start') {
-//                Log::debug('Send message: ' . $this->update->getMessage()->text);
+            if ($this->update->getMessage()?->text === '/start') {
                 $this->userState = null;
                 $this->start();
                 return;
@@ -55,7 +54,7 @@ class FatherBotController extends AbstractTelegramBot
 
             // Обработка команд меню
             switch ($message->text) {
-                case '🛍 Купить пакет':
+                case '📦 Купить пакет':
                     $this->showPacksList();
                     break;
                 case '🤖 Мой бот':
@@ -63,9 +62,6 @@ class FatherBotController extends AbstractTelegramBot
                     break;
                 case '👤 Профиль':
                     $this->showProfile();
-                    break;
-                case '❓ Помощь':
-                    $this->actionHelp();
                     break;
                 default:
                     $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню.');
@@ -352,31 +348,27 @@ class FatherBotController extends AbstractTelegramBot
     }
 
     /**
-     * Generate menu
+     * Генерация меню
      */
     protected function generateMenu(): void
     {
         $buttons = [
-            [
-                'text' => '🛍 Купить пакет'
-            ],
-            [
-                'text' => '🤖 Мой бот'
-            ],
-            [
-                'text' => '👤 Профиль'
-            ],
-            [
-                'text' => '❓ Помощь'
-            ]
+            ['text' => '📦 Купить пакет'],
+            ['text' => '🤖 Мой бот'],
+            ['text' => '👤 Профиль']
         ];
 
-        $message = "👋 *Добро пожаловать в систему управления доступами VPN*\n\n";
-        $message .= "🔸 Покупайте пакеты ключей\n";
-        $message .= "🔸 Создавайте своего бота\n";
-        $message .= "🔸 Продавайте VPN доступы\n";
+        $keyboard = Keyboard::make()
+            ->setResizeKeyboard(true)
+            ->setOneTimeKeyboard(false);
 
-        $this->sendMenu($buttons, $message);
+        // Группируем кнопки по 2 в ряд
+        $rows = array_chunk($buttons, 2);
+        foreach ($rows as $row) {
+            $keyboard->row(...$row);
+        }
+
+        $this->sendMessage('Выберите действие:', $keyboard);
     }
 
     /**
