@@ -21,6 +21,13 @@ class FatherBotController extends AbstractTelegramBot
     private ?string $userState = null;
     private ?int $pendingPackId = null;
 
+    public function __construct(string $token)
+    {
+        parent::__construct($token);
+        // Устанавливаем webhook для основного бота при создании
+        $this->setWebhook($token, self::BOT_TYPE_FATHER);
+    }
+
     /**
      * Process incoming update and route to appropriate action
      */
@@ -75,9 +82,7 @@ class FatherBotController extends AbstractTelegramBot
             $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
 
             // Устанавливаем webhook для бота продавца
-            $webhookPath = "salesman-bot/{$token}/init";
-
-            if (!$this->setWebhook($token, $webhookPath)) {
+            if (!$this->setWebhook($token, self::BOT_TYPE_SALESMAN)) {
                 $this->sendMessage('❌ Ошибка при настройке бота. Пожалуйста, проверьте токен и попробуйте снова.');
                 return;
             }

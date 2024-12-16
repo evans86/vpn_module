@@ -27,6 +27,8 @@ abstract class AbstractTelegramBot
     protected PackSalesmanRepository $packSalesmanRepository;
     protected SalesmanRepository $salesmanRepository;
     protected const WEBHOOK_BASE_URL = 'https://vpn-telegram.com/';
+    protected const BOT_TYPE_FATHER = 'father';
+    protected const BOT_TYPE_SALESMAN = 'salesman';
 
     /**
      * @throws TelegramSDKException
@@ -69,13 +71,17 @@ abstract class AbstractTelegramBot
      * Установка webhook
      *
      * @param string $token
-     * @param string $path
+     * @param string $botType
      * @return bool
      */
-    protected function setWebhook(string $token, string $path): bool
+    protected function setWebhook(string $token, string $botType = self::BOT_TYPE_SALESMAN): bool
     {
         try {
-            $webhookUrl = self::WEBHOOK_BASE_URL . ltrim($path, '/');
+            $path = $botType === self::BOT_TYPE_FATHER ? 
+                "father-bot/{$token}/init" : 
+                "salesman-bot/{$token}/init";
+                
+            $webhookUrl = self::WEBHOOK_BASE_URL . $path;
             Log::debug('Setting webhook URL: ' . $webhookUrl);
 
             $response = $this->telegram->setWebhookWithoutCertificate(['url' => $webhookUrl]);
