@@ -128,18 +128,25 @@ class FatherBotController extends AbstractTelegramBot
             $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
 
             if (empty($salesman->token)) {
-                $salesman->token = self::STATE_WAITING_TOKEN;
-                $salesman->save();
+                $message = "🤖 *Привязка бота*\n\n";
+                $message .= "Для начала продаж вам нужно привязать своего бота.\n\n";
+                $message .= "Как создать бота:\n";
+                $message .= "1. Перейдите к @BotFather\n";
+                $message .= "2. Отправьте команду /newbot\n";
+                $message .= "3. Следуйте инструкциям\n";
+                $message .= "4. Скопируйте полученный токен\n";
+                $message .= "5. Отправьте токен в этот чат\n\n";
+                $message .= "❗️ Отправьте токен вашего бота:";
 
                 $this->userState = self::STATE_WAITING_TOKEN;
-                $this->sendMessage('Отправьте токен вашего бота:');
+                $this->sendMessage($message);
                 return;
             }
 
             $message = "🤖 *Информация о вашем боте*\n\n";
             $message .= "🔗 Ссылка на бота: {$salesman->bot_link}\n";
             $message .= "✅ Статус: Активен\n\n";
-            $message .= "Чтобы привязать другого бота, отправьте новый токен.";
+            $message .= "Чтобы привязать другого бота, просто отправьте новый токен.";
 
             $this->userState = self::STATE_WAITING_TOKEN;
             $this->sendMessage($message);
@@ -339,7 +346,6 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->userState = null;
             $this->sendMessage($message);
-            $this->generateMenu();
         } catch (\Exception $e) {
             Log::error('Check payment error: ' . $e->getMessage());
             $this->sendErrorMessage();
@@ -354,12 +360,6 @@ class FatherBotController extends AbstractTelegramBot
         try {
             $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
 
-            // Устанавливаем webhook для бота продавца
-            if (!$this->setWebhook($token, self::BOT_TYPE_SALESMAN)) {
-                $this->sendMessage('❌ Ошибка при настройке бота. Пожалуйста, проверьте токен и попробуйте снова.');
-                return;
-            }
-
             // Проверяем валидность токена через Telegram API
             try {
                 $telegram = new Api($token);
@@ -371,13 +371,24 @@ class FatherBotController extends AbstractTelegramBot
                 return;
             }
 
+            // Устанавливаем webhook для бота продавца
+            if (!$this->setWebhook($token, self::BOT_TYPE_SALESMAN)) {
+                $this->sendMessage('❌ Ошибка при настройке бота. Пожалуйста, проверьте токен и попробуйте снова.');
+                return;
+            }
+
             // Обновляем данные продавца
             $salesman->token = $token;
             $salesman->bot_link = $botLink;
             $salesman->save();
 
+            $message = "✅ *Бот успешно привязан!*\n\n";
+            $message .= "🔗 Ссылка на бота: {$botLink}\n";
+            $message .= "✅ Статус: Активен\n\n";
+            $message .= "Теперь вы можете продавать доступы через этого бота.";
+
             $this->userState = null;
-            $this->sendMessage("✅ Бот успешно привязан!\nСсылка на бота: {$botLink}");
+            $this->sendMessage($message);
             $this->generateMenu();
         } catch (\Exception $e) {
             Log::error('Bot token handling error: ' . $e->getMessage());
