@@ -33,14 +33,8 @@ class FatherBotController extends AbstractTelegramBot
     {
         try {
             if ($this->update->getMessage()->text === '/start') {
-                $this->userState = null;
+                $this->clearState();
                 $this->start();
-                return;
-            }
-
-            // Обработка callback'ов
-            if ($this->update->callbackQuery) {
-                $this->processCallback($this->update->callbackQuery->data);
                 return;
             }
 
@@ -49,9 +43,16 @@ class FatherBotController extends AbstractTelegramBot
                 return;
             }
 
-            // Проверяем состояние ожидания токена
-            if ($this->userState === self::STATE_WAITING_TOKEN) {
+            // Получаем состояние из базы данных
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if ($salesman && $salesman->state === self::STATE_WAITING_TOKEN) {
                 $this->handleBotToken($message->text);
+                return;
+            }
+
+            // Обработка callback'ов
+            if ($this->update->callbackQuery) {
+                $this->processCallback($this->update->callbackQuery->data);
                 return;
             }
 
@@ -138,7 +139,10 @@ class FatherBotController extends AbstractTelegramBot
                 $message .= "5. Отправьте токен в этот чат\n\n";
                 $message .= "❗️ Отправьте токен вашего бота:";
 
-                $this->userState = self::STATE_WAITING_TOKEN;
+                // Сохраняем состояние в базе данных
+                $salesman->state = self::STATE_WAITING_TOKEN;
+                $salesman->save();
+
                 $this->sendMessage($message);
                 return;
             }
@@ -148,7 +152,10 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "✅ Статус: Активен\n\n";
             $message .= "Чтобы привязать другого бота, просто отправьте новый токен.";
 
-            $this->userState = self::STATE_WAITING_TOKEN;
+            // Сохраняем состояние в базе данных
+            $salesman->state = self::STATE_WAITING_TOKEN;
+            $salesman->save();
+
             $this->sendMessage($message);
         } catch (\Exception $e) {
             Log::error('Show bot info error: ' . $e->getMessage());
@@ -344,7 +351,6 @@ class FatherBotController extends AbstractTelegramBot
                 $message .= $salesman->bot_link;
             }
 
-            $this->userState = null;
             $this->sendMessage($message);
         } catch (\Exception $e) {
             Log::error('Check payment error: ' . $e->getMessage());
@@ -380,6 +386,7 @@ class FatherBotController extends AbstractTelegramBot
             // Обновляем данные продавца
             $salesman->token = $token;
             $salesman->bot_link = $botLink;
+            $salesman->state = null; // Очищаем состояние
             $salesman->save();
 
             $message = "✅ *Бот успешно привязан!*\n\n";
@@ -387,9 +394,7 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "✅ Статус: Активен\n\n";
             $message .= "Теперь вы можете продавать доступы через этого бота.";
 
-            $this->userState = null;
             $this->sendMessage($message);
-            $this->generateMenu();
         } catch (\Exception $e) {
             Log::error('Bot token handling error: ' . $e->getMessage());
             $this->sendErrorMessage();
@@ -468,5 +473,18 @@ class FatherBotController extends AbstractTelegramBot
     private function bytesToGB(int $bytes): float
     {
         return round($bytes / (1024 * 1024 * 1024), 2);
+    }
+
+    private function clearState(): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if ($salesman) {
+                $salesman->state = null;
+                $salesman->save();
+            }
+        } catch (\Exception $e) {
+            Log::error('Clear state error: ' . $e->getMessage());
+        }
     }
 }
