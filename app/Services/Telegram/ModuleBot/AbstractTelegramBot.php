@@ -44,20 +44,6 @@ abstract class AbstractTelegramBot
             $this->salesmanRepository = app(SalesmanRepository::class);
 
             $this->telegram = new Api($token);
-            $this->update = json_decode(file_get_contents('php://input'));
-
-            if ($this->update) {
-                $this->chatId = $this->update->message->chat->id ??
-                               $this->update->callback_query->message->chat->id;
-
-                Log::debug('Telegram update received', [
-                    'chat_id' => $this->chatId,
-                    'update_type' => $this->update->message ? 'message' :
-                                   ($this->update->callback_query ? 'callback_query' : 'unknown')
-                ]);
-            } else {
-                Log::warning('Empty update received from Telegram');
-            }
         } catch (Exception $e) {
             Log::error('Error initializing Telegram bot', [
                 'error' => $e->getMessage(),
@@ -67,7 +53,6 @@ abstract class AbstractTelegramBot
         }
     }
 
-
     /**
      * Инициализация бота
      */
@@ -75,27 +60,36 @@ abstract class AbstractTelegramBot
     {
         try {
             Log::debug('Initializing bot', [
-                'class' => static::class,
                 'update_raw' => request()->all()
             ]);
 
-            Log::debug('Parsed update', [
-                'update' => $this->update,
-                'chat_id' => $this->chatId,
-                'username' => $this->update->message->from->username ?? null,
-                'first_name' => $this->update->message->from->firstName ?? null
-            ]);
+            // Получаем update через Telegram SDK
+            $this->update = $this->telegram->getWebhookUpdate();
 
-            $this->username = $this->update->message->from->username;
-            $this->firstName = $this->update->message->from->firstName;
+            // Получаем chat_id
+            if ($this->update->getMessage()) {
+                $this->chatId = $this->update->getMessage()->getChat()->getId();
+                $this->username = $this->update->getMessage()->getFrom()->getUsername();
+                $this->firstName = $this->update->getMessage()->getFrom()->getFirstName();
+            } elseif ($this->update->getCallbackQuery()) {
+                $this->chatId = $this->update->getCallbackQuery()->getMessage()->getChat()->getId();
+                $this->username = $this->update->getCallbackQuery()->getFrom()->getUsername();
+                $this->firstName = $this->update->getCallbackQuery()->getFrom()->getFirstName();
+            }
+
+            Log::debug('Bot initialized', [
+                'chat_id' => $this->chatId,
+                'username' => $this->username,
+                'first_name' => $this->firstName
+            ]);
 
             $this->processUpdate();
         } catch (Exception $e) {
-            Log::error(static::class . ' initialization error: ' . $e->getMessage(), [
-                'exception' => $e,
+            Log::error('Error initializing bot', [
+                'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            $this->sendErrorMessage();
+            throw $e;
         }
     }
 

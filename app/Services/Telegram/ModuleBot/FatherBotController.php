@@ -33,57 +33,55 @@ class FatherBotController extends AbstractTelegramBot
     {
         try {
             $message = $this->update->getMessage();
-            if (!$message) {
-                Log::warning('Received update without message', [
+            $callbackQuery = $this->update->getCallbackQuery();
+
+            if ($message) {
+                $text = $message->getText();
+                
+                if (!$text) {
+                    Log::warning('Received message without text', [
+                        'message' => $message
+                    ]);
+                    return;
+                }
+
+                if ($text === '/start') {
+                    $this->clearState();
+                    $this->start();
+                    return;
+                }
+
+                // Получаем состояние из базы данных
+                $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+                if ($salesman && $salesman->state === self::STATE_WAITING_TOKEN) {
+                    $this->handleBotToken($text);
+                    return;
+                }
+
+                // Обработка команд меню
+                switch ($text) {
+                    case '📦 Купить пакет':
+                        $this->showPacksList();
+                        break;
+                    case '🤖 Мой бот':
+                        $this->showBotInfo();
+                        break;
+                    case '👤 Профиль':
+                        $this->showProfile();
+                        break;
+                    case '❓ Помощь':
+                        $this->showHelp();
+                        break;
+                    default:
+                        $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню.');
+                        $this->generateMenu();
+                }
+            } elseif ($callbackQuery) {
+                $this->processCallback($callbackQuery);
+            } else {
+                Log::warning('Received update without message or callback_query', [
                     'update' => $this->update
                 ]);
-                return;
-            }
-
-            $text = $message->getText();
-            if (!$text) {
-                Log::warning('Received message without text', [
-                    'message' => $message
-                ]);
-                return;
-            }
-
-            if ($text === '/start') {
-                $this->clearState();
-                $this->start();
-                return;
-            }
-
-            // Получаем состояние из базы данных
-            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-            if ($salesman && $salesman->state === self::STATE_WAITING_TOKEN) {
-                $this->handleBotToken($text);
-                return;
-            }
-
-            // Обработка callback'ов
-            if ($this->update->callbackQuery) {
-                $this->processCallback($this->update->callbackQuery->data);
-                return;
-            }
-
-            // Обработка команд меню
-            switch ($text) {
-                case '📦 Купить пакет':
-                    $this->showPacksList();
-                    break;
-                case '🤖 Мой бот':
-                    $this->showBotInfo();
-                    break;
-                case '👤 Профиль':
-                    $this->showProfile();
-                    break;
-                case '❓ Помощь':
-                    $this->showHelp();
-                    break;
-                default:
-                    $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню.');
-                    $this->generateMenu();
             }
         } catch (\Exception $e) {
             Log::error('Process update error: ' . $e->getMessage(), [
