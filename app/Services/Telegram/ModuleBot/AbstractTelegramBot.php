@@ -21,12 +21,12 @@ abstract class AbstractTelegramBot
     protected ?int $chatId = null;
     protected ?string $username = null;
     protected ?string $firstName = null;
-    protected const WEBHOOK_BASE_URL = 'https://vpn-telegram.com/';
     protected PackSalesmanService $packSalesmanService;
     protected SalesmanService $salesmanService;
     protected KeyActivateRepository $keyActivateRepository;
     protected PackSalesmanRepository $packSalesmanRepository;
     protected SalesmanRepository $salesmanRepository;
+    protected const WEBHOOK_BASE_URL = 'https://vpn-telegram.com/';
 
     /**
      * @throws TelegramSDKException
@@ -72,14 +72,14 @@ abstract class AbstractTelegramBot
      * @param string $path
      * @return bool
      */
-    public function setWebhook(string $token, string $path): bool
+    protected function setWebhook(string $token, string $path): bool
     {
         try {
-            Log::debug('$responce: ' . $token . '/' . $path);
-            $responce = Telegram::setWebhookWithoutCertificate([
-                'url' => self::WEBHOOK_BASE_URL . $token . '/' . $path
-            ]);
-            return $responce;
+            $webhookUrl = self::WEBHOOK_BASE_URL . ltrim($path, '/');
+            Log::debug('Setting webhook URL: ' . $webhookUrl);
+
+            $response = $this->telegram->setWebhookWithoutCertificate(['url' => $webhookUrl]);
+            return (bool)$response;
         } catch (Exception $e) {
             Log::error('Webhook setting error: ' . $e->getMessage());
             return false;

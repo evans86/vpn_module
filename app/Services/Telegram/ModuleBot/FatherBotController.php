@@ -75,10 +75,10 @@ class FatherBotController extends AbstractTelegramBot
             $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
 
             // Устанавливаем webhook для бота продавца
-            $webhookPath = 'salesman-bot/init';
+            $webhookPath = "salesman-bot/{$token}/init";
 
             if (!$this->setWebhook($token, $webhookPath)) {
-                $this->sendMessage('Ошибка при настройке бота. Пожалуйста, проверьте токен и попробуйте снова.');
+                $this->sendMessage('❌ Ошибка при настройке бота. Пожалуйста, проверьте токен и попробуйте снова.');
                 return;
             }
 
@@ -89,7 +89,7 @@ class FatherBotController extends AbstractTelegramBot
             $this->salesmanService->updateToken($salesmanDto);
 
             $this->userState = null;
-            $this->sendMessage("Бот успешно привязан!\nТокен: {$token}\nСсылка на бота: {$salesmanDto->bot_link}");
+            $this->sendMessage("✅ Бот успешно привязан!\nТокен: {$token}\nСсылка на бота: {$salesmanDto->bot_link}");
             $this->generateMenu();
         } catch (\Exception $e) {
             Log::error('Bot token handling error: ' . $e->getMessage());
@@ -325,7 +325,7 @@ class FatherBotController extends AbstractTelegramBot
             $message = "✅ *Пакет успешно куплен!*\n\n";
             $message .= "🔑 Количество ключей: {$pack->count}\n";
             $message .= "⏱ Срок действия: {$pack->period} дней\n";
-            $message .= "📊 Трафик на ключи: {$pack->traffic_limit} GB\n\n"; // TODO: Добавить трафик
+            $message .= "📊 Трафик на ключи: {$pack->traffic_limit} GB\n"; // TODO: Добавить трафик
 
             // Отправляем список ключей
             $message .= "*Ваши VPN ключи для продажи:*\n\n";
