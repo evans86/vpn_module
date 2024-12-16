@@ -98,10 +98,12 @@ class SalesmanService
                 throw new Exception('Salesman with this Telegram ID already exists');
             }
 
+
             $salesman = $this->salesmanRepository->create([
                 'telegram_id' => $telegram_id,
                 'username' => $username,
-                'status' => true
+                'status' => true,
+                'token' => null
             ]);
 
             $this->logger->info('Salesman created successfully', [
@@ -109,7 +111,8 @@ class SalesmanService
                 'action' => 'create_success',
                 'salesman_id' => $salesman->id,
                 'telegram_id' => $telegram_id,
-                'username' => $username
+                'username' => $username,
+                'token' => null
             ]);
 
             return SalesmanFactory::fromEntity($salesman);

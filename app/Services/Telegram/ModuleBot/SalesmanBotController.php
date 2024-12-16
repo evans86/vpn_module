@@ -16,15 +16,19 @@ class SalesmanBotController extends AbstractTelegramBot
 
     public function __construct(string $token)
     {
+        parent::__construct($token);
+
         // Находим продавца по токену
-        $salesman = Salesman::where('token', $token)->first();
-        if (!$salesman) {
+        $this->salesman = $this->salesmanRepository->findByToken($token);
+        if (!$this->salesman) {
             Log::error('Salesman not found for token: ' . substr($token, 0, 10) . '...');
             throw new \RuntimeException('Salesman not found');
         }
-        $this->salesman = $salesman;
 
-        parent::__construct($token);
+        Log::debug('Initialized SalesmanBotController', [
+            'salesman_id' => $this->salesman->id,
+            'token' => substr($token, 0, 10) . '...'
+        ]);
     }
 
     /**
