@@ -30,7 +30,7 @@ class FatherBotController extends AbstractTelegramBot
     {
         try {
             if ($this->update->getMessage()->text === '/start') {
-                Log::debug('Send message: ' . $this->update->getMessage()->text);
+//                Log::debug('Send message: ' . $this->update->getMessage()->text);
                 $this->userState = null;
                 $this->start();
                 return;
@@ -272,7 +272,7 @@ class FatherBotController extends AbstractTelegramBot
             $packSalesman = new PackSalesman();
             $packSalesman->pack_id = $pack->id;
             $packSalesman->salesman_id = $salesman->id;
-            $packSalesman->status = 1; // Исправляем значение статуса на числовое (1) вместо строкового ('paid')
+            $packSalesman->status = PackSalesman::PAID; // Исправляем значение статуса на числовое (1) вместо строкового ('paid')
             $packSalesman->save();
 
             $message = "✅ *Пакет успешно куплен!*\n\n";
@@ -345,8 +345,8 @@ class FatherBotController extends AbstractTelegramBot
         try {
             // Проверяем существование пользователя
             $existingSalesman = Salesman::where('telegram_id', $this->chatId)->first();
-            Log::debug('existingSalesman: ' . $this->chatId);
-            Log::debug('existingSalesman: ' . $this->username);
+//            Log::debug('existingSalesman: ' . $this->chatId);
+//            Log::debug('existingSalesman: ' . $this->username);
 
             if (!$existingSalesman) {
                 $this->salesmanService->create($this->chatId, $this->username == null ? null : $this->firstName);

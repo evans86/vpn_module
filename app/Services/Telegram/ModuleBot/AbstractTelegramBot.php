@@ -60,7 +60,7 @@ abstract class AbstractTelegramBot
             $this->username = $this->update->getChat()->username;
             $this->firstName = $this->update->getChat()->firstName;
 
-            Log::debug('USER STATE: ' . $this->update);
+//            Log::debug('USER STATE: ' . $this->update);
             $this->processUpdate();
         } catch (Exception $e) {
             Log::error(static::class . ' initialization error: ' . $e->getMessage());
@@ -83,7 +83,7 @@ abstract class AbstractTelegramBot
                 "salesman-bot/{$token}/init";
 
             $webhookUrl = self::WEBHOOK_BASE_URL . $path;
-            Log::debug('Setting webhook URL: ' . $webhookUrl);
+//            Log::debug('Setting webhook URL: ' . $webhookUrl);
 
             $response = $this->telegram->setWebhookWithoutCertificate(['url' => $webhookUrl]);
             return (bool)$response;
@@ -150,11 +150,11 @@ abstract class AbstractTelegramBot
     protected function sendMenu(array $buttons, string $message, array $options = []): void
     {
         $keyboard = Keyboard::make()->setResizeKeyboard(true);
-        
+
         // Группируем кнопки по 2 в ряд (если не указано иное)
         $buttonsPerRow = $options['buttons_per_row'] ?? 2;
         $rows = array_chunk($buttons, $buttonsPerRow);
-        
+
         foreach ($rows as $row) {
             $buttonRow = [];
             foreach ($row as $button) {
