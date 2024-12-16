@@ -42,29 +42,34 @@ class FatherBotController extends AbstractTelegramBot
             }
 
             $message = $this->update->getMessage();
-            $callbackQuery = $this->update->callbackQuery;
 
-            Log::debug('UserState: ' . $this->userState);
+            if ($message) {
+                $text = $message->text;
+                switch ($text) {
+                    case '🛍 Купить пакет':
+                        $this->actionPacks();
+                        break;
+                    case '🤖 Мой бот':
+                        $this->actionBindBot();
+                        break;
+                    case '👤 Профиль':
+                        $this->actionProfile();
+                        break;
+                    case '❓ Помощь':
+                        $this->actionHelp();
+                        break;
+                }
+            }
 
-            /**
-             * @var Salesman $salesman
-             */
-            $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
             // Проверяем состояние ожидания токена
-            if ($salesman->token === self::STATE_WAITING_TOKEN && $message) {
-                $salesman->token = null;
-                $salesman->save();
+            if ($this->userState === self::STATE_WAITING_TOKEN && $message) {
                 $this->handleBotToken($message->text);
                 return;
             }
 
-            if ($this->userState === self::STATE_WAITING_PAYMENT && $callbackQuery) {
-                $this->processCallback($callbackQuery->data);
+            if ($this->userState === self::STATE_WAITING_PAYMENT && $this->update->callbackQuery) {
+                $this->processCallback($this->update->callbackQuery->data);
                 return;
-            }
-
-            if ($callbackQuery) {
-                $this->processCallback($callbackQuery->data);
             }
         } catch (\Exception $e) {
             Log::error('Error processing update: ' . $e->getMessage());
@@ -154,20 +159,16 @@ class FatherBotController extends AbstractTelegramBot
     {
         $buttons = [
             [
-                'text' => '🛍 Купить пакет',
-                'callback_data' => 'packs'
+                'text' => '🛍 Купить пакет'
             ],
             [
-                'text' => '🤖 Мой бот',
-                'callback_data' => 'bindBot'
+                'text' => '🤖 Мой бот'
             ],
             [
-                'text' => '👤 Профиль',
-                'callback_data' => 'profile'
+                'text' => '👤 Профиль'
             ],
             [
-                'text' => '❓ Помощь',
-                'callback_data' => 'help'
+                'text' => '❓ Помощь'
             ]
         ];
 

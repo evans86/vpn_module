@@ -26,16 +26,26 @@ class SalesmanBotController extends AbstractTelegramBot
             }
 
             $message = $this->update->getMessage();
-            $callbackQuery = $this->update->getCallbackQuery();
+
+            if ($message) {
+                $text = $message->getText();
+                switch ($text) {
+                    case '🔑 Активировать':
+                        $this->actionActivate();
+                        break;
+                    case '📊 Статус':
+                        $this->actionStatus();
+                        break;
+                    case '❓ Помощь':
+                        $this->actionSupport();
+                        break;
+                }
+            }
 
             // Проверяем состояние ожидания ключа
             if ($this->userState === self::STATE_WAITING_KEY && $message) {
                 $this->handleKeyActivation($message->getText());
                 return;
-            }
-
-            if ($callbackQuery) {
-                $this->processCallback($callbackQuery->getData());
             }
         } catch (\Exception $e) {
             Log::error('Error processing update: ' . $e->getMessage());
@@ -50,18 +60,7 @@ class SalesmanBotController extends AbstractTelegramBot
      */
     private function processCallback(string $data): void
     {
-        $params = [];
-        if (str_contains($data, '?')) {
-            [$action, $queryString] = explode('?', $data);
-            parse_str($queryString, $params);
-        } else {
-            $action = $data;
-        }
-
-        $methodName = 'action' . ucfirst($action);
-        if (method_exists($this, $methodName)) {
-            $this->$methodName($params['id'] ?? null);
-        }
+        // Этот метод больше не используется
     }
 
     /**
@@ -84,16 +83,13 @@ class SalesmanBotController extends AbstractTelegramBot
     {
         $buttons = [
             [
-                'text' => '🔑 Активировать',
-                'callback_data' => 'activate'
+                'text' => '🔑 Активировать'
             ],
             [
-                'text' => '📊 Статус',
-                'callback_data' => 'status'
+                'text' => '📊 Статус'
             ],
             [
-                'text' => '❓ Помощь',
-                'callback_data' => 'support'
+                'text' => '❓ Помощь'
             ]
         ];
 
@@ -126,7 +122,7 @@ class SalesmanBotController extends AbstractTelegramBot
     private function actionStatus(): void
     {
         try {
-            $userId = $this->update->getCallbackQuery()->getFrom()->getId();
+            $userId = $this->update->getMessage()->getFrom()->getId();
 
             // Находим активные ключи через репозиторий
             $this->currentPack = $this->keyActivateRepository->findActiveKeyByUserAndSalesman(
@@ -160,7 +156,7 @@ class SalesmanBotController extends AbstractTelegramBot
     private function actionActivate(): void
     {
         try {
-            $userId = $this->update->getCallbackQuery()->getFrom()->getId();
+            $userId = $this->update->getMessage()->getFrom()->getId();
 
             // Проверяем наличие активного ключа через репозиторий
             $existingPack = $this->keyActivateRepository->findActiveKeyByUserAndSalesman(
