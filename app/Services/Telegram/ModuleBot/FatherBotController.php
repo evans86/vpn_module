@@ -63,6 +63,9 @@ class FatherBotController extends AbstractTelegramBot
                 case '👤 Профиль':
                     $this->showProfile();
                     break;
+                case '❓ Помощь':
+                    $this->showHelp();
+                    break;
                 default:
                     $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню.');
                     $this->generateMenu();
@@ -86,19 +89,20 @@ class FatherBotController extends AbstractTelegramBot
             }
 
             $message = "📦 *Доступные пакеты:*\n\n";
-            $keyboard = [];
+            $keyboard = new Keyboard();
+            $keyboard->inline();
 
             foreach ($packs as $pack) {
                 $message .= "🔸 *{$pack->name}*\n";
                 $message .= "💰 Цена: {$pack->price} руб.\n";
                 $message .= "📝 Описание: {$pack->description}\n\n";
 
-                $keyboard[] = [
+                $keyboard->row(
                     ['text' => "Купить {$pack->name} за {$pack->price} руб.", 'callback_data' => "buy?id={$pack->id}"]
-                ];
+                );
             }
 
-            $this->sendMessage($message, ['reply_markup' => json_encode(['inline_keyboard' => $keyboard])]);
+            $this->sendMessage($message, $keyboard->toJson());
         } catch (\Exception $e) {
             Log::error('Show packs error: ' . $e->getMessage());
             $this->sendErrorMessage();
@@ -355,7 +359,8 @@ class FatherBotController extends AbstractTelegramBot
         $buttons = [
             ['text' => '📦 Купить пакет'],
             ['text' => '🤖 Мой бот'],
-            ['text' => '👤 Профиль']
+            ['text' => '👤 Профиль'],
+            ['text' => '❓ Помощь']
         ];
 
         $keyboard = Keyboard::make()
@@ -368,45 +373,31 @@ class FatherBotController extends AbstractTelegramBot
             $keyboard->row(...$row);
         }
 
-        $this->sendMessage('Выберите действие:', $keyboard);
+        $message = "👋 *Добро пожаловать в систему управления доступами VPN*\n\n";
+        $message .= "🔸 Покупайте пакеты ключей\n";
+        $message .= "🔸 Создавайте своего бота\n";
+        $message .= "🔸 Продавайте VPN доступы\n";
+
+        $this->sendMessage($message, $keyboard);
     }
 
-    /**
-     * Help action
-     */
-    private function actionHelp(): void
+    private function showHelp(): void
     {
-        $message = "❓ *Помощь по использованию бота*\n\n";
-        $message .= "*Как начать продавать VPN:*\n\n";
-        $message .= "1️⃣ Купите пакет ключей\n";
-        $message .= "2️⃣ Создайте бота в @BotFather\n";
-        $message .= "3️⃣ Привяжите полученный токен\n";
-        $message .= "4️⃣ Начните продавать доступы\n\n";
-        $message .= "*Дополнительно:*\n";
-        $message .= "📦 Пакеты можно докупать\n";
-        $message .= "🔄 Ключи активируются автоматически\n";
-        $message .= "📊 Статистика доступна в профиле\n\n";
-        $message .= "Остались вопросы? Пишите @support";
+        $message = "*❓ Помощь*\n\n";
+        $message .= "🔹 *Покупка пакета:*\n";
+        $message .= "1. Нажмите '📦 Купить пакет'\n";
+        $message .= "2. Выберите подходящий пакет\n";
+        $message .= "3. Оплатите его по указанным реквизитам\n\n";
+        $message .= "🔹 *Создание бота:*\n";
+        $message .= "1. Создайте бота у @BotFather\n";
+        $message .= "2. Получите токен бота\n";
+        $message .= "3. Нажмите '🤖 Мой бот' и отправьте токен\n\n";
+        $message .= "🔹 *Продажа доступов:*\n";
+        $message .= "1. Купите пакет ключей\n";
+        $message .= "2. Привяжите своего бота\n";
+        $message .= "3. Начните продавать доступы через своего бота\n\n";
+        $message .= "По всем вопросам обращайтесь к @admin";
 
         $this->sendMessage($message);
-    }
-
-    /**
-     * Get bot link from token
-     * @param string $token
-     * @return string
-     */
-    private function getBotLinkFromToken(string $token): string
-    {
-        try {
-            $telegram = new Api($token);
-            $botInfo = $telegram->getMe();
-            return '@' . $botInfo->username;
-        } catch (\Exception $e) {
-            Log::error('Error getting bot info: ' . $e->getMessage());
-            // Возвращаем запасной вариант, если не удалось получить информацию о боте
-            $botName = explode(':', $token)[0];
-            return '@bot' . $botName;
-        }
     }
 }
