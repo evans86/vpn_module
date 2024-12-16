@@ -364,40 +364,58 @@ class FatherBotController extends AbstractTelegramBot
     private function handleBotToken(string $token): void
     {
         try {
+            Log::debug('Handling bot token', [
+                'token' => substr($token, 0, 10) . '...'
+            ]);
+
+            // Находим продавца по telegram_id
             $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
 
             // Проверяем валидность токена через Telegram API
-//            try {
-//                $telegram = new Api($token);
-//                $botInfo = $telegram->getMe();
-//                $botLink = '@' . $botInfo->username;
-//            } catch (\Exception $e) {
-//                Log::error('Invalid bot token: ' . $e->getMessage());
-//                $this->sendMessage('❌ Неверный токен бота. Пожалуйста, проверьте токен и попробуйте снова.');
-//                return;
-//            }
+            try {
+                $telegram = new Api($token);
+                $botInfo = $telegram->getMe();
+                $botLink = '@' . $botInfo->username;
 
-            // Устанавливаем webhook для бота продавца
-            if (!$this->setWebhook($token, self::BOT_TYPE_SALESMAN)) {
-                $this->sendMessage('❌ Ошибка при настройке бота. Пожалуйста, проверьте токен и попробуйте снова.');
+                Log::debug('Bot info received', [
+                    'username' => $botInfo->username,
+                    'token' => substr($token, 0, 10) . '...'
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Invalid bot token', [
+                    'error' => $e->getMessage(),
+                    'token' => substr($token, 0, 10) . '...',
+                    'trace' => $e->getTraceAsString()
+                ]);
+                $this->sendMessage('❌ Неверный токен бота. Пожалуйста, проверьте токен и попробуйте снова.');
                 return;
             }
 
-            // Обновляем данные продавца
+            // Устанавливаем webhook для бота продавца
+            if (!$this->setWebhook($token, self::BOT_TYPE_SALESMAN)) {
+                Log::error('Failed to set webhook', [
+                    'token' => substr($token, 0, 10) . '...'
+                ]);
+                $this->sendMessage('❌ Ошибка при настройке бота. Пожалуйста, попробуйте позже.');
+                return;
+            }
+
+            // Сохраняем токен для продавца
             $salesman->token = $token;
-            $salesman->bot_link = $botLink;
-            $salesman->state = null; // Очищаем состояние
             $salesman->save();
 
-            $message = "✅ *Бот успешно привязан!*\n\n";
-            $message .= "🔗 Ссылка на бота: {$botLink}\n";
-            $message .= "✅ Статус: Активен\n\n";
-            $message .= "Теперь вы можете продавать доступы через этого бота.";
+            Log::info('Bot token saved', [
+                'salesman_id' => $salesman->id,
+                'token' => substr($token, 0, 10) . '...'
+            ]);
 
-            $this->sendMessage($message);
+            $this->sendMessage("✅ Бот успешно настроен!\n\nБот: {$botLink}");
         } catch (\Exception $e) {
-            Log::error('Bot token handling error: ' . $e->getMessage());
-            $this->sendErrorMessage();
+            Log::error('Error handling bot token', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->sendMessage('❌ Произошла ошибка. Пожалуйста, попробуйте позже или обратитесь к администратору.');
         }
     }
 

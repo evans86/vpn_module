@@ -94,16 +94,35 @@ abstract class AbstractTelegramBot
     {
         try {
             $path = $botType === self::BOT_TYPE_FATHER ?
-                "father-bot/{$token}/init" :
-                "salesman-bot/{$token}/init";
+                "api/telegram/father-bot/{$token}/init" :
+                "api/telegram/salesman-bot/{$token}/init";
 
-            $webhookUrl = self::WEBHOOK_BASE_URL . $path;
-//            Log::debug('Setting webhook URL: ' . $webhookUrl);
+            $webhookUrl = rtrim(self::WEBHOOK_BASE_URL, '/') . '/' . $path;
+            
+            Log::debug('Setting webhook URL', [
+                'url' => $webhookUrl,
+                'bot_type' => $botType,
+                'token' => substr($token, 0, 10) . '...'
+            ]);
 
-            $response = $this->telegram->setWebhookWithoutCertificate(['url' => $webhookUrl]);
+            // Добавляем задержку, чтобы избежать Too Many Requests
+            sleep(1);
+
+            $response = $this->telegram->setWebhook(['url' => $webhookUrl]);
+            
+            Log::debug('Webhook set response', [
+                'response' => $response,
+                'bot_type' => $botType
+            ]);
+
             return (bool)$response;
         } catch (Exception $e) {
-            Log::error('Webhook setting error: ' . $e->getMessage());
+            Log::error('Webhook setting error', [
+                'error' => $e->getMessage(),
+                'bot_type' => $botType,
+                'token' => substr($token, 0, 10) . '...',
+                'trace' => $e->getTraceAsString()
+            ]);
             return false;
         }
     }

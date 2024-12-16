@@ -44,21 +44,16 @@ class WebhookController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'Invalid token'], ResponseAlias::HTTP_FORBIDDEN);
             }
 
-            // Проверяем секретный токен webhook'а
-//            if (!$this->validateWebhookRequest($request)) {
-//                Log::error('Invalid webhook secret token');
-//                return response()->json(['status' => 'error', 'message' => 'Invalid secret token'], ResponseAlias::HTTP_FORBIDDEN);
-//            }
-
             $bot = new FatherBotController($token);
-            $bot->init();
-            return response()->json(['status' => 'ok']);
+            $bot->processUpdate();
+
+            return response()->json(['status' => 'success']);
         } catch (Exception $e) {
-            Log::error('Father bot webhook error: ' . $e->getMessage(), [
-                'exception' => $e,
+            Log::error('Error processing father bot webhook', [
+                'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            return response()->json(['status' => 'error'], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -74,21 +69,16 @@ class WebhookController extends Controller
                 'headers' => $request->headers->all()
             ]);
 
-            // Проверяем секретный токен webhook'а
-//            if (!$this->validateWebhookRequest($request)) {
-//                Log::error('Invalid webhook secret token');
-//                return response()->json(['status' => 'error', 'message' => 'Invalid secret token'], ResponseAlias::HTTP_FORBIDDEN);
-//            }
-
             $bot = new SalesmanBotController($token);
-            $bot->init();
-            return response()->json(['status' => 'ok']);
+            $bot->processUpdate();
+
+            return response()->json(['status' => 'success']);
         } catch (Exception $e) {
-            Log::error('Salesman bot webhook error: ' . $e->getMessage(), [
-                'exception' => $e,
+            Log::error('Error processing salesman bot webhook', [
+                'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            return response()->json(['status' => 'error'], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

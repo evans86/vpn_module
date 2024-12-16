@@ -30,10 +30,10 @@ return [
     */
     'father_bot' => [
         'token' => env('TELEGRAM_FATHER_BOT_TOKEN'),
-        'webhook_url' => env('APP_URL') . '/telegram/father-bot',
+        'webhook_url' => env('APP_URL') . '/api/telegram/father-bot',
     ],
     'salesman_bot' => [
-        'webhook_url' => env('APP_URL') . '/telegram/salesman-bot',
+        'webhook_url' => env('APP_URL') . '/api/telegram/salesman-bot',
     ],
     'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
 
