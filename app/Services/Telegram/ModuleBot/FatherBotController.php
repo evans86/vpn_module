@@ -29,7 +29,7 @@ class FatherBotController extends AbstractTelegramBot
     protected function processUpdate(): void
     {
         try {
-            if ($this->update->getMessage()?->text === '/start') {
+            if ($this->update->getMessage()->text === '/start') {
                 Log::debug('Send message: ' . $this->update->getMessage()->text);
                 $this->userState = null;
                 $this->start();
@@ -205,7 +205,7 @@ class FatherBotController extends AbstractTelegramBot
     {
         try {
             $pack = Pack::findOrFail($packId);
-            
+
             $message = "💎 *Подтверждение покупки пакета*\n\n";
             $message .= "📦 Пакет: {$pack->name}\n";
             $message .= "🔑 Количество ключей: {$pack->count}\n";
@@ -235,7 +235,7 @@ class FatherBotController extends AbstractTelegramBot
     {
         try {
             $pack = Pack::findOrFail($packId);
-            
+
             $message = "💳 *Оплата пакета*\n\n";
             $message .= "Сумма к оплате: {$pack->price} руб.\n\n";
             $message .= "Для оплаты переведите указанную сумму по реквизитам:\n";
