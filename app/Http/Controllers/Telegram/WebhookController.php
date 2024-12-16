@@ -28,10 +28,19 @@ class WebhookController extends Controller
     public function fatherBot(Request $request, string $token): JsonResponse
     {
         try {
+            Log::debug('Received webhook for father bot', [
+                'token' => substr($token, 0, 10) . '...',
+                'request' => $request->all(),
+                'headers' => $request->headers->all()
+            ]);
+
             // Проверяем, что переданный токен совпадает с токеном из конфигурации
             $configToken = config('telegram.father_bot.token');
             if ($token !== $configToken) {
-                Log::error('Invalid bot token provided');
+                Log::error('Invalid bot token provided', [
+                    'provided' => substr($token, 0, 10) . '...',
+                    'expected' => substr($configToken, 0, 10) . '...'
+                ]);
                 return response()->json(['status' => 'error', 'message' => 'Invalid token'], ResponseAlias::HTTP_FORBIDDEN);
             }
 
@@ -45,7 +54,10 @@ class WebhookController extends Controller
             $bot->init();
             return response()->json(['status' => 'ok']);
         } catch (Exception $e) {
-            Log::error('Father bot webhook error: ' . $e->getMessage());
+            Log::error('Father bot webhook error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json(['status' => 'error'], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

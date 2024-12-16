@@ -8,12 +8,12 @@ use App\Repositories\Salesman\SalesmanRepository;
 use App\Services\Pack\PackSalesmanService;
 use App\Services\Salesman\SalesmanService;
 use Exception;
+use Illuminate\Support\Facades\Log;
 use Telegram\Bot\Api;
 use Telegram\Bot\Keyboard\Keyboard;
 use Telegram\Bot\Objects\Update;
 use Telegram\Bot\Exceptions\TelegramSDKException;
 use Telegram\Bot\Laravel\Facades\Telegram;
-use Illuminate\Support\Facades\Log;
 
 abstract class AbstractTelegramBot
 {
@@ -55,15 +55,30 @@ abstract class AbstractTelegramBot
     public function init(): void
     {
         try {
+            Log::debug('Initializing bot', [
+                'class' => static::class,
+                'update_raw' => request()->all()
+            ]);
+
             $this->update = $this->telegram->getWebhookUpdate();
+            
+            Log::debug('Parsed update', [
+                'update' => $this->update,
+                'chat_id' => $this->update->getChat()->id ?? null,
+                'username' => $this->update->getChat()->username ?? null,
+                'first_name' => $this->update->getChat()->firstName ?? null
+            ]);
+
             $this->chatId = $this->update->getChat()->id;
             $this->username = $this->update->getChat()->username;
             $this->firstName = $this->update->getChat()->firstName;
 
-//            Log::debug('USER STATE: ' . $this->update);
             $this->processUpdate();
         } catch (Exception $e) {
-            Log::error(static::class . ' initialization error: ' . $e->getMessage());
+            Log::error(static::class . ' initialization error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'trace' => $e->getTraceAsString()
+            ]);
             $this->sendErrorMessage();
         }
     }
@@ -117,21 +132,38 @@ abstract class AbstractTelegramBot
     protected function sendMessage(string $text, $keyboard = null): void
     {
         try {
+            Log::debug('Sending message', [
+                'chat_id' => $this->chatId,
+                'text' => $text,
+                'keyboard' => $keyboard
+            ]);
+
             $params = [
                 'chat_id' => $this->chatId,
                 'text' => $text,
-                'parse_mode' => 'Markdown'  // Изменяем на Markdown для поддержки * и `
+                'parse_mode' => 'Markdown'
             ];
 
-            if (is_array($keyboard)) {
-                $params = array_merge($params, $keyboard);
-            } elseif ($keyboard instanceof Keyboard) {
-                $params['reply_markup'] = $keyboard;
+            if ($keyboard !== null) {
+                if (is_array($keyboard)) {
+                    if (isset($keyboard['reply_markup'])) {
+                        $params['reply_markup'] = $keyboard['reply_markup'];
+                    } else {
+                        $params['reply_markup'] = json_encode($keyboard);
+                    }
+                } elseif ($keyboard instanceof Keyboard) {
+                    $params['reply_markup'] = json_encode($keyboard->toArray());
+                }
             }
 
-            $this->telegram->sendMessage($params);
+            $response = $this->telegram->sendMessage($params);
+            Log::debug('Message sent', ['response' => $response]);
         } catch (Exception $e) {
-            Log::error('Send message error: ' . $e->getMessage());
+            Log::error('Send message error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'trace' => $e->getTraceAsString(),
+                'params' => $params ?? null
+            ]);
         }
     }
 
