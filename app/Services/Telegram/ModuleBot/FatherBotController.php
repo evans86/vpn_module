@@ -312,7 +312,7 @@ class FatherBotController extends AbstractTelegramBot
                     $finish_at,
                     $deleted_at
                 );
-                $keys[] = $key->key;
+                $keys[] = $key;
             }
 
             $message = "✅ *Пакет успешно куплен!*\n\n";
@@ -323,11 +323,11 @@ class FatherBotController extends AbstractTelegramBot
             }
             $message .= "⏱ Срок действия: {$pack->period} дней\n";
             $message .= "💰 Стоимость: {$pack->price} руб.\n\n";
-            $message .= "🔐 *Ваши ключи:*\n";
+            $message .= "🔐 *Ваши ключи активации:*\n";
             foreach ($keys as $index => $key) {
-                $message .= ($index + 1) . ". `{$key}`\n";
+                $message .= ($index + 1) . ". `{$key->id}`\n";
             }
-            $message .= "\n";
+            $message .= "\n❗️ Сохраните эти ключи - они понадобятся для активации VPN\n\n";
 
             if (!$salesman->token) {
                 $message .= "❗️ *Важно:* Привяжите своего бота для начала продаж\n";
