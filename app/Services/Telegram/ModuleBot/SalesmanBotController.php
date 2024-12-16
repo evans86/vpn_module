@@ -85,7 +85,7 @@ class SalesmanBotController extends AbstractTelegramBot
         $keyboard = Keyboard::make()
             ->setResizeKeyboard(true)
             ->setOneTimeKeyboard(true)
-            ->row([
+            ->row(
                 Keyboard::inlineButton([
                     'text' => 'Активировать',
                     'callback_data' => 'activate',
@@ -94,13 +94,13 @@ class SalesmanBotController extends AbstractTelegramBot
                     'text' => 'Статус',
                     'callback_data' => 'status',
                 ]),
-            ])
-            ->row([
+            )
+            ->row(
                 Keyboard::inlineButton([
                     'text' => 'Помощь',
                     'callback_data' => 'support',
                 ])
-            ]);
+            );
 
         $this->sendMessage('Выберите действие:', $keyboard);
     }
