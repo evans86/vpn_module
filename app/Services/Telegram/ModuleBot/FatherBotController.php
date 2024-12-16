@@ -92,20 +92,27 @@ class FatherBotController extends AbstractTelegramBot
             }
 
             $message = "📦 *Доступные пакеты:*\n\n";
-            $keyboard = new Keyboard();
-            $keyboard->inline();
+            $inlineKeyboard = [];
 
             foreach ($packs as $pack) {
                 $message .= "🔸 *{$pack->name}*\n";
                 $message .= "💰 Цена: {$pack->price} руб.\n";
+                if ($pack->traffic_limit) {
+                    $message .= "📊 Лимит трафика: {$pack->traffic_limit} GB\n";
+                }
+                $message .= "⏱ Срок действия: {$pack->period} дней\n";
                 $message .= "📝 Описание: {$pack->description}\n\n";
 
-                $keyboard->row(
+                $inlineKeyboard[] = [
                     ['text' => "Купить {$pack->name} за {$pack->price} руб.", 'callback_data' => "buy?id={$pack->id}"]
-                );
+                ];
             }
 
-            $this->sendMessage($message, $keyboard->toJson());
+            $keyboard = new Keyboard([
+                'inline_keyboard' => $inlineKeyboard
+            ]);
+
+            $this->sendMessage($message, $keyboard);
         } catch (\Exception $e) {
             Log::error('Show packs error: ' . $e->getMessage());
             $this->sendErrorMessage();
@@ -379,8 +386,6 @@ class FatherBotController extends AbstractTelegramBot
         try {
             // Проверяем существование пользователя
             $existingSalesman = Salesman::where('telegram_id', $this->chatId)->first();
-//            Log::debug('existingSalesman: ' . $this->chatId);
-//            Log::debug('existingSalesman: ' . $this->username);
 
             if (!$existingSalesman) {
                 $this->salesmanService->create($this->chatId, $this->username == null ? null : $this->firstName);
@@ -405,15 +410,11 @@ class FatherBotController extends AbstractTelegramBot
             ['text' => '❓ Помощь']
         ];
 
-        $keyboard = Keyboard::make()
-            ->setResizeKeyboard(true)
-            ->setOneTimeKeyboard(false);
-
-        // Группируем кнопки по 2 в ряд
-        $rows = array_chunk($buttons, 2);
-        foreach ($rows as $row) {
-            $keyboard->row(...$row);
-        }
+        $keyboard = new Keyboard([
+            'keyboard' => array_chunk($buttons, 2),
+            'resize_keyboard' => true,
+            'one_time_keyboard' => false
+        ]);
 
         $message = "👋 *Добро пожаловать в систему управления доступами VPN*\n\n";
         $message .= "🔸 Покупайте пакеты ключей\n";
