@@ -61,7 +61,7 @@ abstract class AbstractTelegramBot
             ]);
 
             $this->update = $this->telegram->getWebhookUpdate();
-            
+
             Log::debug('Parsed update', [
                 'update' => $this->update,
                 'chat_id' => $this->update->getChat()->id ?? null,
@@ -141,7 +141,7 @@ abstract class AbstractTelegramBot
             $params = [
                 'chat_id' => $this->chatId,
                 'text' => $text,
-                'parse_mode' => 'Markdown'
+                'parse_mode' => 'HTML'
             ];
 
             if ($keyboard !== null) {
