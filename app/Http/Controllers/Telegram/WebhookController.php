@@ -28,7 +28,16 @@ class WebhookController extends Controller
     public function fatherBot(Request $request, string $token): JsonResponse
     {
         try {
+            // Проверяем, что переданный токен совпадает с токеном из конфигурации
+            $configToken = config('telegram.father_bot.token');
+            if ($token !== $configToken) {
+                Log::error('Invalid bot token provided');
+                return response()->json(['status' => 'error', 'message' => 'Invalid token'], ResponseAlias::HTTP_FORBIDDEN);
+            }
+
+            // Проверяем секретный токен webhook'а
 //            if (!$this->validateWebhookRequest($request)) {
+//                Log::error('Invalid webhook secret token');
 //                return response()->json(['status' => 'error', 'message' => 'Invalid secret token'], ResponseAlias::HTTP_FORBIDDEN);
 //            }
 
@@ -47,7 +56,9 @@ class WebhookController extends Controller
     public function salesmanBot(Request $request, string $token): JsonResponse
     {
         try {
+            // Проверяем секретный токен webhook'а
 //            if (!$this->validateWebhookRequest($request)) {
+//                Log::error('Invalid webhook secret token');
 //                return response()->json(['status' => 'error', 'message' => 'Invalid secret token'], ResponseAlias::HTTP_FORBIDDEN);
 //            }
 
