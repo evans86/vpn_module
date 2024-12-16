@@ -82,27 +82,27 @@ class SalesmanBotController extends AbstractTelegramBot
      */
     protected function generateMenu(): void
     {
-        $keyboard = Keyboard::make()
-            ->setResizeKeyboard(true)
-            ->setOneTimeKeyboard(true)
-            ->row(
-                Keyboard::inlineButton([
-                    'text' => 'Активировать',
-                    'callback_data' => 'activate',
-                ]),
-                Keyboard::inlineButton([
-                    'text' => 'Статус',
-                    'callback_data' => 'status',
-                ]),
-            )
-            ->row(
-                Keyboard::inlineButton([
-                    'text' => 'Помощь',
-                    'callback_data' => 'support',
-                ])
-            );
+        $buttons = [
+            [
+                'text' => '🔑 Активировать',
+                'callback_data' => 'activate'
+            ],
+            [
+                'text' => '📊 Статус',
+                'callback_data' => 'status'
+            ],
+            [
+                'text' => '❓ Помощь',
+                'callback_data' => 'support'
+            ]
+        ];
 
-        $this->sendMessage('Выберите действие:', $keyboard);
+        $message = "👋 Добро пожаловать в VPN бот!\n\n";
+        $message .= "🔸 Активируйте ваш VPN доступ\n";
+        $message .= "🔸 Проверяйте статус подключения\n";
+        $message .= "🔸 Получайте помощь в настройке\n";
+
+        $this->sendMenu($buttons, $message);
     }
 
     /**

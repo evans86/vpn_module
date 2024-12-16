@@ -152,38 +152,31 @@ class FatherBotController extends AbstractTelegramBot
      */
     protected function generateMenu(): void
     {
-        $keyboard = Keyboard::make()->inline()
-            ->setResizeKeyboard(true)
-            ->setOneTimeKeyboard(false)
-            ->row(
-                Keyboard::inlineButton([
-                    'text' => '🛍 Купить пакет',
-                    'callback_data' => 'packs'
-                ]),
-                Keyboard::inlineButton([
-                    'text' => '🤖 Мой бот',
-                    'callback_data' => 'bindBot'
-                ])
-            )
-            ->row(
-                Keyboard::inlineButton([
-                    'text' => '👤 Профиль',
-                    'callback_data' => 'profile'
-                ]),
-                Keyboard::inlineButton([
-                    'text' => '❓ Помощь',
-                    'callback_data' => 'help'
-                ])
-            );
+        $buttons = [
+            [
+                'text' => '🛍 Купить пакет',
+                'callback_data' => 'packs'
+            ],
+            [
+                'text' => '🤖 Мой бот',
+                'callback_data' => 'bindBot'
+            ],
+            [
+                'text' => '👤 Профиль',
+                'callback_data' => 'profile'
+            ],
+            [
+                'text' => '❓ Помощь',
+                'callback_data' => 'help'
+            ]
+        ];
 
         $message = "👋 *Добро пожаловать в систему управления доступами VPN*\n\n";
         $message .= "🔸 Покупайте пакеты ключей\n";
         $message .= "🔸 Создавайте своего бота\n";
         $message .= "🔸 Продавайте VPN доступы\n";
 
-        Log::debug('Send message: ' . $message . json_encode($keyboard));
-
-        $this->sendMessage($message, $keyboard);
+        $this->sendMenu($buttons, $message);
     }
 
     /**
