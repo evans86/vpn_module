@@ -367,15 +367,15 @@ class FatherBotController extends AbstractTelegramBot
             $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
 
             // Проверяем валидность токена через Telegram API
-            try {
-                $telegram = new Api($token);
-                $botInfo = $telegram->getMe();
-                $botLink = '@' . $botInfo->username;
-            } catch (\Exception $e) {
-                Log::error('Invalid bot token: ' . $e->getMessage());
-                $this->sendMessage('❌ Неверный токен бота. Пожалуйста, проверьте токен и попробуйте снова.');
-                return;
-            }
+//            try {
+//                $telegram = new Api($token);
+//                $botInfo = $telegram->getMe();
+//                $botLink = '@' . $botInfo->username;
+//            } catch (\Exception $e) {
+//                Log::error('Invalid bot token: ' . $e->getMessage());
+//                $this->sendMessage('❌ Неверный токен бота. Пожалуйста, проверьте токен и попробуйте снова.');
+//                return;
+//            }
 
             // Устанавливаем webhook для бота продавца
             if (!$this->setWebhook($token, self::BOT_TYPE_SALESMAN)) {
