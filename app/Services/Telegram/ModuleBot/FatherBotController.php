@@ -98,7 +98,7 @@ class FatherBotController extends AbstractTelegramBot
                 $message .= "🔸 *{$pack->name}*\n";
                 $message .= "💰 Цена: {$pack->price} руб.\n";
                 if ($pack->traffic_limit) {
-                    $message .= "📊 Лимит трафика: {$pack->traffic_limit} GB\n";
+                    $message .= "📊 Лимит трафика: " . $this->bytesToGB($pack->traffic_limit) . " GB\n";
                 }
                 $message .= "⏱ Срок действия: {$pack->period} дней\n";
                 $message .= "📝 Описание: {$pack->description}\n\n";
@@ -231,17 +231,22 @@ class FatherBotController extends AbstractTelegramBot
             $message = "💎 *Подтверждение покупки пакета*\n\n";
             $message .= "📦 Пакет: {$pack->name}\n";
             $message .= "🔑 Количество ключей: {$pack->count}\n";
+            if ($pack->traffic_limit) {
+                $message .= "📊 Лимит трафика: " . $this->bytesToGB($pack->traffic_limit) . " GB\n";
+            }
             $message .= "⏱ Срок действия: {$pack->period} дней\n";
             $message .= "💰 Стоимость: {$pack->price} руб.\n\n";
             $message .= "Для подтверждения покупки нажмите кнопку ниже:";
 
-            $keyboard = new Keyboard();
-            $keyboard->inline();
-            $keyboard->row(
-                ['text' => "💳 Оплатить {$pack->price} руб.", 'callback_data' => "confirm?id={$packId}"]
-            );
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => "💳 Оплатить {$pack->price} руб.", 'callback_data' => "confirm?id={$packId}"]
+                    ]
+                ]
+            ];
 
-            $this->sendMessage($message, $keyboard->toJson());
+            $this->sendMessage($message, ['reply_markup' => json_encode($keyboard)]);
         } catch (\Exception $e) {
             Log::error('Buy pack error: ' . $e->getMessage());
             $this->sendErrorMessage();
@@ -264,13 +269,15 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "❗️ В комментарии укажите: `VPN_{$this->chatId}`\n\n";
             $message .= "После оплаты нажмите кнопку ниже:";
 
-            $keyboard = new Keyboard();
-            $keyboard->inline();
-            $keyboard->row(
-                ['text' => "✅ Я оплатил", 'callback_data' => "checkPayment?id={$packId}"]
-            );
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => "✅ Я оплатил", 'callback_data' => "checkPayment?id={$packId}"]
+                    ]
+                ]
+            ];
 
-            $this->sendMessage($message, $keyboard->toJson());
+            $this->sendMessage($message, ['reply_markup' => json_encode($keyboard)]);
         } catch (\Exception $e) {
             Log::error('Confirm purchase error: ' . $e->getMessage());
             $this->sendErrorMessage();
@@ -311,10 +318,10 @@ class FatherBotController extends AbstractTelegramBot
             $message = "✅ *Пакет успешно куплен!*\n\n";
             $message .= "📦 Пакет: {$pack->name}\n";
             $message .= "🔑 Количество ключей: {$pack->count}\n";
-            $message .= "⏱ Срок действия: {$pack->period} дней\n";
             if ($pack->traffic_limit) {
-                $message .= "📊 Лимит трафика: {$pack->traffic_limit} GB\n";
+                $message .= "📊 Лимит трафика: " . $this->bytesToGB($pack->traffic_limit) . " GB\n";
             }
+            $message .= "⏱ Срок действия: {$pack->period} дней\n";
             $message .= "💰 Стоимость: {$pack->price} руб.\n\n";
             $message .= "🔐 *Ваши ключи:*\n";
             foreach ($keys as $index => $key) {
@@ -442,5 +449,13 @@ class FatherBotController extends AbstractTelegramBot
         $message .= "По всем вопросам обращайтесь к @admin";
 
         $this->sendMessage($message);
+    }
+
+    /**
+     * Конвертация байтов в гигабайты
+     */
+    private function bytesToGB(int $bytes): float
+    {
+        return round($bytes / (1024 * 1024 * 1024), 2);
     }
 }
