@@ -30,7 +30,7 @@ class WebhookController extends Controller
         try {
             Log::debug('Received webhook for father bot', [
                 'token' => substr($token, 0, 10) . '...',
-                'request' => $request->all(),
+                'request_body' => $request->getContent(),
                 'headers' => $request->headers->all()
             ]);
 
@@ -45,13 +45,14 @@ class WebhookController extends Controller
             }
 
             $bot = new FatherBotController($token);
-            $bot->processUpdate();
+            $bot->init();
 
             return response()->json(['status' => 'success']);
         } catch (Exception $e) {
             Log::error('Error processing father bot webhook', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'request_body' => $request->getContent()
             ]);
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
         }
@@ -65,18 +66,19 @@ class WebhookController extends Controller
         try {
             Log::debug('Received webhook for salesman bot', [
                 'token' => substr($token, 0, 10) . '...',
-                'request' => $request->all(),
+                'request_body' => $request->getContent(),
                 'headers' => $request->headers->all()
             ]);
 
             $bot = new SalesmanBotController($token);
-            $bot->processUpdate();
+            $bot->init();
 
             return response()->json(['status' => 'success']);
         } catch (Exception $e) {
             Log::error('Error processing salesman bot webhook', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'request_body' => $request->getContent()
             ]);
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
         }

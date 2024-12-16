@@ -38,69 +38,53 @@ class SalesmanBotController extends AbstractTelegramBot
     {
         try {
             $message = $this->update->getMessage();
-            if (!$message) {
-                Log::warning('Received update without message', [
+            $callbackQuery = $this->update->getCallbackQuery();
+
+            if ($message) {
+                $text = $message->getText();
+                
+                if (!$text) {
+                    Log::warning('Received message without text', [
+                        'message' => $message
+                    ]);
+                    return;
+                }
+
+                if ($text === '/start') {
+                    $this->start();
+                    return;
+                }
+
+                // Обработка команд меню
+                switch ($text) {
+                    case '🔑 Активировать':
+                        $this->actionActivate();
+                        break;
+                    case '📊 Статус':
+                        $this->actionStatus();
+                        break;
+                    case '❓ Помощь':
+                        $this->actionSupport();
+                        break;
+                    default:
+                        // Проверяем состояние ожидания ключа
+                        if ($this->isWaitingForKey($this->chatId)) {
+                            $this->handleKeyActivation($text);
+                        } else {
+                            $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню для выбора действия.');
+                        }
+                }
+            } elseif ($callbackQuery) {
+                $this->processCallback($callbackQuery);
+            } else {
+                Log::warning('Received update without message or callback_query', [
                     'update' => $this->update
                 ]);
-                return;
             }
-
-            $text = $message->getText();
-            if (!$text) {
-                Log::warning('Received message without text', [
-                    'message' => $message
-                ]);
-                return;
-            }
-
-            if ($text === '/start') {
-                $this->start();
-                return;
-            }
-
-            // Проверяем состояние пользователя
-            // $state = $this->getUserState($this->chatId);
-
-            switch ($text) {
-                // case 'waiting_for_payment':
-                //     $this->handlePaymentConfirmation($text);
-                //     break;
-                case '🔑 Активировать':
-                    $this->actionActivate();
-                    break;
-                case '📊 Статус':
-                    $this->actionStatus();
-                    break;
-                case '❓ Помощь':
-                    $this->actionSupport();
-                    break;
-                default:
-                    // Обработка команд меню
-                    // switch ($text) {
-                    //     case self::MENU_ACTIVATE_KEY:
-                    //         $this->handleActivateKey();
-                    //         break;
-                    //     case self::MENU_SUPPORT:
-                    //         $this->handleSupport();
-                    //         break;
-                    //     case self::MENU_HELP:
-                    //         $this->handleHelp();
-                    //         break;
-                    //     default:
-                    //         $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню для выбора действия.');
-                    // }
-            }
-
-            // Проверяем состояние ожидания ключа
-            if ($this->userState === self::STATE_WAITING_KEY && $message) {
-                $this->handleKeyActivation($message->getText());
-                return;
-            }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error processing update in SalesmanBot', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'update' => $this->update
+                'trace' => $e->getTraceAsString()
             ]);
             $this->sendErrorMessage();
         }
