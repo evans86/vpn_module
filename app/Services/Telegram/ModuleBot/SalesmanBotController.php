@@ -4,6 +4,7 @@ namespace App\Services\Telegram\ModuleBot;
 
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\Salesman\Salesman;
+use Exception;
 use Telegram\Bot\Keyboard\Keyboard;
 use Illuminate\Support\Facades\Log;
 
@@ -12,7 +13,7 @@ class SalesmanBotController extends AbstractTelegramBot
     private ?Salesman $salesman = null;
     private ?KeyActivate $currentPack = null;
     private const STATE_WAITING_KEY = 'waiting_key';
-    private ?string $userState = null;
+    private const STATE_WAITING_TOKEN = 'waiting_token';
 
     public function __construct(string $token)
     {
@@ -42,7 +43,7 @@ class SalesmanBotController extends AbstractTelegramBot
 
             if ($message) {
                 $text = $message->getText();
-                
+
                 if (!$text) {
                     Log::warning('Received message without text', [
                         'message' => $message
@@ -51,7 +52,15 @@ class SalesmanBotController extends AbstractTelegramBot
                 }
 
                 if ($text === '/start') {
+                    $this->clearState();
                     $this->start();
+                    return;
+                }
+
+                // Получаем состояние из базы данных
+                $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+                if ($salesman && $salesman->state === self::STATE_WAITING_TOKEN) {
+                    $this->handleBotToken($text);
                     return;
                 }
 
@@ -68,14 +77,15 @@ class SalesmanBotController extends AbstractTelegramBot
                         break;
                     default:
                         // Проверяем состояние ожидания ключа
-                        if ($this->isWaitingForKey($this->chatId)) {
+                        $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+                        if ($salesman && $salesman->state === self::STATE_WAITING_KEY) {
                             $this->handleKeyActivation($text);
                         } else {
                             $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню для выбора действия.');
                         }
                 }
             } elseif ($callbackQuery) {
-                $this->processCallback($callbackQuery);
+                $this->processCallback($callbackQuery->getData());
             } else {
                 Log::warning('Received update without message or callback_query', [
                     'update' => $this->update
@@ -87,6 +97,15 @@ class SalesmanBotController extends AbstractTelegramBot
                 'trace' => $e->getTraceAsString()
             ]);
             $this->sendErrorMessage();
+        }
+    }
+
+    private function clearState(): void
+    {
+        $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+        if ($salesman) {
+            $salesman->state = null;
+            $salesman->save();
         }
     }
 
@@ -206,8 +225,13 @@ class SalesmanBotController extends AbstractTelegramBot
                 return;
             }
 
-            // Устанавливаем состояние ожидания ключа
-            $this->userState = self::STATE_WAITING_KEY;
+            // Устанавливаем состояние ожидания ключа в базе данных
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if ($salesman) {
+                $salesman->state = self::STATE_WAITING_KEY;
+                $salesman->save();
+            }
+            
             $this->sendMessage("<b>Введите ключ активации:</b>");
 
         } catch (\Exception $e) {
@@ -246,7 +270,12 @@ class SalesmanBotController extends AbstractTelegramBot
             $this->currentPack->finish_at = now()->addDays($this->currentPack->duration);
             $this->currentPack->save();
 
-            $this->userState = null;
+            // Очищаем состояние в базе данных
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if ($salesman) {
+                $salesman->state = null;
+                $salesman->save();
+            }
 
             $text = "
                 <b>🎉 VPN-доступ успешно активирован!</b>\n
