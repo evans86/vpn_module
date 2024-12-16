@@ -179,14 +179,30 @@ class FatherBotController extends AbstractTelegramBot
 
             switch ($action) {
                 case 'buy':
-                    $this->handleBuyPack($params['id']);
+                    if (isset($params['id'])) {
+                        $this->handleBuyPack((int)$params['id']);
+                    }
                     break;
                 case 'confirm':
-                    $this->handleConfirmPurchase($params['id']);
+                    if (isset($params['id'])) {
+                        $this->handleConfirmPurchase((int)$params['id']);
+                    }
                     break;
                 case 'checkPayment':
-                    $this->handleCheckPayment($params['id']);
+                    if (isset($params['id'])) {
+                        $this->handleCheckPayment((int)$params['id']);
+                    }
                     break;
+                default:
+                    Log::error('Unknown callback action: ' . $action);
+                    $this->sendErrorMessage();
+            }
+
+            // Отвечаем на callback query, чтобы убрать загрузку с кнопки
+            if ($this->update->callbackQuery) {
+                $this->telegram->answerCallbackQuery([
+                    'callback_query_id' => $this->update->callbackQuery->id
+                ]);
             }
         } catch (\Exception $e) {
             Log::error('Process callback error: ' . $e->getMessage());
@@ -209,13 +225,13 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "💰 Стоимость: {$pack->price} руб.\n\n";
             $message .= "Для подтверждения покупки нажмите кнопку ниже:";
 
-            $keyboard = [
-                [
-                    ['text' => "💳 Оплатить {$pack->price} руб.", 'callback_data' => "confirm?id={$packId}"]
-                ]
-            ];
+            $keyboard = new Keyboard();
+            $keyboard->inline();
+            $keyboard->row(
+                ['text' => "💳 Оплатить {$pack->price} руб.", 'callback_data' => "confirm?id={$packId}"]
+            );
 
-            $this->sendMessage($message, ['reply_markup' => json_encode(['inline_keyboard' => $keyboard])]);
+            $this->sendMessage($message, $keyboard->toJson());
         } catch (\Exception $e) {
             Log::error('Buy pack error: ' . $e->getMessage());
             $this->sendErrorMessage();
@@ -238,13 +254,13 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "❗️ В комментарии укажите: `VPN_{$this->chatId}`\n\n";
             $message .= "После оплаты нажмите кнопку ниже:";
 
-            $keyboard = [
-                [
-                    ['text' => "✅ Я оплатил", 'callback_data' => "checkPayment?id={$packId}"]
-                ]
-            ];
+            $keyboard = new Keyboard();
+            $keyboard->inline();
+            $keyboard->row(
+                ['text' => "✅ Я оплатил", 'callback_data' => "checkPayment?id={$packId}"]
+            );
 
-            $this->sendMessage($message, ['reply_markup' => json_encode(['inline_keyboard' => $keyboard])]);
+            $this->sendMessage($message, $keyboard->toJson());
         } catch (\Exception $e) {
             Log::error('Confirm purchase error: ' . $e->getMessage());
             $this->sendErrorMessage();
