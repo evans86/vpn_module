@@ -29,7 +29,7 @@ class FatherBotController extends AbstractTelegramBot
     protected function processUpdate(): void
     {
         try {
-            if ($this->update->getMessage()?->text === '/start') {
+            if ($this->update->getMessage()->text === '/start') {
                 $this->userState = null;
                 $this->start();
                 return;
