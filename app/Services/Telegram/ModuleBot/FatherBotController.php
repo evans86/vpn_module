@@ -77,7 +77,7 @@ class FatherBotController extends AbstractTelegramBot
                         $this->generateMenu();
                 }
             } elseif ($callbackQuery) {
-                $this->processCallback($callbackQuery);
+                $this->processCallback($callbackQuery->getData());
             } else {
                 Log::warning('Received update without message or callback_query', [
                     'update' => $this->update
@@ -118,7 +118,7 @@ class FatherBotController extends AbstractTelegramBot
                 $message .= "📝 Описание: {$pack->description}\n\n";
 
                 $inlineKeyboard[] = [
-                    ['text' => "Купить {$pack->name} за {$pack->price} руб.", 'callback_data' => "buy?id={$pack->id}"]
+                    ['text' => "Купить {$pack->name} за {$pack->price} руб.", 'callback_data' => json_encode(['action' => 'buy_pack', 'pack_id' => $pack->id])]
                 ];
             }
 
@@ -212,49 +212,44 @@ class FatherBotController extends AbstractTelegramBot
     /**
      * Process callback queries
      */
-    private function processCallback(string $data): void
+    private function processCallback($data): void
     {
         try {
-            $params = [];
-            if (str_contains($data, '?')) {
-                [$action, $queryString] = explode('?', $data);
-                parse_str($queryString, $params);
-            } else {
-                $action = $data;
+            $params = json_decode($data, true);
+            if (!$params || !isset($params['action'])) {
+                Log::error('Invalid callback data', [
+                    'data' => $data
+                ]);
+                return;
             }
 
+            $action = $params['action'];
+
             switch ($action) {
-                case 'buy':
-                    if (isset($params['id'])) {
-                        $this->handleBuyPack((int)$params['id']);
+                case 'buy_pack':
+                    if (isset($params['pack_id'])) {
+                        $this->buyPack($params['pack_id']);
                     }
                     break;
-                case 'confirm':
-                    if (isset($params['id'])) {
-                        $this->handleConfirmPurchase((int)$params['id']);
+                case 'confirm_purchase':
+                    if (isset($params['pack_id'])) {
+                        $this->confirmPurchase($params['pack_id']);
                     }
                     break;
-                case 'checkPayment':
-                    if (isset($params['id'])) {
-                        $this->handleCheckPayment((int)$params['id']);
+                case 'check_payment':
+                    if (isset($params['payment_id'])) {
+                        $this->checkPayment($params['payment_id']);
                     }
                     break;
                 default:
-                    Log::error('Unknown callback action: ' . $action, [
+                    Log::error('Unknown callback action', [
                         'action' => $action,
                         'params' => $params
                     ]);
                     $this->sendErrorMessage();
             }
-
-            // Отвечаем на callback query, чтобы убрать загрузку с кнопки
-            if ($this->update->callbackQuery) {
-                $this->telegram->answerCallbackQuery([
-                    'callback_query_id' => $this->update->callbackQuery->id
-                ]);
-            }
         } catch (\Exception $e) {
-            Log::error('Process callback error: ' . $e->getMessage(), [
+            Log::error('Process callback error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -265,7 +260,7 @@ class FatherBotController extends AbstractTelegramBot
     /**
      * Handle buy pack action
      */
-    private function handleBuyPack(int $packId): void
+    private function buyPack(int $packId): void
     {
         try {
             $pack = Pack::findOrFail($packId);
@@ -283,7 +278,7 @@ class FatherBotController extends AbstractTelegramBot
             $keyboard = [
                 'inline_keyboard' => [
                     [
-                        ['text' => "💳 Оплатить {$pack->price} руб.", 'callback_data' => "confirm?id={$packId}"]
+                        ['text' => "💳 Оплатить {$pack->price} руб.", 'callback_data' => json_encode(['action' => 'confirm_purchase', 'pack_id' => $packId])]
                     ]
                 ]
             ];
@@ -301,7 +296,7 @@ class FatherBotController extends AbstractTelegramBot
     /**
      * Handle confirm purchase action
      */
-    private function handleConfirmPurchase(int $packId): void
+    private function confirmPurchase(int $packId): void
     {
         try {
             $pack = Pack::findOrFail($packId);
@@ -317,7 +312,7 @@ class FatherBotController extends AbstractTelegramBot
             $keyboard = [
                 'inline_keyboard' => [
                     [
-                        ['text' => "✅ Я оплатил", 'callback_data' => "checkPayment?id={$packId}"]
+                        ['text' => "✅ Я оплатил", 'callback_data' => json_encode(['action' => 'check_payment', 'payment_id' => $packId])]
                     ]
                 ]
             ];
@@ -335,10 +330,10 @@ class FatherBotController extends AbstractTelegramBot
     /**
      * Handle check payment action
      */
-    private function handleCheckPayment(int $packId): void
+    private function checkPayment(int $paymentId): void
     {
         try {
-            $pack = Pack::findOrFail($packId);
+            $pack = Pack::findOrFail($paymentId);
             $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
 
             // Создаем пакет продавца
