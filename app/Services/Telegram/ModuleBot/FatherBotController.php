@@ -6,6 +6,7 @@ use App\Dto\Salesman\SalesmanFactory;
 use App\Models\Pack\Pack;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
+use App\Services\KeyActivateService;
 use Telegram\Bot\Api;
 use Telegram\Bot\Keyboard\Keyboard;
 use Illuminate\Support\Facades\Log;
@@ -16,11 +17,13 @@ class FatherBotController extends AbstractTelegramBot
     private const STATE_WAITING_PAYMENT = 'waiting_payment';
 
     private ?string $userState = null;
+    private KeyActivateService $keyActivateService;
 
     public function __construct(string $token)
     {
         parent::__construct($token);
         $this->setWebhook($token, self::BOT_TYPE_FATHER);
+        $this->keyActivateService = app(KeyActivateService::class);
     }
 
     /**
@@ -280,14 +283,29 @@ class FatherBotController extends AbstractTelegramBot
             $packSalesman = new PackSalesman();
             $packSalesman->pack_id = $pack->id;
             $packSalesman->salesman_id = $salesman->id;
-            $packSalesman->status = PackSalesman::PAID; // Исправляем значение статуса на числовое (1) вместо строкового ('paid')
+            $packSalesman->status = PackSalesman::PAID;
             $packSalesman->save();
+
+            // Создаем ключи для продавца
+            $keys = [];
+            for ($i = 0; $i < $pack->count; $i++) {
+                $key = $this->keyActivateService->create(
+                    $packSalesman->id,
+                    $pack->period
+                );
+                $keys[] = $key->key;
+            }
 
             $message = "✅ *Пакет успешно куплен!*\n\n";
             $message .= "📦 Пакет: {$pack->name}\n";
             $message .= "🔑 Количество ключей: {$pack->count}\n";
             $message .= "⏱ Срок действия: {$pack->period} дней\n";
             $message .= "💰 Стоимость: {$pack->price} руб.\n\n";
+            $message .= "🔐 *Ваши ключи:*\n";
+            foreach ($keys as $index => $key) {
+                $message .= ($index + 1) . ". `{$key}`\n";
+            }
+            $message .= "\n";
 
             if (!$salesman->token) {
                 $message .= "❗️ *Важно:* Привяжите своего бота для начала продаж\n";
