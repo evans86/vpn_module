@@ -79,7 +79,7 @@ class FatherBotController extends AbstractTelegramBot
     private function showPacksList(): void
     {
         try {
-            $packs = Pack::where('active', true)->get();
+            $packs = Pack::where('status', true)->get();
             if ($packs->isEmpty()) {
                 $this->sendMessage('❌ В данный момент нет доступных пакетов');
                 return;
@@ -147,7 +147,7 @@ class FatherBotController extends AbstractTelegramBot
         try {
             $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
             $activePacks = PackSalesman::where('salesman_id', $salesman->id)
-                ->where('active', true)
+                ->where('status', PackSalesman::PAID)
                 ->count();
 
             $message = "👤 *Ваш профиль*\n\n";
