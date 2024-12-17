@@ -329,9 +329,10 @@ class FatherBotController extends AbstractTelegramBot
 
             // Обновляем запись о продавце
             $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+
             if ($salesman) {
                 $salesman->token = $token;
-                $salesman->username = $botInfo->getUsername();
+                $salesman->bot_link = 'https://t.me/' . $botInfo->username;
                 $salesman->state = null; // Очищаем состояние
                 $salesman->save();
 
@@ -433,22 +434,24 @@ class FatherBotController extends AbstractTelegramBot
                 $this->sendMessage("❌ Ошибка: продавец не найден");
                 return;
             }
-//            $salesman->token = null;
-//            $salesman->save();
-//            return;
-            if (empty($salesman->token)) {
-                $salesman->state = self::STATE_WAITING_TOKEN;
-                $salesman->save();
+            $salesman->token = null;
+            $salesman->username = $this->username == null ? null : $this->firstName;
+            $salesman->save();
+            return;
 
-                $this->sendMessage("<b>Введите токен вашего бота:</b>\n\nТокен можно получить у @BotFather");
-                return;
-            }
-
-            $message = "<b>🤖 Информация о вашем боте</b>\n\n";
-            $message .= "🔗 Ваш бот: @ССЫЛКУ ДОБАВИТЬ\n";
-            $message .= "✅ Статус: Активен\n\n";
-
-            $this->sendMessage($message);
+//            if (empty($salesman->token)) {
+//                $salesman->state = self::STATE_WAITING_TOKEN;
+//                $salesman->save();
+//
+//                $this->sendMessage("<b>Введите токен вашего бота:</b>\n\nТокен можно получить у @BotFather");
+//                return;
+//            }
+//
+//            $message = "<b>🤖 Информация о вашем боте</b>\n\n";
+//            $message .= "🔗 Ваш бот: @ССЫЛКУ ДОБАВИТЬ\n";
+//            $message .= "✅ Статус: Активен\n\n";
+//
+//            $this->sendMessage($message);
         } catch (\Exception $e) {
             Log::error('Show bot info error: ' . $e->getMessage());
             $this->sendErrorMessage();
