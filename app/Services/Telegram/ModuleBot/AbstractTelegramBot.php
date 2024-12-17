@@ -55,6 +55,7 @@ abstract class AbstractTelegramBot
 
     /**
      * Инициализация бота
+     * @throws Exception
      */
     public function init(): void
     {

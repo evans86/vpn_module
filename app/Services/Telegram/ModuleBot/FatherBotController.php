@@ -6,6 +6,7 @@ use App\Models\Pack\Pack;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
 use App\Services\Key\KeyActivateService;
+use Exception;
 use Telegram\Bot\Api;
 use Telegram\Bot\Keyboard\Keyboard;
 use Illuminate\Support\Facades\Log;
@@ -320,14 +321,14 @@ class FatherBotController extends AbstractTelegramBot
         } catch (\Exception $e) {
             Log::error('Bot token validation error: ' . $e->getMessage());
             $this->sendMessage("❌ Неверный токен бота. Пожалуйста, проверьте токен и попробуйте снова.");
-            
+
             // Сбрасываем состояние при ошибке
             $salesman = Salesman::where('telegram_id', $this->chatId)->first();
             if ($salesman) {
                 $salesman->state = null;
                 $salesman->save();
             }
-            
+
             $this->generateMenu();
         }
     }
@@ -345,12 +346,13 @@ class FatherBotController extends AbstractTelegramBot
                 $this->salesmanService->create($this->chatId, $this->username == null ? null : $this->firstName);
             }
 
-            $this->generateMenu();
             $message = "👋 *Добро пожаловать в систему управления доступами VPN*\n\n";
             $message .= "🔸 Покупайте пакеты ключей\n";
             $message .= "🔸 Создавайте своего бота\n";
             $message .= "🔸 Продавайте VPN доступы";
+            
             $this->sendMessage($message);
+            $this->generateMenu();
         } catch (\Exception $e) {
             Log::error('Start command error: ' . $e->getMessage());
             $this->sendErrorMessage();
@@ -362,20 +364,22 @@ class FatherBotController extends AbstractTelegramBot
      */
     protected function generateMenu(): void
     {
-        $buttons = [
-            [['text' => '📦 Купить пакет']],
-            [['text' => '🤖 Мой бот']],
-            [['text' => '👤 Профиль']],
-            [['text' => '❓ Помощь']]
-        ];
-
         $keyboard = [
-            'keyboard' => $buttons,
+            'keyboard' => [
+                [['text' => '📦 Купить пакет']],
+                [['text' => '🤖 Мой бот']],
+                [['text' => '👤 Профиль']],
+                [['text' => '❓ Помощь']]
+            ],
             'resize_keyboard' => true,
             'one_time_keyboard' => false
         ];
 
-        $this->telegram->replyKeyboardMarkup($keyboard);
+        $this->telegram->sendMessage([
+            'chat_id' => $this->chatId,
+            'text' => '⌨️ Меню',
+            'reply_markup' => json_encode($keyboard)
+        ]);
     }
 
     private function showHelp(): void
@@ -413,7 +417,7 @@ class FatherBotController extends AbstractTelegramBot
             if (empty($salesman->token)) {
                 $salesman->state = self::STATE_WAITING_TOKEN;
                 $salesman->save();
-                
+
                 $this->sendMessage("<b>Введите токен вашего бота:</b>\n\nТокен можно получить у @BotFather");
                 return;
             }
