@@ -349,13 +349,10 @@ class FatherBotController extends AbstractTelegramBot
         try {
             // Проверяем существование пользователя
             $existingSalesman = Salesman::where('telegram_id', $this->chatId)->first();
-            $existingSalesman->username = $this->username == null ? null : $this->firstName;
-            $existingSalesman->bot_link = null;
-            $existingSalesman->save();
 
-//            if (!$existingSalesman) {
-//                $this->salesmanService->create($this->chatId, $this->username == null ? null : $this->firstName);
-//            }
+            if (!$existingSalesman) {
+                $this->salesmanService->create($this->chatId, $this->username == null ? null : $this->firstName);
+            }
 
             $message = "👋 *Добро пожаловать в систему управления доступами VPN*\n\n";
             $message .= "🔸 Покупайте пакеты ключей\n";
