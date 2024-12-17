@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * @property int $id
- * @property string $name
+ * @property string $username
  * @property string $telegram_id
  * @property string $status
  * @property string $created_at
