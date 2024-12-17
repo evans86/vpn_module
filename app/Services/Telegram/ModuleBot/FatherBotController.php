@@ -434,7 +434,7 @@ class FatherBotController extends AbstractTelegramBot
                 $this->sendMessage("❌ Ошибка: продавец не найден");
                 return;
             }
-            $salesman->token = null;
+
             $salesman->username = $this->username == null ? null : $this->firstName;
             $salesman->save();
             return;
