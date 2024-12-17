@@ -72,7 +72,6 @@ class FatherBotController extends AbstractTelegramBot
                         break;
                     default:
                         $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню для выбора действия.');
-                        $this->generateMenu();
                 }
             } elseif ($callbackQuery) {
                 $this->processCallback($callbackQuery->getData());
@@ -96,100 +95,27 @@ class FatherBotController extends AbstractTelegramBot
     private function showPacksList(): void
     {
         try {
-            $packs = Pack::where('status', true)->get();
-            if ($packs->isEmpty()) {
-                $this->sendMessage('❌ В данный момент нет доступных пакетов');
-                return;
-            }
-
-            $message = "📦 *Доступные пакеты:*\n\n";
+            $packs = Pack::all();
+            $message = "<b>📦 Доступные пакеты:</b>\n\n";
             $inlineKeyboard = [];
 
             foreach ($packs as $pack) {
-                $message .= "🔸 *{$pack->name}*\n";
+                $message .= "<b>{$pack->name}</b>\n";
                 $message .= "💰 Цена: {$pack->price} руб.\n";
-                if ($pack->traffic_limit) {
-                    $message .= "📊 Лимит трафика: " . $this->bytesToGB($pack->traffic_limit) . " GB\n";
-                }
-                $message .= "⏱ Срок действия: {$pack->period} дней\n";
                 $message .= "📝 Описание: {$pack->description}\n\n";
 
                 $inlineKeyboard[] = [
-                    ['text' => "Купить {$pack->name} за {$pack->price} руб.", 'callback_data' => json_encode(['action' => 'buy_pack', 'pack_id' => $pack->id])]
+                    ['text' => "Купить за {$pack->price} руб.", 'callback_data' => json_encode(['action' => 'buy_pack', 'pack_id' => $pack->id])]
                 ];
             }
 
-            $keyboard = new Keyboard([
+            $keyboard = [
                 'inline_keyboard' => $inlineKeyboard
-            ]);
+            ];
 
             $this->sendMessage($message, $keyboard);
         } catch (\Exception $e) {
-            Log::error('Show packs error: ' . $e->getMessage(), [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            $this->sendErrorMessage();
-        }
-    }
-
-    /**
-     * Показать информацию о боте
-     */
-    private function showBotInfo(): void
-    {
-        try {
-            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-            if (!$salesman) {
-                $this->sendMessage("❌ Ошибка: продавец не найден");
-                return;
-            }
-
-            if (empty($salesman->token)) {
-                $salesman->state = self::STATE_WAITING_TOKEN;
-                $salesman->save();
-                
-                $this->sendMessage("<b>Введите токен вашего бота:</b>\n\nТокен можно получить у @BotFather");
-                return;
-            }
-
-            $message = "<b>🤖 Информация о вашем боте</b>\n\n";
-            $message .= "🔗 Ваш бот: @{$salesman->username}\n";
-            $message .= "✅ Статус: Активен\n\n";
-            $message .= "Чтобы привязать другого бота, отправьте команду /start";
-
-            $this->sendMessage($message);
-            $this->generateMenu();
-        } catch (\Exception $e) {
-            Log::error('Show bot info error: ' . $e->getMessage());
-            $this->sendErrorMessage();
-            $this->generateMenu();
-        }
-    }
-
-    /**
-     * Показать профиль
-     */
-    private function showProfile(): void
-    {
-        try {
-            $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
-            $activePacks = PackSalesman::where('salesman_id', $salesman->id)
-                ->where('status', PackSalesman::PAID)
-                ->count();
-
-            $message = "👤 *Ваш профиль*\n\n";
-            if ($salesman->username) {
-                $message .= "🤖 Ваш бот: @{$salesman->username}\n";
-            }
-            $message .= "📦 Активных пакетов: {$activePacks}\n";
-
-            $this->sendMessage($message);
-        } catch (\Exception $e) {
-            Log::error('Show profile error: ' . $e->getMessage(), [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            Log::error('Show packs error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
     }
@@ -208,9 +134,7 @@ class FatherBotController extends AbstractTelegramBot
                 return;
             }
 
-            $action = $params['action'];
-
-            switch ($action) {
+            switch ($params['action']) {
                 case 'buy_pack':
                     if (isset($params['pack_id'])) {
                         $this->buyPack($params['pack_id']);
@@ -228,16 +152,12 @@ class FatherBotController extends AbstractTelegramBot
                     break;
                 default:
                     Log::error('Unknown callback action', [
-                        'action' => $action,
-                        'params' => $params
+                        'action' => $params['action'],
+                        'data' => $data
                     ]);
-                    $this->sendErrorMessage();
             }
         } catch (\Exception $e) {
-            Log::error('Process callback error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            Log::error('Process callback error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
     }
@@ -252,11 +172,6 @@ class FatherBotController extends AbstractTelegramBot
 
             $message = "💎 *Подтверждение покупки пакета*\n\n";
             $message .= "📦 Пакет: {$pack->name}\n";
-            $message .= "🔑 Количество ключей: {$pack->count}\n";
-            if ($pack->traffic_limit) {
-                $message .= "📊 Лимит трафика: " . $this->bytesToGB($pack->traffic_limit) . " GB\n";
-            }
-            $message .= "⏱ Срок действия: {$pack->period} дней\n";
             $message .= "💰 Стоимость: {$pack->price} руб.\n\n";
             $message .= "Для подтверждения покупки нажмите кнопку ниже:";
 
@@ -270,10 +185,7 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->sendMessage($message, ['reply_markup' => json_encode($keyboard)]);
         } catch (\Exception $e) {
-            Log::error('Buy pack error: ' . $e->getMessage(), [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            Log::error('Buy pack error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
     }
@@ -304,10 +216,7 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->sendMessage($message, ['reply_markup' => json_encode($keyboard)]);
         } catch (\Exception $e) {
-            Log::error('Confirm purchase error: ' . $e->getMessage(), [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            Log::error('Confirm purchase error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
     }
@@ -345,11 +254,6 @@ class FatherBotController extends AbstractTelegramBot
 
             $message = "✅ *Пакет успешно куплен!*\n\n";
             $message .= "📦 Пакет: {$pack->name}\n";
-            $message .= "🔑 Количество ключей: {$pack->count}\n";
-            if ($pack->traffic_limit) {
-                $message .= "📊 Лимит трафика: " . $this->bytesToGB($pack->traffic_limit) . " GB\n";
-            }
-            $message .= "⏱ Срок действия: {$pack->period} дней\n";
             $message .= "💰 Стоимость: {$pack->price} руб.\n\n";
             $message .= "🔐 *Ваши ключи активации:*\n";
             foreach ($keys as $index => $key) {
@@ -367,10 +271,7 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->sendMessage($message);
         } catch (\Exception $e) {
-            Log::error('Check payment error: ' . $e->getMessage(), [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            Log::error('Check payment error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
     }
@@ -445,11 +346,13 @@ class FatherBotController extends AbstractTelegramBot
             }
 
             $this->generateMenu();
+            $message = "👋 *Добро пожаловать в систему управления доступами VPN*\n\n";
+            $message .= "🔸 Покупайте пакеты ключей\n";
+            $message .= "🔸 Создавайте своего бота\n";
+            $message .= "🔸 Продавайте VPN доступы";
+            $this->sendMessage($message);
         } catch (\Exception $e) {
-            Log::error('Start command error: ' . $e->getMessage(), [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            Log::error('Start command error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
     }
@@ -459,25 +362,17 @@ class FatherBotController extends AbstractTelegramBot
      */
     protected function generateMenu(): void
     {
-        $buttons = [
-            ['text' => '📦 Купить пакет'],
-            ['text' => '🤖 Мой бот'],
-            ['text' => '👤 Профиль'],
-            ['text' => '❓ Помощь']
-        ];
+        $keyboard = new Keyboard();
+        $keyboard->addRow('📦 Купить пакет')
+            ->addRow('🤖 Мой бот')
+            ->addRow('👤 Профиль')
+            ->addRow('❓ Помощь');
 
-        $keyboard = new Keyboard([
-            'keyboard' => array_chunk($buttons, 2),
+        $this->telegram->replyKeyboardMarkup([
+            'keyboard' => $keyboard->get(),
             'resize_keyboard' => true,
             'one_time_keyboard' => false
         ]);
-
-        $message = "👋 *Добро пожаловать в систему управления доступами VPN*\n\n";
-        $message .= "🔸 Покупайте пакеты ключей\n";
-        $message .= "🔸 Создавайте своего бота\n";
-        $message .= "🔸 Продавайте VPN доступы\n";
-
-        $this->sendMessage($message, $keyboard);
     }
 
     private function showHelp(): void
@@ -498,6 +393,64 @@ class FatherBotController extends AbstractTelegramBot
         $message .= "По всем вопросам обращайтесь к @admin";
 
         $this->sendMessage($message);
+    }
+
+    /**
+     * Показать информацию о боте
+     */
+    private function showBotInfo(): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if (!$salesman) {
+                $this->sendMessage("❌ Ошибка: продавец не найден");
+                return;
+            }
+
+            if (empty($salesman->token)) {
+                $salesman->state = self::STATE_WAITING_TOKEN;
+                $salesman->save();
+                
+                $this->sendMessage("<b>Введите токен вашего бота:</b>\n\nТокен можно получить у @BotFather");
+                return;
+            }
+
+            $message = "<b>🤖 Информация о вашем боте</b>\n\n";
+            $message .= "🔗 Ваш бот: @{$salesman->username}\n";
+            $message .= "✅ Статус: Активен\n\n";
+            $message .= "Чтобы привязать другого бота, отправьте команду /start";
+
+            $this->sendMessage($message);
+            $this->generateMenu();
+        } catch (\Exception $e) {
+            Log::error('Show bot info error: ' . $e->getMessage());
+            $this->sendErrorMessage();
+            $this->generateMenu();
+        }
+    }
+
+    /**
+     * Показать профиль
+     */
+    private function showProfile(): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
+            $activePacks = PackSalesman::where('salesman_id', $salesman->id)
+                ->where('status', PackSalesman::PAID)
+                ->count();
+
+            $message = "👤 *Ваш профиль*\n\n";
+            if ($salesman->username) {
+                $message .= "🤖 Ваш бот: @{$salesman->username}\n";
+            }
+            $message .= "📦 Активных пакетов: {$activePacks}\n";
+
+            $this->sendMessage($message);
+        } catch (\Exception $e) {
+            Log::error('Show profile error: ' . $e->getMessage());
+            $this->sendErrorMessage();
+        }
     }
 
     /**
