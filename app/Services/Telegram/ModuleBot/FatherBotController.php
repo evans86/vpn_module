@@ -347,6 +347,7 @@ class FatherBotController extends AbstractTelegramBot
     protected function start(): void
     {
         try {
+            Log::error('telegram_id: ' . $this->chatId . ', username: ' . $this->username);
             // Проверяем существование пользователя
             $existingSalesman = Salesman::where('telegram_id', $this->chatId)->first();
             $existingSalesman->username = $this->username == null ? null : $this->firstName;
