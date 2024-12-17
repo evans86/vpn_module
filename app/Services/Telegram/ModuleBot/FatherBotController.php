@@ -448,7 +448,7 @@ class FatherBotController extends AbstractTelegramBot
             }
 
             $message = "<b>🤖 Информация о вашем боте</b>\n\n";
-            $message .= "🔗 Ваш бот: @ССЫЛКУ ДОБАВИТЬ\n";
+            $message .= "🔗 Ваш бот: $salesman->bot_link\n";
             $message .= "✅ Статус: Активен\n\n";
 
             $this->sendMessage($message);
