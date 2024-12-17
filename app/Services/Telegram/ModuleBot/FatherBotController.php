@@ -76,10 +76,6 @@ class FatherBotController extends AbstractTelegramBot
                 }
             } elseif ($callbackQuery) {
                 $this->processCallback($callbackQuery->getData());
-            } else {
-                Log::warning('Received update without message or callback_query', [
-                    'update' => $this->update
-                ]);
             }
         } catch (Exception $e) {
             Log::error('Error processing update in FatherBot', [
@@ -97,6 +93,11 @@ class FatherBotController extends AbstractTelegramBot
     {
         try {
             $packs = Pack::all();
+            if ($packs->isEmpty()) {
+                $this->sendMessage('❌ В данный момент нет доступных пакетов');
+                return;
+            }
+
             $message = "<b>📦 Доступные пакеты:</b>\n\n";
             $inlineKeyboard = [];
 
@@ -106,7 +107,13 @@ class FatherBotController extends AbstractTelegramBot
                 $message .= "📝 Описание: {$pack->description}\n\n";
 
                 $inlineKeyboard[] = [
-                    ['text' => "Купить за {$pack->price} руб.", 'callback_data' => json_encode(['action' => 'buy_pack', 'pack_id' => $pack->id])]
+                    [
+                        'text' => "Купить за {$pack->price} руб.",
+                        'callback_data' => json_encode([
+                            'action' => 'buy_pack',
+                            'pack_id' => $pack->id
+                        ])
+                    ]
                 ];
             }
 
@@ -115,7 +122,7 @@ class FatherBotController extends AbstractTelegramBot
             ];
 
             $this->sendMessage($message, $keyboard);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Show packs error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
@@ -127,38 +134,35 @@ class FatherBotController extends AbstractTelegramBot
     private function processCallback($data): void
     {
         try {
+            Log::info('Processing callback data', ['data' => $data]);
+            
             $params = json_decode($data, true);
             if (!$params || !isset($params['action'])) {
-                Log::error('Invalid callback data', [
-                    'data' => $data
-                ]);
+                Log::error('Invalid callback data', ['data' => $data]);
                 return;
             }
 
             switch ($params['action']) {
                 case 'buy_pack':
                     if (isset($params['pack_id'])) {
-                        $this->buyPack($params['pack_id']);
+                        $this->buyPack((int)$params['pack_id']);
                     }
                     break;
                 case 'confirm_purchase':
                     if (isset($params['pack_id'])) {
-                        $this->confirmPurchase($params['pack_id']);
-                    }
-                    break;
-                case 'check_payment':
-                    if (isset($params['payment_id'])) {
-                        $this->checkPayment($params['payment_id']);
+                        $this->confirmPurchase((int)$params['pack_id']);
                     }
                     break;
                 default:
-                    Log::error('Unknown callback action', [
+                    Log::warning('Unknown callback action', [
                         'action' => $params['action'],
                         'data' => $data
                     ]);
             }
-        } catch (\Exception $e) {
-            Log::error('Process callback error: ' . $e->getMessage());
+        } catch (Exception $e) {
+            Log::error('Process callback error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
             $this->sendErrorMessage();
         }
     }
@@ -170,8 +174,9 @@ class FatherBotController extends AbstractTelegramBot
     {
         try {
             $pack = Pack::findOrFail($packId);
+            $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
 
-            $message = "💎 *Подтверждение покупки пакета*\n\n";
+            $message = "<b>💎 Подтверждение покупки пакета</b>\n\n";
             $message .= "📦 Пакет: {$pack->name}\n";
             $message .= "💰 Стоимость: {$pack->price} руб.\n\n";
             $message .= "Для подтверждения покупки нажмите кнопку ниже:";
@@ -179,13 +184,19 @@ class FatherBotController extends AbstractTelegramBot
             $keyboard = [
                 'inline_keyboard' => [
                     [
-                        ['text' => "💳 Оплатить {$pack->price} руб.", 'callback_data' => json_encode(['action' => 'confirm_purchase', 'pack_id' => $packId])]
+                        [
+                            'text' => "✅ Подтвердить покупку",
+                            'callback_data' => json_encode([
+                                'action' => 'confirm_purchase',
+                                'pack_id' => $pack->id
+                            ])
+                        ]
                     ]
                 ]
             ];
 
-            $this->sendMessage($message, ['reply_markup' => json_encode($keyboard)]);
-        } catch (\Exception $e) {
+            $this->sendMessage($message, $keyboard);
+        } catch (Exception $e) {
             Log::error('Buy pack error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
