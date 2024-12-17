@@ -327,7 +327,7 @@ class FatherBotController extends AbstractTelegramBot
                 $salesman->save();
 
                 $this->sendMessage("✅ Бот успешно добавлен!\n\nТеперь вы можете купить пакет VPN-доступов.");
-                $this->generateMenu();
+//                $this->generateMenu();
             }
         } catch (\Exception $e) {
             Log::error('Bot token validation error: ' . $e->getMessage());
@@ -340,7 +340,7 @@ class FatherBotController extends AbstractTelegramBot
                 $salesman->save();
             }
 
-            $this->generateMenu();
+//            $this->generateMenu();
         }
     }
 
@@ -362,8 +362,8 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "🔸 Создавайте своего бота\n";
             $message .= "🔸 Продавайте VPN доступы";
 
-            $this->sendMessage($message);
-            $this->generateMenu();
+//            $this->sendMessage();
+            $this->generateMenu($message);
         } catch (\Exception $e) {
             Log::error('Start command error: ' . $e->getMessage());
             $this->sendErrorMessage();
@@ -373,7 +373,7 @@ class FatherBotController extends AbstractTelegramBot
     /**
      * Генерация меню
      */
-    protected function generateMenu(): void
+    protected function generateMenu($message): void
     {
         $keyboard = [
             'keyboard' => [
@@ -392,6 +392,7 @@ class FatherBotController extends AbstractTelegramBot
 
         $this->telegram->sendMessage([
             'chat_id' => $this->chatId,
+            'text' => $message,
             'reply_markup' => json_encode($keyboard)
         ]);
     }
@@ -442,11 +443,11 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "Чтобы привязать другого бота, отправьте команду /start";
 
             $this->sendMessage($message);
-            $this->generateMenu();
+//            $this->generateMenu();
         } catch (\Exception $e) {
             Log::error('Show bot info error: ' . $e->getMessage());
             $this->sendErrorMessage();
-            $this->generateMenu();
+//            $this->generateMenu();
         }
     }
 

@@ -148,11 +148,6 @@ abstract class AbstractTelegramBot
     abstract protected function start(): void;
 
     /**
-     * Меню бота
-     */
-    abstract protected function generateMenu(): void;
-
-    /**
      * Helper отправки сообщения
      *
      * @param string $text
