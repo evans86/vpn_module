@@ -14,9 +14,6 @@ use Illuminate\Support\Facades\Log;
 class FatherBotController extends AbstractTelegramBot
 {
     private const STATE_WAITING_TOKEN = 'waiting_token';
-    private const STATE_WAITING_PAYMENT = 'waiting_payment';
-
-    private ?string $userState = null;
     private KeyActivateService $keyActivateService;
 
     public function __construct(string $token)
