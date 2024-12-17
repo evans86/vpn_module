@@ -439,23 +439,23 @@ class FatherBotController extends AbstractTelegramBot
                 return;
             }
 
-            $salesman->token = null;
-            $salesman->save();
-            return;
+//            $salesman->token = null;
+//            $salesman->save();
+//            return;
 
-//            if (empty($salesman->token)) {
-//                $salesman->state = self::STATE_WAITING_TOKEN;
-//                $salesman->save();
-//
-//                $this->sendMessage("<b>Введите токен вашего бота:</b>\n\nТокен можно получить у @BotFather");
-//                return;
-//            }
-//
-//            $message = "<b>🤖 Информация о вашем боте</b>\n\n";
-//            $message .= "🔗 Ваш бот: $salesman->bot_link\n";
-//            $message .= "✅ Статус: Активен\n\n";
-//
-//            $this->sendMessage($message);
+            if (empty($salesman->token)) {
+                $salesman->state = self::STATE_WAITING_TOKEN;
+                $salesman->save();
+
+                $this->sendMessage("<b>Введите токен вашего бота:</b>\n\nТокен можно получить у @BotFather");
+                return;
+            }
+
+            $message = "<b>🤖 Информация о вашем боте</b>\n\n";
+            $message .= "🔗 Ваш бот: $salesman->bot_link\n";
+            $message .= "✅ Статус: Активен\n\n";
+
+            $this->sendMessage($message);
         } catch (\Exception $e) {
             Log::error('Show bot info error: ' . $e->getMessage());
             $this->sendErrorMessage();
