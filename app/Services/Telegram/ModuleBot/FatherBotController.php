@@ -62,7 +62,7 @@ class FatherBotController extends AbstractTelegramBot
                         $this->showPacksList();
                         break;
                     case '🤖 Мой бот':
-                        $this->handleAddBot();
+                        $this->showBotInfo();
                         break;
                     case '👤 Профиль':
                         $this->showProfile();
@@ -71,7 +71,7 @@ class FatherBotController extends AbstractTelegramBot
                         $this->showHelp();
                         break;
                     default:
-                        $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню.');
+                        $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню для выбора действия.');
                         $this->generateMenu();
                 }
             } elseif ($callbackQuery) {
@@ -81,11 +81,10 @@ class FatherBotController extends AbstractTelegramBot
                     'update' => $this->update
                 ]);
             }
-        } catch (\Exception $e) {
-            Log::error('Process update error: ' . $e->getMessage(), [
+        } catch (Exception $e) {
+            Log::error('Error processing update in FatherBot', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'update' => $this->update
+                'trace' => $e->getTraceAsString()
             ]);
             $this->sendErrorMessage();
         }
@@ -140,25 +139,31 @@ class FatherBotController extends AbstractTelegramBot
     private function showBotInfo(): void
     {
         try {
-            $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
-
-            if (empty($salesman->token)) {
-                $this->handleAddBot();
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if (!$salesman) {
+                $this->sendMessage("❌ Ошибка: продавец не найден");
                 return;
             }
 
-            $message = "🤖 *Информация о вашем боте*\n\n";
-            $message .= "🔗 Ссылка на бота: {$salesman->username}\n";
+            if (empty($salesman->token)) {
+                $salesman->state = self::STATE_WAITING_TOKEN;
+                $salesman->save();
+                
+                $this->sendMessage("<b>Введите токен вашего бота:</b>\n\nТокен можно получить у @BotFather");
+                return;
+            }
+
+            $message = "<b>🤖 Информация о вашем боте</b>\n\n";
+            $message .= "🔗 Ваш бот: @{$salesman->username}\n";
             $message .= "✅ Статус: Активен\n\n";
-            $message .= "Чтобы привязать другого бота, просто отправьте команду /start и следуйте инструкциям.";
+            $message .= "Чтобы привязать другого бота, отправьте команду /start";
 
             $this->sendMessage($message);
+            $this->generateMenu();
         } catch (\Exception $e) {
-            Log::error('Show bot info error: ' . $e->getMessage(), [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            Log::error('Show bot info error: ' . $e->getMessage());
             $this->sendErrorMessage();
+            $this->generateMenu();
         }
     }
 
@@ -414,6 +419,15 @@ class FatherBotController extends AbstractTelegramBot
         } catch (\Exception $e) {
             Log::error('Bot token validation error: ' . $e->getMessage());
             $this->sendMessage("❌ Неверный токен бота. Пожалуйста, проверьте токен и попробуйте снова.");
+            
+            // Сбрасываем состояние при ошибке
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if ($salesman) {
+                $salesman->state = null;
+                $salesman->save();
+            }
+            
+            $this->generateMenu();
         }
     }
 
