@@ -359,7 +359,6 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "🔸 Создавайте своего бота\n";
             $message .= "🔸 Продавайте VPN доступы";
 
-//            $this->sendMessage();
             $this->generateMenu($message);
         } catch (\Exception $e) {
             Log::error('Start command error: ' . $e->getMessage());
@@ -460,9 +459,6 @@ class FatherBotController extends AbstractTelegramBot
                 ->count();
 
             $message = "👤 *Ваш профиль*\n\n";
-            if ($salesman->username) {
-                $message .= "🤖 Ваш бот: @{$salesman->username}\n";
-            }
             $message .= "📦 Активных пакетов: {$activePacks}\n";
 
             $this->sendMessage($message);
