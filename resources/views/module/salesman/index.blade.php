@@ -16,6 +16,7 @@
                                     <th style="width:80px;"><strong>#</strong></th>
                                     <th><strong>Телеграм ID</strong></th>
                                     <th><strong>Имя пользователя</strong></th>
+                                    <th><strong>Токен</strong></th>
                                     <th><strong>Ссылка на бота</strong></th>
                                     <th><strong>Статус</strong></th>
                                 </tr>
@@ -26,6 +27,7 @@
                                         <td><strong>{{ $salesman->id }}</strong></td>
                                         <td>{{ $salesman->telegram_id }}</td>
                                         <td>{{ $salesman->username }}</td>
+                                        <td>{{ $salesman->token }}</td>
                                         <td><a href="{{ $salesman->bot_link }}"
                                                target="_blank">{{ $salesman->bot_link }}</a></td>
                                         <td>

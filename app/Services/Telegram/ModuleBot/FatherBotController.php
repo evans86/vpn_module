@@ -336,7 +336,6 @@ class FatherBotController extends AbstractTelegramBot
                 $salesman->save();
 
                 $this->sendMessage("✅ Бот успешно добавлен!\n\nТеперь вы можете купить пакет VPN-доступов.");
-//                $this->generateMenu();
             }
         } catch (\Exception $e) {
             Log::error('Bot token validation error: ' . $e->getMessage());
@@ -348,8 +347,6 @@ class FatherBotController extends AbstractTelegramBot
                 $salesman->state = null;
                 $salesman->save();
             }
-
-//            $this->generateMenu();
         }
     }
 
