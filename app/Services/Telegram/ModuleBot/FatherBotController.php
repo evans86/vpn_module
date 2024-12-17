@@ -115,6 +115,11 @@ class FatherBotController extends AbstractTelegramBot
                         $this->confirmPurchase((int)$params['pack_id']);
                     }
                     break;
+                case 'check_payment':
+                    if (isset($params['payment_id'])) {
+                        $this->checkPayment((int)$params['payment_id']);
+                    }
+                    break;
                 default:
                     Log::warning('Unknown callback action', [
                         'action' => $params['action'],
