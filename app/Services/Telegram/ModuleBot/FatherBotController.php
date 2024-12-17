@@ -135,7 +135,7 @@ class FatherBotController extends AbstractTelegramBot
     {
         try {
             Log::info('Processing callback data', ['data' => $data]);
-            
+
             $params = json_decode($data, true);
             if (!$params || !isset($params['action'])) {
                 Log::error('Invalid callback data', ['data' => $data]);
@@ -361,7 +361,7 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "🔸 Покупайте пакеты ключей\n";
             $message .= "🔸 Создавайте своего бота\n";
             $message .= "🔸 Продавайте VPN доступы";
-            
+
             $this->sendMessage($message);
             $this->generateMenu();
         } catch (\Exception $e) {
@@ -377,10 +377,14 @@ class FatherBotController extends AbstractTelegramBot
     {
         $keyboard = [
             'keyboard' => [
-                [['text' => '📦 Купить пакет']],
-                [['text' => '🤖 Мой бот']],
-                [['text' => '👤 Профиль']],
-                [['text' => '❓ Помощь']]
+                [
+                    ['text' => '📦 Купить пакет'],
+                    ['text' => '🤖 Мой бот']
+                ],
+                [
+                    ['text' => '👤 Профиль'],
+                    ['text' => '❓ Помощь']
+                ]
             ],
             'resize_keyboard' => true,
             'one_time_keyboard' => false
@@ -388,7 +392,6 @@ class FatherBotController extends AbstractTelegramBot
 
         $this->telegram->sendMessage([
             'chat_id' => $this->chatId,
-            'text' => '⌨️ Меню',
             'reply_markup' => json_encode($keyboard)
         ]);
     }

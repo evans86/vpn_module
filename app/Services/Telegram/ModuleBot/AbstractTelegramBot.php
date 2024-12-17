@@ -13,7 +13,6 @@ use Telegram\Bot\Api;
 use Telegram\Bot\Keyboard\Keyboard;
 use Telegram\Bot\Objects\Update;
 use Telegram\Bot\Exceptions\TelegramSDKException;
-use Telegram\Bot\Laravel\Facades\Telegram;
 
 abstract class AbstractTelegramBot
 {
