@@ -32,6 +32,15 @@ class FatherBotController extends AbstractTelegramBot
             $message = $this->update->getMessage();
             $callbackQuery = $this->update->getCallbackQuery();
 
+            if ($callbackQuery) {
+                Log::info('Received callback query', [
+                    'data' => $callbackQuery->getData(),
+                    'from' => $callbackQuery->getFrom()->getId()
+                ]);
+                $this->processCallback($callbackQuery->getData());
+                return;
+            }
+
             if ($message) {
                 $text = $message->getText();
 
@@ -71,12 +80,49 @@ class FatherBotController extends AbstractTelegramBot
                     default:
                         $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню для выбора действия.');
                 }
-            } elseif ($callbackQuery) {
-                $this->processCallback($callbackQuery->getData());
             }
         } catch (Exception $e) {
             Log::error('Error processing update in FatherBot', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Process callback queries
+     */
+    private function processCallback($data): void
+    {
+        try {
+            Log::info('Processing callback data', ['data' => $data]);
+
+            $params = json_decode($data, true);
+            if (!$params || !isset($params['action'])) {
+                Log::error('Invalid callback data', ['data' => $data]);
+                return;
+            }
+
+            switch ($params['action']) {
+                case 'buy_pack':
+                    if (isset($params['pack_id'])) {
+                        $this->buyPack((int)$params['pack_id']);
+                    }
+                    break;
+                case 'confirm_purchase':
+                    if (isset($params['pack_id'])) {
+                        $this->confirmPurchase((int)$params['pack_id']);
+                    }
+                    break;
+                default:
+                    Log::warning('Unknown callback action', [
+                        'action' => $params['action'],
+                        'data' => $data
+                    ]);
+            }
+        } catch (Exception $e) {
+            Log::error('Process callback error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()
             ]);
             $this->sendErrorMessage();
@@ -121,45 +167,6 @@ class FatherBotController extends AbstractTelegramBot
             $this->sendMessage($message, $keyboard);
         } catch (Exception $e) {
             Log::error('Show packs error: ' . $e->getMessage());
-            $this->sendErrorMessage();
-        }
-    }
-
-    /**
-     * Process callback queries
-     */
-    private function processCallback($data): void
-    {
-        try {
-            Log::info('Processing callback data', ['data' => $data]);
-
-            $params = json_decode($data, true);
-            if (!$params || !isset($params['action'])) {
-                Log::error('Invalid callback data', ['data' => $data]);
-                return;
-            }
-
-            switch ($params['action']) {
-                case 'buy_pack':
-                    if (isset($params['pack_id'])) {
-                        $this->buyPack((int)$params['pack_id']);
-                    }
-                    break;
-                case 'confirm_purchase':
-                    if (isset($params['pack_id'])) {
-                        $this->confirmPurchase((int)$params['pack_id']);
-                    }
-                    break;
-                default:
-                    Log::warning('Unknown callback action', [
-                        'action' => $params['action'],
-                        'data' => $data
-                    ]);
-            }
-        } catch (Exception $e) {
-            Log::error('Process callback error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString()
-            ]);
             $this->sendErrorMessage();
         }
     }
@@ -439,11 +446,9 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "Чтобы привязать другого бота, отправьте команду /start";
 
             $this->sendMessage($message);
-//            $this->generateMenu();
         } catch (\Exception $e) {
             Log::error('Show bot info error: ' . $e->getMessage());
             $this->sendErrorMessage();
-//            $this->generateMenu();
         }
     }
 
