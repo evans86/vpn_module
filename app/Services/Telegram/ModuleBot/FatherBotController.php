@@ -334,7 +334,11 @@ class FatherBotController extends AbstractTelegramBot
                 $salesman->bot_link = 'https://t.me/' . $botInfo->username;
                 $salesman->state = null; // Очищаем состояние
                 $salesman->save();
-                $this->setWebhook($token);
+
+                // Устанавливаем вебхук для бота продавца
+                $salesmanBot = new Api($token);
+                $webhookUrl = rtrim(self::WEBHOOK_BASE_URL, '/') . '/api/telegram/salesman-bot/' . $token . '/init';
+                $salesmanBot->setWebhook(['url' => $webhookUrl]);
 
                 $this->sendMessage("✅ Бот успешно добавлен!\n\nТеперь вы можете купить пакет VPN-доступов.");
             }

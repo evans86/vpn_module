@@ -17,7 +17,6 @@ class SalesmanBotController extends AbstractTelegramBot
     public function __construct(string $token)
     {
         parent::__construct($token);
-        $this->setWebhook($token);
 
         // Находим продавца по токену
         $this->salesman = $this->salesmanRepository->findByToken($token);
