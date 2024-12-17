@@ -13,11 +13,11 @@ class SalesmanBotController extends AbstractTelegramBot
     private ?Salesman $salesman = null;
     private ?KeyActivate $currentPack = null;
     private const STATE_WAITING_KEY = 'waiting_key';
-    private const STATE_WAITING_TOKEN = 'waiting_token';
 
     public function __construct(string $token)
     {
         parent::__construct($token);
+        $this->setWebhook($token);
 
         // Находим продавца по токену
         $this->salesman = $this->salesmanRepository->findByToken($token);
@@ -41,6 +41,15 @@ class SalesmanBotController extends AbstractTelegramBot
             $message = $this->update->getMessage();
             $callbackQuery = $this->update->getCallbackQuery();
 
+            if ($callbackQuery) {
+                Log::info('Received callback query', [
+                    'data' => $callbackQuery->getData(),
+                    'from' => $callbackQuery->getFrom()->getId()
+                ]);
+                $this->processCallback($callbackQuery->getData());
+                return;
+            }
+
             if ($message) {
                 $text = $message->getText();
 
@@ -52,15 +61,7 @@ class SalesmanBotController extends AbstractTelegramBot
                 }
 
                 if ($text === '/start') {
-                    $this->clearState();
                     $this->start();
-                    return;
-                }
-
-                // Получаем состояние из базы данных
-                $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-                if ($salesman && $salesman->state === self::STATE_WAITING_TOKEN) {
-                    $this->handleBotToken($text);
                     return;
                 }
 
@@ -84,12 +85,6 @@ class SalesmanBotController extends AbstractTelegramBot
                             $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню для выбора действия.');
                         }
                 }
-            } elseif ($callbackQuery) {
-                $this->processCallback($callbackQuery->getData());
-            } else {
-                Log::warning('Received update without message or callback_query', [
-                    'update' => $this->update
-                ]);
             }
         } catch (Exception $e) {
             Log::error('Error processing update in SalesmanBot', [
@@ -116,7 +111,28 @@ class SalesmanBotController extends AbstractTelegramBot
      */
     private function processCallback(string $data): void
     {
-        // Этот метод больше не используется
+        try {
+            Log::info('Processing callback data', ['data' => $data]);
+
+            $params = json_decode($data, true);
+            if (!$params || !isset($params['action'])) {
+                Log::error('Invalid callback data', ['data' => $data]);
+                return;
+            }
+
+            switch ($params['action']) {
+                default:
+                    Log::warning('Unknown callback action', [
+                        'action' => $params['action'],
+                        'data' => $data
+                    ]);
+            }
+        } catch (Exception $e) {
+            Log::error('Process callback error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->sendErrorMessage();
+        }
     }
 
     /**
@@ -125,7 +141,12 @@ class SalesmanBotController extends AbstractTelegramBot
     protected function start(): void
     {
         try {
-            $this->generateMenu();
+            $message = "👋 Добро пожаловать в VPN бот!\n\n";
+            $message .= "🔸 Активируйте ваш VPN доступ\n";
+            $message .= "🔸 Проверяйте статус подключения\n";
+            $message .= "🔸 Получайте помощь в настройке\n";
+
+            $this->generateMenu($message);
         } catch (\Exception $e) {
             Log::error('Start command error: ' . $e->getMessage());
             $this->sendErrorMessage();
@@ -133,28 +154,29 @@ class SalesmanBotController extends AbstractTelegramBot
     }
 
     /**
-     * Меню бота
+     * Генерация меню
      */
-    protected function generateMenu(): void
+    protected function generateMenu($message): void
     {
-        $buttons = [
-            [
-                'text' => '🔑 Активировать'
+        $keyboard = [
+            'keyboard' => [
+                [
+                    ['text' => '🔑 Активировать']
+                ],
+                [
+                    ['text' => '📊 Статус'],
+                    ['text' => '❓ Помощь']
+                ]
             ],
-            [
-                'text' => '📊 Статус'
-            ],
-            [
-                'text' => '❓ Помощь'
-            ]
+            'resize_keyboard' => true,
+            'one_time_keyboard' => false
         ];
 
-        $message = "👋 Добро пожаловать в VPN бот!\n\n";
-        $message .= "🔸 Активируйте ваш VPN доступ\n";
-        $message .= "🔸 Проверяйте статус подключения\n";
-        $message .= "🔸 Получайте помощь в настройке\n";
-
-        $this->sendMenu($buttons, $message);
+        $this->telegram->sendMessage([
+            'chat_id' => $this->chatId,
+            'text' => $message,
+            'reply_markup' => json_encode($keyboard)
+        ]);
     }
 
     /**
@@ -231,7 +253,7 @@ class SalesmanBotController extends AbstractTelegramBot
                 $salesman->state = self::STATE_WAITING_KEY;
                 $salesman->save();
             }
-            
+
             $this->sendMessage("<b>Введите ключ активации:</b>");
 
         } catch (\Exception $e) {
