@@ -362,17 +362,20 @@ class FatherBotController extends AbstractTelegramBot
      */
     protected function generateMenu(): void
     {
-        $keyboard = new Keyboard();
-        $keyboard->addRow('📦 Купить пакет')
-            ->addRow('🤖 Мой бот')
-            ->addRow('👤 Профиль')
-            ->addRow('❓ Помощь');
+        $buttons = [
+            [['text' => '📦 Купить пакет']],
+            [['text' => '🤖 Мой бот']],
+            [['text' => '👤 Профиль']],
+            [['text' => '❓ Помощь']]
+        ];
 
-        $this->telegram->replyKeyboardMarkup([
-            'keyboard' => $keyboard->get(),
+        $keyboard = [
+            'keyboard' => $buttons,
             'resize_keyboard' => true,
             'one_time_keyboard' => false
-        ]);
+        ];
+
+        $this->telegram->replyKeyboardMarkup($keyboard);
     }
 
     private function showHelp(): void
