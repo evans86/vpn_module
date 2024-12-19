@@ -119,6 +119,8 @@ class KeyActivateService
                 throw new RuntimeException('Ключ уже используется другим пользователем');
             }
 
+            //@TODO Не работает панель
+
 //            // Получаем активную панель Marzban
 //            $panel = $this->panelRepository->getConfiguredMarzbanPanel();
 //
@@ -149,7 +151,7 @@ class KeyActivateService
                 'action' => 'activate',
                 'key_id' => $activatedKey->id,
                 'user_tg_id' => $userTgId,
-//                'server_user_id' => $serverUser->id,
+//                'server_user_id' => $serverUser->id, //@TODO Не работает панель
                 'server_user_id' => 123,
                 'panel_id' => 1,
                 'traffic_limit' => $key->traffic_limit,

@@ -184,13 +184,37 @@ class SalesmanBotController extends AbstractTelegramBot
     {
         try {
             $key = $this->keyActivateRepository->findById($keyId);
+
+            if (!$key) {
+                $this->sendMessage("❌ Ключ не найден.\n\nПожалуйста, проверьте правильность введенного ключа.");
+                return;
+            }
+
+            // Проверяем статус ключа
+            if ($key->status != KeyActivate::PAID) {
+                $this->sendMessage("❌ Невозможно активировать ключ.\n\nКлюч имеет неверный статус: " . $key->status);
+                return;
+            }
+
+            // Проверяем срок действия
+            if ($key->finish_at && $key->finish_at < time()) {
+                $this->sendMessage("❌ Срок действия ключа истек.\n\nПожалуйста, обратитесь к @admin для получения нового ключа.");
+                return;
+            }
+
+            // Проверяем, не активирован ли уже ключ
+            if ($key->user_tg_id) {
+                $this->sendMessage("❌ Ключ уже был активирован.\n\nКаждый ключ можно использовать только один раз.");
+                return;
+            }
+
             // Активируем ключ через сервис
             $result = $this->keyActivateService->activate($key, $this->chatId);
 
             if ($result) {
                 $this->sendSuccessActivation($key);
             } else {
-                $this->sendMessage("❌ Произошла ошибка при активации ключа.\n\nПожалуйста, попробуйте позже или обратитесь к @admin");
+                $this->sendMessage("❌ Не удалось активировать ключ.\n\nПожалуйста, попробуйте позже или обратитесь к @admin");
             }
         } catch (\Exception $e) {
             Log::error('Key activation error: ' . $e->getMessage());
