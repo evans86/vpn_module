@@ -1,7 +1,6 @@
 {{-- Logo --}}
 <div class="deznav">
     <div class="deznav-scroll">
-
         <ul class="metismenu" id="menu">
             <li>
                 <a href="{{ route('module.server.index') }}"
@@ -79,8 +78,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                          class="feather feather-key">
-                        <path
-                            d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
                     </svg>
                     <span class="nav-text">Ключи активации</span>
                 </a>
@@ -91,18 +89,26 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                          stroke-linejoin="round" class="feather feather-refresh-cw">
-                        <path d="M21 2v6h-6"></path>
-                        <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
-                        <path d="M3 22v-6h6"></path>
-                        <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
                     </svg>
-                    <span class="nav-text">Обновление токена бота</span>
+                    <span class="nav-text">Обновление токена</span>
                 </a>
             </li>
-            <li class="nav-item {{ request()->routeIs('logs.*') ? 'active' : '' }}">
-                <a href="{{ route('logs.index') }}" class="nav-link">
-                    <i class="fas fa-clipboard-list"></i>
-                    <span>Логи приложения</span>
+            <li>
+                <a href="{{ route('logs.index') }}"
+                   class="ai-icon {{ request()->routeIs('logs.*') ? 'active' : '' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                         stroke-linejoin="round" class="feather feather-file-text">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    <span class="nav-text">Логи приложения</span>
                 </a>
             </li>
         </ul>

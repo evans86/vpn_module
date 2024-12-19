@@ -2,73 +2,66 @@
 
 namespace App\Http\Controllers\Module;
 
-use App\Services\Telegram\ModuleBot\FatherBotController;
-use Exception;
-use Illuminate\Http\Request;
-use App\Logging\DatabaseLogger;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
+use Telegram\Bot\Api;
 
 class BotController extends Controller
 {
-    /**
-     * @var DatabaseLogger
-     */
-    private DatabaseLogger $logger;
-
-    public function __construct(DatabaseLogger $logger)
-    {
-        $this->logger = $logger;
-    }
-
-    /**
-     * @throws Exception
-     */
     public function index()
     {
-        try {
-            $this->logger->info('Доступ к странице управления ботом', [
-                'source' => 'bot',
-                'action' => 'view',
-                'user_id' => auth()->id()
-            ]);
-            return view('module.bot.index');
-        } catch (Exception $e) {
-            $this->logger->error('Ошибка при доступе к странице управления ботом', [
-                'source' => 'bot',
-                'action' => 'view',
-                'user_id' => auth()->id(),
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            throw $e;
-        }
+        return view('module.bot.index');
     }
 
-    /**
-     * @throws Exception
-     */
-    public function update(Request $request)
+    public function updateToken(Request $request)
     {
         try {
-            $botFatherService = new FatherBotController();
-            $botFatherService->init();
-
-            $this->logger->info('Сервис бота успешно инициализирован', [
-                'source' => 'bot',
-                'action' => 'update',
-                'user_id' => auth()->id()
+            // Валидация
+            $request->validate([
+                'token' => 'required|string|min:45|max:55'
             ]);
 
-            return view('module.bot.index');
-        } catch (Exception $e) {
-            $this->logger->error('Ошибка при инициализации сервиса бота', [
-                'source' => 'bot',
-                'action' => 'update',
-                'user_id' => auth()->id(),
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            throw $e;
+            $token = $request->input('token');
+            $envFile = base_path('.env');
+
+            if (file_exists($envFile)) {
+                // Читаем содержимое .env файла
+                $envContent = file_get_contents($envFile);
+
+                // Обновляем токен
+                $envContent = preg_replace(
+                    '/TELEGRAM_FATHER_BOT_TOKEN=.*/',
+                    'TELEGRAM_FATHER_BOT_TOKEN=' . $token,
+                    $envContent
+                );
+
+                // Записываем обновленное содержимое
+                file_put_contents($envFile, $envContent);
+
+                // Очищаем кэш конфигурации
+                Artisan::call('config:clear');
+
+                // Обновляем webhook с новым токеном
+                $telegram = new Api($token);
+                
+                // Используем правильный URL для webhook из конфигурации
+                $webhookUrl = config('telegram.father_bot.webhook_url');
+                
+                if (empty($webhookUrl)) {
+                    // Если URL не настроен в конфиге, формируем URL с учетом токена
+                    $webhookUrl = config('app.url') . '/api/telegram/father-bot/' . $token . '/init';
+                }
+
+                // Устанавливаем webhook
+                $telegram->setWebhook(['url' => $webhookUrl]);
+
+                return redirect()->back()->with('success', 'Токен бота успешно обновлен и webhook переустановлен');
+            }
+
+            return redirect()->back()->with('error', 'Файл .env не найден');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Ошибка при обновлении токена: ' . $e->getMessage());
         }
     }
 }
