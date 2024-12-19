@@ -34,7 +34,7 @@ class KeyActivateRepository extends BaseRepository
      * @param int $salesmanId
      * @return KeyActivate|null
      */
-    public function findActiveKeyByUserAndSalesman(int $userTgId, int $salesmanId): ?KeyActivate
+    public function findActiveKeyByUserAndSalesman(int $userTgId, int $salesmanId, int $status = KeyActivate::PAID): ?KeyActivate
     {
         /** @var KeyActivate|null $result */
         $result = $this->query()
@@ -42,7 +42,7 @@ class KeyActivateRepository extends BaseRepository
                 $query->where('salesman_id', $salesmanId);
             })
             ->where('user_tg_id', $userTgId)
-            ->where('status', KeyActivate::ACTIVE)
+            ->where('status', $status)
             ->where('finish_at', '>', Carbon::now()->timestamp)
             ->orderBy('finish_at', 'desc')
             ->first();

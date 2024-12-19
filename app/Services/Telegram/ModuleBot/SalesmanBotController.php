@@ -4,14 +4,14 @@ namespace App\Services\Telegram\ModuleBot;
 
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\Salesman\Salesman;
+use App\Repositories\KeyActivate\KeyActivateRepository;
+use App\Services\Key\KeyActivateService;
 use Exception;
 use Illuminate\Support\Facades\Log;
 
 class SalesmanBotController extends AbstractTelegramBot
 {
     private ?Salesman $salesman = null;
-    private ?KeyActivate $currentPack = null;
-    private const STATE_WAITING_KEY = 'waiting_key';
 
     public function __construct(string $token)
     {
@@ -37,112 +37,50 @@ class SalesmanBotController extends AbstractTelegramBot
     {
         try {
             $message = $this->update->getMessage();
-            $callbackQuery = $this->update->getCallbackQuery();
 
-            if ($callbackQuery) {
-                Log::info('Received callback query', [
-                    'data' => $callbackQuery->getData(),
-                    'from' => $callbackQuery->getFrom()->getId()
-                ]);
-                $this->processCallback($callbackQuery->getData());
+            if (!$message || !$message->getText()) {
                 return;
             }
 
-            if ($message) {
-                $text = $message->getText();
+            $text = $message->getText();
 
-                if (!$text) {
-                    Log::warning('Received message without text', [
-                        'message' => $message
-                    ]);
-                    return;
-                }
-
-                if ($text === '/start') {
-                    $this->start();
-                    return;
-                }
-
-                // Обработка команд меню
-                switch ($text) {
-                    case '🔑 Активировать':
-                        $this->actionActivate();
-                        break;
-                    case '📊 Статус':
-                        $this->actionStatus();
-                        break;
-                    case '❓ Помощь':
-                        $this->actionSupport();
-                        break;
-                    default:
-                        // Проверяем состояние ожидания ключа
-                        $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-                        if ($salesman && $salesman->state === self::STATE_WAITING_KEY) {
-                            $this->handleKeyActivation($text);
-                        } else {
-                            $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню для выбора действия.');
-                        }
-                }
-            }
-        } catch (Exception $e) {
-            Log::error('Error processing update in SalesmanBot', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            $this->sendErrorMessage();
-        }
-    }
-
-    private function clearState(): void
-    {
-        $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-        if ($salesman) {
-            $salesman->state = null;
-            $salesman->save();
-        }
-    }
-
-    /**
-     * обработка callback
-     *
-     * @param string $data
-     */
-    private function processCallback(string $data): void
-    {
-        try {
-            Log::info('Processing callback data', ['data' => $data]);
-
-            $params = json_decode($data, true);
-            if (!$params || !isset($params['action'])) {
-                Log::error('Invalid callback data', ['data' => $data]);
+            if ($text === '/start') {
+                $this->start();
                 return;
             }
 
-            switch ($params['action']) {
+            // Обработка команд меню
+            switch ($text) {
+                case '🔑 Активировать':
+                    $this->actionActivate();
+                    break;
+                case '📊 Статус':
+                    $this->actionStatus();
+                    break;
+                case '❓ Помощь':
+                    $this->actionHelp();
+                    break;
                 default:
-                    Log::warning('Unknown callback action', [
-                        'action' => $params['action'],
-                        'data' => $data
-                    ]);
+                    // Проверяем, похож ли текст на ключ
+                    if ($this->isValidKeyFormat($text)) {
+                        $this->handleKeyActivation($text);
+                    } else {
+                        $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню для выбора действия.');
+                    }
             }
-        } catch (Exception $e) {
-            Log::error('Process callback error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString()
-            ]);
+        } catch (\Exception $e) {
+            Log::error('Process update error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
     }
 
-    /**
-     * обработка start
-     */
     protected function start(): void
     {
         try {
             $message = "👋 Добро пожаловать в VPN бот!\n\n";
             $message .= "🔸 Активируйте ваш VPN доступ\n";
             $message .= "🔸 Проверяйте статус подключения\n";
-            $message .= "🔸 Получайте помощь в настройке\n";
+            $message .= "🔸 Получайте помощь в настройке";
 
             $this->generateMenu($message);
         } catch (\Exception $e) {
@@ -151,9 +89,6 @@ class SalesmanBotController extends AbstractTelegramBot
         }
     }
 
-    /**
-     * Генерация меню
-     */
     protected function generateMenu($message): void
     {
         $keyboard = [
@@ -177,164 +112,113 @@ class SalesmanBotController extends AbstractTelegramBot
         ]);
     }
 
-    /**
-     * Support action
-     */
-    private function actionSupport(): void
-    {
-        $text = "
-            <b>Как использовать VPN:</b>\n
-            1. Активируйте доступ через меню\n
-            2. Следуйте инструкциям для настройки\n
-            3. Проверьте статус подключения\n
-            \nПо всем вопросам обращайтесь к менеджеру @support";
-        $this->sendMessage($text);
-    }
-
-    /**
-     * Status action
-     */
-    private function actionStatus(): void
-    {
-        try {
-            $userId = $this->update->getMessage()->getFrom()->getId();
-
-            // Находим активные ключи через репозиторий
-            $this->currentPack = $this->keyActivateRepository->findActiveKeyByUserAndSalesman(
-                $userId,
-                $this->salesman->id
-            );
-
-            if (!$this->currentPack) {
-                $this->sendMessage("У вас нет активных VPN-доступов. Для приобретения обратитесь к менеджеру @" . $this->getSalesmanUsername());
-                return;
-            }
-
-            $text = "
-                <b>Информация о вашем VPN-доступе:</b>\n
-                ID доступа: <code>" . $this->currentPack->id . "</code>\n
-                Статус: " . $this->currentPack->getStatusText() . "\n
-                Дата покупки: " . $this->currentPack->created_at->format('d.m.Y') . "\n
-                Действителен до: " . $this->currentPack->finish_at->format('d.m.Y') . "\n" .
-                ($this->currentPack->traffic_limit ? "Остаток трафика: " . round($this->currentPack->traffic_limit / 1024 / 1024 / 1024, 2) . " GB" : "Безлимитный трафик");
-
-            $this->sendMessage($text);
-        } catch (\Exception $e) {
-            Log::error('Pack info error: ' . $e->getMessage());
-            $this->sendErrorMessage();
-        }
-    }
-
-    /**
-     * Activate action
-     */
     private function actionActivate(): void
     {
         try {
-            $userId = $this->update->getMessage()->getFrom()->getId();
-
-            // Проверяем наличие активного ключа через репозиторий
-            $existingPack = $this->keyActivateRepository->findActiveKeyByUserAndSalesman(
-                $userId,
+            // Проверяем, есть ли у пользователя уже активный ключ через репозиторий
+            $existingKey = $this->keyActivateRepository->findActiveKeyByUserAndSalesman(
+                $this->chatId,
                 $this->salesman->id
             );
 
-            if ($existingPack) {
-                $this->sendMessage("У вас уже есть активный VPN-доступ до {$existingPack->finish_at->format('d.m.Y')}.\nДля покупки дополнительного доступа обратитесь к менеджеру @{$this->getSalesmanUsername()}");
+            if ($existingKey) {
+                $finishDate = date('d.m.Y', $existingKey->finish_at);
+                $this->sendMessage("У вас уже есть активный VPN-доступ до {$finishDate}.\n\nДля покупки дополнительного доступа обратитесь к @admin");
                 return;
             }
 
-            // Устанавливаем состояние ожидания ключа в базе данных
-            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-            if ($salesman) {
-                $salesman->state = self::STATE_WAITING_KEY;
-                $salesman->save();
-            }
-
-            $this->sendMessage("<b>Введите ключ активации:</b>");
-
+            $this->sendMessage("Пожалуйста, отправьте ваш ключ активации:");
         } catch (\Exception $e) {
-            Log::error('Activation error: ' . $e->getMessage());
+            Log::error('Activate action error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
     }
 
-    /**
-     * Handle key activation
-     */
+    private function actionStatus(): void
+    {
+        try {
+            $activeKey = $this->keyActivateRepository->findActiveKeyByUserAndSalesman(
+                $this->chatId,
+                $this->salesman->id,
+                KeyActivate::ACTIVE
+            );
+
+            if (!$activeKey) {
+                $this->sendMessage("У вас нет активных VPN-доступов.\n\nДля активации нажмите кнопку '🔑 Активировать' и введите ваш ключ.");
+                return;
+            }
+
+            $finishDate = date('d.m.Y', $activeKey->finish_at);
+            $text = "📊 *Информация о вашем VPN-доступе:*\n\n";
+            $text .= "🔑 ID ключа: `{$activeKey->id}`\n";
+            $text .= "📅 Действителен до: {$finishDate}\n";
+
+            if ($activeKey->traffic_limit) {
+                $trafficGB = round($activeKey->traffic_limit / (1024 * 1024 * 1024), 2);
+                $text .= "📊 Лимит трафика: {$trafficGB} GB\n";
+            }
+
+            $this->sendMessage($text);
+        } catch (\Exception $e) {
+            Log::error('Status action error: ' . $e->getMessage());
+            $this->sendErrorMessage();
+        }
+    }
+
+    private function actionHelp(): void
+    {
+        $text = "*❓ Помощь*\n\n";
+        $text .= "🔹 *Активация VPN:*\n";
+        $text .= "1. Нажмите '🔑 Активировать'\n";
+        $text .= "2. Введите полученный ключ\n";
+        $text .= "3. Следуйте инструкциям по настройке\n\n";
+        $text .= "🔹 *Проверка статуса:*\n";
+        $text .= "1. Нажмите '📊 Статус'\n";
+        $text .= "2. Просмотрите информацию о вашем доступе\n\n";
+        $text .= "По всем вопросам обращайтесь к @admin";
+
+        $this->sendMessage($text);
+    }
+
     private function handleKeyActivation(string $keyId): void
     {
         try {
-            // Очищаем состояние ожидания ключа
-            $this->clearState();
-
-            // Находим ключ активации
             $key = $this->keyActivateRepository->findById($keyId);
+            // Активируем ключ через сервис
+            $result = $this->keyActivateService->activate($key, $this->chatId);
 
-            if (!$key) {
-                $this->sendMessage("❌ Ключ активации <code>" . $keyId . "</code> не найден.");
-                return;
+            if ($result) {
+                $this->sendSuccessActivation($key);
+            } else {
+                $this->sendMessage("❌ Произошла ошибка при активации ключа.\n\nПожалуйста, попробуйте позже или обратитесь к @admin");
             }
-
-            // Проверяем статус ключа
-            if (!$this->keyActivateRepository->hasCorrectStatusForActivation($key)) {
-                $this->sendMessage("❌ Ключ <code>" . $keyId . "</code> не может быть активирован (неверный статус).");
-                return;
-            }
-
-            // Активируем ключ
-            $this->currentPack = $this->keyActivateService->activate($key, $this->chatId);
-
-            // Отправляем инструкции по настройке
-            $this->sendSetupInstructions();
         } catch (\Exception $e) {
             Log::error('Key activation error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
     }
 
-    /**
-     * VPN instructions
-     */
-    private function sendSetupInstructions(): void
+    private function sendSuccessActivation(KeyActivate $key): void
     {
-        // Формируем ссылку на конфигурацию VPN
-        $configUrl = config('app.url') . '/config/' . $this->currentPack->key;
+        $finishDate = date('d.m.Y', $key->finish_at);
 
-        $text = "<b>🔐 Ваш VPN успешно активирован!</b>\n\n";
-        $text .= "<b>📱 Инструкция по настройке:</b>\n\n";
-        $text .= "1. Откройте ссылку для загрузки конфигурации:\n";
-        $text .= "<code>" . $configUrl . "</code>\n\n";
-
-        // iOS
-        $text .= "🍎 <b>iOS:</b>\n";
-        $text .= "1. Установите приложение WireGuard из App Store\n";
-        $text .= "2. Откройте ссылку выше\n";
-        $text .= "3. Нажмите 'Добавить туннель'\n\n";
-
-        // Android
-        $text .= "🤖 <b>Android:</b>\n";
-        $text .= "1. Установите приложение WireGuard из Google Play\n";
-        $text .= "2. Откройте ссылку выше\n";
-        $text .= "3. Разрешите добавление конфигурации\n\n";
-
-        // Windows
-        $text .= "💻 <b>Windows:</b>\n";
-        $text .= "1. Установите WireGuard с официального сайта\n";
-        $text .= "2. Откройте ссылку выше\n";
-        $text .= "3. Импортируйте конфигурацию\n\n";
-
-        $text .= "❓ Если возникли вопросы, обратитесь к менеджеру @" . $this->getSalesmanUsername();
+        $text = "✅ VPN успешно активирован!\n\n";
+        $text .= "📅 Срок действия: до {$finishDate}\n\n";
+        $text .= "📱 Инструкция по настройке:\n";
+        $text .= "1. Скачайте приложение Hiddify:\n";
+        $text .= "Android: https://play.google.com/store/apps/details?id=org.outline.android.client\n";
+        $text .= "iOS: https://apps.apple.com/us/app/outline-app/id1356177741\n\n";
+        $text .= "2. Откройте ссылку:\n";
+        $text .= "<code>Надо добавить ссылку на ключ</code>\n\n";
+        $text .= "❓ Если возникли вопросы, обратитесь к @admin";
 
         $this->sendMessage($text);
     }
 
-    /**
-     * Salesman username
-     * @return string
-     */
-    private function getSalesmanUsername(): string
+    private function isValidKeyFormat(string $text): bool
     {
-        return $this->salesman->username ?? 'support';
+        // Здесь можно добавить проверку формата ключа
+        // Например, если это UUID или определенный формат
+        return strlen($text) === 36; // Пример для UUID
     }
 }

@@ -5,6 +5,7 @@ namespace App\Services\Telegram\ModuleBot;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Repositories\PackSalesman\PackSalesmanRepository;
 use App\Repositories\Salesman\SalesmanRepository;
+use App\Services\Key\KeyActivateService;
 use App\Services\Pack\PackSalesmanService;
 use App\Services\Salesman\SalesmanService;
 use Exception;
@@ -26,6 +27,7 @@ abstract class AbstractTelegramBot
     protected KeyActivateRepository $keyActivateRepository;
     protected PackSalesmanRepository $packSalesmanRepository;
     protected SalesmanRepository $salesmanRepository;
+    protected KeyActivateService $keyActivateService;
     protected const WEBHOOK_BASE_URL = 'https://vpn-telegram.com/';
     protected const BOT_TYPE_FATHER = 'father';
     protected const BOT_TYPE_SALESMAN = 'salesman';
@@ -38,6 +40,7 @@ abstract class AbstractTelegramBot
         try {
             $this->packSalesmanService = app(PackSalesmanService::class);
             $this->salesmanService = app(SalesmanService::class);
+            $this->keyActivateService = app(KeyActivateService::class);
             $this->keyActivateRepository = app(KeyActivateRepository::class);
             $this->packSalesmanRepository = app(PackSalesmanRepository::class);
             $this->salesmanRepository = app(SalesmanRepository::class);
