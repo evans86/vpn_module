@@ -202,30 +202,30 @@ abstract class AbstractTelegramBot
         $this->sendMessage('Произошла ошибка. Пожалуйста, попробуйте позже или обратитесь к администратору.');
     }
 
-    /**
-     * Создает и отправляет меню с кнопками
-     * @param array $buttons Массив кнопок в формате [['text' => 'Button Text'], ...]
-     * @param string $message Сообщение над меню
-     * @param array $options Дополнительные опции для клавиатуры
-     */
-    protected function sendMenu(array $buttons, string $message, array $options = []): void
-    {
-        $keyboard = Keyboard::make()->setResizeKeyboard(true);
-
-        // Группируем кнопки по 2 в ряд (если не указано иное)
-        $buttonsPerRow = $options['buttons_per_row'] ?? 2;
-        $rows = array_chunk($buttons, $buttonsPerRow);
-
-        foreach ($rows as $row) {
-            $buttonRow = [];
-            foreach ($row as $button) {
-                $buttonRow[] = Keyboard::button([
-                    'text' => $button['text']
-                ]);
-            }
-            $keyboard->row(...$buttonRow);
-        }
-
-        $this->sendMessage($message, $keyboard);
-    }
+//    /**
+//     * Создает и отправляет меню с кнопками
+//     * @param array $buttons Массив кнопок в формате [['text' => 'Button Text'], ...]
+//     * @param string $message Сообщение над меню
+//     * @param array $options Дополнительные опции для клавиатуры
+//     */
+//    protected function sendMenu(array $buttons, string $message, array $options = []): void
+//    {
+//        $keyboard = Keyboard::make()->setResizeKeyboard(true);
+//
+//        // Группируем кнопки по 2 в ряд (если не указано иное)
+//        $buttonsPerRow = $options['buttons_per_row'] ?? 2;
+//        $rows = array_chunk($buttons, $buttonsPerRow);
+//
+//        foreach ($rows as $row) {
+//            $buttonRow = [];
+//            foreach ($row as $button) {
+//                $buttonRow[] = Keyboard::button([
+//                    'text' => $button['text']
+//                ]);
+//            }
+//            $keyboard->row(...$buttonRow);
+//        }
+//
+//        $this->sendMessage($message, $keyboard);
+//    }
 }

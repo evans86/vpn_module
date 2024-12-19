@@ -5,7 +5,6 @@ namespace App\Services\Telegram\ModuleBot;
 use App\Models\Pack\Pack;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
-use App\Services\Key\KeyActivateService;
 use Exception;
 use Telegram\Bot\Api;
 use Illuminate\Support\Facades\Log;
@@ -294,25 +293,25 @@ class FatherBotController extends AbstractTelegramBot
         }
     }
 
-    /**
-     * Handle add bot
-     */
-    private function handleAddBot(): void
-    {
-        try {
-            // Устанавливаем состояние ожидания токена
-            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-            if ($salesman) {
-                $salesman->state = self::STATE_WAITING_TOKEN;
-                $salesman->save();
-            }
-
-            $this->sendMessage("<b>Введите токен вашего бота:</b>\n\nТокен можно получить у @BotFather");
-        } catch (\Exception $e) {
-            Log::error('Add bot error: ' . $e->getMessage());
-            $this->sendErrorMessage();
-        }
-    }
+//    /**
+//     * Handle add bot
+//     */
+//    private function handleAddBot(): void
+//    {
+//        try {
+//            // Устанавливаем состояние ожидания токена
+//            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+//            if ($salesman) {
+//                $salesman->state = self::STATE_WAITING_TOKEN;
+//                $salesman->save();
+//            }
+//
+//            $this->sendMessage("<b>Введите токен вашего бота:</b>\n\nТокен можно получить у @BotFather");
+//        } catch (\Exception $e) {
+//            Log::error('Add bot error: ' . $e->getMessage());
+//            $this->sendErrorMessage();
+//        }
+//    }
 
     /**
      * Handle bot token from user
@@ -405,6 +404,9 @@ class FatherBotController extends AbstractTelegramBot
         ]);
     }
 
+    /**
+     * @return void
+     */
     private function showHelp(): void
     {
         $message = "*❓ Помощь*\n\n";
@@ -481,11 +483,11 @@ class FatherBotController extends AbstractTelegramBot
         }
     }
 
-    /**
-     * Конвертация байтов в гигабайты
-     */
-    private function bytesToGB(int $bytes): float
-    {
-        return round($bytes / (1024 * 1024 * 1024), 2);
-    }
+//    /**
+//     * Конвертация байтов в гигабайты
+//     */
+//    private function bytesToGB(int $bytes): float
+//    {
+//        return round($bytes / (1024 * 1024 * 1024), 2);
+//    }
 }
