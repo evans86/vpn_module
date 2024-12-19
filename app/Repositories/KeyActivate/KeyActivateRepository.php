@@ -159,8 +159,8 @@ class KeyActivateRepository extends BaseRepository
         $packSalesman = $key->packSalesman;
         $pack = $packSalesman->pack;
         
-        // Рассчитываем дату окончания: текущая дата + период в днях
-        $finishAt = Carbon::now()->addDays($pack->period);
+        // Рассчитываем timestamp окончания: текущее время + период в днях (в секундах)
+        $finishAt = time() + ($pack->period * 24 * 60 * 60);
         
         $key->user_tg_id = $userTgId;
         $key->status = $status;
