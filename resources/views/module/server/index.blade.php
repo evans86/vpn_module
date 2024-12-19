@@ -117,7 +117,7 @@
             function deleteServer(id) {
                 if (confirm('Вы уверены, что хотите удалить этот сервер?')) {
                     $.ajax({
-                        url: '{{ route('module.server.destroy', ['server' => ':id']) }}'.replace(':id', id),
+                        url: '{{ route('admin.module.server.destroy', ['server' => ':id']) }}'.replace(':id', id),
                         method: 'DELETE',
                         data: {
                             _token: '{{ csrf_token() }}'
@@ -168,7 +168,7 @@
                     toastr.info('Создание сервера...', '', {timeOut: 0, extendedTimeOut: 0});
 
                     $.ajax({
-                        url: '/admin/module/server',
+                        url: '{{ route('admin.module.server.store') }}',
                         method: 'POST',
                         data: {
                             provider: provider,

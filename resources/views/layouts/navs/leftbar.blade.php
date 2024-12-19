@@ -3,8 +3,8 @@
     <div class="deznav-scroll">
         <ul class="metismenu" id="menu">
             <li>
-                <a href="{{ route('module.server.index') }}"
-                   class="ai-icon {{ request()->routeIs('module.server.*') ? 'active' : '' }}">
+                <a href="{{ route('admin.module.server.index') }}"
+                   class="ai-icon {{ request()->routeIs('admin.module.server.*') ? 'active' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                          stroke-linejoin="round" class="feather feather-box">
@@ -17,8 +17,8 @@
                 </a>
             </li>
             <li>
-                <a href="{{ route('module.panel.index') }}"
-                   class="ai-icon {{ request()->routeIs('module.panel.*') ? 'active' : '' }}">
+                <a href="{{ route('admin.module.panel.index') }}"
+                   class="ai-icon {{ request()->routeIs('admin.module.panel.*') ? 'active' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                          stroke-linejoin="round" class="feather feather-home">
@@ -29,8 +29,8 @@
                 </a>
             </li>
             <li>
-                <a href="{{ route('module.salesman.index') }}"
-                   class="ai-icon {{ request()->routeIs('module.salesman.*') ? 'active' : '' }}">
+                <a href="{{ route('admin.module.salesman.index') }}"
+                   class="ai-icon {{ request()->routeIs('admin.module.salesman.*') ? 'active' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                          stroke-linejoin="round" class="feather feather-users">
@@ -43,8 +43,8 @@
                 </a>
             </li>
             <li>
-                <a href="{{ route('module.pack.index') }}"
-                   class="ai-icon {{ request()->routeIs('module.pack.*') ? 'active' : '' }}">
+                <a href="{{ route('admin.module.pack.index') }}"
+                   class="ai-icon {{ request()->routeIs('admin.module.pack.*') ? 'active' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                          stroke-linejoin="round" class="feather feather-package">
@@ -58,8 +58,8 @@
                 </a>
             </li>
             <li>
-                <a href="{{ route('module.pack-salesman.index') }}"
-                   class="ai-icon {{ request()->routeIs('module.pack-salesman.*') ? 'active' : '' }}">
+                <a href="{{ route('admin.module.pack-salesman.index') }}"
+                   class="ai-icon {{ request()->routeIs('admin.module.pack-salesman.*') ? 'active' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                          stroke-linejoin="round" class="feather feather-file-text">
@@ -73,32 +73,31 @@
                 </a>
             </li>
             <li>
-                <a href="{{ route('module.key-activate.index') }}"
-                   class="ai-icon {{ request()->routeIs('module.key-activate.*') ? 'active' : '' }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                         class="feather feather-key">
-                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
-                    </svg>
-                    <span class="nav-text">Ключи активации</span>
-                </a>
-            </li>
-            <li>
-                <a href="{{ route('module.bot.index') }}"
-                   class="ai-icon {{ request()->routeIs('module.bot.*') ? 'active' : '' }}">
+                <a href="{{ route('admin.module.key-activate.index') }}"
+                   class="ai-icon {{ request()->routeIs('admin.module.key-activate.*') ? 'active' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                         stroke-linejoin="round" class="feather feather-refresh-cw">
-                        <polyline points="23 4 23 10 17 10"></polyline>
-                        <polyline points="1 20 1 14 7 14"></polyline>
-                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                         stroke-linejoin="round" class="feather feather-key">
+                        <path
+                            d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
                     </svg>
-                    <span class="nav-text">Обновление токена</span>
+                    <span class="nav-text">Активация ключей</span>
                 </a>
             </li>
             <li>
-                <a href="{{ route('logs.index') }}"
-                   class="ai-icon {{ request()->routeIs('logs.*') ? 'active' : '' }}">
+                <a href="{{ route('admin.module.bot.index') }}"
+                   class="ai-icon {{ request()->routeIs('admin.module.bot.*') ? 'active' : '' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                         stroke-linejoin="round" class="feather feather-message-square">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span class="nav-text">Настройки бота</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ route('admin.logs.index') }}"
+                   class="ai-icon {{ request()->routeIs('admin.logs.*') ? 'active' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                          stroke-linejoin="round" class="feather feather-file-text">
@@ -106,9 +105,9 @@
                         <polyline points="14 2 14 8 20 8"></polyline>
                         <line x1="16" y1="13" x2="8" y2="13"></line>
                         <line x1="16" y1="17" x2="8" y2="17"></line>
-                        <polyline points="10 9 9 9 8 9"></polyline>
+                        <line x1="10" y1="9" x2="8" y2="9"></line>
                     </svg>
-                    <span class="nav-text">Логи приложения</span>
+                    <span class="nav-text">Логи</span>
                 </a>
             </li>
         </ul>

@@ -7,7 +7,7 @@
                 <div class="card">
                     <div class="card-header">
                         <h4 class="card-title">Детали лога</h4>
-                        <a href="{{ route('logs.index') }}" class="btn btn-primary btn-sm float-right">
+                        <a href="{{ route('admin.logs.index') }}" class="btn btn-primary btn-sm float-right">
                             <i class="fas fa-arrow-left"></i> Назад к списку
                         </a>
                     </div>

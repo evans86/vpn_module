@@ -82,7 +82,7 @@
                                             </button>
                                             <div class="dropdown-menu dropdown-menu-right">
                                                 @if(!$panel->isConfigured())
-                                                    <form action="{{ route('module.panel.configure', $panel) }}"
+                                                    <form action="{{ route('admin.module.panel.configure', $panel) }}"
                                                           method="POST" class="d-inline">
                                                         @csrf
                                                         <button type="submit" class="dropdown-item"
@@ -91,7 +91,7 @@
                                                         </button>
                                                     </form>
                                                 @else
-                                                    <form action="{{ route('module.panel.update-config', $panel) }}"
+                                                    <form action="{{ route('admin.module.panel.update-config', $panel) }}"
                                                           method="POST" class="d-inline">
                                                         @csrf
                                                         <button type="submit" class="dropdown-item"
@@ -108,7 +108,7 @@
 
                             {{-- Модальное окно редактирования --}}
                             <x-modal id="editPanelModal{{ $panel->id }}" title="Редактировать панель">
-                                <form action="{{ route('module.panel.update', $panel) }}" method="POST">
+                                <form action="{{ route('admin.module.panel.update', $panel) }}" method="POST">
                                     @csrf
                                     @method('PUT')
 
@@ -151,7 +151,7 @@
 
     {{-- Модальное окно создания --}}
     <x-modal id="createPanelModal" title="Добавить панель">
-        <form action="{{ route('module.panel.store') }}" method="POST">
+        <form action="{{ route('admin.module.panel.store') }}" method="POST">
             @csrf
 
             <x-select name="server_id"

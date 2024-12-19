@@ -12,7 +12,7 @@
                         <!-- Фильтры -->
                         <div class="row mb-3">
                             <div class="col-md-12">
-                                <form action="{{ route('logs.index') }}" method="GET" class="form-inline">
+                                <form action="{{ route('admin.logs.index') }}" method="GET" class="form-inline">
                                     <div class="form-group mx-2">
                                         <select name="level" class="form-control">
                                             <option value="">Все уровни</option>
@@ -60,7 +60,7 @@
                                                value="{{ request('search') }}">
                                     </div>
                                     <button type="submit" class="btn btn-primary">Применить фильтры</button>
-                                    <a href="{{ route('logs.index') }}" class="btn btn-secondary ml-2">Сбросить</a>
+                                    <a href="{{ route('admin.logs.index') }}" class="btn btn-secondary ml-2">Сбросить</a>
                                 </form>
                             </div>
                         </div>

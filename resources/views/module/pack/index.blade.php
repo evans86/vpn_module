@@ -54,9 +54,9 @@
                                                    data-target="#editPackModal{{ $pack->id }}">
                                                     <i class="fas fa-edit mr-2"></i>Редактировать
                                                 </a>
-                                                <a class="dropdown-item text-danger" href="#"
-                                                   onclick="deletePack({{ $pack->id }})">
-                                                    <i class="fas fa-trash mr-2"></i>Удалить
+                                                <a href="#" class="dropdown-item text-danger"
+                                                   onclick="event.preventDefault(); deletePack({{ $pack->id }})">
+                                                    <i class="fas fa-trash"></i> Удалить
                                                 </a>
                                             </div>
                                         </div>
@@ -130,7 +130,7 @@
         function deletePack(id) {
             if (confirm('Вы уверены, что хотите удалить этот пакет?')) {
                 $.ajax({
-                    url: '{{ route('module.pack.destroy', ['pack' => ':id']) }}'.replace(':id', id),
+                    url: '{{ route('admin.module.pack.destroy', ':id') }}'.replace(':id', id),
                     method: 'DELETE',
                     data: {
                         _token: '{{ csrf_token() }}'
@@ -142,11 +142,7 @@
                         }, 1000);
                     },
                     error: function (xhr) {
-                        let errorMessage = 'Произошла ошибка при удалении пакета';
-                        if (xhr.responseJSON) {
-                            errorMessage = xhr.responseJSON.message || errorMessage;
-                        }
-                        toastr.error(errorMessage);
+                        toastr.error('Ошибка при удалении пакета');
                     }
                 });
             }
