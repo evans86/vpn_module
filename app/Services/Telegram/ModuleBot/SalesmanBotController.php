@@ -5,7 +5,6 @@ namespace App\Services\Telegram\ModuleBot;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\Salesman\Salesman;
 use Exception;
-use Telegram\Bot\Keyboard\Keyboard;
 use Illuminate\Support\Facades\Log;
 
 class SalesmanBotController extends AbstractTelegramBot
@@ -188,8 +187,7 @@ class SalesmanBotController extends AbstractTelegramBot
             1. Активируйте доступ через меню\n
             2. Следуйте инструкциям для настройки\n
             3. Проверьте статус подключения\n
-            \nПо всем вопросам обращайтесь к менеджеру @{$this->getSalesmanUsername()}
-        ";
+            \nПо всем вопросам обращайтесь к менеджеру @support";
         $this->sendMessage($text);
     }
 
@@ -208,16 +206,16 @@ class SalesmanBotController extends AbstractTelegramBot
             );
 
             if (!$this->currentPack) {
-                $this->sendMessage("У вас нет активных VPN-доступов. Для приобретения обратитесь к менеджеру @{$this->getSalesmanUsername()}");
+                $this->sendMessage("У вас нет активных VPN-доступов. Для приобретения обратитесь к менеджеру @" . $this->getSalesmanUsername());
                 return;
             }
 
             $text = "
                 <b>Информация о вашем VPN-доступе:</b>\n
-                ID доступа: {$this->currentPack->id}\n
-                Статус: {$this->currentPack->getStatusText()}\n
-                Дата покупки: {$this->currentPack->created_at->format('d.m.Y')}\n
-                Действителен до: {$this->currentPack->finish_at->format('d.m.Y')}\n" .
+                ID доступа: <code>" . $this->currentPack->id . "</code>\n
+                Статус: " . $this->currentPack->getStatusText() . "\n
+                Дата покупки: " . $this->currentPack->created_at->format('d.m.Y') . "\n
+                Действителен до: " . $this->currentPack->finish_at->format('d.m.Y') . "\n" .
                 ($this->currentPack->traffic_limit ? "Остаток трафика: " . round($this->currentPack->traffic_limit / 1024 / 1024 / 1024, 2) . " GB" : "Безлимитный трафик");
 
             $this->sendMessage($text);
@@ -267,45 +265,27 @@ class SalesmanBotController extends AbstractTelegramBot
     private function handleKeyActivation(string $keyId): void
     {
         try {
-            $userId = $this->update->getMessage()->getFrom()->getId();
+            // Очищаем состояние ожидания ключа
+            $this->clearState();
 
-            // Находим ключ через репозиторий
-            $this->currentPack = $this->keyActivateRepository->findKeyByIdAndSalesman(
-                $keyId,
-                $this->salesman->id
-            );
+            // Находим ключ активации
+            $key = $this->keyActivateRepository->findById($keyId);
 
-            if (!$this->currentPack) {
-                $this->sendMessage("❌ Неверный ключ активации. Попробуйте еще раз или обратитесь к менеджеру @{$this->getSalesmanUsername()}");
+            if (!$key) {
+                $this->sendMessage("❌ Ключ активации <code>" . $keyId . "</code> не найден.");
                 return;
             }
 
-            if ($this->currentPack->isActivated()) {
-                $this->sendMessage("❌ Этот ключ уже был активирован");
+            // Проверяем статус ключа
+            if (!$this->keyActivateRepository->hasCorrectStatusForActivation($key)) {
+                $this->sendMessage("❌ Ключ <code>" . $keyId . "</code> не может быть активирован (неверный статус).");
                 return;
             }
 
             // Активируем ключ
-            $this->currentPack->user_id = $userId;
-            $this->currentPack->activated_at = now();
-            $this->currentPack->finish_at = now()->addDays($this->currentPack->duration);
-            $this->currentPack->save();
+            $this->currentPack = $this->keyActivateService->activate($key, $this->chatId);
 
-            // Очищаем состояние в базе данных
-            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-            if ($salesman) {
-                $salesman->state = null;
-                $salesman->save();
-            }
-
-            $text = "
-                <b>🎉 VPN-доступ успешно активирован!</b>\n
-                ID доступа: {$this->currentPack->id}\n
-                Действителен до: {$this->currentPack->finish_at->format('d.m.Y')}\n" .
-                ($this->currentPack->traffic_limit ? "Доступный трафик: " . round($this->currentPack->traffic_limit / 1024 / 1024 / 1024, 2) . " GB" : "Безлимитный трафик") . "\n\n" .
-                "Сейчас я отправлю вам инструкцию по настройке.";
-
-            $this->sendMessage($text);
+            // Отправляем инструкции по настройке
             $this->sendSetupInstructions();
         } catch (\Exception $e) {
             Log::error('Key activation error: ' . $e->getMessage());
@@ -324,7 +304,7 @@ class SalesmanBotController extends AbstractTelegramBot
         $text = "<b>🔐 Ваш VPN успешно активирован!</b>\n\n";
         $text .= "<b>📱 Инструкция по настройке:</b>\n\n";
         $text .= "1. Откройте ссылку для загрузки конфигурации:\n";
-        $text .= "<code>$configUrl</code>\n\n";
+        $text .= "<code>" . $configUrl . "</code>\n\n";
 
         // iOS
         $text .= "🍎 <b>iOS:</b>\n";
@@ -344,7 +324,7 @@ class SalesmanBotController extends AbstractTelegramBot
         $text .= "2. Откройте ссылку выше\n";
         $text .= "3. Импортируйте конфигурацию\n\n";
 
-        $text .= "❓ Если возникли вопросы, обратитесь к менеджеру @{$this->getSalesmanUsername()}";
+        $text .= "❓ Если возникли вопросы, обратитесь к менеджеру @" . $this->getSalesmanUsername();
 
         $this->sendMessage($text);
     }

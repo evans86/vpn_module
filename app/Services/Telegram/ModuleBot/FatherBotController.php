@@ -277,7 +277,7 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "💰 Стоимость: {$pack->price} руб.\n\n";
             $message .= "🔐 *Ваши ключи активации:*\n";
             foreach ($keys as $index => $key) {
-                $message .= ($index + 1) . ". `{$key->id}`\n";
+                $message .= ($index + 1) . ". <code>{$key->id}</code>\n";
             }
             $message .= "\n❗️ Сохраните эти ключи - они понадобятся для активации VPN\n\n";
 
