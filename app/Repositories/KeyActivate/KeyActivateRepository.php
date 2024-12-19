@@ -130,7 +130,7 @@ class KeyActivateRepository extends BaseRepository
      */
     public function hasCorrectStatusForActivation(KeyActivate $key): bool
     {
-        return $key->status === KeyActivate::PAID;
+        return $key->status == KeyActivate::PAID;
     }
 
     /**
