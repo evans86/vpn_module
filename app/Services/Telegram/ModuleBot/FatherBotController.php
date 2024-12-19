@@ -13,13 +13,11 @@ use Illuminate\Support\Facades\Log;
 class FatherBotController extends AbstractTelegramBot
 {
     private const STATE_WAITING_TOKEN = 'waiting_token';
-    private KeyActivateService $keyActivateService;
 
     public function __construct(string $token)
     {
         parent::__construct($token);
         $this->setWebhook($token, self::BOT_TYPE_FATHER);
-        $this->keyActivateService = app(KeyActivateService::class);
     }
 
     /**
