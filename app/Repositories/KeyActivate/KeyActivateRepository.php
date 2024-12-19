@@ -156,17 +156,16 @@ class KeyActivateRepository extends BaseRepository
     public function updateActivationData(KeyActivate $key, int $userTgId, string $status): KeyActivate
     {
         // Получаем период действия из связанного пакета
-        $packSalesman = $key->packSalesman;
-        $pack = $packSalesman->pack;
-        
+        $pack = $key->packSalesman->pack;
+
         // Рассчитываем timestamp окончания: текущее время + период в днях (в секундах)
         $finishAt = time() + ($pack->period * 24 * 60 * 60);
-        
+
         $key->user_tg_id = $userTgId;
         $key->status = $status;
         $key->finish_at = $finishAt;
         $key->save();
-        
+
         return $key;
     }
 

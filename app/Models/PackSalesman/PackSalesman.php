@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $pack_id
  * @property int|null $salesman_id
  * @property int|null $status
+ * @property pack|null $pack
  */
 class PackSalesman extends Model
 {
