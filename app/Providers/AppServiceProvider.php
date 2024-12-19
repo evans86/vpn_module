@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\Asset;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -28,6 +29,12 @@ class AppServiceProvider extends ServiceProvider
 
         if(config('app.env') === 'production') {
             \URL::forceScheme('https');
+            \Asset::forceSsl();
+            
+            // Force HTTPS for all asset URLs
+            if (!request()->secure()) {
+                $this->app['request']->server->set('HTTPS', true);
+            }
         }
     }
 }

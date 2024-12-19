@@ -76,7 +76,7 @@
 
     {{-- Модальное окно создания --}}
     <x-modal id="createPackModal" title="Добавить пакет">
-        <form action="{{ route('module.pack.store') }}" method="POST">
+        <form action="{{ secure_url('admin/module/pack') }}" method="POST">
             @csrf
 
             <x-form.input type="number" name="price" label="Цена (₽)" required min="0"/>
@@ -99,7 +99,7 @@
 @foreach($packs as $pack)
     {{-- Модальные окна редактирования --}}
     <x-modal id="editPackModal{{ $pack->id }}" title="Редактировать пакет #{{ $pack->id }}">
-        <form action="{{ route('module.pack.update', $pack->id) }}" method="POST">
+        <form action="{{ secure_url('admin/module/pack/' . $pack->id) }}" method="POST">
             @csrf
             @method('PUT')
 
