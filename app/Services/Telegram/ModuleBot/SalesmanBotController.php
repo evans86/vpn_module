@@ -150,7 +150,7 @@ class SalesmanBotController extends AbstractTelegramBot
 
             $finishDate = date('d.m.Y', $activeKey->finish_at);
             $text = "📊 *Информация о вашем VPN-доступе:*\n\n";
-            $text .= "🔑 ID ключа: " . ". <code>{$activeKey->id}</code>\n";
+            $text .= "🔑 ID ключа: " . "<code>{$activeKey->id}</code>\n";
             $text .= "📅 Действителен до: {$finishDate}\n";
 
             if ($activeKey->traffic_limit) {
