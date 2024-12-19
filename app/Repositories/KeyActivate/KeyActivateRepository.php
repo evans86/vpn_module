@@ -74,10 +74,10 @@ class KeyActivateRepository extends BaseRepository
 
     /**
      * Find key by ID
-     * @param int $id
+     * @param string $id
      * @return KeyActivate|null
      */
-    public function findById(int $id): ?KeyActivate
+    public function findById(string $id): ?KeyActivate
     {
         /** @var KeyActivate|null $result */
         $result = $this->query()->find($id);
