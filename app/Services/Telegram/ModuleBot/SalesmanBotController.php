@@ -4,14 +4,11 @@ namespace App\Services\Telegram\ModuleBot;
 
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\Salesman\Salesman;
-use App\Repositories\KeyActivate\KeyActivateRepository;
-use App\Services\Key\KeyActivateService;
-use Exception;
 use Illuminate\Support\Facades\Log;
 
 class SalesmanBotController extends AbstractTelegramBot
 {
-    private ?Salesman $salesman = null;
+    private ?Salesman $salesman;
 
     public function __construct(string $token)
     {
