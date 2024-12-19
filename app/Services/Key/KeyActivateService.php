@@ -119,19 +119,19 @@ class KeyActivateService
                 throw new RuntimeException('Ключ уже используется другим пользователем');
             }
 
-            // Получаем активную панель Marzban
-            $panel = $this->panelRepository->getConfiguredMarzbanPanel();
-
-            if (!$panel) {
-                throw new RuntimeException('Активная панель Marzban не найдена');
-            }
-
-            // Создаем стратегию для работы с панелью
-            $this->panelStrategy = new PanelStrategy(Panel::MARZBAN);
+//            // Получаем активную панель Marzban
+//            $panel = $this->panelRepository->getConfiguredMarzbanPanel();
+//
+//            if (!$panel) {
+//                throw new RuntimeException('Активная панель Marzban не найдена');
+//            }
+//
+//            // Создаем стратегию для работы с панелью
+//            $this->panelStrategy = new PanelStrategy(Panel::MARZBAN);
 
             // Добавляем пользователя на сервер
             $serverUser = $this->panelStrategy->addServerUser(
-                $panel->id,
+                1,
                 $key->traffic_limit,
                 $key->finish_at,
                 $key->id
@@ -150,7 +150,7 @@ class KeyActivateService
                 'key_id' => $activatedKey->id,
                 'user_tg_id' => $userTgId,
                 'server_user_id' => $serverUser->id,
-                'panel_id' => $panel->id,
+                'panel_id' => 1,
                 'traffic_limit' => $key->traffic_limit,
                 'finish_at' => $key->finish_at
             ]);
