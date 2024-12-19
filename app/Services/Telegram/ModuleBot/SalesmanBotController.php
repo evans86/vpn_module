@@ -192,7 +192,7 @@ class SalesmanBotController extends AbstractTelegramBot
 
             // Проверяем статус ключа
             if ($key->status != KeyActivate::PAID) {
-                $this->sendMessage("❌ Невозможно активировать ключ.\n\nКлюч имеет неверный статус: " . $key->status);
+                $this->sendMessage("❌ Невозможно активировать ключ.\n\nКлюч уже был активирован ");
                 return;
             }
 
