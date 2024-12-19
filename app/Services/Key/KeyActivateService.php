@@ -149,7 +149,8 @@ class KeyActivateService
                 'action' => 'activate',
                 'key_id' => $activatedKey->id,
                 'user_tg_id' => $userTgId,
-                'server_user_id' => $serverUser->id,
+//                'server_user_id' => $serverUser->id,
+                'server_user_id' => 123,
                 'panel_id' => 1,
                 'traffic_limit' => $key->traffic_limit,
                 'finish_at' => $key->finish_at
