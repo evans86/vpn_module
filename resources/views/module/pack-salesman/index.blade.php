@@ -30,7 +30,7 @@
                                             @if($pack_salesman->pack)
                                                 {{ $pack_salesman->pack->name }}
                                                 <small class="d-block text-muted">
-                                                    Кол-во ключей: {{ $pack_salesman->pack->count_keys }}
+                                                    Кол-во ключей: {{ $pack_salesman->pack->count }}
                                                 </small>
                                             @else
                                                 <span class="text-muted">Пакет удален</span>
