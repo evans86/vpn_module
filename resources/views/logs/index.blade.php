@@ -19,15 +19,13 @@
                                             <option value="info" {{ request('level') == 'info' ? 'selected' : '' }}>
                                                 Информация
                                             </option>
-                                            <option
-                                                value="warning" {{ request('level') == 'warning' ? 'selected' : '' }}>
+                                            <option value="warning" {{ request('level') == 'warning' ? 'selected' : '' }}>
                                                 Предупреждение
                                             </option>
                                             <option value="error" {{ request('level') == 'error' ? 'selected' : '' }}>
                                                 Ошибка
                                             </option>
-                                            <option
-                                                value="critical" {{ request('level') == 'critical' ? 'selected' : '' }}>
+                                            <option value="critical" {{ request('level') == 'critical' ? 'selected' : '' }}>
                                                 Критическая ошибка
                                             </option>
                                             <option value="debug" {{ request('level') == 'debug' ? 'selected' : '' }}>
@@ -39,8 +37,7 @@
                                         <select name="source" class="form-control">
                                             <option value="">Все источники</option>
                                             @foreach($sources as $source)
-                                                <option
-                                                    value="{{ $source }}" {{ request('source') == $source ? 'selected' : '' }}>
+                                                <option value="{{ $source }}" {{ request('source') == $source ? 'selected' : '' }}>
                                                     {{ $source }}
                                                 </option>
                                             @endforeach
@@ -55,8 +52,7 @@
                                                value="{{ request('date_to') }}">
                                     </div>
                                     <div class="form-group mx-2">
-                                        <input type="text" name="search" class="form-control"
-                                               placeholder="Поиск по сообщению"
+                                        <input type="text" name="search" class="form-control" placeholder="Поиск по сообщению"
                                                value="{{ request('search') }}">
                                     </div>
                                     <button type="submit" class="btn btn-primary">Применить фильтры</button>
@@ -74,12 +70,11 @@
                                     <th>Уровень</th>
                                     <th>Источник</th>
                                     <th>Сообщение</th>
-                                    <th>Пользователь</th>
                                     <th>Действия</th>
                                 </tr>
                                 </thead>
                                 <tbody>
-                                @foreach($logs as $log)
+                                @forelse($logs as $log)
                                     <tr>
                                         <td>{{ $log->created_at->format('Y-m-d H:i:s') }}</td>
                                         <td>
@@ -90,28 +85,26 @@
                                         </td>
                                         <td>{{ $log->source }}</td>
                                         <td>{{ Str::limit($log->message, 100) }}</td>
-                                        <td>{{ $log->user_id ?: 'Система' }}</td>
                                         <td>
-                                            <a href="{{ route('logs.show', $log) }}"
-                                               class="btn btn-sm btn-info"
-                                               data-toggle="tooltip"
-                                               title="Подробности">
-                                                <i class="fas fa-eye"></i>
+                                            <a href="{{ route('admin.logs.show', $log) }}" class="btn btn-sm btn-info">
+                                                <i class="fas fa-eye"></i> Подробнее
                                             </a>
                                         </td>
                                     </tr>
-                                @endforeach
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted">
+                                            <i class="fas fa-info-circle"></i> Логи не найдены
+                                        </td>
+                                    </tr>
+                                @endforelse
                                 </tbody>
                             </table>
                         </div>
 
                         <!-- Пагинация -->
-                        <div class="pagination-container">
+                        <div class="d-flex justify-content-center mt-3">
                             {{ $logs->links() }}
-                        </div>
-                        <div class="text-center my-4 d-none">
-                            <div class="spinner-border text-primary" role="status"><span
-                                    class="sr-only">Загрузка...</span></div>
                         </div>
                     </div>
                 </div>
