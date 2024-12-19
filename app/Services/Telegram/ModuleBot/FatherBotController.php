@@ -293,26 +293,6 @@ class FatherBotController extends AbstractTelegramBot
         }
     }
 
-//    /**
-//     * Handle add bot
-//     */
-//    private function handleAddBot(): void
-//    {
-//        try {
-//            // Устанавливаем состояние ожидания токена
-//            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-//            if ($salesman) {
-//                $salesman->state = self::STATE_WAITING_TOKEN;
-//                $salesman->save();
-//            }
-//
-//            $this->sendMessage("<b>Введите токен вашего бота:</b>\n\nТокен можно получить у @BotFather");
-//        } catch (\Exception $e) {
-//            Log::error('Add bot error: ' . $e->getMessage());
-//            $this->sendErrorMessage();
-//        }
-//    }
-
     /**
      * Handle bot token from user
      */
@@ -482,12 +462,4 @@ class FatherBotController extends AbstractTelegramBot
             $this->sendErrorMessage();
         }
     }
-
-//    /**
-//     * Конвертация байтов в гигабайты
-//     */
-//    private function bytesToGB(int $bytes): float
-//    {
-//        return round($bytes / (1024 * 1024 * 1024), 2);
-//    }
 }

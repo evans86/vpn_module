@@ -238,8 +238,6 @@ class SalesmanBotController extends AbstractTelegramBot
 
     private function isValidKeyFormat(string $text): bool
     {
-        // Здесь можно добавить проверку формата ключа
-        // Например, если это UUID или определенный формат
         return strlen($text) === 36; // Пример для UUID
     }
 }

@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use Exception;
 use Illuminate\Console\Command;
-use Telegram\Bot\Laravel\Facades\Telegram;
+use Telegram\Bot\Api;
 
 class TelegramWebhookCommand extends Command
 {
@@ -45,7 +45,7 @@ class TelegramWebhookCommand extends Command
         $url = "{$baseUrl}/{$botType}-bot/{$token}/init";
 
         try {
-            $telegram = new \Telegram\Bot\Api($token);
+            $telegram = new Api($token);
             $response = $telegram->setWebhook([
                 'url' => $url,
                 'max_connections' => 100,
@@ -76,7 +76,7 @@ class TelegramWebhookCommand extends Command
         }
 
         try {
-            $telegram = new \Telegram\Bot\Api($token);
+            $telegram = new Api($token);
             $response = $telegram->removeWebhook();
 
             if ($response) {

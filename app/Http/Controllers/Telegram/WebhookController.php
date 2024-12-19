@@ -14,15 +14,6 @@ use Symfony\Component\HttpFoundation\Response as ResponseAlias;
 class WebhookController extends Controller
 {
     /**
-     * Валидация webhook запроса
-     */
-    private function validateWebhookRequest(Request $request): bool
-    {
-        $secretToken = $request->header('X-Telegram-Bot-Api-Secret-Token');
-        return hash_equals(config('telegram.webhook_secret'), $secretToken);
-    }
-
-    /**
      * Обработка webhook-а для главного бота
      */
     public function fatherBot(Request $request, string $token): JsonResponse
