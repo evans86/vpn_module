@@ -133,7 +133,7 @@ class FatherBotController extends AbstractTelegramBot
     /**
      * Показать список пакетов
      */
-    private function showPacksList(): void
+    protected function showPacksList(): void
     {
         try {
             $packs = Pack::all();
@@ -175,7 +175,7 @@ class FatherBotController extends AbstractTelegramBot
     /**
      * Handle buy pack action
      */
-    private function buyPack(int $packId): void
+    protected function buyPack(int $packId): void
     {
         try {
             $pack = Pack::findOrFail($packId);
@@ -210,7 +210,7 @@ class FatherBotController extends AbstractTelegramBot
     /**
      * Handle confirm purchase action
      */
-    private function confirmPurchase(int $packId): void
+    protected function confirmPurchase(int $packId): void
     {
         try {
             $pack = Pack::findOrFail($packId);
@@ -241,7 +241,7 @@ class FatherBotController extends AbstractTelegramBot
     /**
      * Handle check payment action
      */
-    private function checkPayment(int $paymentId): void
+    protected function checkPayment(int $paymentId): void
     {
         try {
             $pack = Pack::findOrFail($paymentId);
@@ -387,7 +387,7 @@ class FatherBotController extends AbstractTelegramBot
     /**
      * @return void
      */
-    private function showHelp(): void
+    protected function showHelp(): void
     {
         $message = "*❓ Помощь*\n\n";
         $message .= "🔹 *Покупка пакета:*\n";
@@ -410,7 +410,7 @@ class FatherBotController extends AbstractTelegramBot
     /**
      * Показать информацию о боте
      */
-    private function showBotInfo(): void
+    protected function showBotInfo(): void
     {
         try {
             $salesman = Salesman::where('telegram_id', $this->chatId)->first();
@@ -445,7 +445,7 @@ class FatherBotController extends AbstractTelegramBot
     /**
      * Показать профиль
      */
-    private function showProfile(): void
+    protected function showProfile(): void
     {
         try {
             $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();

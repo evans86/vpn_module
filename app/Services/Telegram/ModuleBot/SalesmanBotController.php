@@ -109,7 +109,7 @@ class SalesmanBotController extends AbstractTelegramBot
         ]);
     }
 
-    private function actionActivate(): void
+    protected function actionActivate(): void
     {
         try {
             // Проверяем, есть ли у пользователя уже активный ключ через репозиторий
@@ -131,7 +131,7 @@ class SalesmanBotController extends AbstractTelegramBot
         }
     }
 
-    private function actionStatus(): void
+    protected function actionStatus(): void
     {
         try {
             $activeKey = $this->keyActivateRepository->findActiveKeyByUserAndSalesman(
@@ -162,7 +162,7 @@ class SalesmanBotController extends AbstractTelegramBot
         }
     }
 
-    private function actionHelp(): void
+    protected function actionHelp(): void
     {
         $text = "*❓ Помощь*\n\n";
         $text .= "🔹 *Активация VPN:*\n";
@@ -177,7 +177,7 @@ class SalesmanBotController extends AbstractTelegramBot
         $this->sendMessage($text);
     }
 
-    private function handleKeyActivation(string $keyId): void
+    protected function handleKeyActivation(string $keyId): void
     {
         try {
             $key = $this->keyActivateRepository->findById($keyId);
@@ -219,7 +219,7 @@ class SalesmanBotController extends AbstractTelegramBot
         }
     }
 
-    private function sendSuccessActivation(KeyActivate $key): void
+    protected function sendSuccessActivation(KeyActivate $key): void
     {
         $finishDate = date('d.m.Y', $key->finish_at);
 
