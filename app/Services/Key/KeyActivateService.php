@@ -129,13 +129,13 @@ class KeyActivateService
 //            // Создаем стратегию для работы с панелью
 //            $this->panelStrategy = new PanelStrategy(Panel::MARZBAN);
 
-            // Добавляем пользователя на сервер
-            $serverUser = $this->panelStrategy->addServerUser(
-                1,
-                $key->traffic_limit,
-                $key->finish_at,
-                $key->id
-            );
+//            // Добавляем пользователя на сервер
+//            $serverUser = $this->panelStrategy->addServerUser(
+//                1,
+//                $key->traffic_limit,
+//                $key->finish_at,
+//                $key->id
+//            );
 
             // Обновляем данные активации
             $activatedKey = $this->keyActivateRepository->updateActivationData(
