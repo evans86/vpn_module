@@ -25,7 +25,7 @@ Auth::routes(['register' => false]);
 Route::post('/telegram/webhook/{token}', [FatherBotController::class, 'handle'])->name('telegram.webhook');
 
 // VPN Config Download
-Route::get('/vpn/config/{token}', [VpnConfigController::class, 'show'])->name('vpn.config.show');
+Route::get('/config/{token}', [VpnConfigController::class, 'show'])->name('vpn.config.show');
 
 // Admin Routes
 Route::prefix('admin')->name('admin.')->group(function () {
