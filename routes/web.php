@@ -85,6 +85,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/', [KeyActivateController::class, 'index'])->name('index');
             Route::delete('/{key}', [KeyActivateController::class, 'destroy'])->name('destroy');
             Route::post('/{key}/test-activate', [KeyActivateController::class, 'testActivate'])->name('test-activate');
+            Route::post('/{key}/update-dates', [KeyActivateController::class, 'updateDates'])->name('update-dates');
         });
 
         // Bot Routes

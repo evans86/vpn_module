@@ -108,7 +108,18 @@
                                                 Не указан
                                             @endif
                                         </td>
-                                        <td>{{ date('d.m.Y H:i', $key->finish_at) }}</td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                {{ date('d.m.Y H:i', $key->finish_at) }}
+                                                <button class="btn btn-sm btn-link edit-date" 
+                                                        data-id="{{ $key->id }}"
+                                                        data-type="finish_at"
+                                                        data-value="{{ date('d.m.Y H:i', $key->finish_at) }}"
+                                                        title="Изменить дату">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                            </div>
+                                        </td>
                                         <td>
                                             @if($key->user_tg_id)
                                                 <a href="https://t.me/{{ $key->user_tg_id }}" target="_blank">
@@ -118,7 +129,18 @@
                                                 -
                                             @endif
                                         </td>
-                                        <td>{{ date('d.m.Y H:i', $key->deleted_at) }}</td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                {{ date('d.m.Y H:i', $key->deleted_at) }}
+                                                <button class="btn btn-sm btn-link edit-date"
+                                                        data-id="{{ $key->id }}"
+                                                        data-type="deleted_at"
+                                                        data-value="{{ date('d.m.Y H:i', $key->deleted_at) }}"
+                                                        title="Изменить дату">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                            </div>
+                                        </td>
                                         <td>
                                             <span class="badge {{ $key->getStatusBadgeClass() }}">
                                                 {{ $key->getStatusText() }}
@@ -126,12 +148,11 @@
                                         </td>
                                         <td>
                                             <div class="dropdown">
-                                                <button class="btn btn-link" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                                <button class="btn btn-link" type="button" data-toggle="dropdown">
                                                     <i class="fas fa-ellipsis-v"></i>
                                                 </button>
                                                 <div class="dropdown-menu">
-                                                    <a class="dropdown-item text-danger" href="#"
-                                                       onclick="deleteKey({{ $key->id }})">
+                                                    <a class="dropdown-item text-danger delete-key" href="#" data-id="{{ $key->id }}">
                                                         <i class="fas fa-trash mr-2"></i>Удалить
                                                     </a>
                                                 </div>
@@ -160,13 +181,35 @@
             .btn-link:hover {
                 text-decoration: none;
             }
+
+            .edit-date {
+                margin-left: 5px;
+                color: #3498db;
+            }
+
+            .edit-date:hover {
+                color: #2980b9;
+            }
+
+            .dropdown-item.text-danger:hover {
+                background-color: #fee2e2;
+            }
+
+            .flatpickr-input {
+                background-color: #fff !important;
+            }
         </style>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+        <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/material_blue.css">
     @endpush
 
     @push('js')
         <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.8/clipboard.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+        <script src="https://npmcdn.com/flatpickr/dist/l10n/ru.js"></script>
         <script>
             $(document).ready(function () {
+                // Инициализация Clipboard.js
                 var clipboard = new ClipboardJS('[data-clipboard-text]');
 
                 clipboard.on('success', function (e) {
@@ -176,6 +219,107 @@
 
                 clipboard.on('error', function (e) {
                     toastr.error('Ошибка копирования');
+                });
+
+                // Обработка редактирования дат
+                $('.edit-date').on('click', function() {
+                    const id = $(this).data('id');
+                    const type = $(this).data('type');
+                    const currentValue = $(this).data('value');
+                    
+                    // Создаем модальное окно
+                    const modal = $(`
+                        <div class="modal fade" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Изменить дату</h5>
+                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <input type="text" class="form-control datepicker" value="${currentValue}">
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
+                                        <button type="button" class="btn btn-primary save-date">Сохранить</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `);
+
+                    // Инициализируем календарь
+                    const picker = modal.find('.datepicker').flatpickr({
+                        enableTime: true,
+                        dateFormat: "Y-m-d H:i",
+                        time_24hr: true,
+                        locale: "ru",
+                        defaultDate: currentValue,
+                        minuteIncrement: 1
+                    });
+
+                    // Обработка сохранения
+                    modal.find('.save-date').on('click', function() {
+                        const newValue = picker.selectedDates[0];
+                        if (!newValue) {
+                            toastr.error('Выберите дату');
+                            return;
+                        }
+
+                        const data = {};
+                        data[type] = flatpickr.formatDate(newValue, "Y-m-d H:i");
+
+                        $.ajax({
+                            url: `/admin/module/key-activate/${id}/update-dates`,
+                            type: 'POST',
+                            data: data,
+                            headers: {
+                                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                            },
+                            success: function(response) {
+                                if (response.success) {
+                                    toastr.success(response.message);
+                                    location.reload();
+                                } else {
+                                    toastr.error(response.message);
+                                }
+                                modal.modal('hide');
+                            },
+                            error: function(xhr) {
+                                const response = xhr.responseJSON;
+                                toastr.error(response.message || 'Ошибка при обновлении даты');
+                                modal.modal('hide');
+                            }
+                        });
+                    });
+
+                    // Показываем модальное окно
+                    modal.modal('show');
+                });
+
+                // Обработка удаления
+                $('.delete-key').on('click', function(e) {
+                    e.preventDefault();
+                    const id = $(this).data('id');
+                    
+                    if (confirm('Вы уверены, что хотите удалить этот ключ?')) {
+                        $.ajax({
+                            url: `/admin/module/key-activate/${id}`,
+                            type: 'DELETE',
+                            headers: {
+                                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                            },
+                            success: function(response) {
+                                if (response.message) {
+                                    toastr.success(response.message);
+                                    setTimeout(() => location.reload(), 1000);
+                                }
+                            },
+                            error: function() {
+                                toastr.error('Ошибка при удалении ключа');
+                            }
+                        });
+                    }
                 });
             });
         </script>
