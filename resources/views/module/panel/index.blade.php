@@ -24,6 +24,59 @@
                         </button>
                     </x-slot>
 
+                    <form method="GET" action="/admin/module/panel" class="mb-4">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="server">Сервер</label>
+                                    <input type="text" class="form-control" id="server" name="server" 
+                                           value="{{ request('server') }}" 
+                                           placeholder="Поиск по имени или IP сервера">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="panel_adress">Адрес панели</label>
+                                    <input type="text" class="form-control" id="panel_adress" name="panel_adress" 
+                                           value="{{ request('panel_adress') }}" 
+                                           placeholder="Поиск по адресу панели">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="form-group">
+                                    <label for="status">Статус</label>
+                                    <select class="form-control" id="status" name="status">
+                                        <option value="">Все статусы</option>
+                                        <option value="{{ \App\Models\Panel\Panel::PANEL_CREATED }}" 
+                                            {{ request('status') == \App\Models\Panel\Panel::PANEL_CREATED ? 'selected' : '' }}>
+                                            Создана
+                                        </option>
+                                        <option value="{{ \App\Models\Panel\Panel::PANEL_CONFIGURED }}" 
+                                            {{ request('status') == \App\Models\Panel\Panel::PANEL_CONFIGURED ? 'selected' : '' }}>
+                                            Настроена
+                                        </option>
+                                        <option value="{{ \App\Models\Panel\Panel::PANEL_ERROR }}" 
+                                            {{ request('status') == \App\Models\Panel\Panel::PANEL_ERROR ? 'selected' : '' }}>
+                                            Ошибка
+                                        </option>
+                                        <option value="{{ \App\Models\Panel\Panel::PANEL_DELETED }}" 
+                                            {{ request('status') == \App\Models\Panel\Panel::PANEL_DELETED ? 'selected' : '' }}>
+                                            Удалена
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <div class="form-group">
+                                    <button type="submit" class="btn btn-primary">Фильтровать</button>
+                                    @if(request()->anyFilled(['server', 'panel_adress', 'status']))
+                                        <a href="/admin/module/panel" class="btn btn-secondary">Сбросить</a>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+
                     <x-table :headers="['#', 'Адрес панели', 'Тип', 'Логин', 'Пароль', 'Сервер', 'Статус', '']">
                         @forelse($panels as $panel)
                             <tr>
@@ -75,31 +128,16 @@
                                 </span>
                                 </td>
                                 <td>
-                                    @if($panel->panel_status !== Panel::PANEL_DELETED)
+                                    @if($panel->panel_status !== \App\Models\Panel\Panel::PANEL_DELETED)
                                         <div class="dropdown">
-                                            <button type="button" class="btn btn-link" data-toggle="dropdown">
+                                            <button class="btn btn-link" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                                 <i class="fas fa-ellipsis-v"></i>
                                             </button>
-                                            <div class="dropdown-menu dropdown-menu-right">
-                                                @if(!$panel->isConfigured())
-                                                    <form action="{{ route('admin.module.panel.configure', $panel) }}"
-                                                          method="POST" class="d-inline">
-                                                        @csrf
-                                                        <button type="submit" class="dropdown-item"
-                                                                onclick="return confirm('Вы уверены, что хотите настроить эту панель?')">
-                                                            <i class="fas fa-cog"></i> Настроить
-                                                        </button>
-                                                    </form>
-                                                @else
-                                                    <form action="{{ route('admin.module.panel.update-config', $panel) }}"
-                                                          method="POST" class="d-inline">
-                                                        @csrf
-                                                        <button type="submit" class="dropdown-item"
-                                                                onclick="return confirm('Вы уверены, что хотите обновить конфигурацию панели?')">
-                                                            <i class="fas fa-sync"></i> Обновить конфигурацию
-                                                        </button>
-                                                    </form>
-                                                @endif
+                                            <div class="dropdown-menu">
+                                                <a class="dropdown-item text-danger" href="#"
+                                                   onclick="deletePanel({{ $panel->id }})">
+                                                    <i class="fas fa-trash mr-2"></i>Удалить
+                                                </a>
                                             </div>
                                         </div>
                                     @endif

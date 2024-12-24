@@ -67,4 +67,35 @@ class PanelRepository extends BaseRepository
                 return [$server->id => "{$server->name}{$locationName}"];
             });
     }
+
+    /**
+     * Get filtered panels
+     * @param array $filters
+     * @param int $perPage
+     * @return LengthAwarePaginator
+     */
+    public function getFilteredPanels(array $filters = [], int $perPage = 10)
+    {
+        $query = $this->query()->with('server');
+
+        // Фильтр по серверу (минимум 3 символа)
+        if (!empty($filters['server']) && strlen($filters['server']) >= 3) {
+            $query->whereHas('server', function($q) use ($filters) {
+                $q->where('name', 'like', "%{$filters['server']}%")
+                  ->orWhere('ip', 'like', "%{$filters['server']}%");
+            });
+        }
+
+        // Фильтр по адресу панели (минимум 3 символа)
+        if (!empty($filters['panel_adress']) && strlen($filters['panel_adress']) >= 3) {
+            $query->where('panel_adress', 'like', "%{$filters['panel_adress']}%");
+        }
+
+        // Фильтр по статусу
+        if (!empty($filters['status'])) {
+            $query->where('panel_status', $filters['status']);
+        }
+
+        return $query->latest()->paginate($perPage);
+    }
 }

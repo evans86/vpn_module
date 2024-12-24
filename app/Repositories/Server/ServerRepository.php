@@ -66,4 +66,37 @@ class ServerRepository extends BaseRepository
         $server->save();
         return $server;
     }
+
+    /**
+     * Get filtered servers
+     * @param array $filters
+     * @param int $perPage
+     * @return LengthAwarePaginator
+     */
+    public function getFilteredServers(array $filters = [], int $perPage = 10)
+    {
+        $query = $this->query()->with('location');
+
+        // Фильтр по названию (минимум 3 символа)
+        if (!empty($filters['name']) && strlen($filters['name']) >= 3) {
+            $query->where('name', 'like', "%{$filters['name']}%");
+        }
+
+        // Фильтр по IP (минимум 3 символа)
+        if (!empty($filters['ip']) && strlen($filters['ip']) >= 3) {
+            $query->where('ip', 'like', "%{$filters['ip']}%");
+        }
+
+        // Фильтр по хосту (минимум 3 символа)
+        if (!empty($filters['host']) && strlen($filters['host']) >= 3) {
+            $query->where('host', 'like', "%{$filters['host']}%");
+        }
+
+        // Фильтр по статусу
+        if (!empty($filters['status'])) {
+            $query->where('server_status', $filters['status']);
+        }
+
+        return $query->latest()->paginate($perPage);
+    }
 }

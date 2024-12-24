@@ -37,6 +37,66 @@
                         </button>
                     </x-slot>
 
+                    <form method="GET" action="/admin/module/server" class="mb-4">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="name">Название</label>
+                                    <input type="text" class="form-control" id="name" name="name" 
+                                           value="{{ request('name') }}" 
+                                           placeholder="Поиск по названию">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="ip">IP-адрес</label>
+                                    <input type="text" class="form-control" id="ip" name="ip" 
+                                           value="{{ request('ip') }}" 
+                                           placeholder="Поиск по IP">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="form-group">
+                                    <label for="host">Хост</label>
+                                    <input type="text" class="form-control" id="host" name="host" 
+                                           value="{{ request('host') }}" 
+                                           placeholder="Поиск по хосту">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="form-group">
+                                    <label for="status">Статус</label>
+                                    <select class="form-control" id="status" name="status">
+                                        <option value="">Все статусы</option>
+                                        <option value="{{ Server::SERVER_CREATED }}" {{ request('status') == Server::SERVER_CREATED ? 'selected' : '' }}>
+                                            Создан
+                                        </option>
+                                        <option value="{{ Server::SERVER_CONFIGURED }}" {{ request('status') == Server::SERVER_CONFIGURED ? 'selected' : '' }}>
+                                            Настроен
+                                        </option>
+                                        <option value="{{ Server::SERVER_ERROR }}" {{ request('status') == Server::SERVER_ERROR ? 'selected' : '' }}>
+                                            Ошибка
+                                        </option>
+                                        <option value="{{ Server::SERVER_DELETED }}" {{ request('status') == Server::SERVER_DELETED ? 'selected' : '' }}>
+                                            Удален
+                                        </option>
+                                        <option value="{{ Server::SERVER_PASSWORD_UPDATE }}" {{ request('status') == Server::SERVER_PASSWORD_UPDATE ? 'selected' : '' }}>
+                                            Обновление пароля
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <div class="form-group">
+                                    <button type="submit" class="btn btn-primary">Фильтровать</button>
+                                    @if(request()->anyFilled(['name', 'ip', 'host', 'status']))
+                                        <a href="/admin/module/server" class="btn btn-secondary">Сбросить</a>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+
                     <x-table :headers="['#', 'Название', 'IP', 'Логин', 'Хост', 'Локация', 'Статус', '']">
                         @if($servers->isEmpty())
                             <tr>
@@ -70,7 +130,7 @@
                                     <td>
                                         @if($server->server_status !== \App\Models\Server\Server::SERVER_DELETED)
                                             <div class="dropdown">
-                                                <button class="btn btn-link" type="button" data-toggle="dropdown">
+                                                <button class="btn btn-link" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                                     <i class="fas fa-ellipsis-v"></i>
                                                 </button>
                                                 <div class="dropdown-menu">

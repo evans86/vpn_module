@@ -58,24 +58,22 @@
 
     <!-- Required Scripts -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/metismenu/dist/metisMenu.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/perfect-scrollbar@1.5.5/dist/perfect-scrollbar.min.js" crossorigin="anonymous"></script>
-    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js" crossorigin="anonymous"></script>
-
-    <script src="{{ \App\Helpers\AssetHelper::asset('mota/centre/global/global.min.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ \App\Helpers\AssetHelper::asset('mota/centre/bootstrap-select/dist/js/bootstrap-select.min.js') }}"></script>
+    <script src="{{ \App\Helpers\AssetHelper::asset('mota/centre/chartist/js/chartist.min.js') }}"></script>
+    <script src="{{ \App\Helpers\AssetHelper::asset('mota/centre/chartist-plugin-tooltips/js/chartist-plugin-tooltip.min.js') }}"></script>
+    <script src="{{ \App\Helpers\AssetHelper::asset('mota/centre/jqvmap/js/jquery.vmap.min.js') }}"></script>
+    <script src="{{ \App\Helpers\AssetHelper::asset('mota/centre/jqvmap/js/jquery.vmap.usa.js') }}"></script>
+    <script src="{{ \App\Helpers\AssetHelper::asset('mota/js/plugins-init/jqvmap-init.js') }}"></script>
     <script src="{{ \App\Helpers\AssetHelper::asset('mota/js/custom.min.js') }}"></script>
     <script src="{{ \App\Helpers\AssetHelper::asset('mota/js/deznav-init.js') }}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"></script>
 
     <!-- Charts and Graphs -->
     <script src="{{ \App\Helpers\AssetHelper::asset('mota/centre/chart.js/Chart.bundle.min.js') }}"></script>
     <script src="{{ \App\Helpers\AssetHelper::asset('mota/centre/apexchart/apexchart.js') }}"></script>
     <script src="{{ \App\Helpers\AssetHelper::asset('mota/centre/peity/jquery.peity.min.js') }}"></script>
-    <script src="{{ \App\Helpers\AssetHelper::asset('mota/centre/chartist/js/chartist.min.js') }}"></script>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js" crossorigin="anonymous"></script>
 
     <!-- Initialize AOS -->
     <script>

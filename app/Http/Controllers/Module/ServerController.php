@@ -29,7 +29,7 @@ class ServerController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
             $this->logger->info('Accessing servers list', [
@@ -37,7 +37,8 @@ class ServerController extends Controller
                 'user_id' => auth()->id()
             ]);
 
-            $servers = $this->serverRepository->getPaginatedWithRelations();
+            $filters = $request->only(['name', 'ip', 'host', 'status']);
+            $servers = $this->serverRepository->getFilteredServers($filters);
             $locations = $this->serverRepository->getLocationsForDropdown();
 
             return view('module.server.index', compact('servers', 'locations'));
@@ -49,7 +50,7 @@ class ServerController extends Controller
                 'user_id' => auth()->id()
             ]);
 
-            return back()->withErrors('Error loading servers list: ' . $e->getMessage());
+            throw $e;
         }
     }
 
