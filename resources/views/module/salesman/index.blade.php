@@ -9,6 +9,33 @@
                         <h4 class="card-title">Список продавцов</h4>
                     </div>
                     <div class="card-body">
+                        <form method="GET" action="{{ url('/admin/module/salesman') }}" class="mb-4">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="id">ID</label>
+                                        <input type="number" class="form-control" id="id" name="id" 
+                                               value="{{ request('id') }}" placeholder="Введите ID">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="telegram_id">Telegram ID</label>
+                                        <input type="number" class="form-control" id="telegram_id" name="telegram_id"
+                                               value="{{ request('telegram_id') }}" placeholder="Введите Telegram ID">
+                                    </div>
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end">
+                                    <div class="form-group">
+                                        <button type="submit" class="btn btn-primary">Фильтровать</button>
+                                        @if(request('id') || request('telegram_id'))
+                                            <a href="{{ url('/admin/module/salesman') }}" class="btn btn-secondary">Сбросить</a>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+
                         <div class="table-responsive">
                             <table class="table table-responsive-md">
                                 <thead>
@@ -44,7 +71,7 @@
                             </table>
                         </div>
                         <div class="d-flex">
-                            {{ $salesmen->links() }}
+                            {{ $salesmen->appends(request()->query())->links() }}
                         </div>
                     </div>
                 </div>

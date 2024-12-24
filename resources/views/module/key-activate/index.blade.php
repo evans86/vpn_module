@@ -9,6 +9,58 @@
                         <h4 class="card-title">Ключи активации</h4>
                     </div>
                     <div class="card-body">
+                        <form method="GET" action="{{ url('/admin/module/key-activate') }}" class="mb-4">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="id">ID ключа</label>
+                                        <input type="text" class="form-control" id="id" name="id" value="{{ request('id') }}" placeholder="Введите ID">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="pack_id">ID пакета</label>
+                                        <input type="text" class="form-control" id="pack_id" name="pack_id" value="{{ request('pack_id') }}" placeholder="Введите ID пакета">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="status">Статус</label>
+                                        <select class="form-control select2" id="status" name="status">
+                                            <option value="">Все статусы</option>
+                                            @foreach($statuses as $value => $label)
+                                                <option value="{{ $value }}" {{ request('status') == $value ? 'selected' : '' }}>
+                                                    {{ $label }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="user_tg_id">Telegram ID покупателя</label>
+                                        <input type="number" class="form-control" id="user_tg_id" name="user_tg_id"
+                                               value="{{ request('user_tg_id') }}" placeholder="Введите Telegram ID">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="telegram_id">Telegram ID продавца</label>
+                                        <input type="text" class="form-control" id="telegram_id" name="telegram_id"
+                                               value="{{ request('telegram_id') }}" placeholder="Введите Telegram ID">
+                                    </div>
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end">
+                                    <div class="form-group">
+                                        <button type="submit" class="btn btn-primary">Фильтровать</button>
+                                        @if(request('pack_id') || request('status') || request('user_tg_id') || request('id') || request('telegram_id'))
+                                            <a href="{{ url('/admin/module/key-activate') }}" class="btn btn-secondary">Сбросить</a>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+
                         <div class="table-responsive">
                             <table class="table table-responsive-md">
                                 <thead>
@@ -16,7 +68,8 @@
                                     <th><strong>ID</strong></th>
                                     <th><strong>Трафик</strong></th>
                                     <th><strong>Пакет</strong></th>
-                                    <th><strong>Действует до</strong></th>
+                                    <th><strong>Продавец</strong></th>
+                                    <th><strong>Дата окончания</strong></th>
                                     <th><strong>Telegram ID</strong></th>
                                     <th><strong>Активировать до</strong></th>
                                     <th><strong>Статус</strong></th>
@@ -26,13 +79,33 @@
                                 <tbody>
                                 @foreach($activate_keys as $key)
                                     <tr>
-                                        <td><strong>{{ substr($key->id, 0, 8) }}</strong></td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <span>{{ substr($key->id, 0, 8) }}...</span>
+                                                <button class="btn btn-sm btn-link ml-2"
+                                                        data-clipboard-text="{{ $key->id }}"
+                                                        title="Копировать ID">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                        </td>
                                         <td>{{ number_format($key->traffic_limit / (1024*1024*1024), 1) }} GB</td>
                                         <td>
                                             @if($key->packSalesman)
-                                                {{ $key->packSalesman->pack->name }}
+                                                <a href="{{ url('/admin/module/pack?id=' . $key->packSalesman->pack_id) }}" class="text-primary">
+                                                    {{ $key->packSalesman->pack_id }}
+                                                </a>
                                             @else
-                                                -
+                                                Не указан
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if($key->packSalesman && $key->packSalesman->salesman)
+                                                <a href="{{ url('/admin/module/salesman?telegram_id=' . $key->packSalesman->salesman->telegram_id) }}" class="text-primary">
+                                                    {{ $key->packSalesman->salesman->telegram_id }}
+                                                </a>
+                                            @else
+                                                Не указан
                                             @endif
                                         </td>
                                         <td>{{ date('d.m.Y H:i', $key->finish_at) }}</td>
@@ -53,27 +126,14 @@
                                         </td>
                                         <td>
                                             <div class="dropdown">
-                                                <button type="button" class="btn btn-success light sharp"
-                                                        data-toggle="dropdown">
-                                                    <svg width="20px" height="20px" viewBox="0 0 24 24" version="1.1">
-                                                        <g stroke="none" stroke-width="1" fill="none"
-                                                           fill-rule="evenodd">
-                                                            <rect x="0" y="0" width="24" height="24"/>
-                                                            <circle fill="#000000" cx="5" cy="12" r="2"/>
-                                                            <circle fill="#000000" cx="12" cy="12" r="2"/>
-                                                            <circle fill="#000000" cx="19" cy="12" r="2"/>
-                                                        </g>
-                                                    </svg>
+                                                <button class="btn btn-link" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                                    <i class="fas fa-ellipsis-v"></i>
                                                 </button>
                                                 <div class="dropdown-menu">
-                                                    <a class="dropdown-item" href="#"
-                                                       onclick="copyKeyId('{{ $key->id }}')">Копировать ID</a>
-                                                    @if($key->status == \App\Models\KeyActivate\KeyActivate::PAID)
-                                                        <a class="dropdown-item text-success" href="#"
-                                                           onclick="testActivation('{{ $key->id }}')">Тест активации</a>
-                                                    @endif
                                                     <a class="dropdown-item text-danger" href="#"
-                                                       onclick="deleteKey('{{ $key->id }}')">Удалить</a>
+                                                       onclick="deleteKey({{ $key->id }})">
+                                                        <i class="fas fa-trash mr-2"></i>Удалить
+                                                    </a>
                                                 </div>
                                             </div>
                                         </td>
@@ -82,73 +142,42 @@
                                 </tbody>
                             </table>
                         </div>
-                        <div class="d-flex justify-content-center mt-3">
-                            {{ $activate_keys->links() }}
+                        <div class="d-flex">
+                            {{ $activate_keys->appends(request()->query())->links() }}
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-@endsection
 
-@push('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script>
-        // Настройка CSRF-токена для всех AJAX-запросов
-        const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        axios.defaults.headers.common['X-CSRF-TOKEN'] = token;
+    @push('css')
+        <style>
+            .btn-link {
+                padding: 0 5px;
+            }
 
-        function copyKeyId(id) {
-            navigator.clipboard.writeText(id).then(function () {
-                toastr.success('ID ключа скопирован в буфер обмена');
-            }).catch(function () {
-                toastr.error('Не удалось скопировать ID ключа');
+            .btn-link:hover {
+                text-decoration: none;
+            }
+        </style>
+    @endpush
+
+    @push('js')
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.8/clipboard.min.js"></script>
+        <script>
+            $(document).ready(function () {
+                var clipboard = new ClipboardJS('[data-clipboard-text]');
+
+                clipboard.on('success', function (e) {
+                    toastr.success('Скопировано в буфер обмена');
+                    e.clearSelection();
+                });
+
+                clipboard.on('error', function (e) {
+                    toastr.error('Ошибка копирования');
+                });
             });
-        }
-
-        function testActivation(id) {
-            if (confirm('Выполнить тестовую активацию ключа?')) {
-                console.log('Отправка запроса на активацию ключа:', id);
-                console.log('CSRF token:', token);
-
-                axios.post(`/admin/module/key-activate/${id}/test-activate`, {}, {
-                    headers: {
-                        'X-CSRF-TOKEN': token,
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                })
-                    .then(function (response) {
-                        console.log('Успешный ответ:', response.data);
-                        toastr.success(response.data.message || 'Ключ успешно активирован');
-                        setTimeout(() => window.location.reload(), 1000);
-                    })
-                    .catch(function (error) {
-                        console.error('Полная информация об ошибке:', error);
-                        console.error('Ответ сервера:', error.response?.data);
-                        toastr.error(error.response?.data?.message || 'Ошибка при активации ключа');
-                    });
-            }
-        }
-
-        function deleteKey(id) {
-            if (confirm('Вы уверены, что хотите удалить этот ключ?')) {
-                axios.delete(`/admin/module/key-activate/${id}`, {
-                    headers: {
-                        'X-CSRF-TOKEN': token,
-                        'Accept': 'application/json'
-                    }
-                })
-                    .then(function (response) {
-                        toastr.success(response.data.message || 'Ключ успешно удален');
-                        setTimeout(() => window.location.reload(), 1000);
-                    })
-                    .catch(function (error) {
-                        console.error('Ошибка при удалении:', error.response?.data);
-                        toastr.error(error.response?.data?.message || 'Ошибка при удалении ключа');
-                    });
-            }
-        }
-    </script>
-@endpush
+        </script>
+    @endpush
+@endsection

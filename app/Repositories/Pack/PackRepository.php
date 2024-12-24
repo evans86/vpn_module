@@ -17,15 +17,25 @@ class PackRepository extends BaseRepository implements PackRepositoryInterface
     }
 
     /**
-     * Get all packs with pagination
+     * Get all packs with pagination and filters
+     *
+     * @param array $filters
      * @param int $perPage
      * @return LengthAwarePaginator
      */
-    public function getAllPaginated(int $perPage = 10): LengthAwarePaginator
+    public function getAllPaginated(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
-        return $this->query()
-            ->orderBy('id', 'desc')
-            ->paginate($perPage);
+        $query = $this->query();
+
+        if (isset($filters['id'])) {
+            $query->where('id', $filters['id']);
+        }
+
+        if (isset($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        return $query->orderBy('created_at', 'desc')->paginate($perPage);
     }
 
     /**

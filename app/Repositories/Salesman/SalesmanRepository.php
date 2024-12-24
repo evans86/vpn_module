@@ -39,13 +39,24 @@ class SalesmanRepository extends BaseRepository
     }
 
     /**
-     * Get paginated salesmen list
+     * Get paginated salesmen list with filters
      * @param int $perPage
+     * @param array $filters
      * @return LengthAwarePaginator
      */
-    public function getPaginated(int $perPage = 20): LengthAwarePaginator
+    public function getPaginated(int $perPage = 20, array $filters = []): LengthAwarePaginator
     {
-        return $this->query()
+        $query = $this->query();
+
+        if (isset($filters['id'])) {
+            $query->where('id', $filters['id']);
+        }
+
+        if (isset($filters['telegram_id'])) {
+            $query->where('telegram_id', $filters['telegram_id']);
+        }
+
+        return $query
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
     }

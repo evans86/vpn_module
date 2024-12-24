@@ -317,7 +317,9 @@ class FatherBotController extends AbstractTelegramBot
                 $webhookUrl = rtrim(self::WEBHOOK_BASE_URL, '/') . '/api/telegram/salesman-bot/' . $token . '/init';
                 $salesmanBot->setWebhook(['url' => $webhookUrl]);
 
-                $this->sendMessage("✅ Бот успешно добавлен!\n\nТеперь вы можете купить пакет VPN-доступов.");
+                $message = "✅ Бот успешно добавлен!\n\nТеперь вы можете купить пакет VPN-доступов.";
+                $this->generateMenu($message);
+//                $this->sendMessage("✅ Бот успешно добавлен!\n\nТеперь вы можете купить пакет VPN-доступов.");
             }
         } catch (\Exception $e) {
             Log::error('Bot token validation error: ' . $e->getMessage());

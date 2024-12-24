@@ -28,10 +28,11 @@ class SalesmanController extends Controller
 
     /**
      * Display a listing of salesmen
+     * @param Request $request
      * @return View
      * @throws Exception
      */
-    public function index(): View
+    public function index(Request $request)
     {
         try {
             Log::info('Accessing salesman list', [
@@ -39,9 +40,10 @@ class SalesmanController extends Controller
                 'user_id' => auth()->id()
             ]);
 
-            $salesmen = $this->salesmanRepository->getPaginated();
+            $filters = array_filter($request->only(['id', 'telegram_id']));
+            $salesmen = $this->salesmanRepository->getPaginated(20, $filters);
 
-            return view('module.salesman.index', compact('salesmen'));
+            return view('module.salesman.index', compact('salesmen', 'filters'));
         } catch (Exception $e) {
             Log::error('Error accessing salesman list', [
                 'source' => 'salesman',

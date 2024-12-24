@@ -5,7 +5,6 @@ namespace App\Models\KeyActivate;
 use App\Models\PackSalesman\PackSalesman;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use phpseclib\Math\BigInteger;
 
 /**
@@ -31,9 +30,12 @@ class KeyActivate extends Model
     protected $guarded = false;
     protected $table = 'key_activate';
 
-    public function packSalesman(): BelongsTo
+    /**
+     * Get the pack salesman relation
+     */
+    public function packSalesman()
     {
-        return $this->belongsTo(PackSalesman::class, 'pack_salesman_id');
+        return $this->belongsTo(\App\Models\PackSalesman\PackSalesman::class, 'pack_salesman_id');
     }
 
     /**

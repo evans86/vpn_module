@@ -1,173 +1,148 @@
 @extends('layouts.app', ['page' => __('Пакеты'), 'pageSlug' => 'packs'])
 
-@php
-    use App\Models\Pack\Pack;
-@endphp
-
 @section('content')
     <div class="container-fluid">
-        @if(session('error'))
-            <x-alert type="danger">{{ session('error') }}</x-alert>
-        @endif
-
-        @if(session('success'))
-            <x-alert type="success">{{ session('success') }}</x-alert>
-        @endif
         <div class="row">
-            <div class="col-lg-12">
-                <x-card title="Список пакетов VPN">
-                    <x-slot name="tools">
-                        <button type="button" class="btn btn-primary" data-toggle="modal"
-                                data-target="#createPackModal">
-                            <i class="fas fa-plus"></i> Добавить пакет
-                        </button>
-                    </x-slot>
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="row">
+                            <div class="col-6">
+                                <h4 class="card-title">Пакеты</h4>
+                            </div>
+                            <div class="col-6 text-right">
+                                <button type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center py-1" data-toggle="modal"
+                                        data-target="#createPackModal">
+                                    <i class="fas fa-plus mr-1"></i>Добавить пакет
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <form method="GET" action="/admin/module/pack" class="mb-4">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="id">ID пакета</label>
+                                        <input type="number" class="form-control" id="id" name="id"
+                                               value="{{ request('id') }}" placeholder="Введите ID пакета">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="status">Статус</label>
+                                        <select class="form-control" id="status" name="status">
+                                            <option value="">Все статусы</option>
+                                            <option value="1" {{ request('status') == '1' ? 'selected' : '' }}>Активен</option>
+                                            <option value="0" {{ request('status') == '0' ? 'selected' : '' }}>Неактивен</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <div class="form-group">
+                                        <button type="submit" class="btn btn-primary">Фильтровать</button>
+                                        @if(request('id') || request('status'))
+                                            <a href="/admin/module/pack" class="btn btn-secondary">Сбросить</a>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
 
-                    <x-table :headers="['#', 'Цена', 'Период', 'Трафик', 'Ключи', 'Время активации', 'Статус', '']">
-                        @if($packs->isEmpty())
-                            <tr>
-                                <td colspan="8" class="text-center text-muted">
-                                    <i class="fas fa-info-circle"></i> Пакеты не найдены
-                                </td>
-                            </tr>
-                        @else
-                            @foreach($packs as $pack)
-                                <tr>
-                                    <td><strong>{{ $pack->id }}</strong></td>
-                                    <td>{{ number_format($pack->price, 0, '.', ' ') }} ₽</td>
-                                    <td>{{ $pack->period }} дней</td>
-                                    <td>{{ number_format($pack->traffic_limit / 1024 / 1024 / 1024, 0) }} GB</td>
-                                    <td>{{ $pack->count }} шт</td>
-                                    <td>{{ floor($pack->activate_time / 3600) }} часов</td>
-                                    <td>
-                                    <span class="badge badge-{{ $pack->status ? 'success' : 'danger' }}">
-                                        {{ $pack->status ? 'Активен' : 'Неактивен' }}
-                                    </span>
-                                    </td>
-                                    <td>
-                                        <div class="dropdown">
-                                            <button class="btn btn-link" type="button" data-toggle="dropdown">
-                                                <i class="fas fa-ellipsis-v"></i>
-                                            </button>
-                                            <div class="dropdown-menu">
-                                                <a class="dropdown-item" href="#" data-toggle="modal"
-                                                   data-target="#editPackModal{{ $pack->id }}">
-                                                    <i class="fas fa-edit mr-2"></i>Редактировать
-                                                </a>
-                                                <a href="#" class="dropdown-item text-danger"
-                                                   onclick="event.preventDefault(); deletePack({{ $pack->id }})">
-                                                    <i class="fas fa-trash"></i> Удалить
-                                                </a>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforeach
+                        @if(session('success'))
+                            <div class="alert alert-success">
+                                {{ session('success') }}
+                            </div>
                         @endif
-                    </x-table>
 
-                    <div class="d-flex justify-content-center mt-3">
+                        @if(session('error'))
+                            <div class="alert alert-danger">
+                                {{ session('error') }}
+                            </div>
+                        @endif
+
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Цена</th>
+                                    <th>Период</th>
+                                    <th>Трафик</th>
+                                    <th>Ключи</th>
+                                    <th>Время активации</th>
+                                    <th>Статус</th>
+                                    <th>Действия</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                @forelse($packs as $pack)
+                                    <tr>
+                                        <td>{{ $pack->id }}</td>
+                                        <td>{{ $pack->price }} ₽</td>
+                                        <td>{{ $pack->period }} дней</td>
+                                        <td>{{ number_format($pack->traffic_limit / (1024*1024*1024), 1) }} GB</td>
+                                        <td>{{ $pack->count }}</td>
+                                        <td>{{ floor($pack->activate_time / 3600) }} ч.</td>
+                                        <td>
+                                            <span class="badge badge-{{ $pack->status ? 'success' : 'danger' }}">
+                                                {{ $pack->status ? 'Активен' : 'Неактивен' }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <form action="/admin/module/pack/{{ $pack->id }}" method="POST" class="d-inline">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Вы уверены?')">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="8" class="text-center">Пакеты не найдены</td>
+                                    </tr>
+                                @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+
                         {{ $packs->links() }}
                     </div>
-                </x-card>
+                </div>
             </div>
         </div>
     </div>
 
     {{-- Модальное окно создания --}}
     <x-modal id="createPackModal" title="Добавить пакет">
-        <form action="{{ secure_url('admin/module/pack') }}" method="POST">
+        <form action="/admin/module/pack" method="POST">
             @csrf
-
-            <x-form.input type="number" name="price" label="Цена (₽)" required min="0"/>
-            <x-form.input type="number" name="period" label="Период действия (дней)" required min="1" value="30"/>
-            <x-form.input type="number" name="traffic_limit" label="Лимит трафика (GB)" required min="1" value="10"/>
-            <x-form.input type="number" name="count" label="Количество ключей" required min="1" value="5"/>
-            <x-form.input type="number" name="activate_time" label="Время на активацию (часов)" required min="1"
-                          value="24"/>
-
-            <div class="text-right">
+            <div class="form-group">
+                <label for="price">Цена (₽)</label>
+                <input type="number" class="form-control" id="price" name="price" required min="0">
+            </div>
+            <div class="form-group">
+                <label for="period">Период действия (дней)</label>
+                <input type="number" class="form-control" id="period" name="period" required min="1" value="30">
+            </div>
+            <div class="form-group">
+                <label for="traffic_limit">Лимит трафика (GB)</label>
+                <input type="number" class="form-control" id="traffic_limit" name="traffic_limit" required min="1" value="10">
+            </div>
+            <div class="form-group">
+                <label for="count">Количество ключей</label>
+                <input type="number" class="form-control" id="count" name="count" required min="1" value="5">
+            </div>
+            <div class="form-group">
+                <label for="activate_time">Время на активацию (часов)</label>
+                <input type="number" class="form-control" id="activate_time" name="activate_time" required min="1" value="24">
+            </div>
+            <div class="modal-footer px-0 pb-0">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Создать
-                </button>
+                <button type="submit" class="btn btn-primary">Создать</button>
             </div>
         </form>
     </x-modal>
 @endsection
-
-@foreach($packs as $pack)
-    {{-- Модальные окна редактирования --}}
-    <x-modal id="editPackModal{{ $pack->id }}" title="Редактировать пакет #{{ $pack->id }}">
-        <form action="{{ secure_url('admin/module/pack/' . $pack->id) }}" method="POST">
-            @csrf
-            @method('PUT')
-
-            <x-form.input type="number" name="price" label="Цена (₽)" required min="0" :value="$pack->price"/>
-            <x-form.input type="number" name="period" label="Период действия (дней)" required min="1"
-                          :value="$pack->period"/>
-            <x-form.input type="number" name="traffic_limit" label="Лимит трафика (GB)" required min="1"
-                          :value="round($pack->traffic_limit/1024/1024/1024)"/>
-            <x-form.input type="number" name="count" label="Количество ключей" required min="1" :value="$pack->count"/>
-            <x-form.input type="number" name="activate_time" label="Время на активацию (часов)" required min="1"
-                          :value="floor($pack->activate_time/3600)"/>
-
-            <x-form.select name="status" label="Статус" :options="[1 => 'Активен', 0 => 'Неактивен']"
-                           :value="$pack->status"/>
-
-            <div class="text-right">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-save"></i> Сохранить
-                </button>
-            </div>
-        </form>
-    </x-modal>
-@endforeach
-
-@push('js')
-    <script>
-        function deletePack(id) {
-            if (confirm('Вы уверены, что хотите удалить этот пакет?')) {
-                $.ajax({
-                    url: '{{ route('admin.module.pack.destroy', ':id') }}'.replace(':id', id),
-                    method: 'DELETE',
-                    data: {
-                        _token: '{{ csrf_token() }}'
-                    },
-                    success: function (response) {
-                        toastr.success('Пакет успешно удален');
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1000);
-                    },
-                    error: function (xhr) {
-                        toastr.error('Ошибка при удалении пакета');
-                    }
-                });
-            }
-        }
-
-        $(document).ready(function () {
-            // Настройка toastr
-            toastr.options = {
-                "closeButton": true,
-                "progressBar": true,
-                "positionClass": "toast-top-right",
-                "timeOut": "3000"
-            };
-        });
-    </script>
-@endpush
-
-@push('css')
-    <style>
-        .btn-link {
-            padding: 0 5px;
-        }
-
-        .btn-link:hover {
-            text-decoration: none;
-        }
-    </style>
-@endpush

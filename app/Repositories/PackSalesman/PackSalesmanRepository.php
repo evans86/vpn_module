@@ -31,7 +31,7 @@ class PackSalesmanRepository extends BaseRepository
      * @param int $id
      * @return PackSalesman
      */
-    public function findByIdOrFail(int $id)
+    public function findByIdOrFail(int $id): PackSalesman
     {
         /** @var PackSalesman */
         return $this->query()
@@ -49,25 +49,55 @@ class PackSalesmanRepository extends BaseRepository
         /** @var PackSalesman|null $result */
         $result = $this->query()
             ->where('salesman_id', $salesmanId)
-            ->where('status', PackSalesman::PAID)
+            ->where('paid', true)
             ->first();
+
         return $result;
     }
 
     /**
-     * Find paid pack by salesman ID or fail
+     * Find pack by salesman ID
      * @param int $salesmanId
-     * @return PackSalesman
-     * @throws ModelNotFoundException
+     * @return PackSalesman|null
      */
-    public function findPaidBySalesmanIdOrFail(int $salesmanId): PackSalesman
+    public function findBySalesmanId(int $salesmanId): ?PackSalesman
     {
-        /** @var PackSalesman $result */
+        /** @var PackSalesman|null $result */
         $result = $this->query()
             ->where('salesman_id', $salesmanId)
-            ->where('status', PackSalesman::PAID)
-            ->firstOrFail();
+            ->first();
+
         return $result;
+    }
+
+    /**
+     * Find pack by salesman ID and pack ID
+     * @param int $salesmanId
+     * @param int $packId
+     * @return PackSalesman|null
+     */
+    public function findBySalesmanIdAndPackId(int $salesmanId, int $packId): ?PackSalesman
+    {
+        /** @var PackSalesman|null $result */
+        $result = $this->query()
+            ->where('salesman_id', $salesmanId)
+            ->where('pack_id', $packId)
+            ->first();
+
+        return $result;
+    }
+
+    /**
+     * Increment count of sold keys
+     * @param int $id
+     * @return PackSalesman
+     */
+    public function incrementSoldKeys(int $id): PackSalesman
+    {
+        $packSalesman = $this->findByIdOrFail($id);
+        $packSalesman->sold_keys++;
+        $packSalesman->save();
+        return $packSalesman;
     }
 
     /**

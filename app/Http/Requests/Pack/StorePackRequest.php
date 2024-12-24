@@ -43,10 +43,17 @@ class StorePackRequest extends FormRequest
     {
         $validated = parent::validated();
 
-        // Конвертируем GB в байты
-        $validated['traffic_limit'] = $validated['traffic_limit'] * 1024 * 1024 * 1024;
-        // Конвертируем часы в секунды
-        $validated['activate_time'] = $validated['activate_time'] * 3600;
+        // Конвертируем только если данные еще не были сконвертированы
+        if (isset($validated['traffic_limit']) && $validated['traffic_limit'] < 1024*1024*1024) {
+            // Конвертируем GB в байты
+            $validated['traffic_limit'] = $validated['traffic_limit'] * 1024 * 1024 * 1024;
+        }
+        
+        if (isset($validated['activate_time']) && $validated['activate_time'] < 3600) {
+            // Конвертируем часы в секунды
+            $validated['activate_time'] = $validated['activate_time'] * 3600;
+        }
+        
         // По умолчанию пакет активен
         $validated['status'] = true;
 

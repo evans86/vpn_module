@@ -3,11 +3,9 @@
 namespace App\Services\Key;
 
 use App\Models\KeyActivate\KeyActivate;
-use App\Models\Panel\Panel;
-use App\Repositories\Panel\PanelRepository;
-use App\Services\Panel\PanelStrategy;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Repositories\PackSalesman\PackSalesmanRepository;
+use App\Repositories\Panel\PanelRepository;
 use App\Logging\DatabaseLogger;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Str;
@@ -16,7 +14,6 @@ use Exception;
 
 class KeyActivateService
 {
-    private PanelStrategy $panelStrategy;
     private KeyActivateRepository $keyActivateRepository;
     private PackSalesmanRepository $packSalesmanRepository;
     private DatabaseLogger $logger;
@@ -25,8 +22,8 @@ class KeyActivateService
     public function __construct(
         KeyActivateRepository  $keyActivateRepository,
         PackSalesmanRepository $packSalesmanRepository,
-        PanelRepository        $panelRepository,
-        DatabaseLogger         $logger
+        PanelRepository       $panelRepository,
+        DatabaseLogger        $logger
     )
     {
         $this->keyActivateRepository = $keyActivateRepository;
@@ -119,7 +116,7 @@ class KeyActivateService
                 throw new RuntimeException('Ключ уже используется другим пользователем');
             }
 
-            //@TODO Не работает панель
+//@TODO Не работает панель
 
 //            // Получаем активную панель Marzban
 //            $panel = $this->panelRepository->getConfiguredMarzbanPanel();
@@ -224,6 +221,35 @@ class KeyActivateService
             ]);
 
             throw new RuntimeException('Ошибка при обновлении статуса ключа: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get paginated key activates with pack relations and filters
+     *
+     * @param array $filters
+     * @param int $perPage
+     * @return \Illuminate\Pagination\LengthAwarePaginator
+     */
+    public function getPaginatedWithPack(array $filters = [], int $perPage = 10)
+    {
+        try {
+            $this->logger->info('Getting paginated key activates with filters', [
+                'source' => 'key_activate',
+                'action' => 'get_paginated',
+                'filters' => $filters
+            ]);
+
+            return $this->keyActivateRepository->getPaginatedWithPack($filters, $perPage);
+        } catch (Exception $e) {
+            $this->logger->error('Failed to get paginated key activates', [
+                'source' => 'key_activate',
+                'action' => 'get_paginated',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            throw new RuntimeException("Failed to get key activates: {$e->getMessage()}");
         }
     }
 }

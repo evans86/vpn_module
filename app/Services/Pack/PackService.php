@@ -25,21 +25,23 @@ class PackService
     }
 
     /**
-     * Get all packs with pagination
+     * Get all packs with pagination and filters
      *
+     * @param array $filters
      * @param int $perPage
      * @return LengthAwarePaginator
      */
-    public function getAllPaginated(int $perPage = 10): LengthAwarePaginator
+    public function getAllPaginated(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
         try {
             $this->logger->info('Getting paginated packs', [
                 'source' => 'pack',
                 'action' => 'get_paginated',
-                'per_page' => $perPage
+                'per_page' => $perPage,
+                'filters' => $filters
             ]);
 
-            return $this->packRepository->getAllPaginated($perPage);
+            return $this->packRepository->getAllPaginated($filters, $perPage);
         } catch (Exception $e) {
             $this->logger->error('Failed to get paginated packs', [
                 'source' => 'pack',

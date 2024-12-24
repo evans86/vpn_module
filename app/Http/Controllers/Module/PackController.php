@@ -11,6 +11,7 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use RuntimeException;
 
 class PackController extends Controller
@@ -26,22 +27,25 @@ class PackController extends Controller
 
     /**
      * Display a listing of the packs.
+     * @param Request $request
      * @return View|RedirectResponse
      * @throws Exception
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $packs = $this->packService->getAllPaginated();
+            $filters = array_filter($request->only(['id', 'status']));
+            $packs = $this->packService->getAllPaginated($filters);
 
             $this->logger->info('Просмотр списка пакетов', [
                 'source' => 'pack',
                 'action' => 'view',
                 'user_id' => auth()->id(),
-                'total_packs' => $packs->total()
+                'total_packs' => $packs->total(),
+                'filters' => $filters
             ]);
 
-            return view('module.pack.index', compact('packs'));
+            return view('module.pack.index', compact('packs', 'filters'));
         } catch (Exception $e) {
             $this->logger->error('Ошибка при загрузке списка пакетов', [
                 'source' => 'pack',
@@ -51,7 +55,7 @@ class PackController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
 
-            return back()->withErrors(['msg' => $e->getMessage()]);
+            throw $e;
         }
     }
 
@@ -71,10 +75,10 @@ class PackController extends Controller
                 'source' => 'pack',
                 'action' => 'create',
                 'user_id' => auth()->id(),
-                'pack_data' => array_diff_key($data, array_flip(['password'])) // Исключаем чувствительные данные
+                'pack_data' => array_diff_key($data, array_flip(['password']))
             ]);
 
-            return redirect()->route('module.pack.index')
+            return redirect('/admin/module/pack')
                 ->with('success', 'Пакет успешно создан');
         } catch (RuntimeException $e) {
             $this->logger->error('Ошибка при создании пакета', [
@@ -83,7 +87,7 @@ class PackController extends Controller
                 'user_id' => auth()->id(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'request_data' => array_diff_key($request->validated(), array_flip(['password'])) // Исключаем чувствительные данные
+                'request_data' => array_diff_key($data, array_flip(['password']))
             ]);
 
             return back()->withErrors(['msg' => $e->getMessage()]);
@@ -108,7 +112,7 @@ class PackController extends Controller
                 'action' => 'update',
                 'user_id' => auth()->id(),
                 'pack_id' => $id,
-                'pack_data' => array_diff_key($data, array_flip(['password'])) // Исключаем чувствительные данные
+                'pack_data' => array_diff_key($data, array_flip(['password']))
             ]);
 
             return redirect()->route('module.pack.index')
@@ -121,7 +125,7 @@ class PackController extends Controller
                 'pack_id' => $id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'request_data' => array_diff_key($request->validated(), array_flip(['password'])) // Исключаем чувствительные данные
+                'request_data' => array_diff_key($request->validated(), array_flip(['password']))
             ]);
 
             return back()->withErrors(['msg' => $e->getMessage()]);
@@ -131,10 +135,9 @@ class PackController extends Controller
     /**
      * Remove the specified pack.
      * @param int $id
-     * @return JsonResponse
-     * @throws Exception
+     * @return RedirectResponse
      */
-    public function destroy(int $id)
+    public function destroy($id)
     {
         try {
             $this->packService->delete($id);
@@ -146,8 +149,9 @@ class PackController extends Controller
                 'pack_id' => $id
             ]);
 
-            return response()->json(['success' => true]);
-        } catch (RuntimeException $e) {
+            return redirect('/admin/module/pack')
+                ->with('success', 'Пакет успешно удален');
+        } catch (Exception $e) {
             $this->logger->error('Ошибка при удалении пакета', [
                 'source' => 'pack',
                 'action' => 'delete',
@@ -157,10 +161,7 @@ class PackController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
 
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
+            return back()->withErrors(['msg' => $e->getMessage()]);
         }
     }
 }

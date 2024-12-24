@@ -9,32 +9,41 @@ use Illuminate\Pagination\LengthAwarePaginator;
 interface PackRepositoryInterface
 {
     /**
-     * Get all packs with pagination
-     * 
+     * Get all packs with pagination and filters
+     *
+     * @param array $filters
      * @param int $perPage
      * @return LengthAwarePaginator
      */
-    public function getAllPaginated(int $perPage = 10): LengthAwarePaginator;
+    public function getAllPaginated(array $filters = [], int $perPage = 10): LengthAwarePaginator;
 
     /**
-     * Find pack by ID
-     * 
+     * Find pack by id
+     *
      * @param int $id
      * @return Pack|null
      */
     public function findById(int $id): ?Pack;
 
     /**
-     * Create new pack
-     * 
-     * @param array $data
+     * Find pack by id or fail
+     *
+     * @param int $id
      * @return Pack
      */
-    public function create(array $data): Pack;
+    public function findByIdOrFail(int $id): Pack;
+
+    /**
+     * Create new pack
+     *
+     * @param array $data
+     * @return Model
+     */
+    public function create(array $data): Model;
 
     /**
      * Update pack
-     * 
+     *
      * @param Model $model
      * @param array $data
      * @return bool
@@ -43,9 +52,9 @@ interface PackRepositoryInterface
 
     /**
      * Delete pack
-     * 
+     *
      * @param Model $model
-     * @return bool
+     * @return bool|null
      */
-    public function delete(Model $model): bool;
+    public function delete(Model $model): ?bool;
 }

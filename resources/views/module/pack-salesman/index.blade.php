@@ -9,6 +9,44 @@
                         <h4 class="card-title">Купленные пакеты</h4>
                     </div>
                     <div class="card-body">
+                        <form method="GET" action="/admin/module/pack-salesman" class="mb-4">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="salesman_search">Продавец</label>
+                                        <input type="text" class="form-control" id="salesman_search" name="salesman_search" 
+                                               value="{{ request('salesman_search') }}" 
+                                               placeholder="Поиск по ID или имени">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="status">Статус</label>
+                                        <select class="form-control" id="status" name="status">
+                                            <option value="">Все статусы</option>
+                                            <option value="paid" {{ request('status') == 'paid' ? 'selected' : '' }}>Оплачен</option>
+                                            <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Ожидает оплаты</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="created_at">Дата создания</label>
+                                        <input type="date" class="form-control" id="created_at" name="created_at" 
+                                               value="{{ request('created_at') }}">
+                                    </div>
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end">
+                                    <div class="form-group">
+                                        <button type="submit" class="btn btn-primary">Фильтровать</button>
+                                        @if(request()->anyFilled(['salesman_search', 'status', 'created_at']))
+                                            <a href="/admin/module/pack-salesman" class="btn btn-secondary">Сбросить</a>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+
                         <div class="table-responsive">
                             <table class="table">
                                 <thead>
@@ -33,17 +71,19 @@
                                                     Кол-во ключей: {{ $pack_salesman->pack->count }}
                                                 </small>
                                             @else
-                                                <span class="text-muted">Пакет удален</span>
+                                                <span class="text-danger">Пакет удален</span>
                                             @endif
                                         </td>
                                         <td>
                                             @if($pack_salesman->salesman)
-                                                {{ $pack_salesman->salesman->name }}
-                                                <small class="d-block text-muted">
-                                                    ID: {{ $pack_salesman->salesman->id }}
+                                                {{ $pack_salesman->salesman->username }}
+                                                <small class="d-block">
+                                                    <a href="/admin/module/salesman?telegram_id={{ $pack_salesman->salesman->telegram_id }}" class="text-primary">
+                                                        ID: {{ $pack_salesman->salesman->telegram_id }}
+                                                    </a>
                                                 </small>
                                             @else
-                                                <span class="text-muted">Продавец удален</span>
+                                                <span class="text-danger">Продавец удален</span>
                                             @endif
                                         </td>
                                         <td>
@@ -87,33 +127,17 @@
 
     @push('scripts')
         <script>
-            document.addEventListener('DOMContentLoaded', function () {
-                // Добавляем CSRF-токен в заголовки всех AJAX-запросов
-                $.ajaxSetup({
-                    headers: {
-                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                    }
-                });
-            });
-
             function markAsPaid(id) {
-                if (confirm('Отметить пакет как оплаченный?')) {
-                    $.ajax({
-                        url: `/admin/module/pack-salesman/${id}/mark-as-paid`,
-                        method: 'POST',
-                        success: function (response) {
-                            if (response.success) {
-                                toastr.success('Статус успешно обновлен');
-                                setTimeout(() => window.location.reload(), 1000);
-                            } else {
-                                toastr.error(response.message || 'Произошла ошибка');
+                if (confirm('Вы уверены, что хотите отметить пакет как оплаченный?')) {
+                    axios.post(`/admin/module/pack-salesman/${id}/mark-as-paid`)
+                        .then(response => {
+                            if (response.data.success) {
+                                location.reload();
                             }
-                        },
-                        error: function (xhr) {
-                            toastr.error('Произошла ошибка при обновлении статуса');
-                            console.error('Error:', xhr);
-                        }
-                    });
+                        })
+                        .catch(error => {
+                            alert('Произошла ошибка при обновлении статуса');
+                        });
                 }
             }
         </script>

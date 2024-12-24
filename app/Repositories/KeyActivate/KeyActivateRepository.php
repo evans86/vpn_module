@@ -16,16 +16,51 @@ class KeyActivateRepository extends BaseRepository
     }
 
     /**
-     * Get paginated key activates with pack relations
+     * Get paginated key activates with pack relations and filters
+     *
+     * @param array $filters
      * @param int $perPage
      * @return LengthAwarePaginator
      */
-    public function getPaginatedWithPack(int $perPage = 10): LengthAwarePaginator
+    public function getPaginatedWithPack(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
-        return $this->query()
-            ->with(['packSalesman.pack'])
-            ->orderBy('created_at', 'desc')
-            ->paginate($perPage);
+        $query = $this->query()
+            ->with(['packSalesman.pack', 'packSalesman.salesman'])
+            ->orderBy('created_at', 'desc');
+
+        if (!empty($filters['id'])) {
+            $query->where('id', 'like', '%' . $filters['id'] . '%');
+        }
+
+        if (!empty($filters['pack_id'])) {
+            $query->whereHas('packSalesman.pack', function($q) use ($filters) {
+                $q->where('id', $filters['pack_id']);
+            });
+        }
+
+        if (!empty($filters['telegram_id'])) {
+            $query->whereHas('packSalesman', function($q) use ($filters) {
+                $q->whereHas('salesman', function($sq) use ($filters) {
+                    $sq->where('telegram_id', $filters['telegram_id']);
+                });
+            });
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['user_tg_id'])) {
+            $query->where('user_tg_id', $filters['user_tg_id']);
+        }
+
+        \Log::info('KeyActivate Query', [
+            'filters' => $filters,
+            'sql' => $query->toSql(),
+            'bindings' => $query->getBindings()
+        ]);
+
+        return $query->paginate($perPage);
     }
 
     /**

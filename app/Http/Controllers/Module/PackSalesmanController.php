@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Module;
 use App\Models\PackSalesman\PackSalesman;
 use App\Logging\DatabaseLogger;
 use App\Http\Controllers\Controller;
+use App\Models\Salesman\Salesman;
 use App\Repositories\PackSalesman\PackSalesmanRepository;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
+use Illuminate\Http\Request;
 use RuntimeException;
 use App\Services\Pack\PackSalesmanService;
+use Carbon\Carbon;
 
 class PackSalesmanController extends Controller
 {
@@ -32,16 +35,41 @@ class PackSalesmanController extends Controller
      * Display a listing of pack-salesman relations
      * @throws Exception
      */
-    public function index(): View
+    public function index(Request $request): View
     {
         try {
-            $pack_salesmans = $this->packSalesmanRepository->getPaginatedWithRelations();
+            $query = PackSalesman::with(['pack', 'salesman'])->latest();
+
+            // Фильтр по продавцу (поиск по telegram_id или username)
+            if ($request->filled('salesman_search')) {
+                $search = $request->salesman_search;
+                $query->whereHas('salesman', function($q) use ($search) {
+                    $q->where('telegram_id', 'like', "%{$search}%")
+                      ->orWhere('username', 'like', "%{$search}%");
+                });
+            }
+
+            // Фильтр по статусу
+            if ($request->filled('status')) {
+                if ($request->status === 'paid') {
+                    $query->where('status', PackSalesman::PAID);
+                } elseif ($request->status === 'pending') {
+                    $query->where('status', PackSalesman::NOT_PAID);
+                }
+            }
+
+            // Фильтр по дате создания
+            if ($request->filled('created_at')) {
+                $date = Carbon::parse($request->created_at);
+                $query->whereDate('created_at', $date);
+            }
+
+            $pack_salesmans = $query->paginate(10);
 
             $this->logger->info('Просмотр списка связей пакет-продавец', [
                 'source' => 'pack_salesman',
-                'action' => 'view_list',
+                'action' => 'view',
                 'user_id' => auth()->id(),
-                'total_relations' => $pack_salesmans->total(),
                 'page' => $pack_salesmans->currentPage()
             ]);
 
@@ -49,11 +77,12 @@ class PackSalesmanController extends Controller
         } catch (Exception $e) {
             $this->logger->error('Ошибка при загрузке списка связей пакет-продавец', [
                 'source' => 'pack_salesman',
-                'action' => 'view_list',
+                'action' => 'view',
                 'user_id' => auth()->id(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
+
             throw $e;
         }
     }

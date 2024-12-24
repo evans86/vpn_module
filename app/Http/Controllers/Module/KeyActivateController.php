@@ -5,13 +5,15 @@ namespace App\Http\Controllers\Module;
 use App\Models\KeyActivate\KeyActivate;
 use App\Logging\DatabaseLogger;
 use App\Http\Controllers\Controller;
+use App\Models\Pack\Pack;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Services\Key\KeyActivateService;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\View\Factory;
 use Illuminate\Http\JsonResponse;
-use Illuminate\View\View;
+use Illuminate\Http\Request;
 use Exception;
 use RuntimeException;
-use Illuminate\Http\RedirectResponse;
 
 class KeyActivateController extends Controller
 {
@@ -31,33 +33,44 @@ class KeyActivateController extends Controller
 
     /**
      * Display a listing of key activates
-     * @return View|RedirectResponse
+     * @param Request $request
+     * @return Application|Factory|\Illuminate\Contracts\View\View
      * @throws Exception
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $activate_keys = $this->keyActivateRepository->getPaginatedWithPack();
+            $filters = array_filter($request->only(['id', 'pack_id', 'status', 'user_tg_id', 'telegram_id']));
+            $packs = Pack::all();
+            $statuses = [
+                KeyActivate::EXPIRED => 'Просрочен',
+                KeyActivate::ACTIVE => 'Активирован',
+                KeyActivate::PAID => 'Оплачен',
+                KeyActivate::DELETED => 'Удален'
+            ];
+
+            $activate_keys = $this->keyActivateService->getPaginatedWithPack($filters, 10);
 
             $this->logger->info('Просмотр списка активированных ключей', [
                 'source' => 'key_activate',
                 'action' => 'view_list',
                 'user_id' => auth()->id(),
                 'total_keys' => $activate_keys->total(),
-                'page' => $activate_keys->currentPage()
+                'page' => $activate_keys->currentPage(),
+                'filters' => $filters
             ]);
 
-            return view('module.key-activate.index', compact('activate_keys'));
+            return view('module.key-activate.index', compact('activate_keys', 'packs', 'statuses', 'filters'));
         } catch (Exception $e) {
-            $this->logger->error('Ошибка при получении списка ключей', [
+            $this->logger->error('Ошибка при просмотре списка активированных ключей', [
                 'source' => 'key_activate',
                 'action' => 'view_list',
-                'user_id' => auth()->id(),
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id()
             ]);
 
-            return back()->withErrors(['msg' => $e->getMessage()]);
+            throw $e;
         }
     }
 
