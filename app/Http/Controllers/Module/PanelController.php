@@ -32,9 +32,10 @@ class PanelController extends Controller
 
     /**
      * Display a listing of panels.
+     * @param Request $request
      * @return View|RedirectResponse
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
             $this->logger->info('Accessing panels list', [
@@ -42,7 +43,8 @@ class PanelController extends Controller
                 'user_id' => auth()->id()
             ]);
 
-            $panels = $this->panelRepository->getPaginatedWithRelations();
+            $filters = $request->only(['server', 'panel_adress', 'status']);
+            $panels = $this->panelRepository->getFilteredPanels($filters);
             $servers = $this->panelRepository->getConfiguredServersWithoutPanels();
 
             return view('module.panel.index', compact('panels', 'servers'));
@@ -54,7 +56,7 @@ class PanelController extends Controller
                 'user_id' => auth()->id()
             ]);
 
-            return back()->withErrors(['msg' => 'Error loading panels list: ' . $e->getMessage()]);
+            throw $e;
         }
     }
 
