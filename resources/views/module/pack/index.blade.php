@@ -3,114 +3,106 @@
 @section('content')
     <div class="container-fluid">
         <div class="row">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-header">
+            <div class="col-lg-12">
+                <x-card title="Список пакетов">
+                    <x-slot name="tools">
+                        <button type="button" class="btn btn-primary" data-toggle="modal"
+                                data-target="#createPackModal">
+                            <i class="fas fa-plus"></i> Добавить пакет
+                        </button>
+                    </x-slot>
+
+                    <form method="GET" action="/admin/module/pack" class="mb-4">
                         <div class="row">
-                            <div class="col-6">
-                                <h4 class="card-title">Пакеты</h4>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="id">ID пакета</label>
+                                    <input type="number" class="form-control" id="id" name="id"
+                                           value="{{ request('id') }}" placeholder="Введите ID пакета">
+                                </div>
                             </div>
-                            <div class="col-6 text-right">
-                                <button type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center py-1" data-toggle="modal"
-                                        data-target="#createPackModal">
-                                    <i class="fas fa-plus mr-1"></i>Добавить пакет
-                                </button>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="status">Статус</label>
+                                    <select class="form-control" id="status" name="status">
+                                        <option value="">Все статусы</option>
+                                        <option value="1" {{ request('status') == '1' ? 'selected' : '' }}>Активен</option>
+                                        <option value="0" {{ request('status') == '0' ? 'selected' : '' }}>Неактивен</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <div class="form-group">
+                                    <button type="submit" class="btn btn-primary">Фильтровать</button>
+                                    @if(request()->anyFilled(['id', 'status']))
+                                        <a href="/admin/module/pack" class="btn btn-secondary">Сбросить</a>
+                                    @endif
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="card-body">
-                        <form method="GET" action="/admin/module/pack" class="mb-4">
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label for="id">ID пакета</label>
-                                        <input type="number" class="form-control" id="id" name="id"
-                                               value="{{ request('id') }}" placeholder="Введите ID пакета">
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label for="status">Статус</label>
-                                        <select class="form-control" id="status" name="status">
-                                            <option value="">Все статусы</option>
-                                            <option value="1" {{ request('status') == '1' ? 'selected' : '' }}>Активен</option>
-                                            <option value="0" {{ request('status') == '0' ? 'selected' : '' }}>Неактивен</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-4 d-flex align-items-end">
-                                    <div class="form-group">
-                                        <button type="submit" class="btn btn-primary">Фильтровать</button>
-                                        @if(request('id') || request('status'))
-                                            <a href="/admin/module/pack" class="btn btn-secondary">Сбросить</a>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-                        </form>
+                    </form>
 
-                        @if(session('success'))
-                            <div class="alert alert-success">
-                                {{ session('success') }}
-                            </div>
-                        @endif
+                    @if(session('success'))
+                        <div class="alert alert-success">
+                            {{ session('success') }}
+                        </div>
+                    @endif
 
-                        @if(session('error'))
-                            <div class="alert alert-danger">
-                                {{ session('error') }}
-                            </div>
-                        @endif
+                    @if(session('error'))
+                        <div class="alert alert-danger">
+                            {{ session('error') }}
+                        </div>
+                    @endif
 
-                        <div class="table-responsive">
-                            <table class="table">
-                                <thead>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Цена</th>
+                                <th>Период</th>
+                                <th>Трафик</th>
+                                <th>Ключи</th>
+                                <th>Время активации</th>
+                                <th>Статус</th>
+                                <th>Действия</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @forelse($packs as $pack)
                                 <tr>
-                                    <th>ID</th>
-                                    <th>Цена</th>
-                                    <th>Период</th>
-                                    <th>Трафик</th>
-                                    <th>Ключи</th>
-                                    <th>Время активации</th>
-                                    <th>Статус</th>
-                                    <th>Действия</th>
+                                    <td>{{ $pack->id }}</td>
+                                    <td>{{ $pack->price }} ₽</td>
+                                    <td>{{ $pack->period }} дней</td>
+                                    <td>{{ number_format($pack->traffic_limit / (1024*1024*1024), 1) }} GB</td>
+                                    <td>{{ $pack->count }}</td>
+                                    <td>{{ floor($pack->activate_time / 3600) }} ч.</td>
+                                    <td>
+                                        <span class="badge badge-{{ $pack->status ? 'success' : 'danger' }}">
+                                            {{ $pack->status ? 'Активен' : 'Неактивен' }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <form action="/admin/module/pack/{{ $pack->id }}" method="POST" class="d-inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Вы уверены?')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
                                 </tr>
-                                </thead>
-                                <tbody>
-                                @forelse($packs as $pack)
-                                    <tr>
-                                        <td>{{ $pack->id }}</td>
-                                        <td>{{ $pack->price }} ₽</td>
-                                        <td>{{ $pack->period }} дней</td>
-                                        <td>{{ number_format($pack->traffic_limit / (1024*1024*1024), 1) }} GB</td>
-                                        <td>{{ $pack->count }}</td>
-                                        <td>{{ floor($pack->activate_time / 3600) }} ч.</td>
-                                        <td>
-                                            <span class="badge badge-{{ $pack->status ? 'success' : 'danger' }}">
-                                                {{ $pack->status ? 'Активен' : 'Неактивен' }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <form action="/admin/module/pack/{{ $pack->id }}" method="POST" class="d-inline">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Вы уверены?')">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="8" class="text-center">Пакеты не найдены</td>
-                                    </tr>
-                                @endforelse
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {{ $packs->links() }}
+                            @empty
+                                <tr>
+                                    <td colspan="8" class="text-center">Пакеты не найдены</td>
+                                </tr>
+                            @endforelse
+                            </tbody>
+                        </table>
                     </div>
-                </div>
+
+                    {{ $packs->links() }}
+                </x-card>
             </div>
         </div>
     </div>
