@@ -38,6 +38,10 @@ class KeyActivateRepository extends BaseRepository
             });
         }
 
+        if (!empty($filters['pack_salesman_id'])) {
+            $query->where('pack_salesman_id', $filters['pack_salesman_id']);
+        }
+
         if (!empty($filters['telegram_id'])) {
             $query->whereHas('packSalesman', function($q) use ($filters) {
                 $q->whereHas('salesman', function($sq) use ($filters) {
