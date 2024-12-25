@@ -62,9 +62,9 @@ class CloudflareAPI
 
         try {
             // Добавляем домен к имени, если его нет
-            if (strpos($name, self::DOMAIN) === false) {
-                $name = $name . '.' . self::DOMAIN;
-            }
+//            if (strpos($name, self::DOMAIN) === false) {
+//                $name = $name . '.' . self::DOMAIN;
+//            }
 
             Log::info('Creating DNS record', [
                 'name' => $name,
@@ -119,9 +119,9 @@ class CloudflareAPI
 
         try {
             // Добавляем домен к имени, если его нет
-            if (strpos($name, self::DOMAIN) === false) {
-                $name = $name . '.' . self::DOMAIN;
-            }
+//            if (strpos($name, self::DOMAIN) === false) {
+//                $name = $name . '.' . self::DOMAIN;
+//            }
 
             Log::info('Updating DNS record', [
                 'record_id' => $record_id,
