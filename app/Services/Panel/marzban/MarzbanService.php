@@ -96,96 +96,10 @@ class MarzbanService
         try {
             Log::info('Installing panel', ['host' => $host]);
 
-            // Проверяем и устанавливаем Docker если его нет
-            if (!str_contains($ssh->exec('docker --version'), 'Docker version')) {
-                Log::info('Installing Docker');
-                $ssh->exec('curl -fsSL https://get.docker.com -o get-docker.sh');
-                $ssh->exec('sh get-docker.sh');
-                $ssh->exec('systemctl start docker');
-                $ssh->exec('systemctl enable docker');
-                
-                if (!str_contains($ssh->exec('docker --version'), 'Docker version')) {
-                    throw new RuntimeException('Failed to install Docker');
-                }
-            }
-
-            // Проверяем и устанавливаем Docker Compose если его нет
-            if (!str_contains($ssh->exec('docker-compose --version'), 'docker-compose version')) {
-                Log::info('Installing Docker Compose');
-                
-                // Определяем дистрибутив
-                $osInfo = $ssh->exec('cat /etc/os-release');
-                Log::debug('OS Info', ['info' => $osInfo]);
-                
-                if (str_contains($osInfo, 'Ubuntu') || str_contains($osInfo, 'Debian')) {
-                    // Для Ubuntu/Debian
-                    $installCommands = [
-                        'apt-get update',
-                        'apt-get install -y docker-compose'
-                    ];
-                } elseif (str_contains($osInfo, 'CentOS') || str_contains($osInfo, 'Red Hat')) {
-                    // Для CentOS/RHEL
-                    $installCommands = [
-                        'yum install -y epel-release',
-                        'yum install -y docker-compose'
-                    ];
-                } else {
-                    // Для других систем пробуем через pip
-                    $installCommands = [
-                        'curl -fsSL https://bootstrap.pypa.io/get-pip.py -o get-pip.py',
-                        'python3 get-pip.py',
-                        'pip3 install docker-compose'
-                    ];
-                }
-                
-                foreach ($installCommands as $command) {
-                    $result = $ssh->exec($command);
-                    Log::debug('Docker Compose installation command', [
-                        'command' => $command,
-                        'result' => $result
-                    ]);
-                }
-                
-                // Проверяем установку
-                $composeVersion = $ssh->exec('docker-compose --version');
-                Log::info('Docker Compose version check', ['version' => $composeVersion]);
-                
-                if (!str_contains($composeVersion, 'docker-compose version')) {
-                    // Пробуем альтернативный способ установки через curl
-                    Log::info('Trying alternative Docker Compose installation method');
-                    
-                    $alternativeCommands = [
-                        'curl -L "https://github.com/docker/compose/releases/download/v2.23.3/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose',
-                        'chmod +x /usr/local/bin/docker-compose',
-                        'ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose'
-                    ];
-                    
-                    foreach ($alternativeCommands as $command) {
-                        $result = $ssh->exec($command);
-                        Log::debug('Alternative installation command', [
-                            'command' => $command,
-                            'result' => $result
-                        ]);
-                    }
-                    
-                    // Финальная проверка
-                    if (!str_contains($ssh->exec('docker-compose --version'), 'docker-compose version')) {
-                        throw new RuntimeException('Failed to install Docker Compose after multiple attempts');
-                    }
-                }
-            }
-
-            // Проверяем статус Docker
-            $dockerStatus = $ssh->exec('systemctl status docker');
-            if (!str_contains($dockerStatus, 'active (running)')) {
-                Log::info('Starting Docker service');
-                $ssh->exec('systemctl start docker');
-                sleep(5);
-            }
-
-            // Очищаем старые файлы установки
-            $ssh->exec('rm -f install_marzban.sh get-docker.sh get-pip.py');
+            // Очищаем старые файлы установки если они есть
+            $ssh->exec('rm -f install_marzban.sh');
             
+            // Скачиваем и запускаем скрипт установки
             $commands = [
                 'wget ' . self::INSTALL_SCRIPT_URL,
                 'chmod +x install_marzban.sh',
@@ -202,13 +116,14 @@ class MarzbanService
                 }
             }
 
-            // Проверяем статус Docker контейнеров
-            $dockerPs = $ssh->exec('cd /opt/marzban && docker-compose ps');
-            Log::info('Docker containers status', ['status' => $dockerPs]);
+            // Проверяем что файл конфигурации создан
+            if (str_contains($ssh->exec('stat ' . self::PANEL_ENV_PATH), 'No such file')) {
+                throw new RuntimeException('Panel installation failed: configuration file not found');
+            }
 
-            // Проверяем логи контейнеров
-            $dockerLogs = $ssh->exec('cd /opt/marzban && docker-compose logs --tail=50');
-            Log::info('Docker containers logs', ['logs' => $dockerLogs]);
+            // Проверяем логи установки
+            $installLog = $ssh->exec('cat /opt/marzban/install.log 2>/dev/null || echo "No install log found"');
+            Log::info('Installation log', ['log' => $installLog]);
 
         } catch (Exception $e) {
             Log::error('Panel installation failed', [
