@@ -96,11 +96,53 @@ class MarzbanService
         try {
             Log::info('Installing panel', ['host' => $host]);
 
-            // Проверяем и останавливаем существующий Marzban, если он есть
-            $ssh->exec('cd /opt/marzban && docker-compose down 2>/dev/null || true');
-            
+            // Проверяем и устанавливаем Docker если его нет
+            if (!str_contains($ssh->exec('docker --version'), 'Docker version')) {
+                Log::info('Installing Docker');
+                $ssh->exec('curl -fsSL https://get.docker.com -o get-docker.sh');
+                $ssh->exec('sh get-docker.sh');
+                $ssh->exec('systemctl start docker');
+                $ssh->exec('systemctl enable docker');
+                
+                if (!str_contains($ssh->exec('docker --version'), 'Docker version')) {
+                    throw new RuntimeException('Failed to install Docker');
+                }
+            }
+
+            // Проверяем и устанавливаем Docker Compose если его нет
+            if (!str_contains($ssh->exec('docker-compose --version'), 'docker-compose version')) {
+                Log::info('Installing Docker Compose');
+                
+                // Устанавливаем Docker Compose
+                $installComposeCommands = [
+                    'curl -L "https://github.com/docker/compose/releases/download/v2.23.3/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose',
+                    'chmod +x /usr/local/bin/docker-compose',
+                    'ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose'
+                ];
+                
+                foreach ($installComposeCommands as $command) {
+                    $result = $ssh->exec($command);
+                    Log::debug('Docker Compose installation command', [
+                        'command' => $command,
+                        'result' => $result
+                    ]);
+                }
+                
+                if (!str_contains($ssh->exec('docker-compose --version'), 'docker-compose version')) {
+                    throw new RuntimeException('Failed to install Docker Compose');
+                }
+            }
+
+            // Проверяем статус Docker
+            $dockerStatus = $ssh->exec('systemctl status docker');
+            if (!str_contains($dockerStatus, 'active (running)')) {
+                Log::info('Starting Docker service');
+                $ssh->exec('systemctl start docker');
+                sleep(5);
+            }
+
             // Очищаем старые файлы установки
-            $ssh->exec('rm -f install_marzban.sh');
+            $ssh->exec('rm -f install_marzban.sh get-docker.sh');
             
             $commands = [
                 'wget ' . self::INSTALL_SCRIPT_URL,
@@ -125,10 +167,6 @@ class MarzbanService
             // Проверяем логи контейнеров
             $dockerLogs = $ssh->exec('cd /opt/marzban && docker-compose logs --tail=50');
             Log::info('Docker containers logs', ['logs' => $dockerLogs]);
-
-            // Проверяем доступность веб-интерфейса
-            $curlCheck = $ssh->exec("curl -k -I https://$host/dashboard");
-            Log::info('Web interface accessibility check', ['curl_result' => $curlCheck]);
 
         } catch (Exception $e) {
             Log::error('Panel installation failed', [
