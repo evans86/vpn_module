@@ -394,32 +394,64 @@ class VdsinaService
     public function delete(Server $server): void
     {
         try {
-            // Удаляем сервер через API VDSina
-            try {
-                $response = $this->vdsinaApi->deleteServer($server->provider_id);
-            } catch (Exception $e) {
-                // Если сервер не найден (404), продолжаем удаление из базы
-                if (!str_contains($e->getMessage(), '404 Not Found')) {
-                    throw $e;
-                }
-                Log::warning('Server not found in VDSina, proceeding with local deletion', [
-                    'server_id' => $server->id,
-                    'provider_id' => $server->provider_id
-                ]);
-            }
-
-            // Удаляем записи о сервере из базы данных
-            $server->delete();
-
-            Log::info('Server deleted successfully', [
+            Log::info('Starting server deletion', [
                 'server_id' => $server->id,
                 'provider_id' => $server->provider_id
             ]);
+
+            // Удаляем сервер у провайдера
+            if ($server->provider_id) {
+                try {
+                    $this->vdsinaApi->deleteServer($server->provider_id);
+                    Log::info('Server deleted from provider', [
+                        'server_id' => $server->id,
+                        'provider_id' => $server->provider_id
+                    ]);
+                } catch (Exception $e) {
+                    Log::warning('Failed to delete server from provider, continuing with local cleanup', [
+                        'server_id' => $server->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            // Удаляем DNS-запись из Cloudflare
+            if ($server->dns_record_id) {
+                try {
+                    $cloudflare = new CloudflareService();
+                    $cloudflare->deleteSubdomain($server->dns_record_id);
+                    Log::info('DNS record deleted from Cloudflare', [
+                        'server_id' => $server->id,
+                        'dns_record_id' => $server->dns_record_id
+                    ]);
+                } catch (Exception $e) {
+                    Log::warning('Failed to delete DNS record from Cloudflare', [
+                        'server_id' => $server->id,
+                        'dns_record_id' => $server->dns_record_id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            // Удаляем связанные панели
+            foreach ($server->panels as $panel) {
+                $panel->status = Panel::PANEL_DELETED;
+                $panel->save();
+            }
+
+            // Удаляем сервер из базы
+            $server->server_status = Server::SERVER_DELETED;
+            $server->save();
+
+            Log::info('Server and related records deleted successfully', [
+                'server_id' => $server->id
+            ]);
+
         } catch (Exception $e) {
             Log::error('Error deleting server', [
-                'error' => $e->getMessage(),
                 'server_id' => $server->id,
-                'provider_id' => $server->provider_id
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             throw $e;
         }

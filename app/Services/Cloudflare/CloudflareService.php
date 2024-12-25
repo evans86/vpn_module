@@ -116,34 +116,34 @@ class CloudflareService
     /**
      * Удаление поддомена сервера
      *
-     * @param string $dns_record_id
-     * @return bool
+     * @param string $recordId ID записи в Cloudflare
+     * @return void
+     * @throws Exception
      */
-    public function deleteSubdomain(string $dns_record_id): bool
+    public function deleteSubdomain(string $recordId): void
     {
         try {
-            if (empty($dns_record_id)) {
-                throw new RuntimeException('DNS record ID is required for deletion');
+            if (empty($recordId)) {
+                throw new RuntimeException('Record ID is required for deletion');
             }
 
             Log::info('Deleting DNS record', [
-                'record_id' => $dns_record_id
+                'record_id' => $recordId
             ]);
 
-            $result = $this->api->deleteDNSRecord($dns_record_id);
+            $this->api->deleteDNSRecord($recordId);
 
             Log::info('DNS record deleted successfully', [
-                'record_id' => $dns_record_id
+                'record_id' => $recordId
             ]);
 
-            return $result;
         } catch (Exception $e) {
             Log::error('Failed to delete DNS record', [
-                'dns_record_id' => $dns_record_id,
+                'record_id' => $recordId,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            return false;
+            throw $e;
         }
     }
 
