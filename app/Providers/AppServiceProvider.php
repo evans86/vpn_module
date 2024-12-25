@@ -27,7 +27,6 @@ class AppServiceProvider extends ServiceProvider
     {
         if(config('app.env') === 'production') {
             \URL::forceScheme('https');
-            \Asset::forceSsl();
             
             // Force HTTPS for all asset URLs
             if (!request()->secure()) {
