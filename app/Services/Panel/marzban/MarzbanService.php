@@ -95,15 +95,39 @@ class MarzbanService
         try {
             Log::info('Installing panel', ['host' => $host]);
             
+            // Скачиваем и запускаем скрипт установки
             $commands = [
                 'wget ' . self::INSTALL_SCRIPT_URL,
                 'chmod +x install_marzban.sh',
-                './install_marzban.sh ' . $host
+                './install_marzban.sh ' . $host,
+                // Перезапускаем панель после установки
+                'cd /opt/marzban',
+                'docker-compose down',
+                'docker-compose up -d'
             ];
 
             foreach ($commands as $command) {
                 $result = $ssh->exec($command);
                 Log::debug('Command result', ['command' => $command, 'result' => $result]);
+            }
+
+            // Ждем пока панель запустится
+            sleep(10);
+
+            // Проверяем что панель запущена
+            $status = $ssh->exec('cd /opt/marzban && docker-compose ps');
+            if (!str_contains($status, 'running')) {
+                // Смотрим логи если панель не запустилась
+                $logs = $ssh->exec('cd /opt/marzban && docker-compose logs --tail=50');
+                Log::error('Panel failed to start', ['logs' => $logs]);
+                throw new RuntimeException('Panel is not running after installation. Logs: ' . $logs);
+            }
+
+            // Проверяем доступность веб-интерфейса
+            $curl = $ssh->exec("curl -k -I https://{$host}/dashboard");
+            if (!str_contains($curl, '200 OK') && !str_contains($curl, '301 Moved Permanently')) {
+                Log::error('Web interface not accessible', ['curl' => $curl]);
+                throw new RuntimeException('Panel web interface is not accessible');
             }
 
         } catch (Exception $e) {
