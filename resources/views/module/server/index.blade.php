@@ -42,24 +42,24 @@
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label for="name">Название</label>
-                                    <input type="text" class="form-control" id="name" name="name" 
-                                           value="{{ request('name') }}" 
+                                    <input type="text" class="form-control" id="name" name="name"
+                                           value="{{ request('name') }}"
                                            placeholder="Поиск по названию">
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label for="ip">IP-адрес</label>
-                                    <input type="text" class="form-control" id="ip" name="ip" 
-                                           value="{{ request('ip') }}" 
+                                    <input type="text" class="form-control" id="ip" name="ip"
+                                           value="{{ request('ip') }}"
                                            placeholder="Поиск по IP">
                                 </div>
                             </div>
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label for="host">Хост</label>
-                                    <input type="text" class="form-control" id="host" name="host" 
-                                           value="{{ request('host') }}" 
+                                    <input type="text" class="form-control" id="host" name="host"
+                                           value="{{ request('host') }}"
                                            placeholder="Поиск по хосту">
                                 </div>
                             </div>
@@ -97,7 +97,7 @@
                         </div>
                     </form>
 
-                    <x-table :headers="['#', 'Название', 'IP', 'Логин', 'Хост', 'Локация', 'Статус', '']">
+                    <x-table :headers="['#', 'Название', 'IP', 'Логин', 'Пароль', 'Хост', 'Локация', 'Статус', '']">
                         @if($servers->isEmpty())
                             <tr>
                                 <td colspan="8" class="text-center text-muted">
@@ -111,6 +111,7 @@
                                     <td>{{ $server->name }}</td>
                                     <td>{{ $server->ip }}</td>
                                     <td>{{ $server->login }}</td>
+                                    <td>{{ $server->password }}</td>
                                     <td>{{ $server->host }}</td>
                                     <td>
                                         <div class="d-flex align-items-center">
@@ -223,7 +224,7 @@
 
                     // Отключаем кнопку
                     btn.prop('disabled', true);
-                    
+
                     // Показываем индикатор загрузки
                     const loadingHtml = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Создание...';
                     const originalHtml = btn.html();
