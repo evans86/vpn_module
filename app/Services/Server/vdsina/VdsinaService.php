@@ -43,8 +43,6 @@ class VdsinaService
                 throw new RuntimeException('Location not found');
             }
 
-//            $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
-
             // 1. Проверяем доступность дата-центров
             $datacenters = $this->vdsinaApi->getDatacenter();
             if (!isset($datacenters['data']) || !is_array($datacenters['data'])) {
@@ -162,7 +160,6 @@ class VdsinaService
             }
 
             // Получаем информацию о сервере от провайдера
-//            $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
             $vdsina_server = $this->vdsinaApi->getServerById($server->provider_id);
 
             if (!isset($vdsina_server['data']['ip'][0]['ip'])) {
@@ -341,7 +338,6 @@ class VdsinaService
         try {
             Log::info('Checking server status in VDSina', ['provider_id' => $provider_id]);
 
-//            $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
             $server = $this->vdsinaApi->getServerById($provider_id);
 
             if (!isset($server['data']['status'])) {
@@ -390,50 +386,32 @@ class VdsinaService
     public function delete(Server $server): void
     {
         try {
-//            $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
-
             // Удаляем сервер через API VDSina
-            $response = $this->vdsinaApi->deleteServer($server->provider_id);
-
-            if (!isset($response['status']) || $response['status'] !== 'ok') {
-                throw new RuntimeException(
-                    'Failed to delete server in VDSina: ' .
-                    ($response['description'] ?? $response['status_msg'] ?? 'Unknown error')
-                );
-            }
-
-            // Удаляем DNS запись, если она существует
-            if ($server->dns_record_id) {
-                try {
-                    $cloudflare = new CloudflareService();
-                    $cloudflare->deleteSubdomain($server->dns_record_id);
-                } catch (Exception $e) {
-                    Log::warning('Failed to delete DNS record', [
-                        'server_id' => $server->id,
-                        'dns_record_id' => $server->dns_record_id,
-                        'error' => $e->getMessage()
-                    ]);
+            try {
+                $response = $this->vdsinaApi->deleteServer($server->provider_id);
+            } catch (Exception $e) {
+                // Если сервер не найден (404), продолжаем удаление из базы
+                if (!str_contains($e->getMessage(), '404 Not Found')) {
+                    throw $e;
                 }
+                Log::warning('Server not found in VDSina, proceeding with local deletion', [
+                    'server_id' => $server->id,
+                    'provider_id' => $server->provider_id
+                ]);
             }
 
-            // Обновляем статус всех связанных панелей на "удалена"
-            $server->panels()->update(['panel_status' => Panel::PANEL_DELETED]);
+            // Удаляем записи о сервере из базы данных
+            $server->delete();
 
-            // Обновляем статус сервера на "Удален"
-            $server->server_status = Server::SERVER_DELETED;
-            $server->save();
-
-            Log::info('Successfully deleted server in VDSina', [
+            Log::info('Server deleted successfully', [
                 'server_id' => $server->id,
                 'provider_id' => $server->provider_id
             ]);
-
         } catch (Exception $e) {
-            Log::error('Failed to delete server in VDSina', [
-                'server_id' => $server->id,
-                'provider_id' => $server->provider_id,
+            Log::error('Error deleting server', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'server_id' => $server->id,
+                'provider_id' => $server->provider_id
             ]);
             throw $e;
         }
