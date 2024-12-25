@@ -96,12 +96,6 @@ class MarzbanService
         try {
             Log::info('Installing panel', ['host' => $host]);
 
-            // Проверяем и останавливаем существующий Marzban, если он есть
-            $ssh->exec('cd /opt/marzban && docker-compose down 2>/dev/null || true');
-
-            // Очищаем старые файлы установки
-            $ssh->exec('rm -f install_marzban.sh');
-
             $commands = [
                 'wget ' . self::INSTALL_SCRIPT_URL,
                 'chmod +x install_marzban.sh',
@@ -109,27 +103,13 @@ class MarzbanService
             ];
 
             foreach ($commands as $command) {
-                Log::debug('Executing command', ['command' => $command]);
                 $result = $ssh->exec($command);
-                Log::debug('Command result', ['command' => $command, 'result' => $result]);
+                Log::debug('Command executed', ['command' => $command, 'result' => $result]);
 
                 if ($ssh->getExitStatus() !== 0) {
-                    throw new RuntimeException("Command failed: $command\nOutput: $result");
+                    throw new RuntimeException("Command failed: $command");
                 }
             }
-
-            // Проверяем статус Docker контейнеров
-            $dockerPs = $ssh->exec('cd /opt/marzban && docker-compose ps');
-            Log::info('Docker containers status', ['status' => $dockerPs]);
-
-            // Проверяем логи контейнеров
-            $dockerLogs = $ssh->exec('cd /opt/marzban && docker-compose logs --tail=50');
-            Log::info('Docker containers logs', ['logs' => $dockerLogs]);
-
-            // Проверяем доступность веб-интерфейса
-            $curlCheck = $ssh->exec("curl -k -I https://$host/dashboard");
-            Log::info('Web interface accessibility check', ['curl_result' => $curlCheck]);
-
         } catch (Exception $e) {
             Log::error('Panel installation failed', [
                 'host' => $host,
@@ -151,30 +131,8 @@ class MarzbanService
     {
         Log::info('Verifying panel installation', ['server_id' => $server->id]);
 
-        // Проверяем наличие конфигурационного файла
         if (str_contains($ssh->exec('stat ' . self::PANEL_ENV_PATH), 'No such file')) {
             throw new RuntimeException('Panel configuration file not found');
-        }
-
-        // Проверяем статус Docker контейнеров
-        $dockerPs = $ssh->exec('cd /opt/marzban && docker-compose ps');
-        if (!str_contains($dockerPs, 'running')) {
-            // Пробуем перезапустить контейнеры
-            Log::warning('Docker containers are not running, attempting to restart', [
-                'server_id' => $server->id,
-                'docker_status' => $dockerPs
-            ]);
-
-            $ssh->exec('cd /opt/marzban && docker-compose down');
-            sleep(5); // Ждем полной остановки
-            $ssh->exec('cd /opt/marzban && docker-compose up -d');
-            sleep(10); // Ждем запуска
-
-            // Проверяем статус снова
-            $dockerPs = $ssh->exec('cd /opt/marzban && docker-compose ps');
-            if (!str_contains($dockerPs, 'running')) {
-                throw new RuntimeException('Failed to start Docker containers after installation');
-            }
         }
 
         $envContent = $ssh->exec('cat ' . self::PANEL_ENV_PATH);
@@ -184,32 +142,16 @@ class MarzbanService
             throw new RuntimeException('Invalid panel configuration');
         }
 
-        // Проверяем доступность веб-интерфейса
-        $curlCheck = $ssh->exec("curl -k -I https://{$server->host}/dashboard");
-        if (!str_contains($curlCheck, '200 OK') && !str_contains($curlCheck, '302 Found')) {
-            Log::warning('Web interface is not accessible', [
-                'server_id' => $server->id,
-                'curl_result' => $curlCheck
-            ]);
-
-            // Проверяем логи контейнеров
-            $dockerLogs = $ssh->exec('cd /opt/marzban && docker-compose logs --tail=50');
-            Log::info('Docker containers logs', ['logs' => $dockerLogs]);
-        }
-
         $panel = new Panel();
         $panel->server_id = $server->id;
         $panel->panel = Panel::MARZBAN;
         $panel->panel_status = Panel::PANEL_CREATED;
-        $panel->panel_adress = "https://{$server->host}/dashboard";
+        $panel->panel_adress = $config['XRAY_SUBSCRIPTION_URL_PREFIX'] . '/dashboard';
         $panel->panel_login = $config['SUDO_USERNAME'];
         $panel->panel_password = $config['SUDO_PASSWORD'];
         $panel->save();
 
-        Log::info('Panel record created', [
-            'panel_id' => $panel->id,
-            'panel_address' => $panel->panel_adress
-        ]);
+        Log::info('Panel record created', ['panel_id' => $panel->id]);
     }
 
     /**
