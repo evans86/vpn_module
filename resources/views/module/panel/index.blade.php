@@ -24,7 +24,7 @@
                         </button>
                     </x-slot>
 
-                    <form method="GET" action="/admin/module/panel" class="mb-4">
+                    <form method="GET" action="{{ route('admin.module.panel.index') }}" class="mb-4">
                         <div class="row">
                             <div class="col-md-4">
                                 <div class="form-group">
@@ -70,7 +70,7 @@
                                 <div class="form-group">
                                     <button type="submit" class="btn btn-primary">Фильтровать</button>
                                     @if(request()->anyFilled(['server', 'panel_adress', 'status']))
-                                        <a href="/admin/module/panel" class="btn btn-secondary">Сбросить</a>
+                                        <a href="{{ route('admin.module.panel.index') }}" class="btn btn-secondary">Сбросить</a>
                                     @endif
                                 </div>
                             </div>
@@ -110,16 +110,16 @@
                                 </td>
                                 <td>
                                     @if($panel->server)
-                                        <div class="d-flex align-items-center">
-                                            <img
-                                                src="https://flagcdn.com/w20/{{ strtolower($panel->server->location->code) }}.png"
-                                                class="mr-2"
-                                                alt="{{ strtoupper($panel->server->location->code) }}"
-                                                width="20">
-                                            <span>{{ $panel->server->name }}</span>
-                                        </div>
+                                        <a href="{{ route('admin.module.server.index', ['id' => $panel->server_id]) }}" 
+                                           class="text-primary"
+                                           title="Перейти к серверу">
+                                            {{ $panel->server->name }}
+                                            <small class="d-block text-muted">
+                                                {{ $panel->server->host }}
+                                            </small>
+                                        </a>
                                     @else
-                                        <span class="text-muted">Не назначен</span>
+                                        <span class="text-danger">Сервер удален</span>
                                     @endif
                                 </td>
                                 <td>
@@ -127,20 +127,37 @@
                                     {{ $panel->status_label }}
                                 </span>
                                 </td>
-                                <td>
-                                    @if($panel->panel_status !== \App\Models\Panel\Panel::PANEL_DELETED)
-                                        <div class="dropdown">
-                                            <button class="btn btn-link" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                                <i class="fas fa-ellipsis-v"></i>
-                                            </button>
-                                            <div class="dropdown-menu">
-                                                <a class="dropdown-item text-danger" href="#"
-                                                   onclick="deletePanel({{ $panel->id }})">
-                                                    <i class="fas fa-trash mr-2"></i>Удалить
+                                <td class="text-right">
+                                    <div class="dropdown">
+                                        <button class="btn btn-link" type="button" data-toggle="dropdown">
+                                            <i class="fas fa-ellipsis-v"></i>
+                                        </button>
+                                        <div class="dropdown-menu dropdown-menu-right">
+                                            @if($panel->panel_status === \App\Models\Panel\Panel::PANEL_CREATED)
+                                                <a class="dropdown-item" href="#"
+                                                   onclick="event.preventDefault(); document.getElementById('configure-panel-{{ $panel->id }}').submit();">
+                                                    <i class="fas fa-cog mr-2"></i>Настроить
                                                 </a>
-                                            </div>
+                                                <form id="configure-panel-{{ $panel->id }}"
+                                                      action="{{ route('admin.module.panel.configure', $panel->id) }}"
+                                                      method="POST" style="display: none;">
+                                                    @csrf
+                                                </form>
+                                            @endif
+
+                                            @if($panel->panel_status === \App\Models\Panel\Panel::PANEL_CONFIGURED)
+                                                <a class="dropdown-item" href="#"
+                                                   onclick="event.preventDefault(); document.getElementById('update-config-{{ $panel->id }}').submit();">
+                                                    <i class="fas fa-sync mr-2"></i>Обновить
+                                                </a>
+                                                <form id="update-config-{{ $panel->id }}"
+                                                      action="{{ route('admin.module.panel.update-config', $panel->id) }}"
+                                                      method="POST" style="display: none;">
+                                                    @csrf
+                                                </form>
+                                            @endif
                                         </div>
-                                    @endif
+                                    </div>
                                 </td>
                             </tr>
 
