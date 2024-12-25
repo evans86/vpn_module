@@ -33,7 +33,7 @@ class FatherBotController extends AbstractTelegramBot
                     'data' => $callbackQuery->getData(),
                     'from' => $callbackQuery->getFrom()->getId()
                 ]);
-                $this->processCallback($callbackQuery->getData());
+//                $this->processCallback($callbackQuery->getData());
                 return;
             }
 
@@ -86,49 +86,49 @@ class FatherBotController extends AbstractTelegramBot
         }
     }
 
-    /**
-     * Process callback queries
-     */
-    private function processCallback($data): void
-    {
-        try {
-            Log::info('Processing callback data', ['data' => $data]);
-
-            $params = json_decode($data, true);
-            if (!$params || !isset($params['action'])) {
-                Log::error('Invalid callback data', ['data' => $data]);
-                return;
-            }
-
-            switch ($params['action']) {
-                case 'buy_pack':
-                    if (isset($params['pack_id'])) {
-                        $this->buyPack((int)$params['pack_id']);
-                    }
-                    break;
-                case 'confirm_purchase':
-                    if (isset($params['pack_id'])) {
-                        $this->confirmPurchase((int)$params['pack_id']);
-                    }
-                    break;
-                case 'check_payment':
-                    if (isset($params['payment_id'])) {
-                        $this->checkPayment((int)$params['payment_id']);
-                    }
-                    break;
-                default:
-                    Log::warning('Unknown callback action', [
-                        'action' => $params['action'],
-                        'data' => $data
-                    ]);
-            }
-        } catch (Exception $e) {
-            Log::error('Process callback error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString()
-            ]);
-            $this->sendErrorMessage();
-        }
-    }
+//    /**
+//     * Process callback queries
+//     */
+//    private function processCallback($data): void
+//    {
+//        try {
+//            Log::info('Processing callback data', ['data' => $data]);
+//
+//            $params = json_decode($data, true);
+//            if (!$params || !isset($params['action'])) {
+//                Log::error('Invalid callback data', ['data' => $data]);
+//                return;
+//            }
+//
+//            switch ($params['action']) {
+//                case 'buy_pack':
+//                    if (isset($params['pack_id'])) {
+//                        $this->buyPack((int)$params['pack_id']);
+//                    }
+//                    break;
+//                case 'confirm_purchase':
+//                    if (isset($params['pack_id'])) {
+//                        $this->confirmPurchase((int)$params['pack_id']);
+//                    }
+//                    break;
+//                case 'check_payment':
+//                    if (isset($params['payment_id'])) {
+//                        $this->checkPayment((int)$params['payment_id']);
+//                    }
+//                    break;
+//                default:
+//                    Log::warning('Unknown callback action', [
+//                        'action' => $params['action'],
+//                        'data' => $data
+//                    ]);
+//            }
+//        } catch (Exception $e) {
+//            Log::error('Process callback error: ' . $e->getMessage(), [
+//                'trace' => $e->getTraceAsString()
+//            ]);
+//            $this->sendErrorMessage();
+//        }
+//    }
 
 //    /**
 //     * Показать список пакетов
