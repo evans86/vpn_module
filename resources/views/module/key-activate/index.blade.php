@@ -67,7 +67,7 @@
                                 <tr>
                                     <th><strong>ID</strong></th>
                                     <th><strong>Трафик</strong></th>
-                                    <th><strong>Пакет</strong></th>
+                                    <th><strong>Пакет продавца</strong></th>
                                     <th><strong>Продавец</strong></th>
                                     <th><strong>Дата окончания</strong></th>
                                     <th><strong>Telegram ID</strong></th>
@@ -91,12 +91,13 @@
                                         </td>
                                         <td>{{ number_format($key->traffic_limit / (1024*1024*1024), 1) }} GB</td>
                                         <td>
-                                            @if($key->packSalesman)
-                                                <a href="{{ url('/admin/module/pack?id=' . $key->packSalesman->pack_id) }}" class="text-primary">
-                                                    {{ $key->packSalesman->pack_id }}
+                                            @if($key->pack_salesman_id)
+                                                <a href="{{ route('admin.module.pack-salesman.index', ['id' => $key->pack_salesman_id]) }}" 
+                                                   title="Перейти к пакету">
+                                                    {{ $key->pack_salesman_id }}
                                                 </a>
                                             @else
-                                                Не указан
+                                                -
                                             @endif
                                         </td>
                                         <td>

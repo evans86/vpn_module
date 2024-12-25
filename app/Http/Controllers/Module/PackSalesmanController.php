@@ -38,7 +38,12 @@ class PackSalesmanController extends Controller
     public function index(Request $request): View
     {
         try {
-            $query = PackSalesman::with(['pack', 'salesman'])->latest();
+            $query = PackSalesman::with(['pack', 'salesman']);
+
+            // Фильтр по id
+            if ($request->has('id')) {
+                $query->where('id', $request->id);
+            }
 
             // Фильтр по продавцу (поиск по telegram_id или username)
             if ($request->filled('salesman_search')) {
@@ -64,7 +69,7 @@ class PackSalesmanController extends Controller
                 $query->whereDate('created_at', $date);
             }
 
-            $pack_salesmans = $query->paginate(10);
+            $pack_salesmans = $query->latest()->paginate(10);
 
             $this->logger->info('Просмотр списка связей пакет-продавец', [
                 'source' => 'pack_salesman',

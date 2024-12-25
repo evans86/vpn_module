@@ -46,9 +46,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Panel Routes
         Route::prefix('module/panel')->name('module.panel.')->group(function () {
             Route::get('/', [PanelController::class, 'index'])->name('index');
+            Route::get('/create', [PanelController::class, 'create'])->name('create');
             Route::post('/', [PanelController::class, 'store'])->name('store');
+            Route::get('/{panel}/edit', [PanelController::class, 'edit'])->name('edit');
             Route::put('/{panel}', [PanelController::class, 'update'])->name('update');
-            Route::delete('/{panel}', [PanelController::class, 'destroy'])->name('destroy');
             Route::post('/{panel}/configure', [PanelController::class, 'configure'])->name('configure');
             Route::post('/{panel}/update-config', [PanelController::class, 'updateConfig'])->name('update-config');
             Route::get('/{panel}/status', [PanelController::class, 'checkStatus'])->name('status');

@@ -66,9 +66,16 @@
                                         <td>{{ $pack_salesman->id }}</td>
                                         <td>
                                             @if($pack_salesman->pack)
-                                                {{ $pack_salesman->pack->name }}
+                                                <a href="{{ route('admin.module.key-activate.index', ['pack_salesman_id' => $pack_salesman->id]) }}" 
+                                                   title="Просмотреть ключи пакета">
+                                                    {{ $pack_salesman->pack->name }}
+                                                </a>
                                                 <small class="d-block text-muted">
-                                                    Кол-во ключей: {{ $pack_salesman->pack->count }}
+                                                    <a href="{{ route('admin.module.key-activate.index', ['pack_salesman_id' => $pack_salesman->id]) }}" 
+                                                       class="text-primary" 
+                                                       title="Просмотреть ключи пакета">
+                                                        Кол-во ключей: {{ $pack_salesman->pack->count }}
+                                                    </a>
                                                 </small>
                                             @else
                                                 <span class="text-danger">Пакет удален</span>

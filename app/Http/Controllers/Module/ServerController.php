@@ -9,6 +9,9 @@ use App\Repositories\Server\ServerRepository;
 use App\Logging\DatabaseLogger;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\View\Factory;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,29 +31,39 @@ class ServerController extends Controller
 
     /**
      * Display a listing of the resource.
+     *
+     * @param Request $request
+     * @return Application|Factory|View|RedirectResponse
      */
     public function index(Request $request)
     {
         try {
-            $this->logger->info('Accessing servers list', [
+            $query = Server::query();
+
+            if ($request->has('id')) {
+                $query->where('id', $request->id);
+            }
+
+            $servers = $query->orderBy('id', 'desc')
+                ->paginate(config('app.items_per_page', 30));
+
+            $this->logger->info('Просмотр списка серверов', [
                 'source' => 'server',
-                'user_id' => auth()->id()
+                'action' => 'index',
+                'user_id' => auth()->id(),
+                'filters' => $request->only(['id'])
             ]);
 
-            $filters = $request->only(['name', 'ip', 'host', 'status']);
-            $servers = $this->serverRepository->getFilteredServers($filters);
-            $locations = $this->serverRepository->getLocationsForDropdown();
-
-            return view('module.server.index', compact('servers', 'locations'));
+            return view('module.server.index', compact('servers'));
         } catch (Exception $e) {
-            $this->logger->error('Error accessing servers list', [
+            $this->logger->error('Ошибка при просмотре списка серверов', [
                 'source' => 'server',
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user_id' => auth()->id()
+                'action' => 'index',
+                'user_id' => auth()->id(),
+                'error' => $e->getMessage()
             ]);
 
-            throw $e;
+            return redirect()->back()->with('error', 'Ошибка при загрузке списка серверов');
         }
     }
 

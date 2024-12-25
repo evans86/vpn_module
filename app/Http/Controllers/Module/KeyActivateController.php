@@ -41,6 +41,12 @@ class KeyActivateController extends Controller
     {
         try {
             $filters = array_filter($request->only(['id', 'pack_id', 'status', 'user_tg_id', 'telegram_id']));
+            
+            // Добавляем pack_salesman_id в фильтры, если он есть
+            if ($request->has('pack_salesman_id')) {
+                $filters['pack_salesman_id'] = $request->pack_salesman_id;
+            }
+
             $packs = Pack::all();
             $statuses = [
                 KeyActivate::EXPIRED => 'Просрочен',
@@ -60,14 +66,20 @@ class KeyActivateController extends Controller
                 'filters' => $filters
             ]);
 
-            return view('module.key-activate.index', compact('activate_keys', 'packs', 'statuses', 'filters'));
+            return view('module.key-activate.index', [
+                'activate_keys' => $activate_keys,
+                'packs' => $packs,
+                'statuses' => $statuses,
+                'filters' => $filters
+            ]);
+
         } catch (Exception $e) {
             $this->logger->error('Ошибка при просмотре списка активированных ключей', [
                 'source' => 'key_activate',
                 'action' => 'view_list',
+                'user_id' => auth()->id(),
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user_id' => auth()->id()
+                'trace' => $e->getTraceAsString()
             ]);
 
             throw $e;

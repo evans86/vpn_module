@@ -10,11 +10,13 @@ use App\Repositories\Panel\PanelRepository;
 use App\Logging\DatabaseLogger;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\View\Factory;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Illuminate\View\View;
 use Illuminate\Http\JsonResponse;
 
 class PanelController extends Controller
@@ -31,32 +33,62 @@ class PanelController extends Controller
     }
 
     /**
-     * Display a listing of panels.
+     * Display a listing of the resource.
+     *
      * @param Request $request
-     * @return View|RedirectResponse
      */
     public function index(Request $request)
     {
         try {
-            $this->logger->info('Accessing panels list', [
-                'source' => 'panel',
-                'user_id' => auth()->id()
-            ]);
+            $query = Panel::query()->with(['server', 'server.location']);
 
-            $filters = $request->only(['server', 'panel_adress', 'status']);
-            $panels = $this->panelRepository->getFilteredPanels($filters);
-            $servers = $this->panelRepository->getConfiguredServersWithoutPanels();
+            // Фильтр по серверу
+            if ($request->filled('server')) {
+                $search = $request->server;
+                $query->whereHas('server', function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('ip', 'like', "%{$search}%");
+                });
+            }
+
+            // Фильтр по адресу панели
+            if ($request->filled('panel_adress')) {
+                $query->where('panel_adress', 'like', "%{$request->panel_adress}%");
+            }
+
+            // Фильтр по статусу
+            if ($request->filled('status')) {
+                $query->where('panel_status', $request->status);
+            }
+
+            $panels = $query->orderBy('id', 'desc')
+                ->paginate(config('app.items_per_page', 30));
+
+            // Получаем список серверов для формы создания панели
+            $servers = Server::where('server_status', Server::STATUS_ACTIVE)
+                ->orderBy('name')
+                ->get()
+                ->mapWithKeys(function ($server) {
+                    return [$server->id => $server->name . ' (' . $server->ip . ')'];
+                });
+
+            $this->logger->info('Просмотр списка панелей', [
+                'source' => 'panel',
+                'action' => 'index',
+                'user_id' => auth()->id(),
+                'filters' => $request->only(['server', 'panel_adress', 'status'])
+            ]);
 
             return view('module.panel.index', compact('panels', 'servers'));
         } catch (Exception $e) {
-            $this->logger->error('Error accessing panels list', [
+            $this->logger->error('Ошибка при просмотре списка панелей', [
                 'source' => 'panel',
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user_id' => auth()->id()
+                'action' => 'index',
+                'user_id' => auth()->id(),
+                'error' => $e->getMessage()
             ]);
 
-            throw $e;
+            return redirect()->back()->with('error', 'Ошибка при загрузке списка панелей');
         }
     }
 
@@ -118,100 +150,72 @@ class PanelController extends Controller
     }
 
     /**
-     * Configure the specified panel.
+     * Configure panel.
+     *
      * @param Panel $panel
      * @return RedirectResponse
      */
     public function configure(Panel $panel)
     {
         try {
-            $this->logger->info('Configuring panel', [
+            $this->logger->info('Настройка панели', [
                 'source' => 'panel',
+                'action' => 'configure',
                 'user_id' => auth()->id(),
                 'panel_id' => $panel->id
             ]);
 
-            $strategy = new PanelStrategy(Panel::MARZBAN);
+            $strategy = new PanelStrategy($panel->panel);
             $strategy->updateConfiguration($panel->id);
 
-            $this->logger->info('Panel configured successfully', [
-                'source' => 'panel',
-                'user_id' => auth()->id(),
-                'panel_id' => $panel->id
-            ]);
-
-            return redirect()
-                ->route('module.panel.index')
-                ->with('success', 'Panel configured successfully');
-
-        } catch (GuzzleException $e) {
-            $this->logger->error('Network error configuring panel', [
-                'source' => 'panel',
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user_id' => auth()->id(),
-                'panel_id' => $panel->id
-            ]);
-
-            return redirect()
-                ->route('module.panel.index')
-                ->withErrors(['msg' => 'Network connection error: ' . $e->getMessage()]);
-
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'Панель успешно настроена');
         } catch (Exception $e) {
-            $this->logger->error('Error configuring panel', [
+            $this->logger->error('Ошибка при настройке панели', [
                 'source' => 'panel',
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'action' => 'configure',
                 'user_id' => auth()->id(),
-                'panel_id' => $panel->id
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage()
             ]);
 
-            return redirect()
-                ->route('module.panel.index')
-                ->withErrors(['msg' => 'Error configuring panel: ' . $e->getMessage()]);
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Ошибка при настройке панели: ' . $e->getMessage());
         }
     }
 
     /**
      * Update panel configuration.
+     *
      * @param Panel $panel
      * @return RedirectResponse
-     * @throws GuzzleException
      */
     public function updateConfig(Panel $panel)
     {
         try {
-            $this->logger->info('Updating panel configuration', [
+            $this->logger->info('Обновление конфигурации панели', [
                 'source' => 'panel',
+                'action' => 'update-config',
                 'user_id' => auth()->id(),
                 'panel_id' => $panel->id
             ]);
 
-            $strategy = new PanelStrategy(Panel::MARZBAN);
+            $strategy = new PanelStrategy($panel->panel);
             $strategy->updateConfiguration($panel->id);
 
-            $this->logger->info('Panel configuration updated successfully', [
-                'source' => 'panel',
-                'user_id' => auth()->id(),
-                'panel_id' => $panel->id
-            ]);
-
-            return redirect()
-                ->route('module.panel.index')
-                ->with('success', 'Configuration updated successfully');
-
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'Конфигурация панели успешно обновлена');
         } catch (Exception $e) {
-            $this->logger->error('Error updating panel configuration', [
+            $this->logger->error('Ошибка при обновлении конфигурации панели', [
                 'source' => 'panel',
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'action' => 'update-config',
                 'user_id' => auth()->id(),
-                'panel_id' => $panel->id
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage()
             ]);
 
-            return redirect()
-                ->route('module.panel.index')
-                ->withErrors(['msg' => 'Error updating configuration: ' . $e->getMessage()]);
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Ошибка при обновлении конфигурации панели: ' . $e->getMessage());
         }
     }
 
