@@ -192,6 +192,14 @@ class VdsinaService
                     throw new RuntimeException('Invalid response from Cloudflare: missing id or name');
                 }
 
+                // Ждем 5 секунд для пропагации DNS
+                Log::info('Waiting for DNS propagation', [
+                    'server_id' => $server_id,
+                    'host' => $host->name,
+                    'ip' => $serverIp
+                ]);
+                sleep(5);
+
                 // Обновляем информацию о сервере
                 $server->ip = $serverIp;
                 $server->login = 'root';

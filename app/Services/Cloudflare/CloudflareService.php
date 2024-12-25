@@ -61,7 +61,24 @@ class CloudflareService
                         'new_ip' => $ip,
                         'record_id' => $record->id
                     ]);
-//                    return $this->api->updateDNSRecord($record->id, $name, $ip);
+                    
+                    // Удаляем старую запись
+                    $this->api->deleteDNSRecord($record->id);
+                    
+                    // Создаем новую запись с тем же именем, но новым IP
+                    $result = $this->api->createDNSRecord($name, $ip);
+                    
+                    if (!isset($result->id) || !isset($result->name)) {
+                        throw new RuntimeException('Invalid response from Cloudflare API: missing id or name');
+                    }
+                    
+                    Log::info('DNS record updated successfully', [
+                        'name' => $result->name,
+                        'ip' => $ip,
+                        'record_id' => $result->id
+                    ]);
+                    
+                    return $result;
                 }
             }
 
