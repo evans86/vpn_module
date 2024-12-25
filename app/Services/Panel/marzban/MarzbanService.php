@@ -102,8 +102,8 @@ class MarzbanService
                 './install_marzban.sh ' . $host,
                 // Перезапускаем панель после установки
                 'cd /opt/marzban',
-                'docker-compose down',
-                'docker-compose up -d'
+                'docker compose down || true',  // Игнорируем ошибки если контейнеры еще не созданы
+                'docker compose up -d'
             ];
 
             foreach ($commands as $command) {
@@ -115,10 +115,10 @@ class MarzbanService
             sleep(10);
 
             // Проверяем что панель запущена
-            $status = $ssh->exec('cd /opt/marzban && docker-compose ps');
+            $status = $ssh->exec('cd /opt/marzban && docker compose ps');
             if (!str_contains($status, 'running')) {
                 // Смотрим логи если панель не запустилась
-                $logs = $ssh->exec('cd /opt/marzban && docker-compose logs --tail=50');
+                $logs = $ssh->exec('cd /opt/marzban && docker compose logs --tail=50');
                 Log::error('Panel failed to start', ['logs' => $logs]);
                 throw new RuntimeException('Panel is not running after installation. Logs: ' . $logs);
             }
