@@ -156,24 +156,110 @@ class MarzbanService
             throw new RuntimeException('Panel configuration file not found');
         }
 
+        // Проверяем установку Docker
+        $dockerVersion = $ssh->exec('docker --version');
+        Log::info('Docker version', [
+            'server_id' => $server->id,
+            'version' => $dockerVersion
+        ]);
+
+        if (!str_contains($dockerVersion, 'Docker version')) {
+            throw new RuntimeException('Docker is not installed or not accessible');
+        }
+
+        // Проверяем установку Docker Compose
+        $composeVersion = $ssh->exec('docker-compose --version');
+        Log::info('Docker Compose version', [
+            'server_id' => $server->id,
+            'version' => $composeVersion
+        ]);
+
+        if (!str_contains($composeVersion, 'docker-compose version')) {
+            throw new RuntimeException('Docker Compose is not installed or not accessible');
+        }
+
+        // Проверяем статус Docker сервиса
+        $dockerStatus = $ssh->exec('systemctl status docker');
+        Log::info('Docker service status', [
+            'server_id' => $server->id,
+            'status' => $dockerStatus
+        ]);
+
+        if (!str_contains($dockerStatus, 'active (running)')) {
+            // Пробуем запустить Docker
+            Log::warning('Docker service is not running, attempting to start', [
+                'server_id' => $server->id
+            ]);
+            $ssh->exec('systemctl start docker');
+            sleep(5);
+            
+            $dockerStatus = $ssh->exec('systemctl status docker');
+            if (!str_contains($dockerStatus, 'active (running)')) {
+                throw new RuntimeException('Failed to start Docker service');
+            }
+        }
+
+        // Проверяем наличие docker-compose.yml
+        $composeFile = $ssh->exec('cat /opt/marzban/docker-compose.yml');
+        Log::info('Docker Compose file check', [
+            'server_id' => $server->id,
+            'exists' => !empty($composeFile)
+        ]);
+
+        if (empty($composeFile)) {
+            throw new RuntimeException('Docker Compose file not found');
+        }
+
         // Проверяем статус Docker контейнеров
         $dockerPs = $ssh->exec('cd /opt/marzban && docker-compose ps');
+        Log::info('Initial Docker containers status', [
+            'server_id' => $server->id,
+            'status' => $dockerPs
+        ]);
+
         if (!str_contains($dockerPs, 'running')) {
+            // Проверяем логи перед перезапуском
+            $dockerLogs = $ssh->exec('cd /opt/marzban && docker-compose logs --tail=50');
+            Log::info('Docker logs before restart', [
+                'server_id' => $server->id,
+                'logs' => $dockerLogs
+            ]);
+
+            // Проверяем использование портов
+            $portCheck = $ssh->exec('netstat -tulpn | grep -E ":80|:443"');
+            Log::info('Port usage check', [
+                'server_id' => $server->id,
+                'ports' => $portCheck
+            ]);
+
             // Пробуем перезапустить контейнеры
             Log::warning('Docker containers are not running, attempting to restart', [
                 'server_id' => $server->id,
                 'docker_status' => $dockerPs
             ]);
             
-            $ssh->exec('cd /opt/marzban && docker-compose down');
+            $ssh->exec('cd /opt/marzban && docker-compose down --remove-orphans');
             sleep(5); // Ждем полной остановки
+            
+            // Проверяем и удаляем старые контейнеры
+            $ssh->exec('docker rm -f $(docker ps -aq) 2>/dev/null || true');
+            
+            $ssh->exec('cd /opt/marzban && docker-compose pull');
             $ssh->exec('cd /opt/marzban && docker-compose up -d');
-            sleep(10); // Ждем запуска
+            sleep(15); // Ждем запуска
             
             // Проверяем статус снова
             $dockerPs = $ssh->exec('cd /opt/marzban && docker-compose ps');
+            $dockerLogs = $ssh->exec('cd /opt/marzban && docker-compose logs --tail=50');
+            
+            Log::info('Docker status after restart', [
+                'server_id' => $server->id,
+                'status' => $dockerPs,
+                'logs' => $dockerLogs
+            ]);
+
             if (!str_contains($dockerPs, 'running')) {
-                throw new RuntimeException('Failed to start Docker containers after installation');
+                throw new RuntimeException('Failed to start Docker containers after installation. Logs: ' . $dockerLogs);
             }
         }
 
@@ -186,16 +272,10 @@ class MarzbanService
 
         // Проверяем доступность веб-интерфейса
         $curlCheck = $ssh->exec("curl -k -I https://{$server->host}/dashboard");
-        if (!str_contains($curlCheck, '200 OK') && !str_contains($curlCheck, '302 Found')) {
-            Log::warning('Web interface is not accessible', [
-                'server_id' => $server->id,
-                'curl_result' => $curlCheck
-            ]);
-            
-            // Проверяем логи контейнеров
-            $dockerLogs = $ssh->exec('cd /opt/marzban && docker-compose logs --tail=50');
-            Log::info('Docker containers logs', ['logs' => $dockerLogs]);
-        }
+        Log::info('Web interface accessibility check', [
+            'server_id' => $server->id,
+            'curl_result' => $curlCheck
+        ]);
 
         $panel = new Panel();
         $panel->server_id = $server->id;
