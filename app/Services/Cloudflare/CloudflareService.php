@@ -127,6 +127,27 @@ class CloudflareService
                 throw new RuntimeException('Record ID is required for deletion');
             }
 
+            Log::info('Checking DNS record existence', [
+                'record_id' => $recordId
+            ]);
+
+            // Проверяем существование записи
+            $records = $this->api->getRecords();
+            $recordExists = false;
+            foreach ($records as $record) {
+                if ($record->id === $recordId) {
+                    $recordExists = true;
+                    break;
+                }
+            }
+
+            if (!$recordExists) {
+                Log::info('DNS record not found, skipping deletion', [
+                    'record_id' => $recordId
+                ]);
+                return;
+            }
+
             Log::info('Deleting DNS record', [
                 'record_id' => $recordId
             ]);
