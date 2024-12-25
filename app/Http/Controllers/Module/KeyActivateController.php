@@ -8,8 +8,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Pack\Pack;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Services\Key\KeyActivateService;
+use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\Factory;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Exception;
@@ -34,14 +36,14 @@ class KeyActivateController extends Controller
     /**
      * Display a listing of key activates
      * @param Request $request
-     * @return Application|Factory|\Illuminate\Contracts\View\View
+     * @return Application|Factory|View
      * @throws Exception
      */
     public function index(Request $request)
     {
         try {
             $filters = array_filter($request->only(['id', 'pack_id', 'status', 'user_tg_id', 'telegram_id']));
-            
+
             // Добавляем pack_salesman_id в фильтры, если он есть
             if ($request->has('pack_salesman_id')) {
                 $filters['pack_salesman_id'] = $request->pack_salesman_id;
@@ -91,7 +93,7 @@ class KeyActivateController extends Controller
      * @param KeyActivate $key
      * @return JsonResponse
      */
-    public function destroy(KeyActivate $key)
+    public function destroy(KeyActivate $key): JsonResponse
     {
         try {
             $this->keyActivateRepository->delete($key);
@@ -122,8 +124,9 @@ class KeyActivateController extends Controller
      * Test activation of the key (development only)
      * @param KeyActivate $key
      * @return JsonResponse
+     * @throws GuzzleException
      */
-    public function testActivate(KeyActivate $key)
+    public function testActivate(KeyActivate $key): JsonResponse
     {
         try {
             // Проверяем статус ключа
@@ -210,11 +213,11 @@ class KeyActivateController extends Controller
             ]);
 
             $updates = [];
-            
+
             if (isset($validated['finish_at'])) {
                 $updates['finish_at'] = strtotime($validated['finish_at']);
             }
-            
+
             if (isset($validated['deleted_at'])) {
                 $updates['deleted_at'] = strtotime($validated['deleted_at']);
             }

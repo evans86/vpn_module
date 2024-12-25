@@ -25,8 +25,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        Paginator::useBootstrap();
-
         if(config('app.env') === 'production') {
             \URL::forceScheme('https');
             \Asset::forceSsl();
@@ -36,5 +34,7 @@ class AppServiceProvider extends ServiceProvider
                 $this->app['request']->server->set('HTTPS', true);
             }
         }
+        
+        Paginator::useBootstrap();
     }
 }

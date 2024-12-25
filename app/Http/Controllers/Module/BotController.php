@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Telegram\Bot\Api;
@@ -14,7 +15,7 @@ class BotController extends Controller
         return view('module.bot.index');
     }
 
-    public function updateToken(Request $request)
+    public function updateToken(Request $request): RedirectResponse
     {
         try {
             // Валидация
@@ -44,10 +45,10 @@ class BotController extends Controller
 
                 // Обновляем webhook с новым токеном
                 $telegram = new Api($token);
-                
+
                 // Используем правильный URL для webhook из конфигурации
                 $webhookUrl = config('telegram.father_bot.webhook_url');
-                
+
                 if (empty($webhookUrl)) {
                     // Если URL не настроен в конфиге, формируем URL с учетом токена
                     $webhookUrl = config('app.url') . '/api/telegram/father-bot/' . $token . '/init';
