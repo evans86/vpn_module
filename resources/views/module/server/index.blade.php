@@ -177,7 +177,7 @@
             function deleteServer(id) {
                 if (confirm('Вы уверены, что хотите удалить этот сервер?')) {
                     $.ajax({
-                        url: window.location.protocol + '//' + window.location.host + '{{ route('admin.module.server.destroy', ['server' => ':id']) }}'.replace(':id', id),
+                        url: '{{ route('admin.module.server.destroy', ['server' => ':id']) }}'.replace(':id', id),
                         method: 'DELETE',
                         data: {
                             _token: '{{ csrf_token() }}'
@@ -230,7 +230,7 @@
                     btn.html(loadingHtml);
 
                     $.ajax({
-                        url: window.location.protocol + '//' + window.location.host + '{{ route('admin.module.server.store') }}',
+                        url: '{{ route('admin.module.server.store') }}',
                         method: 'POST',
                         data: {
                             _token: '{{ csrf_token() }}',
