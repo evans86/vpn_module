@@ -121,17 +121,16 @@ class PanelController extends Controller
 
             // Создаем панель через стратегию
             $strategy = new PanelStrategy(Panel::MARZBAN);
-            $panel = $strategy->create($validated['server_id']);
+            $strategy->create($validated['server_id']);
 
             DB::commit();
 
             $this->logger->info('Panel created successfully', [
                 'source' => 'panel',
                 'user_id' => auth()->id(),
-                'panel_id' => $panel->id
             ]);
 
-            return redirect()->route('module.panel.index')
+            return redirect()->route('admin.module.panel.index')
                 ->with('success', 'Panel created successfully');
 
         } catch (Exception $e) {
@@ -144,7 +143,7 @@ class PanelController extends Controller
                 'data' => $request->all()
             ]);
 
-            return redirect()->route('module.panel.index')
+            return redirect()->route('admin.module.panel.index')
                 ->withErrors(['msg' => 'Error creating panel: ' . $e->getMessage()]);
         }
     }
