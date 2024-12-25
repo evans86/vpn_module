@@ -113,14 +113,32 @@ class MarzbanService
             if (!str_contains($ssh->exec('docker-compose --version'), 'docker-compose version')) {
                 Log::info('Installing Docker Compose');
                 
-                // Устанавливаем Docker Compose
-                $installComposeCommands = [
-                    'curl -L "https://github.com/docker/compose/releases/download/v2.23.3/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose',
-                    'chmod +x /usr/local/bin/docker-compose',
-                    'ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose'
-                ];
+                // Определяем дистрибутив
+                $osInfo = $ssh->exec('cat /etc/os-release');
+                Log::debug('OS Info', ['info' => $osInfo]);
                 
-                foreach ($installComposeCommands as $command) {
+                if (str_contains($osInfo, 'Ubuntu') || str_contains($osInfo, 'Debian')) {
+                    // Для Ubuntu/Debian
+                    $installCommands = [
+                        'apt-get update',
+                        'apt-get install -y docker-compose'
+                    ];
+                } elseif (str_contains($osInfo, 'CentOS') || str_contains($osInfo, 'Red Hat')) {
+                    // Для CentOS/RHEL
+                    $installCommands = [
+                        'yum install -y epel-release',
+                        'yum install -y docker-compose'
+                    ];
+                } else {
+                    // Для других систем пробуем через pip
+                    $installCommands = [
+                        'curl -fsSL https://bootstrap.pypa.io/get-pip.py -o get-pip.py',
+                        'python3 get-pip.py',
+                        'pip3 install docker-compose'
+                    ];
+                }
+                
+                foreach ($installCommands as $command) {
                     $result = $ssh->exec($command);
                     Log::debug('Docker Compose installation command', [
                         'command' => $command,
@@ -128,8 +146,32 @@ class MarzbanService
                     ]);
                 }
                 
-                if (!str_contains($ssh->exec('docker-compose --version'), 'docker-compose version')) {
-                    throw new RuntimeException('Failed to install Docker Compose');
+                // Проверяем установку
+                $composeVersion = $ssh->exec('docker-compose --version');
+                Log::info('Docker Compose version check', ['version' => $composeVersion]);
+                
+                if (!str_contains($composeVersion, 'docker-compose version')) {
+                    // Пробуем альтернативный способ установки через curl
+                    Log::info('Trying alternative Docker Compose installation method');
+                    
+                    $alternativeCommands = [
+                        'curl -L "https://github.com/docker/compose/releases/download/v2.23.3/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose',
+                        'chmod +x /usr/local/bin/docker-compose',
+                        'ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose'
+                    ];
+                    
+                    foreach ($alternativeCommands as $command) {
+                        $result = $ssh->exec($command);
+                        Log::debug('Alternative installation command', [
+                            'command' => $command,
+                            'result' => $result
+                        ]);
+                    }
+                    
+                    // Финальная проверка
+                    if (!str_contains($ssh->exec('docker-compose --version'), 'docker-compose version')) {
+                        throw new RuntimeException('Failed to install Docker Compose after multiple attempts');
+                    }
                 }
             }
 
@@ -142,7 +184,7 @@ class MarzbanService
             }
 
             // Очищаем старые файлы установки
-            $ssh->exec('rm -f install_marzban.sh get-docker.sh');
+            $ssh->exec('rm -f install_marzban.sh get-docker.sh get-pip.py');
             
             $commands = [
                 'wget ' . self::INSTALL_SCRIPT_URL,
