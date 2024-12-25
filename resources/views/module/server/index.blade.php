@@ -221,23 +221,25 @@
                         return;
                     }
 
-                    // Блокируем кнопку
+                    // Отключаем кнопку
                     btn.prop('disabled', true);
-
+                    
                     // Показываем индикатор загрузки
-                    toastr.info('Создание сервера...', '', {timeOut: 0, extendedTimeOut: 0});
+                    const loadingHtml = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Создание...';
+                    const originalHtml = btn.html();
+                    btn.html(loadingHtml);
 
                     $.ajax({
-                        url: '{{ route('admin.module.server.store') }}',
+                        url: window.location.protocol + '//' + window.location.host + '{{ route('admin.module.server.store') }}',
                         method: 'POST',
                         data: {
+                            _token: '{{ csrf_token() }}',
                             provider: provider,
-                            location_id: location_id,
-                            _token: '{{ csrf_token() }}'
+                            location_id: location_id
                         },
                         success: function (response) {
                             if (response.success) {
-                                toastr.success(response.message || 'Сервер успешно создан');
+                                toastr.success('Сервер успешно создан');
                                 setTimeout(() => {
                                     window.location.reload();
                                 }, 1000);
@@ -247,24 +249,19 @@
                         },
                         error: function (xhr) {
                             let errorMessage = 'Произошла ошибка при создании сервера';
-
                             if (xhr.responseJSON) {
                                 if (xhr.responseJSON.errors) {
-                                    // Показываем ошибки валидации
-                                    const errors = xhr.responseJSON.errors;
-                                    errorMessage = Object.values(errors).flat().join('\n');
-                                } else if (xhr.responseJSON.message) {
-                                    errorMessage = xhr.responseJSON.message;
+                                    errorMessage = Object.values(xhr.responseJSON.errors).join('<br>');
+                                } else {
+                                    errorMessage = xhr.responseJSON.message || errorMessage;
                                 }
                             }
-
                             toastr.error(errorMessage);
                         },
                         complete: function () {
-                            // Разблокируем кнопку
+                            // Возвращаем кнопку в исходное состояние
                             btn.prop('disabled', false);
-                            // Скрываем индикатор загрузки
-                            toastr.clear();
+                            btn.html(originalHtml);
                         }
                     });
                 });
