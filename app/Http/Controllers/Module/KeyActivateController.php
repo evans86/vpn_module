@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Pack\Pack;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Services\Key\KeyActivateService;
+use App\Services\Panel\PanelStrategy;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\Factory;
@@ -104,10 +105,29 @@ class KeyActivateController extends Controller
      * Remove the specified key activate
      * @param KeyActivate $key
      * @return JsonResponse
+     * @throws GuzzleException
      */
     public function destroy(KeyActivate $key): JsonResponse
     {
         try {
+            // Загружаем связанные данные
+            $key->load(['keyActivateUser.serverUser']);
+
+            // Если есть связанный пользователь сервера
+            if ($key->keyActivateUser && $key->keyActivateUser->serverUser) {
+                $serverUser = $key->keyActivateUser->serverUser;
+
+                // Получаем панель и сервис для работы с ней
+                $panel = $serverUser->server->panel;
+                $panelStrategy = new PanelStrategy($serverUser->server->panel->panel);
+                $panelStrategy->deleteServerUser($serverUser->server->panel->id, $serverUser->id);
+
+                // Удаляем запись пользователя сервера
+                $serverUser->delete();
+                $serverUser->save();
+            }
+
+            // Удаляем ключ активации
             $this->keyActivateRepository->delete($key);
 
             $this->logger->info('Удаление ключа активации', [
