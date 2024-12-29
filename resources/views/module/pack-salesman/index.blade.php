@@ -36,12 +36,18 @@
                                                value="{{ request('created_at') }}">
                                     </div>
                                 </div>
-                                <div class="col-md-3 d-flex align-items-end">
+                                <div class="col-md-2">
                                     <div class="form-group">
-                                        <button type="submit" class="btn btn-primary">Фильтровать</button>
-                                        @if(request()->anyFilled(['salesman_search', 'status', 'created_at']))
-                                            <a href="/admin/module/pack-salesman" class="btn btn-secondary">Сбросить</a>
-                                        @endif
+                                        <label>&nbsp;</label>
+                                        <div class="btn-group btn-block">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-search"></i> Поиск
+                                            </button>
+                                            <a href="{{ route('admin.module.pack-salesman.index') }}" 
+                                               class="btn btn-secondary">
+                                                <i class="fas fa-times"></i> Сбросить
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

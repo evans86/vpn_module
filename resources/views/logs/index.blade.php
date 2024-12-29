@@ -9,73 +9,70 @@
                         <h4 class="card-title">Логи приложения</h4>
                     </div>
                     <div class="card-body">
-                        <!-- Фильтры -->
-                        <div class="row mb-3">
-                            <div class="col-md-12">
-                                <form action="{{ route('admin.logs.index') }}" method="GET" class="form-inline">
-                                    <div class="form-group mx-2">
-                                        <select name="level" class="form-control">
+                        <form action="{{ route('admin.logs.index') }}" method="GET">
+                            <div class="row mb-3">
+                                <div class="col-md-2">
+                                    <div class="form-group">
+                                        <label for="level">Уровень</label>
+                                        <select class="form-control" id="level" name="level">
                                             <option value="">Все уровни</option>
-                                            <option value="info" {{ request('level') == 'info' ? 'selected' : '' }}>
-                                                Информация
-                                            </option>
-                                            <option
-                                                value="warning" {{ request('level') == 'warning' ? 'selected' : '' }}>
-                                                Предупреждение
-                                            </option>
-                                            <option value="error" {{ request('level') == 'error' ? 'selected' : '' }}>
-                                                Ошибка
-                                            </option>
-                                            <option
-                                                value="critical" {{ request('level') == 'critical' ? 'selected' : '' }}>
-                                                Критическая ошибка
-                                            </option>
-                                            <option value="debug" {{ request('level') == 'debug' ? 'selected' : '' }}>
-                                                Отладка
-                                            </option>
+                                            <option value="info" {{ request('level') == 'info' ? 'selected' : '' }}>Информация</option>
+                                            <option value="warning" {{ request('level') == 'warning' ? 'selected' : '' }}>Предупреждение</option>
+                                            <option value="error" {{ request('level') == 'error' ? 'selected' : '' }}>Ошибка</option>
+                                            <option value="critical" {{ request('level') == 'critical' ? 'selected' : '' }}>Критическая</option>
+                                            <option value="debug" {{ request('level') == 'debug' ? 'selected' : '' }}>Отладка</option>
                                         </select>
                                     </div>
-                                    <div class="form-group mx-2">
-                                        <select name="source" class="form-control">
-                                            <option value="">Все источники</option>
-                                            @foreach($sources as $source)
-                                                <option
-                                                    value="{{ $source }}" {{ request('source') == $source ? 'selected' : '' }}>
-                                                    {{ $source }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="form-group mx-2">
-                                        <input type="date" name="date_from" class="form-control" placeholder="Дата от"
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="form-group">
+                                        <label for="date_from">Дата от</label>
+                                        <input type="date" class="form-control" id="date_from" name="date_from"
                                                value="{{ request('date_from') }}">
                                     </div>
-                                    <div class="form-group mx-2">
-                                        <input type="date" name="date_to" class="form-control" placeholder="Дата до"
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="form-group">
+                                        <label for="date_to">Дата до</label>
+                                        <input type="date" class="form-control" id="date_to" name="date_to"
                                                value="{{ request('date_to') }}">
                                     </div>
-                                    <div class="form-group mx-2">
-                                        <input type="text" name="search" class="form-control"
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="search">Поиск</label>
+                                        <input type="text" class="form-control" id="search" name="search"
                                                placeholder="Поиск по сообщению"
                                                value="{{ request('search') }}">
                                     </div>
-                                    <button type="submit" class="btn btn-primary">Применить фильтры</button>
-                                    <a href="{{ route('admin.logs.index') }}"
-                                       class="btn btn-secondary ml-2">Сбросить</a>
-                                </form>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label>&nbsp;</label>
+                                        <div class="btn-group btn-block">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-search"></i> Поиск
+                                            </button>
+                                            <a href="{{ route('admin.logs.index') }}" 
+                                               class="btn btn-secondary">
+                                                <i class="fas fa-times"></i> Сбросить
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        </form>
 
                         <!-- Таблица логов -->
                         <div class="table-responsive">
                             <table class="table">
                                 <thead>
                                 <tr>
-                                    <th>Время</th>
-                                    <th>Уровень</th>
-                                    <th>Источник</th>
-                                    <th>Сообщение</th>
-                                    <th>Действия</th>
+                                    <th>ВРЕМЯ</th>
+                                    <th>УРОВЕНЬ</th>
+                                    <th>ИСТОЧНИК</th>
+                                    <th>СООБЩЕНИЕ</th>
+                                    <th>ДЕЙСТВИЯ</th>
                                 </tr>
                                 </thead>
                                 <tbody>

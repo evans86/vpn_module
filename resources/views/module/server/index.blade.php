@@ -41,62 +41,54 @@
                         <div class="row">
                             <div class="col-md-3">
                                 <div class="form-group">
-                                    <label for="name">Название</label>
+                                    <label for="name">Имя сервера</label>
                                     <input type="text" class="form-control" id="name" name="name"
-                                           value="{{ request('name') }}"
-                                           placeholder="Поиск по названию">
+                                           value="{{ request('name') }}" placeholder="Поиск по имени">
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="form-group">
-                                    <label for="ip">IP-адрес</label>
+                                    <label for="ip">IP адрес</label>
                                     <input type="text" class="form-control" id="ip" name="ip"
-                                           value="{{ request('ip') }}"
-                                           placeholder="Поиск по IP">
+                                           value="{{ request('ip') }}" placeholder="Поиск по IP">
                                 </div>
                             </div>
-                            <div class="col-md-2">
-                                <div class="form-group">
-                                    <label for="host">Хост</label>
-                                    <input type="text" class="form-control" id="host" name="host"
-                                           value="{{ request('host') }}"
-                                           placeholder="Поиск по хосту">
-                                </div>
-                            </div>
-                            <div class="col-md-2">
+                            <div class="col-md-3">
                                 <div class="form-group">
                                     <label for="status">Статус</label>
                                     <select class="form-control" id="status" name="status">
                                         <option value="">Все статусы</option>
-                                        <option
-                                            value="{{ Server::SERVER_CREATED }}" {{ request('status') == Server::SERVER_CREATED ? 'selected' : '' }}>
+                                        <option value="{{ \App\Models\Server\Server::SERVER_CREATED }}"
+                                            {{ request('status') == \App\Models\Server\Server::SERVER_CREATED ? 'selected' : '' }}>
                                             Создан
                                         </option>
-                                        <option
-                                            value="{{ Server::SERVER_CONFIGURED }}" {{ request('status') == Server::SERVER_CONFIGURED ? 'selected' : '' }}>
+                                        <option value="{{ \App\Models\Server\Server::SERVER_CONFIGURED }}"
+                                            {{ request('status') == \App\Models\Server\Server::SERVER_CONFIGURED ? 'selected' : '' }}>
                                             Настроен
                                         </option>
-                                        <option
-                                            value="{{ Server::SERVER_ERROR }}" {{ request('status') == Server::SERVER_ERROR ? 'selected' : '' }}>
+                                        <option value="{{ \App\Models\Server\Server::SERVER_ERROR }}"
+                                            {{ request('status') == \App\Models\Server\Server::SERVER_ERROR ? 'selected' : '' }}>
                                             Ошибка
                                         </option>
-                                        <option
-                                            value="{{ Server::SERVER_DELETED }}" {{ request('status') == Server::SERVER_DELETED ? 'selected' : '' }}>
+                                        <option value="{{ \App\Models\Server\Server::SERVER_DELETED }}"
+                                            {{ request('status') == \App\Models\Server\Server::SERVER_DELETED ? 'selected' : '' }}>
                                             Удален
-                                        </option>
-                                        <option
-                                            value="{{ Server::SERVER_PASSWORD_UPDATE }}" {{ request('status') == Server::SERVER_PASSWORD_UPDATE ? 'selected' : '' }}>
-                                            Обновление пароля
                                         </option>
                                     </select>
                                 </div>
                             </div>
-                            <div class="col-md-2 d-flex align-items-end">
+                            <div class="col-md-3">
                                 <div class="form-group">
-                                    <button type="submit" class="btn btn-primary">Фильтровать</button>
-                                    @if(request()->anyFilled(['name', 'ip', 'host', 'status']))
-                                        <a href="/admin/module/server" class="btn btn-secondary">Сбросить</a>
-                                    @endif
+                                    <label>&nbsp;</label>
+                                    <div class="btn-group btn-block">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-search"></i> Поиск
+                                        </button>
+                                        <a href="{{ route('admin.module.server.index') }}" 
+                                           class="btn btn-secondary">
+                                            <i class="fas fa-times"></i> Сбросить
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         </div>

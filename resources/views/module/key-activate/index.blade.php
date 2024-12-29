@@ -53,12 +53,18 @@
                                                value="{{ request('telegram_id') }}" placeholder="Введите Telegram ID">
                                     </div>
                                 </div>
-                                <div class="col-md-3 d-flex align-items-end">
+                                <div class="col-md-2">
                                     <div class="form-group">
-                                        <button type="submit" class="btn btn-primary">Фильтровать</button>
-                                        @if(request('pack_id') || request('status') || request('user_tg_id') || request('id') || request('telegram_id'))
-                                            <a href="{{ url('/admin/module/key-activate') }}" class="btn btn-secondary">Сбросить</a>
-                                        @endif
+                                        <label>&nbsp;</label>
+                                        <div class="btn-group btn-block">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-search"></i> Поиск
+                                            </button>
+                                            <a href="{{ route('admin.module.key-activate.index') }}" 
+                                               class="btn btn-secondary">
+                                                <i class="fas fa-times"></i> Сбросить
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

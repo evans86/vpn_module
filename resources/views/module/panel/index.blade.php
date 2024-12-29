@@ -42,36 +42,18 @@
                                            placeholder="Поиск по адресу панели">
                                 </div>
                             </div>
-                            <div class="col-md-2">
+                            <div class="col-md-4">
                                 <div class="form-group">
-                                    <label for="status">Статус</label>
-                                    <select class="form-control" id="status" name="status">
-                                        <option value="">Все статусы</option>
-                                        <option value="{{ \App\Models\Panel\Panel::PANEL_CREATED }}" 
-                                            {{ request('status') == \App\Models\Panel\Panel::PANEL_CREATED ? 'selected' : '' }}>
-                                            Создана
-                                        </option>
-                                        <option value="{{ \App\Models\Panel\Panel::PANEL_CONFIGURED }}" 
-                                            {{ request('status') == \App\Models\Panel\Panel::PANEL_CONFIGURED ? 'selected' : '' }}>
-                                            Настроена
-                                        </option>
-                                        <option value="{{ \App\Models\Panel\Panel::PANEL_ERROR }}" 
-                                            {{ request('status') == \App\Models\Panel\Panel::PANEL_ERROR ? 'selected' : '' }}>
-                                            Ошибка
-                                        </option>
-                                        <option value="{{ \App\Models\Panel\Panel::PANEL_DELETED }}" 
-                                            {{ request('status') == \App\Models\Panel\Panel::PANEL_DELETED ? 'selected' : '' }}>
-                                            Удалена
-                                        </option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="col-md-2 d-flex align-items-end">
-                                <div class="form-group">
-                                    <button type="submit" class="btn btn-primary">Фильтровать</button>
-                                    @if(request()->anyFilled(['server', 'panel_adress', 'status']))
-                                        <a href="{{ route('admin.module.panel.index') }}" class="btn btn-secondary">Сбросить</a>
-                                    @endif
+                                    <label>&nbsp;</label>
+                                    <div class="btn-group btn-block">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-search"></i> Поиск
+                                        </button>
+                                        <a href="{{ route('admin.module.panel.index') }}" 
+                                           class="btn btn-secondary">
+                                            <i class="fas fa-times"></i> Сбросить
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
