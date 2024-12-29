@@ -15,6 +15,7 @@ use App\Services\Telegram\ModuleBot\FatherBotController;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Telegram\Bot\Api;
 
 class PackSalesmanService
 {
@@ -133,14 +134,26 @@ class PackSalesmanService
             }
 
             // Отправляем сообщение через FatherBot
-//            $message = "✅ Ваш пакет \"{$pack->name}\" успешно активирован!\n\n";
-//            $message .= "📦 Количество ключей: {$pack->count}\n";
-//            $message .= "⏱ Период действия: {$pack->period} дней\n";
-//            $message .= "💾 Лимит трафика: {$pack->traffic_limit} GB\n";
-//            $message .= "⚡️ Время на активацию: {$pack->activate_time} дней";
-//
-//            $abstract_telegram_bot = new FatherBotController($salesman->token);
-//            $abstract_telegram_bot->sendMessage($message);
+            $message = "✅ Ваш пакет \"{$pack->name}\" успешно активирован!\n\n";
+            $message .= "📦 Количество ключей: {$pack->count}\n";
+            $message .= "⏱ Период действия: {$pack->period} дней\n";
+            $message .= "💾 Лимит трафика: {$pack->traffic_limit} GB\n";
+            $message .= "⚡️ Время на активацию: {$pack->activate_time} дней";
+
+            try {
+                $telegram = new Api(config('services.telegram.father_bot_token'));
+                $telegram->sendMessage([
+                    'chat_id' => $salesman->telegram_id,
+                    'text' => $message,
+                    'parse_mode' => 'HTML'
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Ошибка при отправке сообщения через FatherBot', [
+                    'error' => $e->getMessage(),
+                    'salesman_id' => $salesman->id,
+                    'telegram_id' => $salesman->telegram_id
+                ]);
+            }
 
         } catch (Exception $e) {
             throw new Exception('Ошибка при создании ключей: ' . $e->getMessage());
