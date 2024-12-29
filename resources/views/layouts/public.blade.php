@@ -6,7 +6,7 @@
     <title>VPN Configuration</title>
 
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
