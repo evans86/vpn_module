@@ -597,20 +597,17 @@ class MarzbanService
         try {
             /** @var Panel $panel */
             $panel = Panel::query()->findOrFail($panel_id);
-            
-            // Получаем текущий токен или обновляем его если истек
-            $token = $panel->token;
-            if (!$token) {
-                $token = $this->updateMarzbanToken($panel_id);
-            }
 
-            $marzbanApi = new MarzbanAPI($panel->address);
-            
+            // Получаем текущий токен или обновляем его если истек
+            $panel = self::updateMarzbanToken($panel->id);
+
+            $marzbanApi = new MarzbanAPI($panel->api_address);
+
             // Подготавливаем данные для обновления
             $updateData = [
                 'is_sudo' => true // Обязательный параметр
             ];
-            
+
             // Добавляем только те поля, которые были переданы
             if (isset($data['username'])) {
                 $updateData['username'] = $data['username'];
@@ -618,16 +615,16 @@ class MarzbanService
             if (isset($data['password'])) {
                 $updateData['password'] = $data['password'];
             }
-            
+
             // Обновляем данные администратора через API
-            $result = $marzbanApi->modifyAdmin($token, $panel->login, $updateData);
-            
+            $result = $marzbanApi->modifyAdmin($panel->auth_token, $panel->panel_login, $updateData);
+
             // Если был изменен логин, обновляем его в базе
             if (isset($data['username'])) {
                 $panel->login = $data['username'];
                 $panel->save();
             }
-            
+
             Log::info('Admin credentials updated successfully', ['panel_id' => $panel_id]);
         } catch (Exception $e) {
             Log::error('Error updating admin credentials', [
