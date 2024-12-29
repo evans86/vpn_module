@@ -118,8 +118,8 @@ class KeyActivateController extends Controller
                 $serverUser = $key->keyActivateUser->serverUser;
 
                 // Получаем панель и сервис для работы с ней
-                $panelStrategy = new PanelStrategy($serverUser->server->panel->panel);
-                $panelStrategy->deleteServerUser($serverUser->server->panel->id, $serverUser->id);
+                $panelStrategy = new PanelStrategy($serverUser->panel->panel);
+                $panelStrategy->deleteServerUser($serverUser->panel->id, $serverUser->id);
 
                 // Удаляем запись пользователя сервера
                 $serverUser->delete();
