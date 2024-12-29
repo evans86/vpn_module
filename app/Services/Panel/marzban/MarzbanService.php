@@ -677,10 +677,9 @@ class MarzbanService
 //                'status' => $userData['status'] ?? 'active'
 //            ];
             $targetPanel = self::updateMarzbanToken($targetPanel->id);
-            $userId = Str::uuid();
             $newUser = $targetMarzbanApi->createUser(
                 $targetPanel->auth_token,
-                $userId,
+                $serverUser->id,
                     $userData['data_limit'] ?? 0,
                     $userData['expire'] ?? 0
             );
