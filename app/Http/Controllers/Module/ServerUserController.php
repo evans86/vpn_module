@@ -12,10 +12,16 @@ class ServerUserController extends Controller
     /**
      * Display a listing of the server users.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
-        $serverUsers = ServerUser::with(['keyActivateUser.keyActivate', 'server.panel'])
-            ->orderBy('created_at', 'desc')
+        $query = ServerUser::with(['keyActivateUser.keyActivate', 'server.panel']);
+
+        // Фильтрация по ID
+        if ($request->has('id')) {
+            $query->where('id', $request->id);
+        }
+
+        $serverUsers = $query->orderBy('created_at', 'desc')
             ->paginate(20);
 
         return view('module.server-users.index', compact('serverUsers'));

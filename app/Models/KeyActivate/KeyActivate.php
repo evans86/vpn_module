@@ -39,6 +39,14 @@ class KeyActivate extends Model
     }
 
     /**
+     * Get the key activate user relation
+     */
+    public function keyActivateUser()
+    {
+        return $this->hasOne(\App\Models\KeyActivateUser\KeyActivateUser::class, 'key_activate_id');
+    }
+
+    /**
      * Получить текстовое описание статуса
      *
      * @return string

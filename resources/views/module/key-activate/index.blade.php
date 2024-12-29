@@ -72,6 +72,7 @@
                                     <th><strong>Дата окончания</strong></th>
                                     <th><strong>Telegram ID</strong></th>
                                     <th><strong>Активировать до</strong></th>
+                                    <th><strong>Пользователь сервера</strong></th>
                                     <th><strong>Статус</strong></th>
                                     <th></th>
                                 </tr>
@@ -92,7 +93,7 @@
                                         <td>{{ number_format($key->traffic_limit / (1024*1024*1024), 1) }} GB</td>
                                         <td>
                                             @if($key->pack_salesman_id)
-                                                <a href="{{ route('admin.module.pack-salesman.index', ['id' => $key->pack_salesman_id]) }}" 
+                                                <a href="{{ route('admin.module.pack-salesman.index', ['id' => $key->pack_salesman_id]) }}"
                                                    title="Перейти к пакету">
                                                     {{ $key->pack_salesman_id }}
                                                 </a>
@@ -112,7 +113,7 @@
                                         <td>
                                             <div class="d-flex align-items-center">
                                                 {{ date('d.m.Y H:i', $key->finish_at) }}
-                                                <button class="btn btn-sm btn-link edit-date" 
+                                                <button class="btn btn-sm btn-link edit-date"
                                                         data-id="{{ $key->id }}"
                                                         data-type="finish_at"
                                                         data-value="{{ date('d.m.Y H:i', $key->finish_at) }}"
@@ -141,6 +142,16 @@
                                                     <i class="fas fa-edit"></i>
                                                 </button>
                                             </div>
+                                        </td>
+                                        <td>
+                                            @if($key->keyActivateUser && $key->keyActivateUser->serverUser)
+                                                <a href="{{ route('admin.module.server-users.index', ['id' => $key->keyActivateUser->server_user_id]) }}"
+                                                   class="btn btn-sm btn-primary">
+                                                    <i class="fas fa-user"></i> Пользователь
+                                                </a>
+                                            @else
+                                                -
+                                            @endif
                                         </td>
                                         <td>
                                             <span class="badge {{ $key->getStatusBadgeClass() }}">
@@ -227,7 +238,7 @@
                     const id = $(this).data('id');
                     const type = $(this).data('type');
                     const currentValue = $(this).data('value');
-                    
+
                     // Создаем модальное окно
                     const modal = $(`
                         <div class="modal fade" tabindex="-1">
@@ -302,7 +313,7 @@
                 $('.delete-key').on('click', function(e) {
                     e.preventDefault();
                     const id = $(this).data('id');
-                    
+
                     if (confirm('Вы уверены, что хотите удалить этот ключ?')) {
                         $.ajax({
                             url: `/admin/module/key-activate/${id}`,

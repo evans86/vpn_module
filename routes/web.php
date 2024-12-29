@@ -9,7 +9,6 @@ use App\Http\Controllers\Module\KeyActivateController;
 use App\Http\Controllers\Module\BotController;
 use App\Http\Controllers\VpnConfigController;
 use App\Http\Controllers\LogController;
-use App\Http\Controllers\AdminController;
 use App\Http\Controllers\Module\ServerUserController;
 use App\Services\Telegram\ModuleBot\FatherBotController;
 use Illuminate\Support\Facades\Auth;
@@ -35,8 +34,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Logs Routes (должны быть первыми, чтобы не перехватывались другими маршрутами)
         Route::get('/logs', [LogController::class, 'index'])->name('logs.index');
         Route::get('/logs/{log}', [LogController::class, 'show'])->name('logs.show');
-
-        Route::get('/', [AdminController::class, 'index'])->name('index');
 
         // Модули
         Route::prefix('module')->name('module.')->group(function () {
@@ -99,6 +96,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/{key}/update-dates', [KeyActivateController::class, 'updateDates'])->name('update-dates');
             });
 
+            Route::prefix('server-users')->name('server-users.')->group(function () {
+                Route::get('/', [ServerUserController::class, 'index'])->name('index');
+                Route::get('/{key}', [ServerUserController::class, 'show'])->name('show');
+            });
+
             // Bot Routes
             Route::prefix('bot')->name('bot.')->group(function () {
                 Route::get('/', [BotController::class, 'index'])->name('index');
@@ -107,7 +109,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         });
 
         // Пользователи сервера
-        Route::resource('server-users', ServerUserController::class);
+//        Route::resource('server-users', ServerUserController::class);
 
         // Dashboard
         Route::get('/', function () {
