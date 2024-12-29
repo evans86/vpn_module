@@ -14,7 +14,7 @@
                                 <div class="col-md-3">
                                     <div class="form-group">
                                         <label for="id">ID</label>
-                                        <input type="number" class="form-control" id="id" name="id" 
+                                        <input type="number" class="form-control" id="id" name="id"
                                                value="{{ request('id') }}" placeholder="Введите ID">
                                     </div>
                                 </div>
@@ -46,6 +46,7 @@
                                     <th><strong>Токен</strong></th>
                                     <th><strong>Ссылка на бота</strong></th>
                                     <th><strong>Статус</strong></th>
+                                    <th><strong>Действия</strong></th>
                                 </tr>
                                 </thead>
                                 <tbody>
@@ -60,9 +61,15 @@
                                         <td>
                                             <button
                                                 class="btn btn-sm status-toggle {{ $salesman->status ? 'btn-success' : 'btn-danger' }}"
-                                                data-id="{{ $salesman->id }}"
-                                                onclick="toggleStatus({{ $salesman->id }})">
+                                                data-id="{{ $salesman->id }}">
                                                 {{ $salesman->status ? 'Активен' : 'Неактивен' }}
+                                            </button>
+                                        </td>
+                                        <td>
+                                            <button
+                                                class="btn btn-sm btn-primary assign-pack-btn"
+                                                data-salesman-id="{{ $salesman->id }}">
+                                                Предоставить пакет
                                             </button>
                                         </td>
                                     </tr>
@@ -79,8 +86,42 @@
         </div>
     </div>
 
-    @push('js')
-        <script>
+    <!-- Модальное окно для выбора пакета -->
+    <div class="modal fade" id="packModal" tabindex="-1" role="dialog" aria-labelledby="packModalLabel"
+         aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="packModalLabel">Предоставить пакет</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="assignPackForm">
+                        <input type="hidden" id="salesmanId" name="salesman_id">
+                        <div class="form-group">
+                            <label for="packId">Выберите пакет</label>
+                            <select class="form-control" id="packId" name="pack_id" required>
+                                @foreach($packs as $pack)
+                                    <option value="{{ $pack->id }}">{{ $pack->name }} - {{ $pack->price }}₽</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="assignPackButton">Предоставить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+@endsection
+
+@push('js')
+    <script>
+        $(document).ready(function () {
             // Настройка CSRF-токена для всех AJAX-запросов
             $.ajaxSetup({
                 headers: {
@@ -88,7 +129,41 @@
                 }
             });
 
-            function toggleStatus(id) {
+            // Обработчик клика по кнопке "Предоставить пакет"
+            $('.assign-pack-btn').on('click', function () {
+                const salesmanId = $(this).data('salesman-id');
+                $('#salesmanId').val(salesmanId);
+                $('#packModal').modal('show');
+            });
+
+            // Обработчик клика по кнопке "Предоставить" в модальном окне
+            $('#assignPackButton').on('click', function () {
+                const salesmanId = $('#salesmanId').val();
+                const packId = $('#packId').val();
+
+                $.ajax({
+                    url: `/admin/module/salesman/${salesmanId}/assign-pack`,
+                    method: 'POST',
+                    data: {
+                        pack_id: packId
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            showNotification('success', 'Пакет успешно предоставлен');
+                            $('#packModal').modal('hide');
+                        } else {
+                            showNotification('error', response.message || 'Произошла ошибка');
+                        }
+                    },
+                    error: function (xhr) {
+                        showNotification('error', xhr.responseJSON?.message || 'Произошла ошибка при назначении пакета');
+                    }
+                });
+            });
+
+            // Обработчик клика по кнопке статуса
+            $('.status-toggle').on('click', function () {
+                const id = $(this).data('id');
                 $.ajax({
                     url: `/admin/module/salesman/${id}/toggle-status`,
                     type: 'POST',
@@ -102,7 +177,6 @@
                                 button.removeClass('btn-success').addClass('btn-danger');
                                 button.text('Неактивен');
                             }
-                            // Показываем уведомление об успехе
                             showNotification('success', response.message);
                         } else {
                             showNotification('error', response.message);
@@ -113,7 +187,7 @@
                         showNotification('error', 'Произошла ошибка при изменении статуса');
                     }
                 });
-            }
+            });
 
             function showNotification(type, message) {
                 if (typeof toastr !== 'undefined') {
@@ -122,6 +196,6 @@
                     alert(message);
                 }
             }
-        </script>
-    @endpush
-@endsection
+        });
+    </script>
+@endpush

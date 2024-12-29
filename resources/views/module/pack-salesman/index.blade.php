@@ -132,19 +132,25 @@
         </div>
     </div>
 
-    @push('scripts')
+    @push('js')
         <script>
             function markAsPaid(id) {
                 if (confirm('Вы уверены, что хотите отметить пакет как оплаченный?')) {
-                    axios.post(`/admin/module/pack-salesman/${id}/mark-as-paid`)
-                        .then(response => {
-                            if (response.data.success) {
+                    $.ajax({
+                        url: `/admin/module/pack-salesman/${id}/mark-as-paid`,
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                        },
+                        success: function(response) {
+                            if (response.success) {
                                 location.reload();
                             }
-                        })
-                        .catch(error => {
+                        },
+                        error: function(xhr) {
                             alert('Произошла ошибка при обновлении статуса');
-                        });
+                        }
+                    });
                 }
             }
         </script>

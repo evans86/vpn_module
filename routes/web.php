@@ -62,6 +62,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::put('/{salesman}', [SalesmanController::class, 'update'])->name('update');
             Route::delete('/{salesman}', [SalesmanController::class, 'destroy'])->name('destroy');
             Route::post('/{id}/toggle-status', [SalesmanController::class, 'toggleStatus'])->name('toggle-status');
+            Route::post('/{id}/assign-pack', [SalesmanController::class, 'assignPack'])->name('assign-pack');
         });
 
         // Pack Routes

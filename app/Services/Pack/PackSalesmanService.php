@@ -8,7 +8,10 @@ use App\Models\PackSalesman\PackSalesman;
 use App\Repositories\Pack\PackRepository;
 use App\Repositories\PackSalesman\PackSalesmanRepository;
 use App\Repositories\Salesman\SalesmanRepository;
+use App\Services\Bot\FatherBotService;
 use App\Services\Key\KeyActivateService;
+use App\Services\Telegram\ModuleBot\AbstractTelegramBot;
+use App\Services\Telegram\ModuleBot\FatherBotController;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -104,35 +107,41 @@ class PackSalesmanService
     {
         try {
             $pack_salesman = $this->packSalesmanRepository->findByIdOrFail($pack_salesman_id);
-
             $pack = $this->packRepository->findByIdOrFail($pack_salesman->pack_id);
+            $salesman = $this->salesmanRepository->findByIdOrFail($pack_salesman->salesman_id);
 
             // Создаем ключи согласно параметрам пакета
             for ($i = 0; $i < $pack->count; $i++) {
-                // Используем текущее время как базу
                 $now = time();
-
-                // Ограничиваем периоды до разумных значений
-                $period_days = min($pack->period, 365 * 2); // максимум 2 года
-                $activate_days = min($pack->activate_time, 90); // максимум 90 дней на активацию
-
-                // Вычисляем временные метки относительно текущего времени
+                $period_days = min($pack->period, 365 * 2);
+                $activate_days = min($pack->activate_time, 90);
                 $finish_at = $now + ($period_days * 24 * 60 * 60);
                 $deleted_at = $now + ($activate_days * 24 * 60 * 60);
 
                 try {
                     $this->keyActivateService->create(
-                        $pack->traffic_limit,  // Лимит трафика из пакета
-                        $pack_salesman->id,    // ID связи пакет-продавец
-                        $finish_at,            // Дата окончания действия ключа
-                        $deleted_at,            // Дата, до которой нужно активировать ключ
-                        null                  // Время начала (null = начнется при активации)
+                        $pack->traffic_limit,
+                        $pack_salesman->id,
+                        $finish_at,
+                        $deleted_at,
+                        null
                     );
                 } catch (\Exception $e) {
                     Log::error("Ошибка при создании ключа: " . $e->getMessage());
                     throw new RuntimeException('Ошибка при создании ключа: ' . $e->getMessage());
                 }
             }
+
+            // Отправляем сообщение через FatherBot
+            $message = "✅ Ваш пакет \"{$pack->name}\" успешно активирован!\n\n";
+            $message .= "📦 Количество ключей: {$pack->count}\n";
+            $message .= "⏱ Период действия: {$pack->period} дней\n";
+            $message .= "💾 Лимит трафика: {$pack->traffic_limit} GB\n";
+            $message .= "⚡️ Время на активацию: {$pack->activate_time} дней";
+
+            $abstract_telegram_bot = new FatherBotController($salesman->token);
+            $abstract_telegram_bot->sendMessage($message);
+
         } catch (Exception $e) {
             throw new Exception('Ошибка при создании ключей: ' . $e->getMessage());
         }

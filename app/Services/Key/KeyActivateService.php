@@ -3,10 +3,12 @@
 namespace App\Services\Key;
 
 use App\Models\KeyActivate\KeyActivate;
+use App\Models\Panel\Panel;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Repositories\PackSalesman\PackSalesmanRepository;
 use App\Repositories\Panel\PanelRepository;
 use App\Logging\DatabaseLogger;
+use App\Services\Panel\PanelStrategy;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -118,23 +120,23 @@ class KeyActivateService
 
 //@TODO Не работает панель
 
-//            // Получаем активную панель Marzban
-//            $panel = $this->panelRepository->getConfiguredMarzbanPanel();
-//
-//            if (!$panel) {
-//                throw new RuntimeException('Активная панель Marzban не найдена');
-//            }
-//
-//            // Создаем стратегию для работы с панелью
-//            $this->panelStrategy = new PanelStrategy(Panel::MARZBAN);
+            // Получаем активную панель Marzban
+            $panel = $this->panelRepository->getConfiguredMarzbanPanel();
 
-//            // Добавляем пользователя на сервер
-//            $serverUser = $this->panelStrategy->addServerUser(
-//                1,
-//                $key->traffic_limit,
-//                $key->finish_at,
-//                $key->id
-//            );
+            if (!$panel) {
+                throw new RuntimeException('Активная панель Marzban не найдена');
+            }
+
+            // Создаем стратегию для работы с панелью
+            $this->panelStrategy = new PanelStrategy(Panel::MARZBAN);
+
+            // Добавляем пользователя на сервер
+            $serverUser = $this->panelStrategy->addServerUser(
+                1,
+                $key->traffic_limit,
+                $key->finish_at,
+                $key->id
+            );
 
             // Обновляем данные активации
             $activatedKey = $this->keyActivateRepository->updateActivationData(
@@ -148,8 +150,8 @@ class KeyActivateService
                 'action' => 'activate',
                 'key_id' => $activatedKey->id,
                 'user_tg_id' => $userTgId,
-//                'server_user_id' => $serverUser->id, //@TODO Не работает панель
-                'server_user_id' => 123,
+                'server_user_id' => $serverUser->id, //@TODO Не работает панель
+//                'server_user_id' => 123,
                 'panel_id' => 1,
                 'traffic_limit' => $key->traffic_limit,
                 'finish_at' => $key->finish_at

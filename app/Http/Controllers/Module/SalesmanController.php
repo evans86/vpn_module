@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Salesman\Salesman;
 use App\Repositories\Salesman\SalesmanRepository;
 use App\Services\Salesman\SalesmanService;
+use App\Services\Pack\PackSalesmanService;
+use App\Repositories\Pack\PackRepository;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,13 +19,19 @@ class SalesmanController extends Controller
 {
     private SalesmanService $salesmanService;
     private SalesmanRepository $salesmanRepository;
+    private PackSalesmanService $packSalesmanService;
+    private PackRepository $packRepository;
 
     public function __construct(
         SalesmanService $salesmanService,
-        SalesmanRepository $salesmanRepository
+        SalesmanRepository $salesmanRepository,
+        PackSalesmanService $packSalesmanService,
+        PackRepository $packRepository
     ) {
         $this->salesmanService = $salesmanService;
         $this->salesmanRepository = $salesmanRepository;
+        $this->packSalesmanService = $packSalesmanService;
+        $this->packRepository = $packRepository;
     }
 
     /**
@@ -42,8 +50,9 @@ class SalesmanController extends Controller
 
             $filters = array_filter($request->only(['id', 'telegram_id']));
             $salesmen = $this->salesmanRepository->getPaginated(20, $filters);
+            $packs = $this->packRepository->getAllActive();
 
-            return view('module.salesman.index', compact('salesmen', 'filters'));
+            return view('module.salesman.index', compact('salesmen', 'filters', 'packs'));
         } catch (Exception $e) {
             Log::error('Error accessing salesman list', [
                 'source' => 'salesman',
@@ -84,6 +93,49 @@ class SalesmanController extends Controller
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'salesman_id' => $id,
+                'user_id' => auth()->id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Assign pack to salesman
+     * @param Request $request
+     * @param int $id
+     * @return JsonResponse
+     */
+    public function assignPack(Request $request, int $id): JsonResponse
+    {
+        try {
+            Log::info('Assigning pack to salesman', [
+                'source' => 'salesman',
+                'salesman_id' => $id,
+                'pack_id' => $request->input('pack_id'),
+                'user_id' => auth()->id()
+            ]);
+
+            $packSalesman = $this->packSalesmanService->create(
+                $request->input('pack_id'),
+                $id
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pack assigned successfully',
+                'data' => $packSalesman->getArray()
+            ]);
+        } catch (Exception $e) {
+            Log::error('Error assigning pack to salesman', [
+                'source' => 'salesman',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'salesman_id' => $id,
+                'pack_id' => $request->input('pack_id'),
                 'user_id' => auth()->id()
             ]);
 

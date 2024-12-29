@@ -156,7 +156,7 @@ abstract class AbstractTelegramBot
      * @param string $text
      * @param mixed $keyboard
      */
-    protected function sendMessage(string $text, $keyboard = null): void
+    public function sendMessage(string $text, $keyboard = null): void
     {
         try {
             Log::debug('Sending message', [
