@@ -63,7 +63,8 @@ class PanelController extends Controller
                 ->paginate(config('app.items_per_page', 30));
 
             // Получаем список серверов для формы создания панели
-            $servers = Server::where('server_status', Server::STATUS_ACTIVE)
+            $servers = Server::where('server_status', Server::SERVER_CONFIGURED)
+                ->whereDoesntHave('panels')  // Добавляем условие отсутствия связанной панели
                 ->orderBy('name')
                 ->get()
                 ->mapWithKeys(function ($server) {
