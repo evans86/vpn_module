@@ -40,6 +40,11 @@ class PanelController extends Controller
         try {
             $query = Panel::query()->with(['server', 'server.location']);
 
+            // Если передан panel_id, показываем только эту панель
+            if ($request->filled('panel_id')) {
+                $query->where('id', $request->panel_id);
+            }
+
             // Фильтр по серверу
             if ($request->filled('server')) {
                 $search = $request->server;
@@ -64,7 +69,7 @@ class PanelController extends Controller
 
             // Получаем список серверов для формы создания панели
             $servers = Server::where('server_status', Server::SERVER_CONFIGURED)
-                ->whereDoesntHave('panels')  // Добавляем условие отсутствия связанной панели
+                ->whereDoesntHave('panel')  // Исправляем на panel вместо panels
                 ->orderBy('name')
                 ->get()
                 ->mapWithKeys(function ($server) {
@@ -75,7 +80,7 @@ class PanelController extends Controller
                 'source' => 'panel',
                 'action' => 'index',
                 'user_id' => auth()->id(),
-                'filters' => $request->only(['server', 'panel_adress', 'status'])
+                'filters' => $request->only(['server', 'panel_adress', 'status', 'panel_id'])
             ]);
 
             return view('module.panel.index', compact('panels', 'servers'));
@@ -100,51 +105,49 @@ class PanelController extends Controller
     public function store(Request $request): RedirectResponse
     {
         try {
-            $this->logger->info('Creating new panel', [
-                'source' => 'panel',
-                'user_id' => auth()->id(),
-                'server_id' => $request->input('server_id')
-            ]);
-
             $validated = $request->validate([
-                'server_id' => [
-                    'required',
-                    'exists:server,id',
-                    Rule::unique('panel', 'server_id'),
-                    Rule::exists('server', 'id')->where(function ($query) {
-                        $query->where('server_status', Server::SERVER_CONFIGURED);
-                    }),
-                ]
+                'server_id' => ['required', 'exists:server,id'],
+                'panel_adress' => ['required', 'string', 'max:255'],
+                'panel_port' => ['required', 'integer', 'min:1', 'max:65535'],
             ]);
 
             DB::beginTransaction();
 
-            // Создаем панель через стратегию
-            $strategy = new PanelStrategy(Panel::MARZBAN);
-            $strategy->create($validated['server_id']);
+            // Создаем панель
+            $panel = Panel::create([
+                'server_id' => $validated['server_id'],
+                'panel_adress' => $validated['panel_adress'],
+                'panel_port' => $validated['panel_port'],
+                'panel_status' => Panel::PANEL_CREATED
+            ]);
+
+            $this->logger->info('Создание панели', [
+                'source' => 'panel',
+                'action' => 'store',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id
+            ]);
 
             DB::commit();
 
-            $this->logger->info('Panel created successfully', [
-                'source' => 'panel',
-                'user_id' => auth()->id(),
-            ]);
-
-            return redirect()->route('admin.module.panel.index')
-                ->with('success', 'Panel created successfully');
+            return redirect()
+                ->route('admin.module.panel.index')
+                ->with('success', 'Панель успешно создана');
 
         } catch (Exception $e) {
             DB::rollBack();
-            $this->logger->error('Error creating panel', [
+
+            $this->logger->error('Ошибка при создании панели', [
                 'source' => 'panel',
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'action' => 'store',
                 'user_id' => auth()->id(),
-                'data' => $request->all()
+                'error' => $e->getMessage()
             ]);
 
-            return redirect()->route('admin.module.panel.index')
-                ->withErrors(['msg' => 'Error creating panel: ' . $e->getMessage()]);
+            return redirect()
+                ->back()
+                ->with('error', 'Ошибка при создании панели: ' . $e->getMessage())
+                ->withInput();
         }
     }
 

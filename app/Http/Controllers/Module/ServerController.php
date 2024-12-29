@@ -40,10 +40,32 @@ class ServerController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Server::query();
+            $query = Server::query()->with(['panel', 'location']);
 
-            if ($request->has('id')) {
-                $query->where('id', $request->id);
+            // Фильтрация по конкретному серверу
+            if ($request->filled('server_id')) {
+                $query->where('id', $request->input('server_id'));
+            } else {
+                // Остальные фильтры применяются только если не указан конкретный сервер
+                if ($request->filled('id')) {
+                    $query->where('id', $request->input('id'));
+                }
+
+                if ($request->filled('name')) {
+                    $query->where('name', 'like', '%' . $request->input('name') . '%');
+                }
+
+                if ($request->filled('ip')) {
+                    $query->where('ip', 'like', '%' . $request->input('ip') . '%');
+                }
+
+                if ($request->filled('host')) {
+                    $query->where('host', 'like', '%' . $request->input('host') . '%');
+                }
+
+                if ($request->filled('status')) {
+                    $query->where('server_status', $request->input('status'));
+                }
             }
 
             $servers = $query->orderBy('id', 'desc')
@@ -53,7 +75,7 @@ class ServerController extends Controller
                 'source' => 'server',
                 'action' => 'index',
                 'user_id' => auth()->id(),
-                'filters' => $request->only(['id'])
+                'filters' => $request->only(['id', 'name', 'ip', 'host', 'status', 'server_id'])
             ]);
 
             return view('module.server.index', compact('servers'));

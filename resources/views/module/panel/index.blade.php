@@ -133,29 +133,18 @@
                                             <i class="fas fa-ellipsis-v"></i>
                                         </button>
                                         <div class="dropdown-menu dropdown-menu-right">
-                                            @if($panel->panel_status === \App\Models\Panel\Panel::PANEL_CREATED)
-                                                <a class="dropdown-item" href="#"
-                                                   onclick="event.preventDefault(); document.getElementById('configure-panel-{{ $panel->id }}').submit();">
-                                                    <i class="fas fa-cog mr-2"></i>Настроить
-                                                </a>
-                                                <form id="configure-panel-{{ $panel->id }}"
-                                                      action="{{ route('admin.module.panel.configure', $panel->id) }}"
-                                                      method="POST" style="display: none;">
-                                                    @csrf
-                                                </form>
-                                            @endif
-
-                                            @if($panel->panel_status === \App\Models\Panel\Panel::PANEL_CONFIGURED)
-                                                <a class="dropdown-item" href="#"
-                                                   onclick="event.preventDefault(); document.getElementById('update-config-{{ $panel->id }}').submit();">
-                                                    <i class="fas fa-sync mr-2"></i>Обновить
-                                                </a>
-                                                <form id="update-config-{{ $panel->id }}"
-                                                      action="{{ route('admin.module.panel.update-config', $panel->id) }}"
-                                                      method="POST" style="display: none;">
-                                                    @csrf
-                                                </form>
-                                            @endif
+                                            <a href="{{ route('admin.module.server-users.index', ['panel_id' => $panel->id]) }}" 
+                                               class="dropdown-item">
+                                                <i class="fas fa-users"></i> Пользователи
+                                            </a>
+                                            <button type="button" class="dropdown-item" data-toggle="modal"
+                                                    data-target="#editPanelModal{{ $panel->id }}">
+                                                <i class="fas fa-edit"></i> Редактировать
+                                            </button>
+                                            <button type="button" class="dropdown-item text-danger"
+                                                    onclick="deletePanel({{ $panel->id }})">
+                                                <i class="fas fa-trash"></i> Удалить
+                                            </button>
                                         </div>
                                     </div>
                                 </td>

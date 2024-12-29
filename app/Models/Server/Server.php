@@ -7,7 +7,7 @@ use App\Models\Panel\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -25,6 +25,8 @@ use Illuminate\Support\Carbon;
  * @property bool|null $is_free
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property-read Panel|null $panel
+ * @property-read Location|null $location
  */
 class Server extends Model
 {
@@ -66,11 +68,11 @@ class Server extends Model
     public const STATUS_ERROR = self::SERVER_ERROR;
 
     /**
-     * Get the panels associated with the server.
+     * Get the panel associated with the server.
      */
-    public function panels(): HasMany
+    public function panel(): HasOne
     {
-        return $this->hasMany(Panel::class);
+        return $this->hasOne(Panel::class);
     }
 
     /**
@@ -109,17 +111,17 @@ class Server extends Model
     {
         switch ($this->server_status) {
             case self::SERVER_CREATED:
-                return 'warning';
+                return 'primary';
             case self::SERVER_CONFIGURED:
                 return 'success';
             case self::SERVER_ERROR:
                 return 'danger';
             case self::SERVER_DELETED:
-                return 'dark';
-            case self::SERVER_PASSWORD_UPDATE:
-                return 'info';
-            default:
                 return 'secondary';
+            case self::SERVER_PASSWORD_UPDATE:
+                return 'warning';
+            default:
+                return 'info';
         }
     }
 

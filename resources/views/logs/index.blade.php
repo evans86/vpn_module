@@ -109,7 +109,7 @@
 
                         <!-- Пагинация -->
                         <div class="d-flex justify-content-center mt-3">
-                            {{ $logs->links() }}
+                            {{ $logs->appends(request()->query())->links() }}
                         </div>
                     </div>
                 </div>
@@ -123,66 +123,28 @@
         document.addEventListener('DOMContentLoaded', function () {
             const form = document.querySelector('form');
             const tableBody = document.querySelector('tbody');
-            const loadingIndicator = document.querySelector('.text-center.my-4');
 
-            function updateLogs(url) {
-                loadingIndicator.classList.remove('d-none');
-                fetch(url)
-                    .then(response => response.text())
-                    .then(html => {
-                        const parser = new DOMParser();
-                        const doc = parser.parseFromString(html, 'text/html');
-                        const newTableBody = doc.querySelector('tbody');
-                        const pagination = doc.querySelector('.pagination-container');
+            // Обработка пагинации
+            document.addEventListener('click', function(e) {
+                const target = e.target;
+                
+                // Проверяем, является ли клик по ссылке пагинации
+                if (target.tagName === 'A' && target.closest('.pagination')) {
+                    e.preventDefault();
+                    const url = target.href;
+                    
+                    // Загружаем страницу обычным способом
+                    window.location.href = url;
+                }
+            });
 
-                        tableBody.innerHTML = newTableBody.innerHTML;
-
-                        // Update pagination if it exists
-                        const currentPagination = document.querySelector('.pagination-container');
-                        if (currentPagination && pagination) {
-                            currentPagination.innerHTML = pagination.innerHTML;
-                        }
-
-                        loadingIndicator.classList.add('d-none');
-
-                        // Update URL without page reload
-                        window.history.pushState({}, '', url);
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        loadingIndicator.classList.add('d-none');
-                    });
-            }
-
-            // Handle form submission
-            form.addEventListener('submit', function (e) {
+            // Обработка формы фильтрации
+            form.addEventListener('submit', function(e) {
                 e.preventDefault();
                 const formData = new FormData(form);
                 const queryString = new URLSearchParams(formData).toString();
                 const url = `${form.action}?${queryString}`;
-                updateLogs(url);
-            });
-
-            // Handle pagination clicks
-            document.addEventListener('click', function (e) {
-                const link = e.target.closest('.pagination a');
-                if (link) {
-                    e.preventDefault();
-                    updateLogs(link.href);
-                }
-            });
-
-            // Add debounce for search input
-            let timeout = null;
-            const searchInput = document.querySelector('input[name="search"]');
-            searchInput.addEventListener('input', function () {
-                clearTimeout(timeout);
-                timeout = setTimeout(() => {
-                    const formData = new FormData(form);
-                    const queryString = new URLSearchParams(formData).toString();
-                    const url = `${form.action}?${queryString}`;
-                    updateLogs(url);
-                }, 500);
+                window.location.href = url;
             });
         });
     </script>

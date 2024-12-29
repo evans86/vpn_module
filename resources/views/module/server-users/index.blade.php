@@ -7,10 +7,59 @@
             <div class="col-lg-12">
                 <div class="card">
                     <div class="card-header">
-                        <h4 class="card-title">Пользователи сервера</h4>
+                        <h4 class="card-title">
+                            Пользователи сервера
+                            @if($panel)
+                                - Панель: {{ $panel->panel_adress }}
+                            @endif
+                        </h4>
                     </div>
 
                     <div class="card-body">
+                        <!-- Фильтры -->
+                        <form method="GET" action="{{ route('admin.module.server-users.index') }}" class="mb-4">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="id">ID</label>
+                                        <input type="text" class="form-control" id="id" name="id" 
+                                               value="{{ request('id') }}" 
+                                               placeholder="Поиск по ID">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="server">Сервер</label>
+                                        <input type="text" class="form-control" id="server" name="server" 
+                                               value="{{ request('server') }}" 
+                                               placeholder="Поиск по имени или IP">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="panel">Панель</label>
+                                        <input type="text" class="form-control" id="panel" name="panel" 
+                                               value="{{ request('panel') }}" 
+                                               placeholder="Поиск по адресу">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label>&nbsp;</label>
+                                        <div class="btn-group btn-block">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-search"></i> Поиск
+                                            </button>
+                                            <a href="{{ route('admin.module.server-users.index') }}" 
+                                               class="btn btn-secondary">
+                                                <i class="fas fa-times"></i> Сбросить
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+
                         <div class="table-responsive">
                             <table class="table table-responsive-md">
                                 <thead>
@@ -18,6 +67,7 @@
                                         <th><strong>ID</strong></th>
                                         <th><strong>Сервер</strong></th>
                                         <th><strong>Панель</strong></th>
+                                        <th><strong>Telegram ID</strong></th>
                                         <th><strong>Ключи</strong></th>
                                         <th><strong>Использовано</strong></th>
                                         <th><strong>Действия</strong></th>
@@ -26,27 +76,35 @@
                                 <tbody>
                                     @foreach($serverUsers as $user)
                                         <tr>
+                                            <td>{{ $user->id }}</td>
                                             <td>
-                                                <a href="{{ route('admin.module.server-users.show', $user) }}" class="text-primary">
-                                                    {{ $user->id }}
-                                                </a>
-                                            </td>
-                                            <td>
-                                                @if($user->server)
-                                                    <a href="{{ route('admin.module.server.show', $user->server) }}" class="text-primary">
-                                                        {{ $user->server->name }}
+                                                @if($user->panel && $user->panel->server)
+                                                    <a href="{{ route('admin.module.server.index', ['server_id' => $user->panel->server->id]) }}" 
+                                                       class="text-primary">
+                                                        {{ $user->panel->server->name }}
                                                     </a>
                                                 @else
                                                     <span class="text-muted">Нет сервера</span>
                                                 @endif
                                             </td>
                                             <td>
-                                                @if($user->server && $user->server->panel)
-                                                    <a href="{{ route('admin.module.panel.show', $user->server->panel) }}" class="text-primary">
-                                                        {{ $user->server->panel->name }}
+                                                @if($user->panel)
+                                                    <a href="{{ route('admin.module.panel.index', ['panel_id' => $user->panel->id]) }}" 
+                                                       class="text-primary" 
+                                                       title="{{ $user->panel->panel_adress }}">
+                                                        {{ Str::limit($user->panel->panel_adress, 30) }}
                                                     </a>
                                                 @else
                                                     <span class="text-muted">Нет панели</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if($user->telegram_id)
+                                                    <a href="https://t.me/{{ $user->telegram_id }}" target="_blank">
+                                                        {{ $user->telegram_id }}
+                                                    </a>
+                                                @else
+                                                    <span class="text-muted">-</span>
                                                 @endif
                                             </td>
                                             <td>
@@ -76,30 +134,33 @@
                                                     <span class="text-muted">Нет ключей</span>
                                                 @endif
                                             </td>
+                                            <td>{{ $user->used_at ? $user->used_at->format('d.m.Y H:i') : 'Не использован' }}</td>
                                             <td>
-                                                {{ number_format($user->used_traffic / (1024*1024*1024), 2) }} GB
-                                            </td>
-                                            <td>
-                                                @if($user->keyActivateUser && $user->keyActivateUser->keyActivate)
-                                                    <a href="{{ route('admin.module.key-activate.index', ['id' => $user->keyActivateUser->key_activate_id]) }}"
-                                                       class="btn btn-sm btn-primary">
-                                                        <i class="fas fa-key"></i> Ключ активации
-                                                    </a>
-                                                @endif
+                                                <div class="dropdown">
+                                                    <button class="btn btn-link" type="button" data-toggle="dropdown">
+                                                        <i class="fas fa-ellipsis-v"></i>
+                                                    </button>
+                                                    <div class="dropdown-menu dropdown-menu-right">
+                                                        <a href="{{ route('admin.module.server-users.show', $user) }}" 
+                                                           class="dropdown-item">
+                                                            <i class="fas fa-eye"></i> Просмотр
+                                                        </a>
+                                                    </div>
+                                                </div>
                                             </td>
                                         </tr>
                                     @endforeach
                                 </tbody>
                             </table>
                         </div>
-                        <div class="d-flex justify-content-center mt-4">
-                            {{ $serverUsers->links() }}
-                        </div>
+
+                        {{ $serverUsers->links() }}
                     </div>
                 </div>
             </div>
         </div>
     </div>
+@endsection
 
 @push('css')
 <style>
@@ -107,86 +168,33 @@
     position: relative;
     display: inline-block;
 }
-
-.keys-dropdown .dropdown-menu {
-    position: absolute !important;
-    transform: none !important;
-    top: 100% !important;
-    left: 155px !important;
-    width: 350px;
-    max-height: 400px;
-    overflow-y: auto;
-    padding: 8px;
-    background: white;
-    box-shadow: 0 3px 12px rgba(0,0,0,0.15);
-    border: 1px solid rgba(0,0,0,0.1);
-    border-radius: 6px;
-    z-index: 9999;
-    margin-top: 5px;
-}
-
-.keys-dropdown .dropdown-item {
-    padding: 10px;
-    margin-bottom: 4px;
-    border-radius: 4px;
-    background: #f8f9fa;
-    border: 1px solid #e9ecef;
-}
-
-.keys-dropdown .dropdown-item:last-child {
-    margin-bottom: 0;
-}
-
-.keys-dropdown .dropdown-item:hover {
-    background: #e9ecef;
-}
-
-.keys-dropdown .key-content {
+.key-content {
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: space-between;
 }
-
-.keys-dropdown .key-text {
+.key-text {
     flex: 1;
-    font-family: 'Consolas', monospace;
-    font-size: 13px;
-    line-height: 1.4;
-    color: #495057;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
-
-.btn-link {
-    padding: 0 5px;
-}
-
-.btn-link:hover {
-    text-decoration: none;
-}
-
 .keys-overlay {
+    display: none;
     position: fixed;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
-    background: transparent;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
     z-index: 1000;
-    display: none;
 }
-
-.keys-overlay.show {
-    display: block;
+.keys-dropdown .dropdown-menu {
+    max-width: 400px;
 }
-
-.keys-overlay.show ~ .table tr:hover {
-    background: inherit !important;
-}
-
-.keys-overlay.show ~ .table tr:hover td {
-    background: inherit !important;
+.keys-dropdown .dropdown-item {
+    white-space: normal;
+    word-break: break-all;
 }
 </style>
 @endpush
@@ -194,59 +202,11 @@
 @push('js')
 <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.8/clipboard.min.js"></script>
 <script>
-$(document).ready(function () {
-    const overlay = document.querySelector('.keys-overlay');
-
-    // Показываем оверлей при открытии дропдауна
-    $('.keys-dropdown').on('show.bs.dropdown', function () {
-        overlay.classList.add('show');
-    });
-
-    // Скрываем оверлей при закрытии дропдауна
-    $('.keys-dropdown').on('hide.bs.dropdown', function () {
-        overlay.classList.remove('show');
-    });
-
-    // Закрываем дропдаун при клике на оверлей
-    overlay.addEventListener('click', function() {
-        $('.keys-dropdown .dropdown-menu').dropdown('hide');
-    });
-
-    // Инициализация clipboard.js
-    var clipboard = new ClipboardJS('[data-clipboard-text]');
-
-    clipboard.on('success', function (e) {
-        toastr.success('Скопировано в буфер обмена');
+document.addEventListener('DOMContentLoaded', function() {
+    new ClipboardJS('.btn[data-clipboard-text]').on('success', function(e) {
         e.clearSelection();
-    });
-
-    clipboard.on('error', function (e) {
-        toastr.error('Ошибка копирования');
-    });
-
-    // Предотвращаем закрытие dropdown при клике внутри
-    $('.dropdown-menu').on('click', function(e) {
-        e.stopPropagation();
-    });
-
-    // Проверяем позицию dropdown после открытия
-    $('.keys-dropdown').on('shown.bs.dropdown', function () {
-        const dropdown = $(this).find('.dropdown-menu');
-        const rect = dropdown[0].getBoundingClientRect();
-
-        if (rect.right > window.innerWidth) {
-            dropdown.css('left', 'auto');
-            dropdown.css('right', '0');
-        }
-
-        if (rect.bottom > window.innerHeight) {
-            dropdown.css('top', 'auto');
-            dropdown.css('bottom', '100%');
-            dropdown.css('margin-top', '0');
-            dropdown.css('margin-bottom', '5px');
-        }
+        alert('Ключ скопирован в буфер обмена');
     });
 });
 </script>
 @endpush
-@endsection

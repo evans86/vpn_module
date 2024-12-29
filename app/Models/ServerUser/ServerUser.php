@@ -4,7 +4,7 @@ namespace App\Models\ServerUser;
 
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\KeyActivateUser\KeyActivateUser;
-use App\Models\Server\Server;
+use App\Models\Panel\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,7 +21,7 @@ use phpseclib\Math\BigInteger;
  * @property int|null $used_traffic
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
- * @property-read Server|null $server
+ * @property-read Panel|null $panel
  * @property-read KeyActivateUser|null $keyActivateUser
  */
 class ServerUser extends Model
@@ -33,11 +33,11 @@ class ServerUser extends Model
     protected $table = 'server_user';
 
     /**
-     * Получить сервер, к которому привязан пользователь
+     * Получить панель, к которой привязан пользователь
      */
-    public function server(): BelongsTo
+    public function panel(): BelongsTo
     {
-        return $this->belongsTo(Server::class, 'server_id');
+        return $this->belongsTo(Panel::class, 'panel_id');
     }
 
     /**

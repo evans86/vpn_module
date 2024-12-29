@@ -4,8 +4,12 @@ namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
 use App\Models\ServerUser\ServerUser;
+use App\Models\Server\Server;
+use App\Models\Panel\Panel;
+use App\Models\KeyActivate\KeyActivate;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\DB;
 
 class ServerUserController extends Controller
 {
@@ -14,17 +18,46 @@ class ServerUserController extends Controller
      */
     public function index(Request $request): View
     {
-        $query = ServerUser::with(['keyActivateUser.keyActivate', 'server.panel']);
+        $query = ServerUser::query()
+            ->select('server_user.*', 'key_activate.user_tg_id as telegram_id')
+            ->leftJoin('key_activate_user', 'server_user.id', '=', 'key_activate_user.server_user_id')
+            ->leftJoin('key_activate', 'key_activate_user.key_activate_id', '=', 'key_activate.id')
+            ->with(['panel.server']);
 
         // Фильтрация по ID
-        if ($request->has('id')) {
-            $query->where('id', $request->id);
+        if ($request->filled('id')) {
+            $query->where('server_user.id', $request->input('id'));
         }
 
-        $serverUsers = $query->orderBy('created_at', 'desc')
+        // Фильтрация по panel_id
+        if ($request->filled('panel_id')) {
+            $query->where('server_user.panel_id', $request->input('panel_id'));
+        }
+
+        // Фильтрация по имени или IP сервера
+        if ($request->filled('server')) {
+            $search = $request->input('server');
+            $query->whereHas('panel.server', function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('ip', 'like', "%{$search}%");
+            });
+        }
+
+        // Фильтрация по адресу панели
+        if ($request->filled('panel')) {
+            $search = $request->input('panel');
+            $query->whereHas('panel', function($q) use ($search) {
+                $q->where('panel_adress', 'like', "%{$search}%");
+            });
+        }
+
+        $serverUsers = $query->orderBy('server_user.created_at', 'desc')
             ->paginate(20);
 
-        return view('module.server-users.index', compact('serverUsers'));
+        // Загружаем текущую панель, если указан panel_id
+        $panel = $request->filled('panel_id') ? Panel::with('server')->find($request->input('panel_id')) : null;
+
+        return view('module.server-users.index', compact('serverUsers', 'panel'));
     }
 
     /**
@@ -32,7 +65,7 @@ class ServerUserController extends Controller
      */
     public function show(ServerUser $serverUser): View
     {
-        $serverUser->load(['keyActivateUser.keyActivate', 'server.panel']);
+        $serverUser->load(['keyActivateUser.keyActivate', 'panel.server']);
 
         return view('module.server-users.show', compact('serverUser'));
     }

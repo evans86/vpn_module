@@ -140,11 +140,21 @@
                                                         aria-haspopup="true" aria-expanded="false">
                                                     <i class="fas fa-ellipsis-v"></i>
                                                 </button>
-                                                <div class="dropdown-menu">
-                                                    <a class="dropdown-item text-danger" href="#"
-                                                       onclick="deleteServer({{ $server->id }})">
-                                                        <i class="fas fa-trash mr-2"></i>Удалить
+                                                <div class="dropdown-menu dropdown-menu-right">
+                                                    @if($server->panel)
+                                                        <a href="{{ route('admin.module.panel.index', ['panel_id' => $server->panel->id]) }}" 
+                                                           class="dropdown-item">
+                                                            <i class="fas fa-desktop"></i> Панель
+                                                        </a>
+                                                    @endif
+                                                    <a href="{{ route('admin.module.server-users.index', ['server_id' => $server->id]) }}" 
+                                                       class="dropdown-item">
+                                                        <i class="fas fa-users"></i> Пользователи
                                                     </a>
+                                                    <button class="dropdown-item" type="button"
+                                                            onclick="deleteServer({{ $server->id }})">
+                                                        <i class="fas fa-trash"></i> Удалить
+                                                    </button>
                                                 </div>
                                             </div>
                                         @endif
