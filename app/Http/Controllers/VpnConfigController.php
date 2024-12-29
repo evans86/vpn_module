@@ -39,17 +39,30 @@ class VpnConfigController extends Controller
                 throw new RuntimeException('Invalid connection keys format');
             }
 
-            // Проверяем User-Agent на наличие Hidiffy или других клиентов
-            $userAgent = request()->header('User-Agent');
-            if (str_contains(strtolower($userAgent), 'hidiffy') || request()->wantsJson()) {
-                // Для приложения возвращаем только список ключей
+            // Проверяем User-Agent на наличие клиентов VPN
+            $userAgent = strtolower(request()->header('User-Agent') ?? '');
+            $isMarzbanClient = str_contains($userAgent, 'v2rayng') || 
+                             str_contains($userAgent, 'nekobox') || 
+                             str_contains($userAgent, 'nekoray') ||
+                             str_contains($userAgent, 'singbox');
+
+            if ($isMarzbanClient || request()->wantsJson()) {
+                // Для VPN клиентов возвращаем формат Marzban
                 return response()->json([
-                    'status' => 'success',
-                    'keys' => $connectionKeys
+                    'username' => $serverUser->id,
+                    'status' => $serverUser->status ?? 'active',
+                    'data_limit' => ($keyActivateUser->keyActivate->traffic_limit ?? 0) * 1024 * 1024 * 1024, // Convert GB to bytes
+                    'data_limit_reset_strategy' => 'no_reset',
+                    'expire' => $keyActivateUser->keyActivate->finish_at ?? null,
+                    'inbounds' => $this->getInboundsList($connectionKeys),
+                    'links' => array_values($connectionKeys), // Массив URI для подключения
+                    'subscription_url' => route('vpn.config.show', ['token' => $key_activate_id]),
+                    'created_at' => $keyActivateUser->created_at->timestamp ?? time(),
+                    'updated_at' => time()
                 ]);
             }
 
-            // Форматируем данные для отображения
+            // Для браузера показываем HTML страницу
             $userInfo = [
                 'username' => $serverUser->id,
                 'status' => $serverUser->status ?? 'active',
@@ -70,6 +83,13 @@ class VpnConfigController extends Controller
                 'key_activate_id' => $key_activate_id,
                 'error' => $e->getMessage()
             ]);
+
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Configuration not found'
+                ], 404);
+            }
 
             return response()->view('vpn.error', [
                 'message' => 'Не удалось загрузить конфигурацию VPN. Пожалуйста, проверьте правильность ссылки.'
@@ -104,36 +124,34 @@ class VpnConfigController extends Controller
         ];
 
         $formattedKeys = [];
-
-        // Разбираем каждую строку конфигурации
-        foreach ($connectionKeys as $configString) {
-            // Удаляем экранирование слешей
-            $configString = stripslashes($configString);
-
-            if (preg_match('/^(vless|vmess|trojan|ss):\/\//', $configString, $matches)) {
-                $protocol = $matches[1];
-                if ($protocol === 'ss') {
-                    $protocol = 'shadowsocks';
-                }
-
-                $protocolInfo = $protocolDescriptions[strtolower($protocol)] ?? [
-                    'name' => strtoupper($protocol),
-                    'icon' => substr(strtoupper($protocol), 0, 1)
-                ];
-
-                // Извлекаем тип подключения из комментария
-                preg_match('/\[(.*?)\]$/', $configString, $typeMatches);
-                $connectionType = $typeMatches[1] ?? '';
-
+        foreach ($connectionKeys as $key) {
+            $protocol = strtolower(explode('://', $key)[0]);
+            if (isset($protocolDescriptions[$protocol])) {
                 $formattedKeys[] = [
-                    'protocol' => $protocolInfo['name'],
-                    'icon' => $protocolInfo['icon'],
-                    'link' => addslashes($configString),
-                    'connection_type' => $connectionType
+                    'uri' => $key,
+                    'name' => $protocolDescriptions[$protocol]['name'],
+                    'icon' => $protocolDescriptions[$protocol]['icon']
                 ];
             }
         }
 
         return $formattedKeys;
+    }
+
+    /**
+     * Get list of inbounds from connection keys
+     * @param array $connectionKeys
+     * @return array
+     */
+    private function getInboundsList(array $connectionKeys): array
+    {
+        $inbounds = [];
+        foreach ($connectionKeys as $key) {
+            $protocol = strtolower(explode('://', $key)[0]);
+            if (!in_array($protocol, $inbounds)) {
+                $inbounds[] = $protocol;
+            }
+        }
+        return $inbounds;
     }
 }
