@@ -68,9 +68,7 @@
                                         <th><strong>Сервер</strong></th>
                                         <th><strong>Панель</strong></th>
                                         <th><strong>Telegram ID</strong></th>
-                                        <th><strong>Ключи</strong></th>
-                                        <th><strong>Использовано</strong></th>
-                                        <th><strong>Действия</strong></th>
+                                        <th><strong>Дата создания</strong></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -107,47 +105,7 @@
                                                     <span class="text-muted">-</span>
                                                 @endif
                                             </td>
-                                            <td>
-                                                @if($user->keys)
-                                                    <div class="keys-dropdown">
-                                                        <button class="btn btn-link p-0 text-primary" type="button" data-toggle="dropdown">
-                                                            <i class="fas fa-key mr-1"></i>Показать ключи
-                                                        </button>
-                                                        <div class="dropdown-menu">
-                                                            @foreach(json_decode($user->keys, true) as $key)
-                                                                <div class="dropdown-item">
-                                                                    <div class="key-content">
-                                                                        <div class="key-text">
-                                                                            {{ substr($key, 0, 35) }}...
-                                                                        </div>
-                                                                        <button class="btn btn-sm btn-link ml-2"
-                                                                                data-clipboard-text="{{ $key }}"
-                                                                                title="Копировать">
-                                                                            <i class="fas fa-copy"></i>
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            @endforeach
-                                                        </div>
-                                                    </div>
-                                                @else
-                                                    <span class="text-muted">Нет ключей</span>
-                                                @endif
-                                            </td>
-                                            <td>{{ $user->used_at ? $user->used_at->format('d.m.Y H:i') : 'Не использован' }}</td>
-                                            <td>
-                                                <div class="dropdown">
-                                                    <button class="btn btn-link" type="button" data-toggle="dropdown">
-                                                        <i class="fas fa-ellipsis-v"></i>
-                                                    </button>
-                                                    <div class="dropdown-menu dropdown-menu-right">
-                                                        <a href="{{ route('admin.module.server-users.show', $user) }}" 
-                                                           class="dropdown-item">
-                                                            <i class="fas fa-eye"></i> Просмотр
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            </td>
+                                            <td>{{ $user->created_at }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>

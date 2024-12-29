@@ -55,7 +55,16 @@
                                         <td><strong>{{ $salesman->id }}</strong></td>
                                         <td>{{ $salesman->telegram_id }}</td>
                                         <td>{{ $salesman->username }}</td>
-                                        <td>{{ $salesman->token }}</td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <span>{{ Str::limit($salesman->token, 20) }}</span>
+                                                <button class="btn btn-sm btn-link ml-2"
+                                                        data-clipboard-text="{{ $salesman->token }}"
+                                                        title="Копировать токен">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                        </td>
                                         <td><a href="{{ $salesman->bot_link }}"
                                                target="_blank">{{ $salesman->bot_link }}</a></td>
                                         <td>
@@ -120,6 +129,7 @@
 @endsection
 
 @push('js')
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.8/clipboard.min.js"></script>
     <script>
         $(document).ready(function () {
             // Настройка CSRF-токена для всех AJAX-запросов
@@ -189,13 +199,34 @@
                 });
             });
 
+            // Инициализация ClipboardJS
+            var clipboard = new ClipboardJS('[data-clipboard-text]');
+
+            clipboard.on('success', function (e) {
+                toastr.success('Скопировано в буфер обмена');
+                e.clearSelection();
+            });
+
+            clipboard.on('error', function (e) {
+                toastr.error('Ошибка копирования');
+            });
+
             function showNotification(type, message) {
                 if (typeof toastr !== 'undefined') {
                     toastr[type](message);
-                } else {
-                    alert(message);
                 }
             }
         });
     </script>
+@endpush
+
+@push('css')
+    <style>
+        .btn-link {
+            padding: 0 5px;
+        }
+        .btn-link:hover {
+            text-decoration: none;
+        }
+    </style>
 @endpush
