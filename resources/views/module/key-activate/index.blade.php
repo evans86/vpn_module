@@ -14,13 +14,15 @@
                                 <div class="col-md-3">
                                     <div class="form-group">
                                         <label for="id">ID ключа</label>
-                                        <input type="text" class="form-control" id="id" name="id" value="{{ request('id') }}" placeholder="Введите ID">
+                                        <input type="text" class="form-control" id="id" name="id"
+                                               value="{{ request('id') }}" placeholder="Введите ID">
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="form-group">
                                         <label for="pack_id">ID пакета</label>
-                                        <input type="text" class="form-control" id="pack_id" name="pack_id" value="{{ request('pack_id') }}" placeholder="Введите ID пакета">
+                                        <input type="text" class="form-control" id="pack_id" name="pack_id"
+                                               value="{{ request('pack_id') }}" placeholder="Введите ID пакета">
                                     </div>
                                 </div>
                                 <div class="col-md-3">
@@ -29,7 +31,8 @@
                                         <select class="form-control select2" id="status" name="status">
                                             <option value="">Все статусы</option>
                                             @foreach($statuses as $value => $label)
-                                                <option value="{{ $value }}" {{ request('status') == $value ? 'selected' : '' }}>
+                                                <option
+                                                    value="{{ $value }}" {{ request('status') == $value ? 'selected' : '' }}>
                                                     {{ $label }}
                                                 </option>
                                             @endforeach
@@ -103,7 +106,8 @@
                                         </td>
                                         <td>
                                             @if($key->packSalesman && $key->packSalesman->salesman)
-                                                <a href="{{ url('/admin/module/salesman?telegram_id=' . $key->packSalesman->salesman->telegram_id) }}" class="text-primary">
+                                                <a href="{{ url('/admin/module/salesman?telegram_id=' . $key->packSalesman->salesman->telegram_id) }}"
+                                                   class="text-primary">
                                                     {{ $key->packSalesman->salesman->telegram_id }}
                                                 </a>
                                             @else
@@ -164,7 +168,8 @@
                                                     <i class="fas fa-ellipsis-v"></i>
                                                 </button>
                                                 <div class="dropdown-menu">
-                                                    <a class="dropdown-item text-danger delete-key" href="#" data-id="{{ $key->id }}">
+                                                    <a class="dropdown-item text-danger delete-key" href="#"
+                                                       data-id="{{ $key->id }}">
                                                         <i class="fas fa-trash mr-2"></i>Удалить
                                                     </a>
                                                 </div>
@@ -234,7 +239,7 @@
                 });
 
                 // Обработка редактирования дат
-                $('.edit-date').on('click', function() {
+                $('.edit-date').on('click', function () {
                     const id = $(this).data('id');
                     const type = $(this).data('type');
                     const currentValue = $(this).data('value');
@@ -271,7 +276,7 @@
                     });
 
                     // Обработка сохранения
-                    modal.find('.save-date').on('click', function() {
+                    modal.find('.save-date').on('click', function () {
                         const newValue = picker.selectedDates[0];
                         if (!newValue) {
                             toastr.error('Выберите дату');
@@ -288,7 +293,7 @@
                             headers: {
                                 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                             },
-                            success: function(response) {
+                            success: function (response) {
                                 if (response.success) {
                                     toastr.success(response.message);
                                     location.reload();
@@ -297,7 +302,7 @@
                                 }
                                 modal.modal('hide');
                             },
-                            error: function(xhr) {
+                            error: function (xhr) {
                                 const response = xhr.responseJSON;
                                 toastr.error(response.message || 'Ошибка при обновлении даты');
                                 modal.modal('hide');
@@ -310,7 +315,7 @@
                 });
 
                 // Обработка удаления
-                $('.delete-key').on('click', function(e) {
+                $('.delete-key').on('click', function (e) {
                     e.preventDefault();
                     const id = $(this).data('id');
 
@@ -321,13 +326,13 @@
                             headers: {
                                 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                             },
-                            success: function(response) {
+                            success: function (response) {
                                 if (response.message) {
                                     toastr.success(response.message);
                                     setTimeout(() => location.reload(), 1000);
                                 }
                             },
-                            error: function() {
+                            error: function () {
                                 toastr.error('Ошибка при удалении ключа');
                             }
                         });

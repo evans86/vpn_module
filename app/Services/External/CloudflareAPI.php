@@ -14,7 +14,6 @@ class CloudflareAPI
 {
     private const ZONE_ID = 'ecd4115fa760df3dd0a5f9c0e2caee2d';
     private const RECORD_TYPE = 'A';
-    private const DOMAIN = 'bot-t.ru';
 
     /**
      * Возвращает адаптер для работы с API
@@ -61,11 +60,6 @@ class CloudflareAPI
         }
 
         try {
-            // Добавляем домен к имени, если его нет
-//            if (strpos($name, self::DOMAIN) === false) {
-//                $name = $name . '.' . self::DOMAIN;
-//            }
-
             Log::info('Creating DNS record', [
                 'name' => $name,
                 'ip' => $ip,
@@ -99,6 +93,8 @@ class CloudflareAPI
     }
 
     /**
+     * @TODO
+     *
      * Обновить существующую DNS запись
      *
      * @param string $record_id
@@ -118,11 +114,6 @@ class CloudflareAPI
         }
 
         try {
-            // Добавляем домен к имени, если его нет
-//            if (strpos($name, self::DOMAIN) === false) {
-//                $name = $name . '.' . self::DOMAIN;
-//            }
-
             Log::info('Updating DNS record', [
                 'record_id' => $record_id,
                 'name' => $name,

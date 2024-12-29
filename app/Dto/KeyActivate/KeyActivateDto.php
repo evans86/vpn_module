@@ -2,8 +2,6 @@
 
 namespace App\Dto\KeyActivate;
 
-use Ramsey\Uuid\UuidInterface;
-
 class KeyActivateDto
 {
     public string $id;

@@ -61,7 +61,8 @@
                                             <h5 class="card-title">Контекст</h5>
                                         </div>
                                         <div class="card-body">
-                                            <pre class="context-box">{{ json_encode($log->context, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+                                            <pre
+                                                class="context-box">{{ json_encode($log->context, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
                                         </div>
                                     </div>
                                 @endif

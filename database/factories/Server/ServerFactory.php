@@ -10,7 +10,7 @@ class ServerFactory extends Factory
 {
     protected $model = Server::class;
 
-    public function definition()
+    public function definition(): array
     {
         return [
             'location_id' => Location::factory(), // Автоматическое создание связанной локации

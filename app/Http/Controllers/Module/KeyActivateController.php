@@ -24,10 +24,11 @@ class KeyActivateController extends Controller
     private KeyActivateRepository $keyActivateRepository;
 
     public function __construct(
-        DatabaseLogger $logger,
-        KeyActivateService $keyActivateService,
+        DatabaseLogger        $logger,
+        KeyActivateService    $keyActivateService,
         KeyActivateRepository $keyActivateRepository
-    ) {
+    )
+    {
         $this->logger = $logger;
         $this->keyActivateService = $keyActivateService;
         $this->keyActivateRepository = $keyActivateRepository;
@@ -57,7 +58,7 @@ class KeyActivateController extends Controller
                 KeyActivate::DELETED => 'Удален'
             ];
 
-            $activate_keys = $this->keyActivateService->getPaginatedWithPack($filters, 10);
+            $activate_keys = $this->keyActivateService->getPaginatedWithPack($filters);
 
             $this->logger->info('Просмотр списка активированных ключей', [
                 'source' => 'key_activate',
@@ -215,7 +216,7 @@ class KeyActivateController extends Controller
      * @param KeyActivate $key
      * @return JsonResponse
      */
-    public function updateDates(Request $request, KeyActivate $key)
+    public function updateDates(Request $request, KeyActivate $key): JsonResponse
     {
         try {
             $validated = $request->validate([

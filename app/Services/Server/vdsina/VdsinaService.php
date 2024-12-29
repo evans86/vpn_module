@@ -389,7 +389,7 @@ class VdsinaService
      *
      * @param Server $server
      * @return void
-     * @throws Exception
+     * @throws Exception|GuzzleException
      */
     public function delete(Server $server): void
     {

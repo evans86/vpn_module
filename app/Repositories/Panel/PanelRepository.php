@@ -74,7 +74,7 @@ class PanelRepository extends BaseRepository
      * @param int $perPage
      * @return LengthAwarePaginator
      */
-    public function getFilteredPanels(array $filters = [], int $perPage = 10)
+    public function getFilteredPanels(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
         $query = $this->query()->with('server');
 

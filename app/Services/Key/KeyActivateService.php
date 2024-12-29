@@ -10,6 +10,7 @@ use App\Repositories\Panel\PanelRepository;
 use App\Logging\DatabaseLogger;
 use App\Services\Panel\PanelStrategy;
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Exception;
@@ -24,8 +25,8 @@ class KeyActivateService
     public function __construct(
         KeyActivateRepository  $keyActivateRepository,
         PackSalesmanRepository $packSalesmanRepository,
-        PanelRepository       $panelRepository,
-        DatabaseLogger        $logger
+        PanelRepository        $panelRepository,
+        DatabaseLogger         $logger
     )
     {
         $this->keyActivateRepository = $keyActivateRepository;
@@ -118,8 +119,6 @@ class KeyActivateService
                 throw new RuntimeException('Ключ уже используется другим пользователем');
             }
 
-//@TODO Не работает панель
-
             // Получаем активную панель Marzban
             $panel = $this->panelRepository->getConfiguredMarzbanPanel();
 
@@ -128,10 +127,10 @@ class KeyActivateService
             }
 
             // Создаем стратегию для работы с панелью
-            $this->panelStrategy = new PanelStrategy(Panel::MARZBAN);
+            $panelStrategy = new PanelStrategy(Panel::MARZBAN);
 
             // Добавляем пользователя на сервер
-            $serverUser = $this->panelStrategy->addServerUser(
+            $serverUser = $panelStrategy->addServerUser(
                 $panel->id,
                 $key->traffic_limit,
                 $key->finish_at,
@@ -150,8 +149,7 @@ class KeyActivateService
                 'action' => 'activate',
                 'key_id' => $activatedKey->id,
                 'user_tg_id' => $userTgId,
-                'server_user_id' => $serverUser->id, //@TODO Не работает панель
-//                'server_user_id' => 123,
+                'server_user_id' => $serverUser->id,
                 'panel_id' => 1,
                 'traffic_limit' => $key->traffic_limit,
                 'finish_at' => $key->finish_at
@@ -173,6 +171,8 @@ class KeyActivateService
     }
 
     /**
+     * @TODO
+     *
      * Проверка и обновление статуса ключа
      *
      * @param KeyActivate $key
@@ -231,9 +231,9 @@ class KeyActivateService
      *
      * @param array $filters
      * @param int $perPage
-     * @return \Illuminate\Pagination\LengthAwarePaginator
+     * @return LengthAwarePaginator
      */
-    public function getPaginatedWithPack(array $filters = [], int $perPage = 10)
+    public function getPaginatedWithPack(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
         try {
             $this->logger->info('Getting paginated key activates with filters', [

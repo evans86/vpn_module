@@ -5,8 +5,6 @@ namespace App\Http\Controllers\Module;
 use App\Models\PackSalesman\PackSalesman;
 use App\Logging\DatabaseLogger;
 use App\Http\Controllers\Controller;
-use App\Models\Salesman\Salesman;
-use App\Repositories\PackSalesman\PackSalesmanRepository;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
@@ -19,16 +17,14 @@ class PackSalesmanController extends Controller
 {
     private DatabaseLogger $logger;
     private PackSalesmanService $packSalesmanService;
-    private PackSalesmanRepository $packSalesmanRepository;
 
     public function __construct(
-        DatabaseLogger $logger,
-        PackSalesmanService $packSalesmanService,
-        PackSalesmanRepository $packSalesmanRepository
-    ) {
+        DatabaseLogger      $logger,
+        PackSalesmanService $packSalesmanService
+    )
+    {
         $this->logger = $logger;
         $this->packSalesmanService = $packSalesmanService;
-        $this->packSalesmanRepository = $packSalesmanRepository;
     }
 
     /**
@@ -48,9 +44,9 @@ class PackSalesmanController extends Controller
             // Фильтр по продавцу (поиск по telegram_id или username)
             if ($request->filled('salesman_search')) {
                 $search = $request->salesman_search;
-                $query->whereHas('salesman', function($q) use ($search) {
+                $query->whereHas('salesman', function ($q) use ($search) {
                     $q->where('telegram_id', 'like', "%{$search}%")
-                      ->orWhere('username', 'like', "%{$search}%");
+                        ->orWhere('username', 'like', "%{$search}%");
                 });
             }
 

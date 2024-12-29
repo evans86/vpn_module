@@ -8,10 +8,7 @@ use App\Models\PackSalesman\PackSalesman;
 use App\Repositories\Pack\PackRepository;
 use App\Repositories\PackSalesman\PackSalesmanRepository;
 use App\Repositories\Salesman\SalesmanRepository;
-use App\Services\Bot\FatherBotService;
 use App\Services\Key\KeyActivateService;
-use App\Services\Telegram\ModuleBot\AbstractTelegramBot;
-use App\Services\Telegram\ModuleBot\FatherBotController;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -26,10 +23,10 @@ class PackSalesmanService
     private KeyActivateService $keyActivateService;
 
     public function __construct(
-        PackRepository $packRepository,
-        SalesmanRepository $salesmanRepository,
+        PackRepository         $packRepository,
+        SalesmanRepository     $salesmanRepository,
         PackSalesmanRepository $packSalesmanRepository,
-        KeyActivateService $keyActivateService
+        KeyActivateService     $keyActivateService
     )
     {
         $this->packRepository = $packRepository;
@@ -85,13 +82,13 @@ class PackSalesmanService
             $pack_salesman = $this->packSalesmanRepository->findByIdOrFail($pack_salesman_id);
 
             //Должна появиться логика оплаты и после этого статус PAID, пока сразу для тестов
-
             $pack_salesman->status = PackSalesman::PAID;
 
             if (!$pack_salesman->save())
                 throw new RuntimeException('Pack Salesman dont update status');
 
-            self::successPaid($pack_salesman->id);//выполнение действий после успешной оплаты
+            //выполнение действий после успешной оплаты
+            self::successPaid($pack_salesman->id);
         } catch (RuntimeException $r) {
             throw new RuntimeException($r->getMessage());
         } catch (Exception $e) {
@@ -127,14 +124,14 @@ class PackSalesmanService
                         $deleted_at,
                         null
                     );
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::error("Ошибка при создании ключа: " . $e->getMessage());
                     throw new RuntimeException('Ошибка при создании ключа: ' . $e->getMessage());
                 }
             }
 
             // Отправляем сообщение через FatherBot
-            $message = "✅ Ваш пакет \"{$pack->name}\" успешно активирован!\n\n";
+            $message = "✅ Ваш пакет на \"{$pack->count}\" ключей успешно активирован!\n\n";
             $message .= "📦 Количество ключей: {$pack->count}\n";
             $message .= "⏱ Период действия: {$pack->period} дней\n";
             $message .= "💾 Лимит трафика: {$pack->traffic_limit} GB\n";
@@ -147,7 +144,7 @@ class PackSalesmanService
                     'text' => $message,
                     'parse_mode' => 'HTML'
                 ]);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::error('Ошибка при отправке сообщения через FatherBot', [
                     'error' => $e->getMessage(),
                     'salesman_id' => $salesman->id,
@@ -161,6 +158,7 @@ class PackSalesmanService
     }
 
     //проверка всех купленных пакетов по статусу
+    //@TODO
     public function checkStatus()
     {
         /**

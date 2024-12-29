@@ -4,7 +4,6 @@ namespace App\Models\ServerUser;
 
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\KeyActivateUser\KeyActivateUser;
-use App\Models\Panel\Panel;
 use App\Models\Server\Server;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -52,7 +51,7 @@ class ServerUser extends Model
     /**
      * Получить активированный ключ через связь
      */
-    public function keyActivate()
+    public function keyActivate(): ?KeyActivate
     {
         return $this->keyActivateUser ? $this->keyActivateUser->keyActivate : null;
     }

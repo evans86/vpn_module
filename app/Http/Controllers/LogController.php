@@ -4,10 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Log\ApplicationLog;
 use App\Repositories\Log\LogRepository;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\View\View;
-use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class LogController extends Controller
@@ -46,7 +45,7 @@ class LogController extends Controller
             ]);
 
             // Get unique sources for filter with caching
-            $sources = cache()->remember('log_sources', 60, function() {
+            $sources = cache()->remember('log_sources', 60, function () {
                 return $this->logRepository->getUniqueSources();
             });
 
@@ -65,17 +64,17 @@ class LogController extends Controller
                     'search' => $request->get('search'),
                 ]
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error displaying logs', [
                 'source' => 'system',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             if ($request->ajax()) {
                 return response()->json(['error' => 'Error loading logs: ' . $e->getMessage()], 500);
             }
-            
+
             return back()->with('error', 'Error displaying logs: ' . $e->getMessage());
         }
     }

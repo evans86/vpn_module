@@ -15,7 +15,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class ServerController extends Controller
@@ -23,7 +22,10 @@ class ServerController extends Controller
     private ServerRepository $serverRepository;
     private DatabaseLogger $logger;
 
-    public function __construct(ServerRepository $serverRepository, DatabaseLogger $logger)
+    public function __construct(
+        ServerRepository $serverRepository,
+        DatabaseLogger   $logger
+    )
     {
         $this->serverRepository = $serverRepository;
         $this->logger = $logger;
@@ -107,20 +109,6 @@ class ServerController extends Controller
                 'data' => $server
             ]);
 
-        } catch (ValidationException $e) {
-            $this->logger->warning('Server creation validation failed', [
-                'source' => 'server',
-                'user_id' => auth()->id(),
-                'errors' => $e->errors(),
-                'data' => $request->all()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'errors' => $e->errors()
-            ], 422);
-
         } catch (RuntimeException $e) {
             $this->logger->error('Server creation failed', [
                 'source' => 'server',
@@ -135,7 +123,7 @@ class ServerController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'VDSina server limit reached (limit: 5 servers). ' .
-                                'Please delete unused servers or add funds.',
+                        'Please delete unused servers or add funds.',
                     'error_code' => 'SERVER_LIMIT_REACHED'
                 ], 400);
             }

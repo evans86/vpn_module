@@ -18,8 +18,9 @@ class PackService
 
     public function __construct(
         PackRepositoryInterface $packRepository,
-        DatabaseLogger        $logger
-    ) {
+        DatabaseLogger          $logger
+    )
+    {
         $this->packRepository = $packRepository;
         $this->logger = $logger;
     }

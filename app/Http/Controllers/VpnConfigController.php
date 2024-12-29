@@ -41,11 +41,11 @@ class VpnConfigController extends Controller
 
             // Проверяем User-Agent на наличие клиентов VPN
             $userAgent = strtolower(request()->header('User-Agent') ?? '');
-            $isVpnClient = str_contains($userAgent, 'v2rayng') || 
-                          str_contains($userAgent, 'nekobox') || 
-                          str_contains($userAgent, 'nekoray') ||
-                          str_contains($userAgent, 'singbox') ||
-                          str_contains($userAgent, 'hiddify');
+            $isVpnClient = str_contains($userAgent, 'v2rayng') ||
+                str_contains($userAgent, 'nekobox') ||
+                str_contains($userAgent, 'nekoray') ||
+                str_contains($userAgent, 'singbox') ||
+                str_contains($userAgent, 'hiddify');
 
             if ($isVpnClient || request()->wantsJson()) {
                 // Для VPN клиентов возвращаем строку с конфигурациями

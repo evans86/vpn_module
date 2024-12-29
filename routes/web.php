@@ -96,6 +96,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/{key}/update-dates', [KeyActivateController::class, 'updateDates'])->name('update-dates');
             });
 
+            // Server User Routes
             Route::prefix('server-users')->name('server-users.')->group(function () {
                 Route::get('/', [ServerUserController::class, 'index'])->name('index');
                 Route::get('/{key}', [ServerUserController::class, 'show'])->name('show');
@@ -107,9 +108,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/update-token', [BotController::class, 'updateToken'])->name('update-token');
             });
         });
-
-        // Пользователи сервера
-//        Route::resource('server-users', ServerUserController::class);
 
         // Dashboard
         Route::get('/', function () {

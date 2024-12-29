@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Panel\Panel;
 use App\Models\Server\Server;
 use App\Services\Panel\PanelStrategy;
-use App\Repositories\Panel\PanelRepository;
 use App\Logging\DatabaseLogger;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
@@ -21,14 +20,12 @@ use Illuminate\Http\JsonResponse;
 
 class PanelController extends Controller
 {
-    private PanelRepository $panelRepository;
     private DatabaseLogger $logger;
 
     public function __construct(
-        PanelRepository $panelRepository,
         DatabaseLogger $logger
-    ) {
-        $this->panelRepository = $panelRepository;
+    )
+    {
         $this->logger = $logger;
     }
 
@@ -36,6 +33,7 @@ class PanelController extends Controller
      * Display a listing of the resource.
      *
      * @param Request $request
+     * @return Application|Factory|View|RedirectResponse
      */
     public function index(Request $request)
     {
@@ -45,9 +43,9 @@ class PanelController extends Controller
             // Фильтр по серверу
             if ($request->filled('server')) {
                 $search = $request->server;
-                $query->whereHas('server', function($q) use ($search) {
+                $query->whereHas('server', function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('ip', 'like', "%{$search}%");
+                        ->orWhere('ip', 'like', "%{$search}%");
                 });
             }
 
@@ -94,10 +92,11 @@ class PanelController extends Controller
 
     /**
      * Store a newly created panel.
+     *
      * @param Request $request
      * @return RedirectResponse
      */
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
         try {
             $this->logger->info('Creating new panel', [
@@ -153,8 +152,9 @@ class PanelController extends Controller
      *
      * @param Panel $panel
      * @return RedirectResponse
+     * @throws GuzzleException
      */
-    public function configure(Panel $panel)
+    public function configure(Panel $panel): RedirectResponse
     {
         try {
             $this->logger->info('Настройка панели', [
@@ -188,8 +188,9 @@ class PanelController extends Controller
      *
      * @param Panel $panel
      * @return RedirectResponse
+     * @throws GuzzleException
      */
-    public function updateConfig(Panel $panel)
+    public function updateConfig(Panel $panel): RedirectResponse
     {
         try {
             $this->logger->info('Обновление конфигурации панели', [
@@ -219,6 +220,8 @@ class PanelController extends Controller
     }
 
     /**
+     * @TODO
+     *
      * Check panel status
      * @param Panel $panel
      * @return JsonResponse

@@ -126,19 +126,6 @@ class SalesmanRepository extends BaseRepository
         return $result;
     }
 
-//    /**
-//     * Update salesman
-//     * @param Salesman $salesman
-//     * @param array $data
-//     * @return bool
-//     */
-//    public function update(Salesman $salesman, array $data): bool
-//    {
-//        $salesman->fill($data);
-//        $salesman->save();
-//        return $salesman;
-//    }
-
     /**
      * Update salesman status
      * @param Salesman $salesman
@@ -164,14 +151,4 @@ class SalesmanRepository extends BaseRepository
         $salesman->save();
         return $salesman;
     }
-
-//    /**
-//     * Delete salesman
-//     * @param Salesman $salesman
-//     * @return bool
-//     */
-//    public function delete(Salesman $salesman): bool
-//    {
-//        return parent::delete($salesman);
-//    }
 }

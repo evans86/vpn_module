@@ -9,7 +9,7 @@ use RuntimeException;
 
 class MarzbanAPI
 {
-    private $host;
+    private string $host;
 
     public function __construct($host)
     {
@@ -56,7 +56,7 @@ class MarzbanAPI
             }
 
             return $result['access_token'];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             throw new RuntimeException('Ошибка при получении токена: ' . $e->getMessage());
         }
     }

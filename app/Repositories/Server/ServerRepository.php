@@ -73,7 +73,7 @@ class ServerRepository extends BaseRepository
      * @param int $perPage
      * @return LengthAwarePaginator
      */
-    public function getFilteredServers(array $filters = [], int $perPage = 10)
+    public function getFilteredServers(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
         $query = $this->query()->with('location');
 

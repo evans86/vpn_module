@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
-use App\Models\Salesman\Salesman;
 use App\Repositories\Salesman\SalesmanRepository;
 use App\Services\Salesman\SalesmanService;
 use App\Services\Pack\PackSalesmanService;
@@ -23,11 +22,12 @@ class SalesmanController extends Controller
     private PackRepository $packRepository;
 
     public function __construct(
-        SalesmanService $salesmanService,
-        SalesmanRepository $salesmanRepository,
+        SalesmanService     $salesmanService,
+        SalesmanRepository  $salesmanRepository,
         PackSalesmanService $packSalesmanService,
-        PackRepository $packRepository
-    ) {
+        PackRepository      $packRepository
+    )
+    {
         $this->salesmanService = $salesmanService;
         $this->salesmanRepository = $salesmanRepository;
         $this->packSalesmanService = $packSalesmanService;
@@ -36,11 +36,12 @@ class SalesmanController extends Controller
 
     /**
      * Display a listing of salesmen
+     *
      * @param Request $request
      * @return View
      * @throws Exception
      */
-    public function index(Request $request)
+    public function index(Request $request): View
     {
         try {
             Log::info('Accessing salesman list', [
@@ -67,11 +68,12 @@ class SalesmanController extends Controller
 
     /**
      * Toggle salesman status
-     * @param Request $request
+     *
      * @param int $id
      * @return JsonResponse
+     * @throws Exception
      */
-    public function toggleStatus(Request $request, int $id): JsonResponse
+    public function toggleStatus(int $id): JsonResponse
     {
         try {
             Log::info('Toggling salesman status', [

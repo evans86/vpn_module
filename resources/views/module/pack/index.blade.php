@@ -26,8 +26,10 @@
                                     <label for="status">Статус</label>
                                     <select class="form-control" id="status" name="status">
                                         <option value="">Все статусы</option>
-                                        <option value="1" {{ request('status') == '1' ? 'selected' : '' }}>Активен</option>
-                                        <option value="0" {{ request('status') == '0' ? 'selected' : '' }}>Неактивен</option>
+                                        <option value="1" {{ request('status') == '1' ? 'selected' : '' }}>Активен
+                                        </option>
+                                        <option value="0" {{ request('status') == '0' ? 'selected' : '' }}>Неактивен
+                                        </option>
                                     </select>
                                 </div>
                             </div>
@@ -83,10 +85,12 @@
                                         </span>
                                     </td>
                                     <td>
-                                        <form action="/admin/module/pack/{{ $pack->id }}" method="POST" class="d-inline">
+                                        <form action="/admin/module/pack/{{ $pack->id }}" method="POST"
+                                              class="d-inline">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Вы уверены?')">
+                                            <button type="submit" class="btn btn-sm btn-danger"
+                                                    onclick="return confirm('Вы уверены?')">
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                         </form>
@@ -121,7 +125,8 @@
             </div>
             <div class="form-group">
                 <label for="traffic_limit">Лимит трафика (GB)</label>
-                <input type="number" class="form-control" id="traffic_limit" name="traffic_limit" required min="1" value="10">
+                <input type="number" class="form-control" id="traffic_limit" name="traffic_limit" required min="1"
+                       value="10">
             </div>
             <div class="form-group">
                 <label for="count">Количество ключей</label>
@@ -129,7 +134,8 @@
             </div>
             <div class="form-group">
                 <label for="activate_time">Время на активацию (часов)</label>
-                <input type="number" class="form-control" id="activate_time" name="activate_time" required min="1" value="24">
+                <input type="number" class="form-control" id="activate_time" name="activate_time" required min="1"
+                       value="24">
             </div>
             <div class="modal-footer px-0 pb-0">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>

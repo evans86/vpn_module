@@ -68,19 +68,24 @@
                                     <label for="status">Статус</label>
                                     <select class="form-control" id="status" name="status">
                                         <option value="">Все статусы</option>
-                                        <option value="{{ Server::SERVER_CREATED }}" {{ request('status') == Server::SERVER_CREATED ? 'selected' : '' }}>
+                                        <option
+                                            value="{{ Server::SERVER_CREATED }}" {{ request('status') == Server::SERVER_CREATED ? 'selected' : '' }}>
                                             Создан
                                         </option>
-                                        <option value="{{ Server::SERVER_CONFIGURED }}" {{ request('status') == Server::SERVER_CONFIGURED ? 'selected' : '' }}>
+                                        <option
+                                            value="{{ Server::SERVER_CONFIGURED }}" {{ request('status') == Server::SERVER_CONFIGURED ? 'selected' : '' }}>
                                             Настроен
                                         </option>
-                                        <option value="{{ Server::SERVER_ERROR }}" {{ request('status') == Server::SERVER_ERROR ? 'selected' : '' }}>
+                                        <option
+                                            value="{{ Server::SERVER_ERROR }}" {{ request('status') == Server::SERVER_ERROR ? 'selected' : '' }}>
                                             Ошибка
                                         </option>
-                                        <option value="{{ Server::SERVER_DELETED }}" {{ request('status') == Server::SERVER_DELETED ? 'selected' : '' }}>
+                                        <option
+                                            value="{{ Server::SERVER_DELETED }}" {{ request('status') == Server::SERVER_DELETED ? 'selected' : '' }}>
                                             Удален
                                         </option>
-                                        <option value="{{ Server::SERVER_PASSWORD_UPDATE }}" {{ request('status') == Server::SERVER_PASSWORD_UPDATE ? 'selected' : '' }}>
+                                        <option
+                                            value="{{ Server::SERVER_PASSWORD_UPDATE }}" {{ request('status') == Server::SERVER_PASSWORD_UPDATE ? 'selected' : '' }}>
                                             Обновление пароля
                                         </option>
                                     </select>
@@ -131,7 +136,8 @@
                                     <td>
                                         @if($server->server_status !== \App\Models\Server\Server::SERVER_DELETED)
                                             <div class="dropdown">
-                                                <button class="btn btn-link" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                                <button class="btn btn-link" type="button" data-toggle="dropdown"
+                                                        aria-haspopup="true" aria-expanded="false">
                                                     <i class="fas fa-ellipsis-v"></i>
                                                 </button>
                                                 <div class="dropdown-menu">

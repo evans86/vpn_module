@@ -37,9 +37,9 @@ interface PackRepositoryInterface
      * Create new pack
      *
      * @param array $data
-     * @return Model
+     * @return Pack
      */
-    public function create(array $data): Model;
+    public function create(array $data): Pack;
 
     /**
      * Update pack

@@ -2,9 +2,12 @@
 
 namespace App\Models\KeyActivate;
 
+use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Models\PackSalesman\PackSalesman;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use phpseclib\Math\BigInteger;
 
 /**
@@ -12,20 +15,21 @@ use phpseclib\Math\BigInteger;
  * @property int|null $traffic_limit лимит трафика на пользователя (сколько осталось)
  * @property int|null $pack_salesman_id кто продавец
  * @property int|null $finish_at дата окончания
+ * @property int|null $activated_at дата активации
  * @property BigInteger|null $user_tg_id кто активировал ключ
  * @property int|null $deleted_at срок, до которого нужно активировать
- * @property int|null $status
+ * @property int|null $status статус
  * @property PackSalesman|null $packSalesman
  */
 class KeyActivate extends Model
 {
-    // Статусы ключа
     const EXPIRED = 0;        // Просрочен
     const ACTIVE = 1;         // Активирован и используется
     const PAID = 2;          // Оплачен, ожидает активации
     const DELETED = 3;       // Удален
 
     use HasFactory;
+
     public $incrementing = false;
     protected $guarded = false;
     protected $table = 'key_activate';
@@ -33,17 +37,17 @@ class KeyActivate extends Model
     /**
      * Get the pack salesman relation
      */
-    public function packSalesman()
+    public function packSalesman(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\PackSalesman\PackSalesman::class, 'pack_salesman_id');
+        return $this->belongsTo(PackSalesman::class, 'pack_salesman_id');
     }
 
     /**
      * Get the key activate user relation
      */
-    public function keyActivateUser()
+    public function keyActivateUser(): HasOne
     {
-        return $this->hasOne(\App\Models\KeyActivateUser\KeyActivateUser::class, 'key_activate_id');
+        return $this->hasOne(KeyActivateUser::class, 'key_activate_id');
     }
 
     /**

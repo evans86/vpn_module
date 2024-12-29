@@ -8,7 +8,8 @@ use App\Http\Requests\Pack\UpdatePackRequest;
 use App\Services\Pack\PackService;
 use App\Logging\DatabaseLogger;
 use Exception;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\View\Factory;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,7 +29,7 @@ class PackController extends Controller
     /**
      * Display a listing of the packs.
      * @param Request $request
-     * @return View|RedirectResponse
+     * @return Application|Factory|View
      * @throws Exception
      */
     public function index(Request $request)
@@ -65,7 +66,7 @@ class PackController extends Controller
      * @return RedirectResponse
      * @throws Exception
      */
-    public function store(StorePackRequest $request)
+    public function store(StorePackRequest $request): RedirectResponse
     {
         try {
             $data = $request->validated();
@@ -101,7 +102,7 @@ class PackController extends Controller
      * @return RedirectResponse
      * @throws Exception
      */
-    public function update(UpdatePackRequest $request, int $id)
+    public function update(UpdatePackRequest $request, int $id): RedirectResponse
     {
         try {
             $data = $request->validated();
@@ -137,7 +138,7 @@ class PackController extends Controller
      * @param int $id
      * @return RedirectResponse
      */
-    public function destroy($id)
+    public function destroy(int $id): RedirectResponse
     {
         try {
             $this->packService->delete($id);

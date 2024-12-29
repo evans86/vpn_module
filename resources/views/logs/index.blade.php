@@ -19,13 +19,15 @@
                                             <option value="info" {{ request('level') == 'info' ? 'selected' : '' }}>
                                                 Информация
                                             </option>
-                                            <option value="warning" {{ request('level') == 'warning' ? 'selected' : '' }}>
+                                            <option
+                                                value="warning" {{ request('level') == 'warning' ? 'selected' : '' }}>
                                                 Предупреждение
                                             </option>
                                             <option value="error" {{ request('level') == 'error' ? 'selected' : '' }}>
                                                 Ошибка
                                             </option>
-                                            <option value="critical" {{ request('level') == 'critical' ? 'selected' : '' }}>
+                                            <option
+                                                value="critical" {{ request('level') == 'critical' ? 'selected' : '' }}>
                                                 Критическая ошибка
                                             </option>
                                             <option value="debug" {{ request('level') == 'debug' ? 'selected' : '' }}>
@@ -37,7 +39,8 @@
                                         <select name="source" class="form-control">
                                             <option value="">Все источники</option>
                                             @foreach($sources as $source)
-                                                <option value="{{ $source }}" {{ request('source') == $source ? 'selected' : '' }}>
+                                                <option
+                                                    value="{{ $source }}" {{ request('source') == $source ? 'selected' : '' }}>
                                                     {{ $source }}
                                                 </option>
                                             @endforeach
@@ -52,11 +55,13 @@
                                                value="{{ request('date_to') }}">
                                     </div>
                                     <div class="form-group mx-2">
-                                        <input type="text" name="search" class="form-control" placeholder="Поиск по сообщению"
+                                        <input type="text" name="search" class="form-control"
+                                               placeholder="Поиск по сообщению"
                                                value="{{ request('search') }}">
                                     </div>
                                     <button type="submit" class="btn btn-primary">Применить фильтры</button>
-                                    <a href="{{ route('admin.logs.index') }}" class="btn btn-secondary ml-2">Сбросить</a>
+                                    <a href="{{ route('admin.logs.index') }}"
+                                       class="btn btn-secondary ml-2">Сбросить</a>
                                 </form>
                             </div>
                         </div>

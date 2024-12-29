@@ -29,7 +29,7 @@ class LocationRepository extends BaseRepository
      * @param int $id
      * @return Location
      */
-    public function findByIdOrFail(int $id)
+    public function findByIdOrFail(int $id): Location
     {
         /** @var Location */
         return $this->query()

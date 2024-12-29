@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="JavaScriptLibraryMappings">
-    <file url="PROJECT" libraries="{LineIcons, animate.css, aos, font-awesome, metismenu, perfect-scrollbar}" />
+    <file url="PROJECT" libraries="{LineIcons, bootstrap, toastr.js}" />
   </component>
 </project>

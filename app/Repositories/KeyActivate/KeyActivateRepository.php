@@ -4,9 +4,11 @@ namespace App\Repositories\KeyActivate;
 
 use App\Models\KeyActivate\KeyActivate;
 use App\Repositories\BaseRepository;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class KeyActivateRepository extends BaseRepository
 {
@@ -58,7 +60,7 @@ class KeyActivateRepository extends BaseRepository
             $query->where('user_tg_id', $filters['user_tg_id']);
         }
 
-        \Log::info('KeyActivate Query', [
+        Log::info('KeyActivate Query', [
             'filters' => $filters,
             'sql' => $query->toSql(),
             'bindings' => $query->getBindings()
@@ -71,6 +73,7 @@ class KeyActivateRepository extends BaseRepository
      * Find active key by user and salesman
      * @param int $userTgId
      * @param int $salesmanId
+     * @param int $status
      * @return KeyActivate|null
      */
     public function findActiveKeyByUserAndSalesman(int $userTgId, int $salesmanId, int $status = KeyActivate::PAID): ?KeyActivate
@@ -141,7 +144,7 @@ class KeyActivateRepository extends BaseRepository
      * Find key by ID with relations or fail
      * @param int $id
      * @return KeyActivate
-     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
+     * @throws ModelNotFoundException
      */
     public function findByIdWithRelationsOrFail(int $id): KeyActivate
     {

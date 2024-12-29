@@ -13,7 +13,7 @@ class VdsinaAPI
 {
     const HOST_RU = 'https://userapi.vdsina.ru/v1/';
     const HOST_COM = 'https://userapi.vdsina.com/v1/';
-    private $apiKey;
+    private string $apiKey;
 
     public function __construct($apiKey)
     {
@@ -322,10 +322,10 @@ class VdsinaAPI
      */
     public function createServer(
         string $server_name,
-        int $server_plan,
-        int $autoprolong = 0,
-        int $datacenter = 1,
-        int $template = 23
+        int    $server_plan,
+        int    $autoprolong = 0,
+        int    $datacenter = 1,
+        int    $template = 23
     ): array
     {
         try {
