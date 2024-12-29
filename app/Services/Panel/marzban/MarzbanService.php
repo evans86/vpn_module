@@ -582,4 +582,59 @@ class MarzbanService
             throw new RuntimeException($e->getMessage());
         }
     }
+
+    /**
+     * Обновление данных администратора панели
+     *
+     * @param int $panel_id
+     * @param array $data
+     * @return void
+     * @throws GuzzleException
+     * @throws Exception
+     */
+    public function updateAdminCredentials(int $panel_id, array $data): void
+    {
+        try {
+            /** @var Panel $panel */
+            $panel = Panel::query()->findOrFail($panel_id);
+            
+            // Получаем текущий токен или обновляем его если истек
+            $token = $panel->token;
+            if (!$token) {
+                $token = $this->updateMarzbanToken($panel_id);
+            }
+
+            $marzbanApi = new MarzbanAPI($panel->address);
+            
+            // Подготавливаем данные для обновления
+            $updateData = [
+                'is_sudo' => true // Обязательный параметр
+            ];
+            
+            // Добавляем только те поля, которые были переданы
+            if (isset($data['username'])) {
+                $updateData['username'] = $data['username'];
+            }
+            if (isset($data['password'])) {
+                $updateData['password'] = $data['password'];
+            }
+            
+            // Обновляем данные администратора через API
+            $result = $marzbanApi->modifyAdmin($token, $panel->login, $updateData);
+            
+            // Если был изменен логин, обновляем его в базе
+            if (isset($data['username'])) {
+                $panel->login = $data['username'];
+                $panel->save();
+            }
+            
+            Log::info('Admin credentials updated successfully', ['panel_id' => $panel_id]);
+        } catch (Exception $e) {
+            Log::error('Error updating admin credentials', [
+                'panel_id' => $panel_id,
+                'error' => $e->getMessage()
+            ]);
+            throw new RuntimeException('Ошибка при обновлении данных администратора: ' . $e->getMessage());
+        }
+    }
 }

@@ -58,6 +58,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/{panel}/configure', [PanelController::class, 'configure'])->name('configure');
                 Route::post('/{panel}/update-config', [PanelController::class, 'updateConfig'])->name('update-config');
                 Route::get('/{panel}/status', [PanelController::class, 'checkStatus'])->name('status');
+                Route::post('/{panel}/update-credentials', [PanelController::class, 'updateCredentials'])->name('update-credentials');
             });
 
             // Salesman Routes

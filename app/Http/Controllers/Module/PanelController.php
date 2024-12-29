@@ -268,4 +268,46 @@ class PanelController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Update panel admin credentials.
+     *
+     * @param Panel $panel
+     * @param Request $request
+     * @return RedirectResponse
+     * @throws GuzzleException
+     */
+    public function updateCredentials(Panel $panel, Request $request): RedirectResponse
+    {
+        try {
+            $this->logger->info('Обновление учетных данных панели', [
+                'source' => 'panel',
+                'action' => 'update-credentials',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id
+            ]);
+
+            $validated = $request->validate([
+                'username' => 'sometimes|required|string|min:3|max:255',
+                'password' => 'sometimes|required|string|min:6|max:255',
+            ]);
+
+            $marzbanService = app(MarzbanService::class);
+            $marzbanService->updateAdminCredentials($panel->id, $validated);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'Учетные данные панели успешно обновлены');
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при обновлении учетных данных панели', [
+                'source' => 'panel',
+                'action' => 'update-credentials',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Ошибка при обновлении учетных данных: ' . $e->getMessage());
+        }
+    }
 }

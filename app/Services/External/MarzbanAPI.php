@@ -289,4 +289,39 @@ class MarzbanAPI
             throw new Exception($e->getMessage());
         }
     }
+
+    /**
+     * Обновление данных администратора панели
+     *
+     * @param string $token
+     * @param string $username
+     * @param array $data
+     * @return mixed
+     * @throws GuzzleException
+     * @throws Exception
+     */
+    public function modifyAdmin(string $token, string $username, array $data)
+    {
+        try {
+            $client = new Client([
+                'base_uri' => rtrim($this->host, '/') . '/api/',
+                'verify' => false
+            ]);
+
+            $requestParam = [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json'
+                ],
+                'json' => $data,
+                'verify' => false
+            ];
+
+            $response = $client->put('admin/' . $username, $requestParam);
+            return json_decode($response->getBody()->getContents(), true);
+        } catch (Exception $e) {
+            throw new RuntimeException('Ошибка при обновлении данных администратора: ' . $e->getMessage());
+        }
+    }
 }

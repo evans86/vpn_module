@@ -134,29 +134,26 @@
 
                             {{-- Модальное окно редактирования --}}
                             <x-modal id="editPanelModal{{ $panel->id }}" title="Редактировать панель">
-                                <form action="{{ route('admin.module.panel.update', $panel) }}" method="POST">
+                                <form action="{{ route('admin.module.panel.update-credentials', $panel) }}" method="POST">
                                     @csrf
-                                    @method('PUT')
-
-                                    <x-input name="panel_adress" label="Адрес панели" type="url"
-                                             value="{{ $panel->panel_adress }}" required/>
-
-                                    <x-input name="panel_login" label="Логин" type="text"
-                                             value="{{ $panel->panel_login }}" required/>
-
-                                    <x-input name="panel_password" label="Пароль" type="password"
-                                             help="Оставьте пустым, чтобы не менять"/>
-
-                                    <x-select name="server_id" label="Сервер" :options="$servers"
-                                              selected="{{ $panel->server_id }}" required/>
-
+                                    <div class="row">
+                                        <div class="col-md-12">
+                                            <div class="form-group">
+                                                <label for="username">Логин</label>
+                                                <input type="text" name="username" id="username" class="form-control" value="{{ $panel->panel_login }}" minlength="3" maxlength="255">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-12">
+                                            <div class="form-group">
+                                                <label for="password">Пароль</label>
+                                                <input type="password" name="password" id="password" class="form-control" minlength="6" maxlength="255">
+                                                <small class="form-text text-muted">Оставьте поле пустым, если не хотите менять пароль</small>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div class="text-right">
-                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">
-                                            Отмена
-                                        </button>
-                                        <button type="submit" class="btn btn-primary">
-                                            <i class="fas fa-save"></i> Сохранить
-                                        </button>
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
+                                        <button type="submit" class="btn btn-primary">Сохранить</button>
                                     </div>
                                 </form>
                             </x-modal>
