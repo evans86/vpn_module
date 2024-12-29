@@ -271,6 +271,7 @@ class PanelController extends Controller
     }
 
     /**
+     * @TODO не работает правльно
      * Update panel admin credentials.
      *
      * @param Panel $panel

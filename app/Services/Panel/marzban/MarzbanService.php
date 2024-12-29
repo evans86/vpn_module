@@ -584,6 +584,8 @@ class MarzbanService
     }
 
     /**
+     * @TODO не работает правльно
+     *
      * Обновление данных администратора панели
      *
      * @param int $panel_id

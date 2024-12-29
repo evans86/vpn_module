@@ -29,16 +29,16 @@
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label for="server">Сервер</label>
-                                    <input type="text" class="form-control" id="server" name="server" 
-                                           value="{{ request('server') }}" 
+                                    <input type="text" class="form-control" id="server" name="server"
+                                           value="{{ request('server') }}"
                                            placeholder="Поиск по имени или IP сервера">
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label for="panel_adress">Адрес панели</label>
-                                    <input type="text" class="form-control" id="panel_adress" name="panel_adress" 
-                                           value="{{ request('panel_adress') }}" 
+                                    <input type="text" class="form-control" id="panel_adress" name="panel_adress"
+                                           value="{{ request('panel_adress') }}"
                                            placeholder="Поиск по адресу панели">
                                 </div>
                             </div>
@@ -49,7 +49,7 @@
                                         <button type="submit" class="btn btn-primary">
                                             <i class="fas fa-search"></i> Поиск
                                         </button>
-                                        <a href="{{ route('admin.module.panel.index') }}" 
+                                        <a href="{{ route('admin.module.panel.index') }}"
                                            class="btn btn-secondary">
                                             <i class="fas fa-times"></i> Сбросить
                                         </a>
@@ -92,7 +92,7 @@
                                 </td>
                                 <td>
                                     @if($panel->server)
-                                        <a href="{{ route('admin.module.server.index', ['id' => $panel->server_id]) }}" 
+                                        <a href="{{ route('admin.module.server.index', ['id' => $panel->server_id]) }}"
                                            class="text-primary"
                                            title="Перейти к серверу">
                                             {{ $panel->server->name }}
@@ -115,14 +115,14 @@
                                             <i class="fas fa-ellipsis-v"></i>
                                         </button>
                                         <div class="dropdown-menu dropdown-menu-right">
-                                            <a href="{{ route('admin.module.server-users.index', ['panel_id' => $panel->id]) }}" 
+                                            <a href="{{ route('admin.module.server-users.index', ['panel_id' => $panel->id]) }}"
                                                class="dropdown-item">
                                                 <i class="fas fa-users"></i> Пользователи
                                             </a>
-                                            <button type="button" class="dropdown-item" data-toggle="modal"
-                                                    data-target="#editPanelModal{{ $panel->id }}">
-                                                <i class="fas fa-edit"></i> Редактировать
-                                            </button>
+{{--                                            <button type="button" class="dropdown-item" data-toggle="modal"--}}
+{{--                                                    data-target="#editPanelModal{{ $panel->id }}">--}}
+{{--                                                <i class="fas fa-edit"></i> Редактировать--}}
+{{--                                            </button>--}}
                                             <button type="button" class="dropdown-item text-danger"
                                                     onclick="deletePanel({{ $panel->id }})">
                                                 <i class="fas fa-trash"></i> Удалить
