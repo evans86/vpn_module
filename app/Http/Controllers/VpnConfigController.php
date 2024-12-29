@@ -48,11 +48,9 @@ class VpnConfigController extends Controller
                           str_contains($userAgent, 'hiddify');
 
             if ($isVpnClient || request()->wantsJson()) {
-                // Для VPN клиентов возвращаем только список ключей
-                return response()->json([
-                    'status' => 'success',
-                    'keys' => $connectionKeys
-                ]);
+                // Для VPN клиентов возвращаем строку с конфигурациями
+                return response(implode("\n", $connectionKeys))
+                    ->header('Content-Type', 'text/plain');
             }
 
             // Для браузера показываем HTML страницу
