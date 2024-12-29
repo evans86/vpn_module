@@ -41,24 +41,17 @@ class VpnConfigController extends Controller
 
             // Проверяем User-Agent на наличие клиентов VPN
             $userAgent = strtolower(request()->header('User-Agent') ?? '');
-            $isMarzbanClient = str_contains($userAgent, 'v2rayng') || 
-                             str_contains($userAgent, 'nekobox') || 
-                             str_contains($userAgent, 'nekoray') ||
-                             str_contains($userAgent, 'singbox');
+            $isVpnClient = str_contains($userAgent, 'v2rayng') || 
+                          str_contains($userAgent, 'nekobox') || 
+                          str_contains($userAgent, 'nekoray') ||
+                          str_contains($userAgent, 'singbox') ||
+                          str_contains($userAgent, 'hiddify');
 
-            if ($isMarzbanClient || request()->wantsJson()) {
-                // Для VPN клиентов возвращаем формат Marzban
+            if ($isVpnClient || request()->wantsJson()) {
+                // Для VPN клиентов возвращаем только список ключей
                 return response()->json([
-                    'username' => $serverUser->id,
-                    'status' => $serverUser->status ?? 'active',
-                    'data_limit' => ($keyActivateUser->keyActivate->traffic_limit ?? 0) * 1024 * 1024 * 1024, // Convert GB to bytes
-                    'data_limit_reset_strategy' => 'no_reset',
-                    'expire' => $keyActivateUser->keyActivate->finish_at ?? null,
-                    'inbounds' => $this->getInboundsList($connectionKeys),
-                    'links' => array_values($connectionKeys), // Массив URI для подключения
-                    'subscription_url' => route('vpn.config.show', ['token' => $key_activate_id]),
-                    'created_at' => $keyActivateUser->created_at->timestamp ?? time(),
-                    'updated_at' => time()
+                    'status' => 'success',
+                    'keys' => $connectionKeys
                 ]);
             }
 
@@ -124,34 +117,34 @@ class VpnConfigController extends Controller
         ];
 
         $formattedKeys = [];
-        foreach ($connectionKeys as $key) {
-            $protocol = strtolower(explode('://', $key)[0]);
-            if (isset($protocolDescriptions[$protocol])) {
+        foreach ($connectionKeys as $configString) {
+            // Удаляем экранирование слешей
+            $configString = stripslashes($configString);
+
+            if (preg_match('/^(vless|vmess|trojan|ss):\/\//', $configString, $matches)) {
+                $protocol = $matches[1];
+                if ($protocol === 'ss') {
+                    $protocol = 'shadowsocks';
+                }
+
+                $protocolInfo = $protocolDescriptions[strtolower($protocol)] ?? [
+                    'name' => strtoupper($protocol),
+                    'icon' => substr(strtoupper($protocol), 0, 1)
+                ];
+
+                // Извлекаем тип подключения из комментария
+                preg_match('/\[(.*?)\]$/', $configString, $typeMatches);
+                $connectionType = $typeMatches[1] ?? '';
+
                 $formattedKeys[] = [
-                    'uri' => $key,
-                    'name' => $protocolDescriptions[$protocol]['name'],
-                    'icon' => $protocolDescriptions[$protocol]['icon']
+                    'protocol' => $protocolInfo['name'],
+                    'icon' => $protocolInfo['icon'],
+                    'link' => addslashes($configString),
+                    'connection_type' => $connectionType
                 ];
             }
         }
 
         return $formattedKeys;
-    }
-
-    /**
-     * Get list of inbounds from connection keys
-     * @param array $connectionKeys
-     * @return array
-     */
-    private function getInboundsList(array $connectionKeys): array
-    {
-        $inbounds = [];
-        foreach ($connectionKeys as $key) {
-            $protocol = strtolower(explode('://', $key)[0]);
-            if (!in_array($protocol, $inbounds)) {
-                $inbounds[] = $protocol;
-            }
-        }
-        return $inbounds;
     }
 }
