@@ -15,6 +15,7 @@ class FatherBotController extends AbstractTelegramBot
 
     public function __construct(string $token)
     {
+        $this->init();
         parent::__construct($token);
         $this->setWebhook($token, self::BOT_TYPE_FATHER);
     }
