@@ -337,7 +337,7 @@ class MarzbanService
             $marzbanApi = new MarzbanAPI($panel->api_address);
 
             // Удаляем пользователя из панели
-            $deleteData = $marzbanApi->deleteUser($panel->auth_token, $user_id);
+            $marzbanApi->deleteUser($panel->auth_token, $user_id);
 
 //            if (!empty($deleteData)) {
 //                throw new RuntimeException('Failed to delete user from panel');
