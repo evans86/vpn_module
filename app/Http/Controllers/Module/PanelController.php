@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Module;
 use App\Http\Controllers\Controller;
 use App\Models\Panel\Panel;
 use App\Models\Server\Server;
+use App\Services\Panel\marzban\MarzbanService;
 use App\Services\Panel\PanelStrategy;
 use App\Logging\DatabaseLogger;
 use Exception;
@@ -292,7 +293,7 @@ class PanelController extends Controller
                 'password' => 'sometimes|required|string|min:6|max:255',
             ]);
 
-            $marzbanService = app(MarzbanService::class);
+            $marzbanService = new MarzbanService();
             $marzbanService->updateAdminCredentials($panel->id, $validated);
 
             return redirect()->route('admin.module.panel.index')
