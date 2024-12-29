@@ -339,9 +339,9 @@ class MarzbanService
             // Удаляем пользователя из панели
             $deleteData = $marzbanApi->deleteUser($panel->auth_token, $user_id);
 
-            if (!empty($deleteData)) {
-                throw new RuntimeException('Failed to delete user from panel');
-            }
+//            if (!empty($deleteData)) {
+//                throw new RuntimeException('Failed to delete user from panel');
+//            }
 
             // Удаляем запись из БД
             $serverUser = ServerUser::query()->where('id', $user_id)->firstOrFail();
