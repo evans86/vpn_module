@@ -89,6 +89,17 @@ class KeyActivateController extends Controller
     }
 
     /**
+     * Display the specified key activate
+     * @param KeyActivate $key
+     * @return Application|Factory|View
+     */
+    public function show(KeyActivate $key): View
+    {
+        $key->load(['packSalesman.pack', 'packSalesman.salesman', 'keyActivateUser.serverUser']);
+        return view('module.key-activate.show', compact('key'));
+    }
+
+    /**
      * Remove the specified key activate
      * @param KeyActivate $key
      * @return JsonResponse
