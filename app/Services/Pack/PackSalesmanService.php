@@ -141,7 +141,7 @@ class PackSalesmanService
             $message .= "⚡️ Время на активацию: {$pack->activate_time} дней";
 
             try {
-                $telegram = new Api(config('services.telegram.father_bot_token'));
+                $telegram = new Api(config('telegram.father_bot.token'));
                 $telegram->sendMessage([
                     'chat_id' => $salesman->telegram_id,
                     'text' => $message,
