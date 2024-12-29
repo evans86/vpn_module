@@ -121,8 +121,14 @@
                                             </a>
 {{--                                            <button type="button" class="dropdown-item" data-toggle="modal"--}}
 {{--                                                    data-target="#editPanelModal{{ $panel->id }}">--}}
-{{--                                                <i class="fas fa-edit"></i> Редактировать--}}
+{{--                                                <i class="fas fa-key"></i> Изменить учетные данные--}}
 {{--                                            </button>--}}
+                                            <form action="{{ route('admin.module.panel.update-config', $panel) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                <button type="submit" class="dropdown-item">
+                                                    <i class="fas fa-sync"></i> Обновить конфигурацию
+                                                </button>
+                                            </form>
                                             <button type="button" class="dropdown-item text-danger"
                                                     onclick="deletePanel({{ $panel->id }})">
                                                 <i class="fas fa-trash"></i> Удалить
