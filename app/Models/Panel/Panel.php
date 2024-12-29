@@ -32,6 +32,13 @@ class Panel extends Model
     use HasFactory;
 
     /**
+     * Имя таблицы
+     *
+     * @var string
+     */
+    protected $table = 'panel';
+
+    /**
      * @var string Тип панели Marzban
      */
     const MARZBAN = 'marzban';
@@ -51,8 +58,6 @@ class Panel extends Model
      * @var int Статус: Панель удалена
      */
     const PANEL_DELETED = 4;
-
-    protected $table = 'panel';
 
     protected $fillable = [
         'panel',

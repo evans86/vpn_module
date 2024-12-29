@@ -4,12 +4,14 @@ namespace App\Services\Panel\marzban;
 
 use App\Dto\Server\ServerDto;
 use App\Dto\Server\ServerFactory;
+use App\Models\KeyActivate\KeyActivate;
 use App\Models\Panel\Panel;
 use App\Models\Server\Server;
 use App\Models\ServerUser\ServerUser;
 use App\Services\External\MarzbanAPI;
 use App\Services\Key\KeyActivateUserService;
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use phpseclib\Net\SSH2;
@@ -634,6 +636,94 @@ class MarzbanService
                 'error' => $e->getMessage()
             ]);
             throw new RuntimeException('Ошибка при обновлении данных администратора: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Перенос пользователя с одной панели на другую
+     *
+     * @param int $sourcePanel_id ID исходной панели
+     * @param int $targetPanel_id ID целевой панели
+     * @param string $serverUser_id ID пользователя сервера
+     * @return ServerUser|null Обновленный пользователь сервера
+     * @throws RuntimeException|GuzzleException
+     */
+    public function transferUser(int $sourcePanel_id, int $targetPanel_id, string $serverUser_id): ServerUser
+    {
+        try {
+            // Получаем исходную и целевую панели
+            /** @var Panel $panel */
+            $sourcePanel = Panel::findOrFail($sourcePanel_id);
+            /** @var Panel $panel */
+            $targetPanel = Panel::findOrFail($targetPanel_id);
+
+            // Получаем пользователя сервера
+            $key_activate = KeyActivate::findOrFail($serverUser_id);
+            $serverUser = $key_activate->keyActivateUser->serverUser;
+
+            // Создаем API клиенты для обеих панелей
+            $sourceMarzbanApi = new MarzbanAPI($sourcePanel->api_address);
+            $targetMarzbanApi = new MarzbanAPI($targetPanel->api_address);
+
+            // 1. Получаем данные пользователя с исходной панели
+            $sourcePanel = self::updateMarzbanToken($sourcePanel->id);
+            $userData = $sourceMarzbanApi->getUser($sourcePanel->auth_token, $serverUser->id);
+
+            // 2. Создаем пользователя на новой панели с теми же настройками
+//            $newUserData = [
+//                'proxies' => $userData['proxies'] ?? ['vmess', 'vless'], // Используем существующие прокси или дефолтные
+//                'data_limit' => $userData['data_limit'] ?? 0,
+//                'expire' => $userData['expire'] ?? 0,
+//                'status' => $userData['status'] ?? 'active'
+//            ];
+            $targetPanel = self::updateMarzbanToken($targetPanel->id);
+            $userId = Str::uuid();
+            $newUser = $targetMarzbanApi->createUser(
+                $targetPanel->auth_token,
+                $userId,
+                    $userData['data_limit'] ?? 0,
+                    $userData['expire'] ?? 0
+            );
+
+            // 3. Обновляем данные в БД
+            DB::beginTransaction();
+            try {
+                // Сохраняем старые ключи для логирования
+                $oldKeys = $serverUser->keys;
+
+                // Обновляем данные пользователя сервера
+                $serverUser->panel_id = $targetPanel_id;
+//                $serverUser->server_id = $targetPanel->server_id;
+                $serverUser->keys = json_encode($newUser['links']); // Новые ключи подключения
+                $serverUser->save();
+
+                // Логируем изменения
+                Log::info('User transfer completed', [
+                    'user_id' => $serverUser_id,
+                    'old_panel' => $sourcePanel_id,
+                    'new_panel' => $targetPanel_id,
+                    'old_keys' => $oldKeys,
+                    'new_keys' => $newUser['subscription_url']
+                ]);
+
+                // 4. Удаляем пользователя со старой панели
+                $sourceMarzbanApi->deleteUser($sourcePanel->auth_token, $serverUser->id);
+
+                DB::commit();
+                return $serverUser;
+            } catch (Exception $e) {
+                DB::rollBack();
+                throw new RuntimeException('Failed to update database records: ' . $e->getMessage());
+            }
+        } catch (Exception $e) {
+            Log::error('Failed to transfer user', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'source_panel' => $sourcePanel_id,
+                'target_panel' => $targetPanel_id,
+                'user_id' => $serverUser_id
+            ]);
+            throw new RuntimeException('Failed to transfer user: ' . $e->getMessage());
         }
     }
 }

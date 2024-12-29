@@ -10,6 +10,7 @@ use App\Http\Controllers\Module\BotController;
 use App\Http\Controllers\VpnConfigController;
 use App\Http\Controllers\LogController;
 use App\Http\Controllers\Module\ServerUserController;
+use App\Http\Controllers\Module\ServerUserTransferController;
 use App\Services\Telegram\ModuleBot\FatherBotController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -88,19 +89,23 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/{id}/mark-as-paid', [PackSalesmanController::class, 'markAsPaid'])->name('mark-as-paid');
             });
 
+            // Server User Transfer Routes
+            Route::prefix('server-user-transfer')->name('server-user-transfer.')->group(function () {
+                Route::post('/panels', [ServerUserTransferController::class, 'getPanels'])->name('panels');
+                Route::post('/transfer', [ServerUserTransferController::class, 'transfer'])->name('transfer');
+            });
+
             // Key Activate Routes
             Route::prefix('key-activate')->name('key-activate.')->group(function () {
                 Route::get('/', [KeyActivateController::class, 'index'])->name('index');
-                Route::get('/{key}', [KeyActivateController::class, 'show'])->name('show');
-                Route::delete('/{key}', [KeyActivateController::class, 'destroy'])->name('destroy');
-                Route::post('/{key}/test-activate', [KeyActivateController::class, 'testActivate'])->name('test-activate');
-                Route::post('/{key}/update-dates', [KeyActivateController::class, 'updateDates'])->name('update-dates');
+                Route::delete('/{id}', [KeyActivateController::class, 'destroy'])->name('destroy');
+                Route::post('/{id}/update-dates', [KeyActivateController::class, 'updateDates'])->name('update-dates');
             });
 
             // Server User Routes
             Route::prefix('server-users')->name('server-users.')->group(function () {
                 Route::get('/', [ServerUserController::class, 'index'])->name('index');
-                Route::get('/{key}', [ServerUserController::class, 'show'])->name('show');
+                Route::get('/{panel_id}', [ServerUserController::class, 'show'])->name('show');
             });
 
             // Bot Routes
