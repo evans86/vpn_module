@@ -61,11 +61,11 @@ class FatherBotController extends AbstractTelegramBot
 
                 // Обработка команд меню
                 switch ($text) {
-//                    case '📦 Купить пакет':
-//                        $this->showPacksList();
-//                        break;
                     case '🤖 Мой бот':
                         $this->showBotInfo();
+                        break;
+                    case '📦 Пакеты':
+                        $this->showPacksList();
                         break;
                     case '👤 Профиль':
                         $this->showProfile();
@@ -103,6 +103,19 @@ class FatherBotController extends AbstractTelegramBot
             switch ($params['action']) {
                 case 'change_bot':
                     $this->initiateBotChange();
+                    break;
+                case 'show_pack':
+                    if (isset($params['pack_id'])) {
+                        $this->showPackDetails($params['pack_id']);
+                    }
+                    break;
+                case 'export_keys':
+                    if (isset($params['pack_id'])) {
+                        $this->exportKeysToFile($params['pack_id']);
+                    }
+                    break;
+                case 'show_packs':
+                    $this->showPacksList();
                     break;
                 case 'toggle_bot':
                     $this->toggleBot();
@@ -143,212 +156,152 @@ class FatherBotController extends AbstractTelegramBot
         }
     }
 
-//    /**
-//     * Process callback queries
-//     */
-//    private function processCallback($data): void
-//    {
-//        try {
-//            Log::info('Processing callback data', ['data' => $data]);
-//
-//            $params = json_decode($data, true);
-//            if (!$params || !isset($params['action'])) {
-//                Log::error('Invalid callback data', ['data' => $data]);
-//                return;
-//            }
-//
-//            switch ($params['action']) {
-//                case 'buy_pack':
-//                    if (isset($params['pack_id'])) {
-//                        $this->buyPack((int)$params['pack_id']);
-//                    }
-//                    break;
-//                case 'confirm_purchase':
-//                    if (isset($params['pack_id'])) {
-//                        $this->confirmPurchase((int)$params['pack_id']);
-//                    }
-//                    break;
-//                case 'check_payment':
-//                    if (isset($params['payment_id'])) {
-//                        $this->checkPayment((int)$params['payment_id']);
-//                    }
-//                    break;
-//                default:
-//                    Log::warning('Unknown callback action', [
-//                        'action' => $params['action'],
-//                        'data' => $data
-//                    ]);
-//            }
-//        } catch (Exception $e) {
-//            Log::error('Process callback error: ' . $e->getMessage(), [
-//                'trace' => $e->getTraceAsString()
-//            ]);
-//            $this->sendErrorMessage();
-//        }
-//    }
+    /**
+     * Показать список пакетов продавца
+     */
+    private function showPacksList(): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if (!$salesman) {
+                $this->sendMessage("❌ Ошибка: продавец не найден");
+                return;
+            }
 
-//    /**
-//     * Показать список пакетов
-//     */
-//    protected function showPacksList(): void
-//    {
-//        try {
-//            $packs = Pack::all();
-//            if ($packs->isEmpty()) {
-//                $this->sendMessage('❌ В данный момент нет доступных пакетов');
-//                return;
-//            }
-//
-//            $message = "<b>📦 Доступные пакеты:</b>\n\n";
-//            $inlineKeyboard = [];
-//
-//            foreach ($packs as $pack) {
-//                $message .= "<b>{$pack->name}</b>\n";
-//                $message .= "💰 Цена: {$pack->price} руб.\n";
-//                $message .= "📝 Описание: {$pack->description}\n\n";
-//
-//                $inlineKeyboard[] = [
-//                    [
-//                        'text' => "Купить за {$pack->price} руб.",
-//                        'callback_data' => json_encode([
-//                            'action' => 'buy_pack',
-//                            'pack_id' => $pack->id
-//                        ])
-//                    ]
-//                ];
-//            }
-//
-//            $keyboard = [
-//                'inline_keyboard' => $inlineKeyboard
-//            ];
-//
-//            $this->sendMessage($message, $keyboard);
-//        } catch (Exception $e) {
-//            Log::error('Show packs error: ' . $e->getMessage());
-//            $this->sendErrorMessage();
-//        }
-//    }
+            $packs = PackSalesman::where('salesman_id', $salesman->id)
+                ->where('status', PackSalesman::PAID)
+                ->with('pack')
+                ->get();
 
-//    /**
-//     * Handle buy pack action
-//     */
-//    protected function buyPack(int $packId): void
-//    {
-//        try {
-//            $pack = Pack::findOrFail($packId);
-//            $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
-//
-//            $message = "<b>💎 Подтверждение покупки пакета</b>\n\n";
-//            $message .= "📦 Пакет: {$pack->name}\n";
-//            $message .= "💰 Стоимость: {$pack->price} руб.\n\n";
-//            $message .= "Для подтверждения покупки нажмите кнопку ниже:";
-//
-//            $keyboard = [
-//                'inline_keyboard' => [
-//                    [
-//                        [
-//                            'text' => "✅ Подтвердить покупку",
-//                            'callback_data' => json_encode([
-//                                'action' => 'confirm_purchase',
-//                                'pack_id' => $pack->id
-//                            ])
-//                        ]
-//                    ]
-//                ]
-//            ];
-//
-//            $this->sendMessage($message, $keyboard);
-//        } catch (Exception $e) {
-//            Log::error('Buy pack error: ' . $e->getMessage());
-//            $this->sendErrorMessage();
-//        }
-//    }
+            if ($packs->isEmpty()) {
+                $this->sendMessage("❌ У вас нет активных пакетов");
+                return;
+            }
 
-//    /**
-//     * Handle confirm purchase action
-//     */
-//    protected function confirmPurchase(int $packId): void
-//    {
-//        try {
-//            $pack = Pack::findOrFail($packId);
-//
-//            $message = "💳 *Оплата пакета*\n\n";
-//            $message .= "Сумма к оплате: {$pack->price} руб.\n\n";
-//            $message .= "Для оплаты переведите указанную сумму по реквизитам:\n";
-//            $message .= "💠 Сбербанк: `1234 5678 9012 3456`\n";
-//            $message .= "💠 Тинькофф: `9876 5432 1098 7654`\n\n";
-//            $message .= "❗️ В комментарии укажите: `VPN_{$this->chatId}`\n\n";
-//            $message .= "После оплаты нажмите кнопку ниже:";
-//
-//            $keyboard = [
-//                'inline_keyboard' => [
-//                    [
-//                        ['text' => "✅ Я оплатил", 'callback_data' => json_encode(['action' => 'check_payment', 'payment_id' => $packId])]
-//                    ]
-//                ]
-//            ];
-//
-//            $this->sendMessage($message, ['reply_markup' => json_encode($keyboard)]);
-//        } catch (\Exception $e) {
-//            Log::error('Confirm purchase error: ' . $e->getMessage());
-//            $this->sendErrorMessage();
-//        }
-//    }
+            $message = "<b>📦 Ваши пакеты:</b>\n\n";
+            $keyboard = ['inline_keyboard' => []];
 
-//    /**
-//     * Handle check payment action
-//     */
-//    protected function checkPayment(int $paymentId): void
-//    {
-//        try {
-//            $pack = Pack::findOrFail($paymentId);
-//            $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
-//
-//            // Создаем пакет продавца
-//            $packSalesman = new PackSalesman();
-//            $packSalesman->pack_id = $pack->id;
-//            $packSalesman->salesman_id = $salesman->id;
-//            $packSalesman->status = PackSalesman::PAID;
-//            $packSalesman->save();
-//
-//            // Создаем ключи для продавца
-//            $keys = [];
-//            $finish_at = time() + ($pack->period * 24 * 60 * 60); // период в днях переводим в секунды
-//            $deleted_at = $finish_at + (7 * 24 * 60 * 60); // добавляем неделю для удаления
-//
-//            for ($i = 0; $i < $pack->count; $i++) {
-//                $key = $this->keyActivateService->create(
-//                    $pack->traffic_limit,
-//                    $packSalesman->id,
-//                    $finish_at,
-//                    $deleted_at
-//                );
-//                $keys[] = $key;
-//            }
-//
-//            $message = "✅ *Пакет успешно куплен!*\n\n";
-//            $message .= "📦 Пакет: {$pack->name}\n";
-//            $message .= "💰 Стоимость: {$pack->price} руб.\n\n";
-//            $message .= "🔐 *Ваши ключи активации:*\n";
-//            foreach ($keys as $index => $key) {
-//                $message .= ($index + 1) . ". <code>{$key->id}</code>\n";
-//            }
-//            $message .= "\n❗️ Сохраните эти ключи - они понадобятся для активации VPN\n\n";
-//
-//            if (!$salesman->token) {
-//                $message .= "❗️ *Важно:* Привяжите своего бота для начала продаж\n";
-//                $message .= "Нажмите кнопку '🤖 Мой бот' в меню";
-//            } else {
-//                $message .= "🤖 Перейдите в своего бота для продажи ключей:\n";
-//                $message .= $salesman->username;
-//            }
-//
-//            $this->sendMessage($message);
-//        } catch (\Exception $e) {
-//            Log::error('Check payment error: ' . $e->getMessage());
-//            $this->sendErrorMessage();
-//        }
-//    }
+            foreach ($packs as $packSalesman) {
+                $pack = $packSalesman->pack;
+                $keyboard['inline_keyboard'][] = [
+                    [
+                        'text' => "📦 {$pack->id}",
+                        'callback_data' => json_encode([
+                            'action' => 'show_pack',
+                            'pack_id' => $packSalesman->id
+                        ])
+                    ]
+                ];
+            }
+
+            $this->sendMessage($message, $keyboard);
+        } catch (\Exception $e) {
+            Log::error('Error in showPacksList: ' . $e->getMessage());
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Показать детали пакета и его ключи
+     */
+    private function showPackDetails(int $packSalesmanId): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if (!$salesman) {
+                $this->sendMessage("❌ Ошибка: продавец не найден");
+                return;
+            }
+
+            $packSalesman = PackSalesman::with(['pack', 'keyActivates'])
+                ->where('id', $packSalesmanId)
+                ->where('salesman_id', $salesman->id)
+                ->firstOrFail();
+
+            $pack = $packSalesman->pack;
+            $keys = $packSalesman->keyActivates;
+
+            $message = "<b>📦 Информация о пакете</b>\n\n";
+            $message .= "🏷 Название: {$pack->name}\n";
+            $message .= "💾 Трафик: " . number_format($pack->traffic_limit / (1024*1024*1024), 1) . " GB\n";
+            $message .= "⏱ Период: {$pack->period} дней\n\n";
+
+            $message .= "<b>🔑 Ключи активации:</b>\n";
+            foreach ($keys as $index => $key) {
+                $status = $key->user_tg_id ? "✅ Активирован" : "⚪️ Не активирован";
+                $message .= ($index + 1) . ". <code>{$key->id}</code> - {$status}\n";
+            }
+
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        [
+                            'text' => '📥 Выгрузить ключи',
+                            'callback_data' => json_encode([
+                                'action' => 'export_keys',
+                                'pack_id' => $packSalesmanId
+                            ])
+                        ]
+                    ]
+                ]
+            ];
+
+            $this->sendMessage($message, $keyboard);
+        } catch (\Exception $e) {
+            Log::error('Error in showPackDetails: ' . $e->getMessage());
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Экспорт ключей в текстовый файл
+     */
+    private function exportKeysToFile(int $packSalesmanId): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if (!$salesman) {
+                $this->sendMessage("❌ Ошибка: продавец не найден");
+                return;
+            }
+
+            $packSalesman = PackSalesman::with(['pack', 'keyActivates'])
+                ->where('id', $packSalesmanId)
+                ->where('salesman_id', $salesman->id)
+                ->firstOrFail();
+
+            $pack = $packSalesman->pack;
+            $keys = $packSalesman->keyActivates;
+
+            // Создаем содержимое файла
+            $content = "Пакет: {$pack->id}\n";
+            $content .= "Трафик: " . number_format($pack->traffic_limit / (1024*1024*1024), 1) . " GB\n";
+            $content .= "Период: {$pack->period} дней\n\n";
+            $content .= "Ключи активации:\n";
+
+            foreach ($keys as $index => $key) {
+                $status = $key->user_tg_id ? "Активирован" : "Не активирован";
+                $content .= ($index + 1) . ". {$key->id} - {$status}\n";
+            }
+
+            // Создаем временный файл
+            $tempFile = tempnam(sys_get_temp_dir(), 'keys_');
+            file_put_contents($tempFile, $content);
+
+            // Отправляем файл
+            $this->telegram->sendDocument([
+                'chat_id' => $this->chatId,
+                'document' => new \CURLFile($tempFile, 'text/plain', "keys_{$pack->id}.txt"),
+                'caption' => "📥 Выгрузка ключей для пакета {$pack->id}"
+            ]);
+
+            // Удаляем временный файл
+            unlink($tempFile);
+        } catch (\Exception $e) {
+            Log::error('Error in exportKeysToFile: ' . $e->getMessage());
+            $this->sendErrorMessage();
+        }
+    }
 
     /**
      * Handle bot token from user
@@ -419,13 +372,13 @@ class FatherBotController extends AbstractTelegramBot
     /**
      * Генерация меню
      */
-    protected function generateMenu($message): void
+    protected function generateMenu($message = null): void
     {
         $keyboard = [
             'keyboard' => [
                 [
-//                    ['text' => '📦 Купить пакет'],
-                    ['text' => '🤖 Мой бот']
+                    ['text' => '🤖 Мой бот'],
+                    ['text' => '📦 Пакеты']
                 ],
                 [
                     ['text' => '👤 Профиль'],
@@ -436,11 +389,15 @@ class FatherBotController extends AbstractTelegramBot
             'one_time_keyboard' => false
         ];
 
-        $this->telegram->sendMessage([
-            'chat_id' => $this->chatId,
-            'text' => $message,
-            'reply_markup' => json_encode($keyboard)
-        ]);
+        if ($message) {
+            $this->sendMessage($message, $keyboard);
+        } else {
+            $this->telegram->sendMessage([
+                'chat_id' => $this->chatId,
+                'text' => '👋 Выберите действие:',
+                'reply_markup' => json_encode($keyboard)
+            ]);
+        }
     }
 
     /**
@@ -450,7 +407,7 @@ class FatherBotController extends AbstractTelegramBot
     {
         $message = "*❓ Помощь*\n\n";
         $message .= "🔹 *Покупка пакета:*\n";
-        $message .= "1. Нажмите '📦 Купить пакет'\n";
+        $message .= "1. Нажмите '📦 Пакеты'\n";
         $message .= "2. Выберите подходящий пакет\n";
         $message .= "3. Оплатите его по указанным реквизитам\n\n";
         $message .= "🔹 *Создание бота:*\n";
