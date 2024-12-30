@@ -339,14 +339,18 @@ class MarzbanService
             $marzbanApi = new MarzbanAPI($panel->api_address);
 
             // Удаляем пользователя из панели
-            $marzbanApi->deleteUser($panel->auth_token, $user_id);
-
-//            if (!empty($deleteData)) {
-//                throw new RuntimeException('Failed to delete user from panel');
-//            }
+            $deleteResult = $marzbanApi->deleteUser($panel->auth_token, $user_id);
+            Log::info('Marzban API delete result', ['result' => $deleteResult]);
 
             // Удаляем запись из БД
             $serverUser = ServerUser::query()->where('id', $user_id)->firstOrFail();
+            
+            // Удаляем связанную запись KeyActivateUser
+            if ($serverUser->keyActivateUser) {
+                Log::info('Deleting KeyActivateUser', ['key_activate_user_id' => $serverUser->keyActivateUser->id]);
+                $serverUser->keyActivateUser->delete();
+            }
+
             if (!$serverUser->delete()) {
                 throw new RuntimeException('Failed to delete user record from database');
             }
@@ -359,7 +363,8 @@ class MarzbanService
             Log::error('Failed to delete server user', [
                 'panel_id' => $panel_id,
                 'user_id' => $user_id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             throw $e;
         }

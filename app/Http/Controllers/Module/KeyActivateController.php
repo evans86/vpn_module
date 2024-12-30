@@ -103,47 +103,73 @@ class KeyActivateController extends Controller
 
     /**
      * Remove the specified key activate
-     * @param KeyActivate $key
+     * @param string $id
      * @return JsonResponse
-     * @throws GuzzleException
      */
-    public function destroy(KeyActivate $key): JsonResponse
+    public function destroy(string $id): JsonResponse
     {
         try {
-            // Загружаем связанные данные
-            $key->load(['keyActivateUser.serverUser']);
+            $key = KeyActivate::with(['keyActivateUser.serverUser.panel'])->findOrFail($id);
 
-            // Если есть связанный пользователь сервера
-            if ($key->keyActivateUser && $key->keyActivateUser->serverUser) {
+            $this->logger->info('Начало удаления ключа активации', [
+                'key_id' => $id,
+                'key_activate_user_exists' => $key->keyActivateUser ? 'yes' : 'no',
+                'server_user_exists' => $key->keyActivateUser->serverUser ? 'yes' : 'no'
+            ]);
+
+            // Если есть связанный пользователь на сервере, удаляем его
+            if ($key->keyActivateUser->serverUser && $key->keyActivateUser->serverUser->panel) {
                 $serverUser = $key->keyActivateUser->serverUser;
+                $panel = $serverUser->panel;
 
-                // Получаем панель и сервис для работы с ней
-                $panelStrategy = new PanelStrategy($serverUser->panel->panel);
-                $panelStrategy->deleteServerUser($serverUser->panel->id, $serverUser->id);
+                try {
+                    $panelStrategy = new PanelStrategy($panel->panel);
+                    $panelStrategy->deleteServerUser($panel->id, $serverUser->id);
+
+                    $this->logger->info('Удаление пользователя из панели выполнено', [
+                        'key_id' => $id,
+                        'panel_id' => $panel->id,
+                        'server_user_id' => $serverUser->id
+                    ]);
+                } catch (Exception $e) {
+                    $this->logger->error('Ошибка при удалении пользователя из панели', [
+                        'key_id' => $id,
+                        'panel_id' => $panel->id,
+                        'server_user_id' => $serverUser->id,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ]);
+                    throw $e; // Прерываем процесс, если не удалось удалить пользователя из панели
+                }
             }
 
-            // Удаляем ключ активации
-            $key->delete();
-
-            $this->logger->info('Удаление ключа активации', [
-                'source' => 'key_activate',
-                'action' => 'delete',
-                'user_id' => auth()->id(),
-                'key_id' => $key->id
-            ]);
+            // Удаляем KeyActivate
+            try {
+                $key->delete();
+                $this->logger->info('KeyActivate удален', [
+                    'key_id' => $id
+                ]);
+            } catch (Exception $e) {
+                $this->logger->error('Ошибка при удалении KeyActivate', [
+                    'key_id' => $id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+                throw $e;
+            }
 
             return response()->json(['message' => 'Ключ успешно удален']);
         } catch (Exception $e) {
-            $this->logger->error('Ошибка при удалении ключа активации', [
+            $this->logger->error('Общая ошибка при удалении ключа активации', [
                 'source' => 'key_activate',
                 'action' => 'delete',
                 'user_id' => auth()->id(),
-                'key_id' => $key->id,
+                'key_id' => $id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
 
-            return response()->json(['message' => 'Ошибка при удалении ключа'], 500);
+            return response()->json(['message' => 'Ошибка при удалении ключа: ' . $e->getMessage()], 500);
         }
     }
 
