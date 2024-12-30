@@ -33,7 +33,7 @@ class FatherBotController extends AbstractTelegramBot
                     'data' => $callbackQuery->getData(),
                     'from' => $callbackQuery->getFrom()->getId()
                 ]);
-//                $this->processCallback($callbackQuery->getData());
+                $this->processCallback($callbackQuery->getData());
                 return;
             }
 
@@ -82,6 +82,60 @@ class FatherBotController extends AbstractTelegramBot
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Process callback queries
+     */
+    private function processCallback($data): void
+    {
+        try {
+            Log::info('Processing callback data', ['data' => $data]);
+
+            $params = json_decode($data, true);
+            if (!$params || !isset($params['action'])) {
+                Log::error('Invalid callback data', ['data' => $data]);
+                return;
+            }
+
+            switch ($params['action']) {
+                case 'change_bot':
+                    $this->initiateBotChange();
+                    break;
+                default:
+                    Log::warning('Unknown callback action', [
+                        'action' => $params['action'],
+                        'data' => $data
+                    ]);
+            }
+        } catch (Exception $e) {
+            Log::error('Process callback error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Initiate bot change process
+     */
+    private function initiateBotChange(): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if (!$salesman) {
+                $this->sendMessage("❌ Ошибка: продавец не найден");
+                return;
+            }
+
+            $salesman->state = self::STATE_WAITING_TOKEN;
+            $salesman->save();
+
+            $this->sendMessage("<b>🔄 Введите токен нового бота:</b>\n\nТокен можно получить у @BotFather\n\n⚠️ Внимание: после смены бота все старые ссылки перестанут работать!");
+        } catch (Exception $e) {
+            Log::error('Initiate bot change error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
     }
@@ -437,7 +491,19 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "🔗 Ваш бот: $salesman->bot_link\n";
             $message .= "✅ Статус: Активен\n\n";
 
-            $this->sendMessage($message);
+            // Добавляем инлайн-кнопку для привязки нового бота
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        [
+                            'text' => '🔄 Привязать нового бота',
+                            'callback_data' => json_encode(['action' => 'change_bot'])
+                        ]
+                    ]
+                ]
+            ];
+
+            $this->sendMessage($message, $keyboard);
         } catch (\Exception $e) {
             Log::error('Show bot info error: ' . $e->getMessage());
             $this->sendErrorMessage();
