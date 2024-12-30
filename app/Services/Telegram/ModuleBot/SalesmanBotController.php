@@ -140,28 +140,34 @@ class SalesmanBotController extends AbstractTelegramBot
     protected function actionStatus(): void
     {
         try {
-            $activeKey = $this->keyActivateRepository->findActiveKeyByUserAndSalesman(
+            $activeKeys = $this->keyActivateRepository->findAllActiveKeysByUser(
                 $this->chatId,
                 $this->salesman->id,
                 KeyActivate::ACTIVE
             );
 
-            if (!$activeKey) {
+            if ($activeKeys->isEmpty()) {
                 $this->sendMessage("У вас нет активных VPN-доступов.\n\nДля активации нажмите кнопку '🔑 Активировать' и введите ваш ключ.");
                 return;
             }
 
-            $finishDate = date('d.m.Y', $activeKey->finish_at);
-            $text = "📊 *Информация о вашем VPN-доступе:*\n\n";
-            $text .= "🔑 ID ключа: " . "<code>{$activeKey->id}</code>\n";
-            $text .= "📅 Действителен до: {$finishDate}\n";
-
-            if ($activeKey->traffic_limit) {
-                $trafficGB = round($activeKey->traffic_limit / (1024 * 1024 * 1024), 2);
-                $text .= "📊 Лимит трафика: {$trafficGB} GB\n";
+            $message = "📊 *Ваши активные VPN-подписки:*\n\n";
+            
+            foreach ($activeKeys as $key) {
+                $finishDate = date('d.m.Y', $key->finish_at);
+                $message .= "🔑 *Подписка #{$key->id}*\n";
+                $message .= "📅 Действует до: {$finishDate}\n";
+                
+                if ($key->traffic_limit) {
+                    $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
+                    $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
+                }
+                
+                $message .= "🔗 Ссылка на подписку:\n";
+                $message .= "<code>https://vpn-telegram.com/config/{$key->id}</code>\n\n";
             }
 
-            $this->sendMessage($text);
+            $this->sendMessage($message);
         } catch (\Exception $e) {
             Log::error('Status action error: ' . $e->getMessage());
             $this->sendErrorMessage();
@@ -230,16 +236,49 @@ class SalesmanBotController extends AbstractTelegramBot
         $finishDate = date('d.m.Y', $key->finish_at);
 
         $text = "✅ VPN успешно активирован!\n\n";
-        $text .= "📅 Срок действия: до {$finishDate}\n\n";
-        $text .= "📱 Инструкция по настройке:\n";
-        $text .= "1. Скачайте приложение Hiddify:\n";
-        $text .= "Android: https://play.google.com/store/apps/details?id=org.outline.android.client\n";
-        $text .= "iOS: https://apps.apple.com/us/app/outline-app/id1356177741\n\n";
-        $text .= "2. Откройте ссылку:\n";
-        $text .= "<code>Надо добавить ссылку на ключ</code>\n\n";
+        $text .= "📅 Срок действия: до {$finishDate}\n";
+        
+        if ($key->traffic_limit) {
+            $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
+            $text .= "📊 Лимит трафика: {$trafficGB} GB\n\n";
+        }
+
+        $text .= "🔗 *Ваша ссылка на подписку:*\n";
+        $text .= "<code>https://vpn-telegram.com/config/{$key->id}</code>\n\n";
+        
+        $text .= "📱 *Рекомендуемый VPN-клиент:*\n";
+        $text .= "Для удобного использования VPN рекомендуем приложение Hiddify:\n\n";
+        $text .= "📲 *Android:* [Скачать Hiddify](https://play.google.com/store/apps/details?id=app.hiddify.com)\n";
+        $text .= "📲 *iOS:* [Скачать Hiddify](https://apps.apple.com/app/hiddify/id6451357551)\n\n";
+        
+        $text .= "📝 *Инструкция по настройке:*\n";
+        $text .= "1. Установите приложение Hiddify\n";
+        $text .= "2. Откройте приложение\n";
+        $text .= "3. Нажмите '+' для добавления новой конфигурации\n";
+        $text .= "4. Выберите 'Import from clipboard'\n";
+        $text .= "5. Вставьте скопированную ссылку на подписку\n";
+        $text .= "6. Нажмите 'Connect'\n\n";
+        
         $text .= "❓ Если возникли вопросы, обратитесь к @admin";
 
-        $this->sendMessage($text);
+        $keyboard = [
+            'inline_keyboard' => [
+                [
+                    [
+                        'text' => '📲 Android - Hiddify',
+                        'url' => 'https://play.google.com/store/apps/details?id=app.hiddify.com'
+                    ]
+                ],
+                [
+                    [
+                        'text' => '📲 iOS - Hiddify',
+                        'url' => 'https://apps.apple.com/app/hiddify/id6451357551'
+                    ]
+                ]
+            ]
+        ];
+
+        $this->sendMessage($text, $keyboard);
     }
 
     private function isValidKeyFormat(string $text): bool

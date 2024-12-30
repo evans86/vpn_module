@@ -257,4 +257,33 @@ class KeyActivateRepository extends BaseRepository
     {
         return $key->user_tg_id && $key->user_tg_id !== $userTgId;
     }
+
+    /**
+     * Find all active keys for a user and salesman
+     *
+     * @param string $userTgId
+     * @param int $salesmanId
+     * @param int|null $status
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function findAllActiveKeysByUser(string $userTgId, int $salesmanId, ?int $status = null)
+    {
+        $query = $this->query()
+            ->where('user_tg_id', $userTgId)
+            ->whereHas('packSalesman', function($q) use ($salesmanId) {
+                $q->where('salesman_id', $salesmanId);
+            });
+
+        if ($status !== null) {
+            $query->where('status', $status);
+        }
+
+        // Проверяем срок действия
+        $query->where(function($q) {
+            $q->whereNull('finish_at')
+              ->orWhere('finish_at', '>', time());
+        });
+
+        return $query->get();
+    }
 }
