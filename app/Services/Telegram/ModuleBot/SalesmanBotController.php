@@ -152,18 +152,18 @@ class SalesmanBotController extends AbstractTelegramBot
             }
 
             $message = "📊 *Ваши активные VPN-подписки:*\n\n";
-            
+
             foreach ($activeKeys as $key) {
                 $finishDate = date('d.m.Y', $key->finish_at);
-                $message .= "🔑 *Подписка #{$key->id}*\n";
+                $message .= "🔑 *Подписка <code>{$key->id}</code>*\n";
                 $message .= "📅 Действует до: {$finishDate}\n";
-                
+
                 if ($key->traffic_limit) {
                     $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
                     $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
                 }
-                
-                $message .= "🔗 [Открыть конфигурацию](https://vpn-telegram.com/config/{$key->id})\n\n";
+
+                $message .= "🔗 [Открыть конфигурацию]\n(https://vpn-telegram.com/config/{$key->id})\n\n";
             }
 
             $this->sendMessage($message);
@@ -183,7 +183,7 @@ class SalesmanBotController extends AbstractTelegramBot
         $text .= "🔹 *Проверка статуса:*\n";
         $text .= "1. Нажмите '📊 Статус'\n";
         $text .= "2. Просмотрите информацию о вашем доступе\n\n";
-        $text .= "По всем вопросам обращайтесь к @admin";
+        $text .= "По всем вопросам обращайтесь к администратору бота";
 
         $this->sendMessage($text);
     }
@@ -236,7 +236,7 @@ class SalesmanBotController extends AbstractTelegramBot
 
         $text = "✅ VPN успешно активирован!\n\n";
         $text .= "📅 Срок действия: до {$finishDate}\n";
-        
+
         if ($key->traffic_limit) {
             $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
             $text .= "📊 Лимит трафика: {$trafficGB} GB\n\n";
@@ -244,20 +244,20 @@ class SalesmanBotController extends AbstractTelegramBot
 
         $text .= "🔗 *Ваша VPN-конфигурация:*\n";
         $text .= "[Открыть конфигурацию](https://vpn-telegram.com/config/{$key->id})\n\n";
-        
+
         $text .= "📱 *Рекомендуемый VPN-клиент:*\n";
-        $text .= "Для удобного использования VPN рекомендуем приложение Hiddify:\n\n";
+        $text .= "Для удобного использования VPN рекомендуем использовать приложение Hiddify:\n\n";
         $text .= "📲 *Android:* [Скачать Hiddify](https://play.google.com/store/apps/details?id=app.hiddify.com)\n";
         $text .= "📲 *iOS:* [Скачать Hiddify](https://apps.apple.com/app/hiddify/id6451357551)\n\n";
-        
+
         $text .= "📝 *Инструкция по настройке:*\n";
         $text .= "1. Установите приложение Hiddify\n";
         $text .= "2. Откройте приложение\n";
         $text .= "3. Нажмите '+' для добавления новой конфигурации\n";
         $text .= "4. Нажмите на ссылку конфигурации выше\n";
         $text .= "5. Нажмите 'Connect'\n\n";
-        
-        $text .= "❓ Если возникли вопросы, обратитесь к @admin";
+
+        $text .= "❓ Если возникли вопросы, обратитесь к администратору бота";
 
         $keyboard = [
             'inline_keyboard' => [
