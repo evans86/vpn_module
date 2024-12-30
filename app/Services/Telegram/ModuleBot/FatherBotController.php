@@ -104,6 +104,9 @@ class FatherBotController extends AbstractTelegramBot
                 case 'change_bot':
                     $this->initiateBotChange();
                     break;
+                case 'toggle_bot':
+                    $this->toggleBot();
+                    break;
                 default:
                     Log::warning('Unknown callback action', [
                         'action' => $params['action'],
@@ -475,10 +478,6 @@ class FatherBotController extends AbstractTelegramBot
                 return;
             }
 
-//            $salesman->token = null;
-//            $salesman->save();
-//            return;
-
             if (empty($salesman->token)) {
                 $salesman->state = self::STATE_WAITING_TOKEN;
                 $salesman->save();
@@ -489,11 +488,17 @@ class FatherBotController extends AbstractTelegramBot
 
             $message = "<b>🤖 Информация о вашем боте</b>\n\n";
             $message .= "🔗 Ваш бот: $salesman->bot_link\n";
-            $message .= "✅ Статус: Активен\n\n";
+            $message .= "✅ Статус: " . ($salesman->bot_active ? "Активен" : "Отключен") . "\n\n";
 
-            // Добавляем инлайн-кнопку для привязки нового бота
+            // Добавляем инлайн-кнопки для управления ботом
             $keyboard = [
                 'inline_keyboard' => [
+                    [
+                        [
+                            'text' => $salesman->bot_active ? '🔴 Отключить бота' : '🟢 Включить бота',
+                            'callback_data' => json_encode(['action' => 'toggle_bot'])
+                        ]
+                    ],
                     [
                         [
                             'text' => '🔄 Привязать нового бота',
@@ -506,6 +511,34 @@ class FatherBotController extends AbstractTelegramBot
             $this->sendMessage($message, $keyboard);
         } catch (\Exception $e) {
             Log::error('Show bot info error: ' . $e->getMessage());
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Toggle bot active status
+     */
+    private function toggleBot(): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if (!$salesman) {
+                $this->sendMessage("❌ Ошибка: продавец не найден");
+                return;
+            }
+
+            // Меняем статус бота
+            $salesman->bot_active = !$salesman->bot_active;
+            $salesman->save();
+
+            // Обновляем сообщение с информацией о боте
+            $this->showBotInfo();
+
+            // Отправляем уведомление
+            $status = $salesman->bot_active ? "включен" : "отключен";
+            $this->sendMessage("✅ Бот успешно " . $status);
+        } catch (Exception $e) {
+            Log::error('Toggle bot error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
     }

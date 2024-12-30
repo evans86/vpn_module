@@ -33,6 +33,12 @@ class SalesmanBotController extends AbstractTelegramBot
     public function processUpdate(): void
     {
         try {
+            // Проверяем, активен ли бот
+            if (!$this->salesman->bot_active) {
+                $this->sendMessage("⚠️ Бот временно отключен администратором.");
+                return;
+            }
+
             $message = $this->update->getMessage();
 
             if (!$message || !$message->getText()) {
