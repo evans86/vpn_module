@@ -285,18 +285,26 @@ class FatherBotController extends AbstractTelegramBot
             }
 
             // Создаем временный файл
-            $tempFile = tempnam(sys_get_temp_dir(), 'keys_');
-            file_put_contents($tempFile, $content);
+            $fileName = "keys_{$pack->id}.txt";
+            $tempPath = storage_path('app/temp/' . $fileName);
+
+            // Создаем директорию если её нет
+            if (!file_exists(storage_path('app/temp'))) {
+                mkdir(storage_path('app/temp'), 0777, true);
+            }
+
+            // Записываем содержимое в файл
+            file_put_contents($tempPath, $content);
 
             // Отправляем файл
             $this->telegram->sendDocument([
                 'chat_id' => $this->chatId,
-                'document' => new \CURLFile($tempFile, 'text/plain', "keys_{$pack->id}.txt"),
+                'document' => fopen($tempPath, 'r'),
                 'caption' => "📥 Выгрузка ключей для пакета {$pack->id}"
             ]);
 
             // Удаляем временный файл
-            unlink($tempFile);
+            unlink($tempPath);
         } catch (\Exception $e) {
             Log::error('Error in exportKeysToFile: ' . $e->getMessage());
             $this->sendErrorMessage();
@@ -406,18 +414,13 @@ class FatherBotController extends AbstractTelegramBot
     protected function showHelp(): void
     {
         $message = "*❓ Помощь*\n\n";
-        $message .= "🔹 *Покупка пакета:*\n";
-        $message .= "1. Нажмите '📦 Пакеты'\n";
-        $message .= "2. Выберите подходящий пакет\n";
-        $message .= "3. Оплатите его по указанным реквизитам\n\n";
         $message .= "🔹 *Создание бота:*\n";
         $message .= "1. Создайте бота у @BotFather\n";
         $message .= "2. Получите токен бота\n";
         $message .= "3. Нажмите '🤖 Мой бот' и отправьте токен\n\n";
         $message .= "🔹 *Продажа доступов:*\n";
-        $message .= "1. Купите пакет ключей\n";
-        $message .= "2. Привяжите своего бота\n";
-        $message .= "3. Начните продавать доступы через своего бота\n\n";
+        $message .= "1. Привяжите своего бота\n";
+        $message .= "2. Начните продавать доступы через своего бота\n\n";
         $message .= "По всем вопросам обращайтесь к @admin";
 
         $this->sendMessage($message);
