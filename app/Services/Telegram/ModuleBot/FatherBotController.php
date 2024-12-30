@@ -2,7 +2,6 @@
 
 namespace App\Services\Telegram\ModuleBot;
 
-use App\Models\Pack\Pack;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
 use Exception;
@@ -29,7 +28,7 @@ class FatherBotController extends AbstractTelegramBot
             $callbackQuery = $this->update->getCallbackQuery();
 
             if ($callbackQuery) {
-                Log::info('Received callback query', [
+                Log::info('Вызов callback query', [
                     'data' => $callbackQuery->getData(),
                     'from' => $callbackQuery->getFrom()->getId()
                 ]);
@@ -149,7 +148,7 @@ class FatherBotController extends AbstractTelegramBot
             $salesman->state = self::STATE_WAITING_TOKEN;
             $salesman->save();
 
-            $this->sendMessage("<b>🔄 Введите токен нового бота:</b>\n\nТокен можно получить у @BotFather\n\n⚠️ Внимание: после смены бота все старые ссылки перестанут работать!");
+            $this->sendMessage("<b>🔄 Введите токен нового бота:</b>\n\nТокен можно получить в @BotFather\n\n⚠️ Внимание: после смены бота все старые ссылки перестанут работать!");
         } catch (Exception $e) {
             Log::error('Initiate bot change error: ' . $e->getMessage());
             $this->sendErrorMessage();
@@ -178,14 +177,14 @@ class FatherBotController extends AbstractTelegramBot
                 return;
             }
 
-            $message = "<b>📦 Ваши пакеты:</b>\n\n";
+            $message = "<b>📦 Ваши пакеты доступов:</b>\n\n";
             $keyboard = ['inline_keyboard' => []];
 
             foreach ($packs as $packSalesman) {
                 $pack = $packSalesman->pack;
                 $keyboard['inline_keyboard'][] = [
                     [
-                        'text' => "📦 {$pack->id}",
+                        'text' => "📦 ID: {$packSalesman->id}",
                         'callback_data' => json_encode([
                             'action' => 'show_pack',
                             'pack_id' => $packSalesman->id
@@ -221,8 +220,7 @@ class FatherBotController extends AbstractTelegramBot
             $pack = $packSalesman->pack;
             $keys = $packSalesman->keyActivates;
 
-            $message = "<b>📦 Информация о пакете</b>\n\n";
-            $message .= "🏷 Название: {$pack->name}\n";
+            $message = "<b>📦 Информация о пакете:</b>\n\n";
             $message .= "💾 Трафик: " . number_format($pack->traffic_limit / (1024*1024*1024), 1) . " GB\n";
             $message .= "⏱ Период: {$pack->period} дней\n\n";
 
@@ -236,7 +234,7 @@ class FatherBotController extends AbstractTelegramBot
                 'inline_keyboard' => [
                     [
                         [
-                            'text' => '📥 Выгрузить ключи',
+                            'text' => '📥 Выгрузить ключи в .txt файл',
                             'callback_data' => json_encode([
                                 'action' => 'export_keys',
                                 'pack_id' => $packSalesmanId
@@ -274,7 +272,7 @@ class FatherBotController extends AbstractTelegramBot
             $keys = $packSalesman->keyActivates;
 
             // Создаем содержимое файла
-            $content = "Пакет: {$pack->id}\n";
+            $content = "Пакет: ID {$packSalesman->id}\n";
             $content .= "Трафик: " . number_format($pack->traffic_limit / (1024*1024*1024), 1) . " GB\n";
             $content .= "Период: {$pack->period} дней\n\n";
             $content .= "Ключи активации:\n";
@@ -285,7 +283,7 @@ class FatherBotController extends AbstractTelegramBot
             }
 
             // Создаем временный файл
-            $fileName = "keys_{$pack->id}.txt";
+            $fileName = "keys_{$packSalesman->id}.txt";
             $tempPath = storage_path('app/temp/' . $fileName);
 
             // Создаем директорию если её нет
@@ -367,7 +365,7 @@ class FatherBotController extends AbstractTelegramBot
 
             $message = "👋 *Добро пожаловать в систему управления доступами VPN*\n\n";
             $message .= "🔸 Покупайте пакеты ключей\n";
-            $message .= "🔸 Создавайте своего бота\n";
+            $message .= "🔸 Привяжите своего бота для активации доступов\n";
             $message .= "🔸 Продавайте VPN доступы";
 
             $this->generateMenu($message);
@@ -415,13 +413,13 @@ class FatherBotController extends AbstractTelegramBot
     {
         $message = "*❓ Помощь*\n\n";
         $message .= "🔹 *Создание бота:*\n";
-        $message .= "1. Создайте бота у @BotFather\n";
+        $message .= "1. Создайте бота в @BotFather\n";
         $message .= "2. Получите токен бота\n";
         $message .= "3. Нажмите '🤖 Мой бот' и отправьте токен\n\n";
         $message .= "🔹 *Продажа доступов:*\n";
         $message .= "1. Привяжите своего бота\n";
         $message .= "2. Начните продавать доступы через своего бота\n\n";
-        $message .= "По всем вопросам обращайтесь к @admin";
+        $message .= "По всем вопросам обращайтесь в @BOTT_SUPPORT_BOT";
 
         $this->sendMessage($message);
     }
@@ -446,7 +444,7 @@ class FatherBotController extends AbstractTelegramBot
                 return;
             }
 
-            $message = "<b>🤖 Информация о вашем боте</b>\n\n";
+            $message = "<b>🤖 Информация о вашем боте:</b>\n\n";
             $message .= "🔗 Ваш бот: $salesman->bot_link\n";
             $message .= "✅ Статус: " . ($salesman->bot_active ? "Активен" : "Отключен") . "\n\n";
 
@@ -495,7 +493,7 @@ class FatherBotController extends AbstractTelegramBot
             $this->showBotInfo();
 
             // Отправляем уведомление
-            $status = $salesman->bot_active ? "включен" : "отключен";
+            $status = $salesman->bot_active ? "включен 🟢" : "отключен 🔴";
             $this->sendMessage("✅ Бот успешно " . $status);
         } catch (Exception $e) {
             Log::error('Toggle bot error: ' . $e->getMessage());
