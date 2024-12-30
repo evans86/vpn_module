@@ -226,56 +226,53 @@ class KeyActivateController extends Controller
     }
 
     /**
-     * Update key dates
+     * Update date for the specified key activate
      * @param Request $request
-     * @param KeyActivate $key
      * @return JsonResponse
      */
-    public function updateDates(Request $request, KeyActivate $key): JsonResponse
+    public function updateDate(Request $request): JsonResponse
     {
         try {
             $validated = $request->validate([
-                'finish_at' => 'sometimes|required|date_format:Y-m-d H:i',
-                'deleted_at' => 'sometimes|required|date_format:Y-m-d H:i'
+                'id' => 'required|uuid|exists:key_activate,id',
+                'type' => 'required|in:finish_at,deleted_at',
+                'value' => 'required|integer'
             ]);
 
-            $updates = [];
+            $key = KeyActivate::findOrFail($validated['id']);
 
-            if (isset($validated['finish_at'])) {
-                $updates['finish_at'] = strtotime($validated['finish_at']);
-            }
+            // Обновляем дату
+            $key->{$validated['type']} = $validated['value'];
+            $key->save();
 
-            if (isset($validated['deleted_at'])) {
-                $updates['deleted_at'] = strtotime($validated['deleted_at']);
-            }
-
-            $key->update($updates);
-
-            $this->logger->info('Обновление дат ключа активации', [
+            $this->logger->info('Обновление даты для ключа активации', [
                 'source' => 'key_activate',
-                'action' => 'update_dates',
+                'action' => 'update_date',
                 'user_id' => auth()->id(),
                 'key_id' => $key->id,
-                'updates' => $updates
+                'field' => $validated['type'],
+                'new_value' => $validated['value']
             ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Даты успешно обновлены'
+                'message' => 'Дата успешно обновлена'
             ]);
+
         } catch (Exception $e) {
-            $this->logger->error('Ошибка при обновлении дат ключа активации', [
+            $this->logger->error('Ошибка при обновлении даты ключа активации', [
                 'source' => 'key_activate',
-                'action' => 'update_dates',
+                'action' => 'update_date',
                 'user_id' => auth()->id(),
-                'key_id' => $key->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request' => $request->all()
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Ошибка при обновлении дат: ' . $e->getMessage()
-            ], 422);
+                'message' => 'Ошибка при обновлении даты'
+            ], 500);
         }
     }
 }

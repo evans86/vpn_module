@@ -99,7 +99,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::prefix('key-activate')->name('key-activate.')->group(function () {
                 Route::get('/', [KeyActivateController::class, 'index'])->name('index');
                 Route::delete('/{id}', [KeyActivateController::class, 'destroy'])->name('destroy');
-                Route::post('/{id}/update-dates', [KeyActivateController::class, 'updateDates'])->name('update-dates');
+                Route::post('/update-date', [KeyActivateController::class, 'updateDate'])->name('update-date');
             });
 
             // Server User Routes

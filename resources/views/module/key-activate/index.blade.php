@@ -205,7 +205,39 @@
         </div>
     </div>
     <!-- Модальное окно для переноса ключа -->
-    <div class="modal fade" id="transferKeyModal" tabindex="-1" role="dialog">
+    <div class="modal" id="transferKeyModal" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Перенос ключа на другой сервер</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form id="transfer-key-form">
+                    <div class="modal-body">
+                        <input type="hidden" id="transfer-key-id" name="key_id">
+                        <div class="form-group">
+                            <label for="target-panel-select">Выберите сервер для переноса</label>
+                            <select class="form-control" id="target-panel-select" name="target_panel_id" required>
+                                <option value="">Выберите сервер</option>
+                            </select>
+                            <small class="form-text text-muted">
+                                Выберите сервер, на который нужно перенести ключ.
+                                Все настройки и ограничения будут сохранены.
+                            </small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">
+                            <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                            Перенести
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     @push('css')
@@ -239,128 +271,186 @@
         <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/material_blue.css">
     @endpush
 
-    @push('js')
+    @push('scripts')
         <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.8/clipboard.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
         <script src="https://npmcdn.com/flatpickr/dist/l10n/ru.js"></script>
         <script>
             $(document).ready(function() {
+                // Инициализируем bootstrap-select для всех select на странице
+                $('.form-control').selectpicker({
+                    style: 'btn-light',
+                    size: 7,
+                    liveSearch: true,
+                    width: '100%'
+                });
+
                 // Инициализация Clipboard.js
                 var clipboard = new ClipboardJS('[data-clipboard-text]');
                 clipboard.on('success', function(e) {
                     e.clearSelection();
-                    alert('ID скопирован в буфер обмена');
+                });
+
+                // Инициализация Flatpickr для всех полей с датами
+                flatpickr.localize(flatpickr.l10ns.ru);
+                
+                // Обработчик клика по кнопке редактирования даты
+                $(document).on('click', '.edit-date', function(e) {
+                    e.preventDefault();
+                    const button = $(this);
+                    const id = button.data('id');
+                    const type = button.data('type');
+                    const currentValue = button.data('value');
+                    
+                    // Создаем временное поле ввода
+                    const input = $('<input type="text" class="form-control form-control-sm d-inline-block" style="width: 150px;">');
+                    input.val(currentValue);
+                    
+                    // Заменяем текст даты на поле ввода
+                    const container = button.parent();
+                    const originalText = container.contents().filter(function() {
+                        return this.nodeType === 3;
+                    }).first();
+                    originalText.replaceWith(input);
+                    
+                    // Инициализируем Flatpickr для поля ввода
+                    const fp = flatpickr(input[0], {
+                        enableTime: true,
+                        dateFormat: "d.m.Y H:i",
+                        defaultDate: currentValue,
+                        onClose: function(selectedDates, dateStr) {
+                            if (selectedDates.length > 0) {
+                                // Отправляем запрос на обновление даты
+                                $.ajax({
+                                    url: '/admin/module/key-activate/update-date',
+                                    method: 'POST',
+                                    headers: {
+                                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                                    },
+                                    data: {
+                                        id: id,
+                                        type: type,
+                                        value: Math.floor(selectedDates[0].getTime() / 1000)
+                                    },
+                                    success: function(response) {
+                                        if (response.success) {
+                                            // Обновляем отображаемую дату
+                                            input.replaceWith(dateStr);
+                                            // Обновляем значение в кнопке
+                                            button.data('value', dateStr);
+                                        } else {
+                                            alert('Ошибка при обновлении даты');
+                                            input.replaceWith(currentValue);
+                                        }
+                                    },
+                                    error: function() {
+                                        alert('Ошибка при обновлении даты');
+                                        input.replaceWith(currentValue);
+                                    }
+                                });
+                            } else {
+                                input.replaceWith(currentValue);
+                            }
+                        }
+                    });
+                    
+                    // Открываем календарь
+                    fp.open();
                 });
 
                 // Обработчик клика по кнопке переноса
                 $(document).on('click', '.btn-transfer-key', function() {
                     const keyId = $(this).data('key-id');
-                    console.log('Key ID:', keyId); // Отладочный вывод
+                    console.log('Key ID:', keyId);
 
                     // Сохраняем ID ключа в скрытое поле
                     $('#transfer-key-id').val(keyId);
 
-                    // Загружаем список доступных серверов
+                    // Загружаем список доступных панелей
                     $.ajax({
-                        url: '/admin/module/server-user-transfer/panels',
+                        url: '{{ route('admin.module.server-user-transfer.panels') }}',
                         method: 'POST',
                         headers: {
                             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                         },
+                        data: {
+                            key_id: keyId
+                        },
                         success: function(response) {
-                            console.log('Panels response:', response); // Отладочный вывод
-
-                            // Формируем HTML для модального окна
-                            let modalHtml = `
-                                <div class="modal-dialog">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title">Перенос ключа на другой сервер</h5>
-                                            <button type="button" class="close" data-dismiss="modal">
-                                                <span>&times;</span>
-                                            </button>
-                                        </div>
-                                        <form id="transfer-key-form">
-                                            <div class="modal-body">
-                                                <input type="hidden" id="transfer-key-id">
-                                                <div class="form-group">
-                                                    <label for="target-panel-select">Выберите сервер для переноса</label>
-                                                    <select class="form-control" id="target-panel-select" required>`;
-
+                            console.log('Response:', response);
                             const panels = response.panels || [];
-                            if (Array.isArray(panels) && panels.length > 0) {
-                                modalHtml += '<option value="">Выберите сервер</option>';
+                            
+                            // Очищаем и заполняем select опциями
+                            const select = $('#target-panel-select');
+                            console.log('Select element:', select.length ? 'Found' : 'Not found');
+                            console.log('Panels to add:', panels);
+                            
+                            select.empty();
+                            select.append('<option value="">Выберите сервер</option>');
+                            
+                            if (panels.length > 0) {
                                 panels.forEach(function(panel) {
-                                    console.log('Panel:', panel);
+                                    console.log('Adding panel:', panel);
                                     const serverName = panel.server_name || 'Неизвестный сервер';
-                                    const address = panel.address || 'Адрес не указан';
-                                    modalHtml += `<option value="${panel.id}">${serverName} (${address})</option>`;
+                                    const address = panel.address || '';
+                                    const displayName = address ? `${serverName} (${address})` : serverName;
+                                    const optionHtml = `<option value="${panel.id}">${displayName}</option>`;
+                                    console.log('Option HTML:', optionHtml);
+                                    select.append(optionHtml);
                                 });
+
+                                // Проверяем количество опций после добавления
+                                console.log('Total options after adding:', select.find('option').length);
+                                
+                                // Инициализируем bootstrap-select
+                                select.selectpicker('destroy');
+                                select.selectpicker({
+                                    style: 'btn-light',
+                                    size: 7,
+                                    liveSearch: true,
+                                    width: '100%'
+                                });
+                                
+                                // Показываем модальное окно
+                                $('#transferKeyModal').modal('show');
+                                
+                                // Проверяем HTML после показа модального окна
+                                setTimeout(() => {
+                                    console.log('Modal HTML after show:', $('#transferKeyModal').html());
+                                    console.log('Select HTML after show:', $('#target-panel-select').html());
+                                }, 500);
                             } else {
-                                modalHtml += '<option value="">Нет доступных серверов</option>';
+                                alert('Нет доступных серверов для переноса');
                             }
-
-                            modalHtml += `
-                                                    </select>
-                                                    <small class="form-text text-muted">
-                                                        Выберите сервер, на который нужно перенести ключ.
-                                                        Все настройки и ограничения будут сохранены.
-                                                    </small>
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
-                                                <button type="submit" class="btn btn-primary" id="transfer-submit-btn">
-                                                    <span class="spinner-border spinner-border-sm d-none" role="status"></span>
-                                                    Перенести
-                                                </button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>`;
-
-                            // Обновляем содержимое модального окна
-                            $('#transferKeyModal').html(modalHtml);
-
-                            // Устанавливаем ID ключа
-                            $('#transfer-key-id').val(keyId);
-
-                            // Показываем модальное окно
-                            $('#transferKeyModal').modal('show');
                         },
                         error: function(xhr) {
-                            console.error('Ajax error:', xhr); // Отладочный вывод
-                            const message = xhr.responseJSON?.message || 'Произошла ошибка при загрузке серверов';
-                            alert(message);
+                            console.error('Error:', xhr);
+                            alert('Ошибка при загрузке списка серверов: ' + (xhr.responseJSON?.message || 'Неизвестная ошибка'));
                         }
                     });
                 });
 
                 // Обработчик отправки формы переноса
-                $('#transferKeyModal').on('submit', '#transfer-key-form', function(e) {
+                $('#transfer-key-form').on('submit', function(e) {
                     e.preventDefault();
                     
                     const keyId = $('#transfer-key-id').val();
                     const targetPanelId = $('#target-panel-select').val();
                     
-                    console.log('Form submitted:', {
-                        keyId: keyId,
-                        targetPanelId: targetPanelId
-                    });
-                    
                     if (!targetPanelId) {
-                        alert('Выберите сервер для переноса');
+                        alert('Пожалуйста, выберите сервер для переноса');
                         return;
                     }
 
-                    // Показываем спиннер
-                    const submitBtn = $('#transfer-submit-btn');
+                    const spinner = $(this).find('.spinner-border');
+                    const submitBtn = $(this).find('button[type="submit"]');
+                    
+                    // Блокируем кнопку и показываем спиннер
                     submitBtn.prop('disabled', true);
-                    submitBtn.find('.spinner-border').removeClass('d-none');
+                    spinner.removeClass('d-none');
 
-                    // Отправляем запрос на перенос
                     $.ajax({
-                        url: '/admin/module/server-user-transfer/transfer',
+                        url: '{{ route('admin.module.server-user-transfer.transfer') }}',
                         method: 'POST',
                         headers: {
                             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -370,43 +460,18 @@
                             target_panel_id: targetPanelId
                         },
                         success: function(response) {
-                            console.log('Transfer response:', response);
-                            // Скрываем модальное окно
                             $('#transferKeyModal').modal('hide');
-                            
-                            if (response.success) {
-                                // Показываем сообщение об успехе
-                                alert('Ключ успешно перенесен на новый сервер');
-                                // Перезагружаем страницу для обновления данных
-                                window.location.reload();
-                            } else {
-                                // Если сервер вернул ошибку в response
-                                const message = response.message || 'Произошла ошибка при переносе ключа';
-                                alert(message);
-                            }
+                            alert('Ключ успешно перенесен на новый сервер');
+                            location.reload();
                         },
                         error: function(xhr) {
                             console.error('Transfer error:', xhr);
-                            // Скрываем модальное окно
-                            $('#transferKeyModal').modal('hide');
-                            
-                            let message = 'Произошла ошибка при переносе ключа';
-                            
-                            // Пытаемся получить сообщение об ошибке из ответа сервера
-                            if (xhr.responseJSON && xhr.responseJSON.message) {
-                                message = xhr.responseJSON.message;
-                            } else if (xhr.status === 404) {
-                                message = 'Ключ или сервер не найден';
-                            } else if (xhr.status === 403) {
-                                message = 'Нет прав для выполнения операции';
-                            }
-                            
-                            alert(message);
+                            alert('Ошибка при переносе ключа: ' + (xhr.responseJSON?.message || 'Неизвестная ошибка'));
                         },
                         complete: function() {
-                            // Скрываем спиннер
+                            // Разблокируем кнопку и скрываем спиннер
                             submitBtn.prop('disabled', false);
-                            submitBtn.find('.spinner-border').addClass('d-none');
+                            spinner.addClass('d-none');
                         }
                     });
                 });
