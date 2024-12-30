@@ -163,8 +163,7 @@ class SalesmanBotController extends AbstractTelegramBot
                     $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
                 }
                 
-                $message .= "🔗 Ссылка на подписку:\n";
-                $message .= "<code>https://vpn-telegram.com/config/{$key->id}</code>\n\n";
+                $message .= "🔗 [Открыть конфигурацию](https://vpn-telegram.com/config/{$key->id})\n\n";
             }
 
             $this->sendMessage($message);
@@ -243,8 +242,8 @@ class SalesmanBotController extends AbstractTelegramBot
             $text .= "📊 Лимит трафика: {$trafficGB} GB\n\n";
         }
 
-        $text .= "🔗 *Ваша ссылка на подписку:*\n";
-        $text .= "<code>https://vpn-telegram.com/config/{$key->id}</code>\n\n";
+        $text .= "🔗 *Ваша VPN-конфигурация:*\n";
+        $text .= "[Открыть конфигурацию](https://vpn-telegram.com/config/{$key->id})\n\n";
         
         $text .= "📱 *Рекомендуемый VPN-клиент:*\n";
         $text .= "Для удобного использования VPN рекомендуем приложение Hiddify:\n\n";
@@ -255,9 +254,8 @@ class SalesmanBotController extends AbstractTelegramBot
         $text .= "1. Установите приложение Hiddify\n";
         $text .= "2. Откройте приложение\n";
         $text .= "3. Нажмите '+' для добавления новой конфигурации\n";
-        $text .= "4. Выберите 'Import from clipboard'\n";
-        $text .= "5. Вставьте скопированную ссылку на подписку\n";
-        $text .= "6. Нажмите 'Connect'\n\n";
+        $text .= "4. Нажмите на ссылку конфигурации выше\n";
+        $text .= "5. Нажмите 'Connect'\n\n";
         
         $text .= "❓ Если возникли вопросы, обратитесь к @admin";
 
