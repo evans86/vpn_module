@@ -4,16 +4,20 @@ namespace App\Models\PackSalesman;
 
 use App\Models\Pack\Pack;
 use App\Models\Salesman\Salesman;
+use App\Models\KeyActivate\KeyActivate;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id
  * @property int|null $pack_id
  * @property int|null $salesman_id
  * @property int|null $status
- * @property pack|null $pack
+ * @property Pack|null $pack
+ * @property Salesman|null $salesman
+ * @property KeyActivate[] $keyActivates
  */
 class PackSalesman extends Model
 {
@@ -40,6 +44,14 @@ class PackSalesman extends Model
     public function salesman(): BelongsTo
     {
         return $this->belongsTo(Salesman::class, 'salesman_id');
+    }
+
+    /**
+     * Отношение к ключам активации
+     */
+    public function keyActivates(): HasMany
+    {
+        return $this->hasMany(KeyActivate::class, 'pack_salesman_id');
     }
 
     /**
