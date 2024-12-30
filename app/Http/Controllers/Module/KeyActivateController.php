@@ -122,8 +122,10 @@ class KeyActivateController extends Controller
                 $panelStrategy->deleteServerUser($serverUser->panel->id, $serverUser->id);
             }
 
+            $key->delete();
+            $key->save();
             // Удаляем ключ активации
-            $this->keyActivateRepository->delete($key);
+//            $this->keyActivateRepository->delete($key);
 
             $this->logger->info('Удаление ключа активации', [
                 'source' => 'key_activate',
