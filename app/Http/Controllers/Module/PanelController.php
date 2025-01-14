@@ -117,8 +117,8 @@ class PanelController extends Controller
             // Создаем панель
             $panel = Panel::create([
                 'server_id' => $request['server_id'],
-                'panel_adress' => $validated['panel_adress'],
-                'panel_port' => $validated['panel_port'],
+                'panel_adress' => $request['panel_adress'],
+                'panel_port' => $request['panel_port'],
                 'panel_status' => Panel::PANEL_CREATED
             ]);
 
