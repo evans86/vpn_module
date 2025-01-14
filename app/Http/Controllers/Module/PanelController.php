@@ -106,19 +106,19 @@ class PanelController extends Controller
     public function store(Request $request): RedirectResponse
     {
         try {
-//            $validated = $request->validate([
-//                'server_id' => ['required', 'exists:server,id'],
-//                'panel_adress' => ['required', 'string', 'max:255'],
-//                'panel_port' => ['required', 'integer', 'min:1', 'max:65535'],
-//            ]);
+            $validated = $request->validate([
+                'server_id' => ['required', 'exists:server,id'],
+                'panel_adress' => ['required', 'string', 'max:255'],
+                'panel_port' => ['required', 'integer', 'min:1', 'max:65535'],
+            ]);
 
             DB::beginTransaction();
 
             // Создаем панель
             $panel = Panel::create([
-                'server_id' => $request['server_id'],
-                'panel_adress' => $request['panel_adress'],
-                'panel_port' => $request['panel_port'],
+                'server_id' => $validated['server_id'],
+                'panel_adress' => $validated['panel_adress'],
+                'panel_port' => $validated['panel_port'],
                 'panel_status' => Panel::PANEL_CREATED
             ]);
 
