@@ -34,15 +34,15 @@ class ClearModuleDataCommand extends Command
             Panel::query()->delete();
             $this->info("Удалено панелей: {$panelCount}");
 
-            // Удаляем ключи
-            $keyCount = KeyActivate::count();
-            KeyActivate::query()->delete();
-            $this->info("Удалено ключей: {$keyCount}");
-
-            // Удаляем пакеты продавцов
-            $packageCount = PackSalesman::count();
-            PackSalesman::query()->delete();
-            $this->info("Удалено пакетов: {$packageCount}");
+//            // Удаляем ключи
+//            $keyCount = KeyActivate::count();
+//            KeyActivate::query()->delete();
+//            $this->info("Удалено ключей: {$keyCount}");
+//
+//            // Удаляем пакеты продавцов
+//            $packageCount = PackSalesman::count();
+//            PackSalesman::query()->delete();
+//            $this->info("Удалено пакетов: {$packageCount}");
 
             $this->info('Все данные успешно удалены!');
 
@@ -50,8 +50,8 @@ class ClearModuleDataCommand extends Command
             Log::info('Выполнена очистка данных модуля', [
                 'servers' => $serverCount,
                 'panels' => $panelCount,
-                'keys' => $keyCount,
-                'packages' => $packageCount
+//                'keys' => $keyCount,
+//                'packages' => $packageCount
             ]);
 
         } catch (\Exception $e) {
