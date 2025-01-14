@@ -206,6 +206,7 @@ class KeyActivateRepository extends BaseRepository
         $key->user_tg_id = $userTgId;
         $key->status = $status;
         $key->finish_at = $finishAt;
+        $key->deleted_at = null;
         $key->save();
 
         return $key;
