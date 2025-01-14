@@ -419,7 +419,7 @@ class FatherBotController extends AbstractTelegramBot
         $message .= "🔹 *Продажа доступов:*\n";
         $message .= "1. Привяжите своего бота\n";
         $message .= "2. Начните продавать доступы через своего бота\n\n";
-        $message .= "По всем вопросам обращайтесь в @BOTT_SUPPORT_BOT";
+//        $message .= "По всем вопросам обращайтесь в @BOTT_SUPPORT_BOT";
 
         $this->sendMessage($message);
     }
