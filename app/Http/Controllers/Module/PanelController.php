@@ -106,6 +106,13 @@ class PanelController extends Controller
     public function store(Request $request): RedirectResponse
     {
         try {
+            $this->logger->debug('РЕквест', [
+                'source' => 'panel',
+                'action' => 'store',
+                'user_id' => auth()->id(),
+                'error' => $request
+            ]);
+
             $validated = $request->validate([
                 'server_id' => ['required'],
                 'panel_adress' => ['required'],
