@@ -106,58 +106,120 @@ class PanelController extends Controller
     public function store(Request $request): RedirectResponse
     {
         try {
-            $this->logger->debug('Request data', [
+            $this->logger->info('Creating new panel', [
                 'source' => 'panel',
-                'action' => 'store',
                 'user_id' => auth()->id(),
-                'request_data' => $request->all()
+                'server_id' => $request->input('server_id')
             ]);
 
             $validated = $request->validate([
-                'server_id' => ['required'],
-                'panel_adress' => ['required'],
-                'panel_port' => ['required'],
+                'server_id' => [
+                    'required',
+                    'exists:server,id',
+                    Rule::unique('panel', 'server_id'),
+                    Rule::exists('server', 'id')->where(function ($query) {
+                        $query->where('server_status', Server::SERVER_CONFIGURED);
+                    }),
+                ]
             ]);
 
             DB::beginTransaction();
 
-            // Создаем панель
-            $panel = Panel::create([
-                'server_id' => $validated['server_id'],
-                'panel_adress' => $validated['panel_adress'],
-                'panel_port' => $validated['panel_port'],
-                'panel_status' => Panel::PANEL_CREATED
-            ]);
-
-            $this->logger->info('Создание панели', [
-                'source' => 'panel',
-                'action' => 'store',
-                'user_id' => auth()->id(),
-                'panel_id' => $panel->id
-            ]);
+            // Создаем панель через стратегию
+            $strategy = new PanelStrategy(Panel::MARZBAN);
+            $strategy->create($validated['server_id']);
 
             DB::commit();
 
-            return redirect()
-                ->route('admin.module.panel.index')
-                ->with('success', 'Панель успешно создана');
+            $this->logger->info('Panel created successfully', [
+                'source' => 'panel',
+                'user_id' => auth()->id(),
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'Panel created successfully');
 
         } catch (Exception $e) {
             DB::rollBack();
-
-            $this->logger->error('Ошибка при создании панели', [
+            $this->logger->error('Error creating panel', [
                 'source' => 'panel',
-                'action' => 'store',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'user_id' => auth()->id(),
-                'error' => $e->getMessage()
+                'data' => $request->all()
             ]);
 
-            return redirect()
-                ->back()
-                ->with('error', 'Ошибка при создании панели: ' . $e->getMessage())
-                ->withInput();
+            return redirect()->route('admin.module.panel.index')
+                ->withErrors(['msg' => 'Error creating panel: ' . $e->getMessage()]);
         }
     }
+
+//    /**
+//     * Store a newly created panel.
+//     *
+//     * @param Request $request
+//     * @return RedirectResponse
+//     */
+//    public function store(Request $request): RedirectResponse
+//    {
+//        try {
+//            $this->logger->debug('Request data', [
+//                'source' => 'panel',
+//                'action' => 'store',
+//                'user_id' => auth()->id(),
+//                'request_data' => $request->all()
+//            ]);
+//
+//            $validated = $request->validate([
+//                'server_id' => ['required'],
+////                'panel_adress' => ['required'],
+////                'panel_port' => ['required'],
+//            ]);
+//
+//            $server = Server::find($validated['server_id']);
+//            if (empty($server)) {
+//                return redirect()->back()->with('error', 'Сервер не найден');
+//            }
+//
+//            DB::beginTransaction();
+//
+//            // Создаем панель
+//            $panel = Panel::create([
+//                'server_id' => $validated['server_id'],
+//                'panel_adress' => $validated['panel_adress'],
+//                'panel_port' => $validated['panel_port'],
+//                'panel_status' => Panel::PANEL_CREATED
+//            ]);
+//
+//            $this->logger->info('Создание панели', [
+//                'source' => 'panel',
+//                'action' => 'store',
+//                'user_id' => auth()->id(),
+//                'panel_id' => $panel->id
+//            ]);
+//
+//            DB::commit();
+//
+//            return redirect()
+//                ->route('admin.module.panel.index')
+//                ->with('success', 'Панель успешно создана');
+//
+//        } catch (Exception $e) {
+//            DB::rollBack();
+//
+//            $this->logger->error('Ошибка при создании панели', [
+//                'source' => 'panel',
+//                'action' => 'store',
+//                'user_id' => auth()->id(),
+//                'error' => $e->getMessage()
+//            ]);
+//
+//            return redirect()
+//                ->back()
+//                ->with('error', 'Ошибка при создании панели: ' . $e->getMessage())
+//                ->withInput();
+//        }
+//    }
 
     /**
      * Configure panel.
