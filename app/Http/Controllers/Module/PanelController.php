@@ -107,9 +107,9 @@ class PanelController extends Controller
     {
         try {
             $validated = $request->validate([
-                'server_id' => ['required', 'exists:server,id'],
-                'panel_adress' => ['required', 'string', 'max:255'],
-                'panel_port' => ['required', 'integer', 'min:1', 'max:65535'],
+                'server_id' => ['required'],
+                'panel_adress' => ['required'],
+                'panel_port' => ['required'],
             ]);
 
             DB::beginTransaction();
