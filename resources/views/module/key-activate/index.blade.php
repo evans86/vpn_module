@@ -122,11 +122,11 @@
                                         </td>
                                         <td>
                                             <div class="d-flex align-items-center">
-                                                {{ date('d.m.Y H:i', $key->finish_at) }}
+                                                {{ date('d.m.Y H:i', $key->finish_at) ?? '' }}
                                                 <button class="btn btn-sm btn-link edit-date"
                                                         data-id="{{ $key->id }}"
                                                         data-type="finish_at"
-                                                        data-value="{{ date('d.m.Y H:i', $key->finish_at) ?? '' }}"
+                                                        data-value="{{ date('d.m.Y H:i', $key->finish_at) }}"
                                                         title="Изменить дату">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
@@ -170,7 +170,8 @@
                                         </td>
                                         <td>
                                             <div class="btn-group">
-                                                <button class="btn btn-primary btn-sm dropdown-toggle" type="button" data-toggle="dropdown">
+                                                <button class="btn btn-primary btn-sm dropdown-toggle" type="button"
+                                                        data-toggle="dropdown">
                                                     <i class="fas fa-cog"></i>
                                                 </button>
                                                 <div class="dropdown-menu">
@@ -180,7 +181,8 @@
                                                                 data-key-id="{{ $key->id }}"
                                                                 data-key-traffic="{{ $key->traffic_limit }}"
                                                                 data-key-finish="{{ $key->finish_at }}">
-                                                            <i class="fas fa-exchange-alt"></i> Перенести на другой сервер
+                                                            <i class="fas fa-exchange-alt"></i> Перенести на другой
+                                                            сервер
                                                         </button>
                                                     @endif
                                                     <button type="button"
@@ -276,7 +278,7 @@
         <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
         <script src="https://npmcdn.com/flatpickr/dist/l10n/ru.js"></script>
         <script>
-            $(document).ready(function() {
+            $(document).ready(function () {
                 // Инициализируем bootstrap-select для всех select на странице
                 $('.form-control').selectpicker({
                     style: 'btn-light',
@@ -287,7 +289,7 @@
 
                 // Инициализация Clipboard.js
                 var clipboard = new ClipboardJS('[data-clipboard-text]');
-                clipboard.on('success', function(e) {
+                clipboard.on('success', function (e) {
                     e.clearSelection();
                 });
 
@@ -295,7 +297,7 @@
                 flatpickr.localize(flatpickr.l10ns.ru);
 
                 // Обработчик клика по кнопке редактирования даты
-                $(document).on('click', '.edit-date', function(e) {
+                $(document).on('click', '.edit-date', function (e) {
                     e.preventDefault();
                     const button = $(this);
                     const id = button.data('id');
@@ -308,7 +310,7 @@
 
                     // Заменяем текст даты на поле ввода
                     const container = button.parent();
-                    const originalText = container.contents().filter(function() {
+                    const originalText = container.contents().filter(function () {
                         return this.nodeType === 3;
                     }).first();
                     originalText.replaceWith(input);
@@ -318,7 +320,7 @@
                         enableTime: true,
                         dateFormat: "d.m.Y H:i",
                         defaultDate: currentValue,
-                        onClose: function(selectedDates, dateStr) {
+                        onClose: function (selectedDates, dateStr) {
                             if (selectedDates.length > 0) {
                                 // Отправляем запрос на обновление даты
                                 $.ajax({
@@ -332,7 +334,7 @@
                                         type: type,
                                         value: Math.floor(selectedDates[0].getTime() / 1000)
                                     },
-                                    success: function(response) {
+                                    success: function (response) {
                                         if (response.success) {
                                             // Обновляем отображаемую дату
                                             input.replaceWith(dateStr);
@@ -343,7 +345,7 @@
                                             input.replaceWith(currentValue);
                                         }
                                     },
-                                    error: function() {
+                                    error: function () {
                                         alert('Ошибка при обновлении даты');
                                         input.replaceWith(currentValue);
                                     }
@@ -359,7 +361,7 @@
                 });
 
                 // Обработчик клика по кнопке переноса
-                $(document).on('click', '.btn-transfer-key', function() {
+                $(document).on('click', '.btn-transfer-key', function () {
                     const keyId = $(this).data('key-id');
                     console.log('Key ID:', keyId);
 
@@ -376,7 +378,7 @@
                         data: {
                             key_id: keyId
                         },
-                        success: function(response) {
+                        success: function (response) {
                             console.log('Response:', response);
                             const panels = response.panels || [];
 
@@ -389,7 +391,7 @@
                             select.append('<option value="">Выберите сервер</option>');
 
                             if (panels.length > 0) {
-                                panels.forEach(function(panel) {
+                                panels.forEach(function (panel) {
                                     console.log('Adding panel:', panel);
                                     const serverName = panel.server_name || 'Неизвестный сервер';
                                     const address = panel.address || '';
@@ -423,7 +425,7 @@
                                 alert('Нет доступных серверов для переноса');
                             }
                         },
-                        error: function(xhr) {
+                        error: function (xhr) {
                             console.error('Error:', xhr);
                             alert('Ошибка при загрузке списка серверов: ' + (xhr.responseJSON?.message || 'Неизвестная ошибка'));
                         }
@@ -431,7 +433,7 @@
                 });
 
                 // Обработчик отправки формы переноса
-                $('#transfer-key-form').on('submit', function(e) {
+                $('#transfer-key-form').on('submit', function (e) {
                     e.preventDefault();
 
                     const keyId = $('#transfer-key-id').val();
@@ -459,16 +461,16 @@
                             key_id: keyId,
                             target_panel_id: targetPanelId
                         },
-                        success: function(response) {
+                        success: function (response) {
                             $('#transferKeyModal').modal('hide');
                             alert('Ключ успешно перенесен на новый сервер');
                             location.reload();
                         },
-                        error: function(xhr) {
+                        error: function (xhr) {
                             console.error('Transfer error:', xhr);
                             alert('Ошибка при переносе ключа: ' + (xhr.responseJSON?.message || 'Неизвестная ошибка'));
                         },
-                        complete: function() {
+                        complete: function () {
                             // Разблокируем кнопку и скрываем спиннер
                             submitBtn.prop('disabled', false);
                             spinner.addClass('d-none');
@@ -477,7 +479,7 @@
                 });
 
                 // Обработчик удаления ключа
-                $(document).on('click', '.delete-key', function(e) {
+                $(document).on('click', '.delete-key', function (e) {
                     e.preventDefault();
                     const id = $(this).data('id');
 
@@ -488,10 +490,10 @@
                             headers: {
                                 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                             },
-                            success: function() {
+                            success: function () {
                                 location.reload();
                             },
-                            error: function(xhr) {
+                            error: function (xhr) {
                                 alert('Ошибка при удалении ключа');
                             }
                         });
