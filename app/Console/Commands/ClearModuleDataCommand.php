@@ -25,31 +25,31 @@ class ClearModuleDataCommand extends Command
 
         try {
             // Удаляем серверы
-            $serverCount = Server::count();
-            Server::query()->where('server_status', [Server::SERVER_ERROR, Server::SERVER_CONFIGURED])->delete();
-            $this->info("Удалено серверов: {$serverCount}");
-
-            // Удаляем панели
-            $panelCount = Panel::count();
-            Panel::query()->where('server_status', [Panel::PANEL_CONFIGURED, Panel::PANEL_ERROR])->delete();
-            $this->info("Удалено панелей: {$panelCount}");
+//            $serverCount = Server::count();
+//            Server::query()->where('server_status', [Server::SERVER_ERROR, Server::SERVER_CONFIGURED])->delete();
+//            $this->info("Удалено серверов: {$serverCount}");
+//
+//            // Удаляем панели
+//            $panelCount = Panel::count();
+//            Panel::query()->where('server_status', [Panel::PANEL_CONFIGURED, Panel::PANEL_ERROR])->delete();
+//            $this->info("Удалено панелей: {$panelCount}");
 
 //            // Удаляем ключи
-//            $keyCount = KeyActivate::count();
-//            KeyActivate::query()->delete();
-//            $this->info("Удалено ключей: {$keyCount}");
+            $keyCount = KeyActivate::count();
+            KeyActivate::query()->delete();
+            $this->info("Удалено ключей: {$keyCount}");
 //
 //            // Удаляем пакеты продавцов
-//            $packageCount = PackSalesman::count();
-//            PackSalesman::query()->delete();
-//            $this->info("Удалено пакетов: {$packageCount}");
+            $packageCount = PackSalesman::count();
+            PackSalesman::query()->delete();
+            $this->info("Удалено пакетов: {$packageCount}");
 
             $this->info('Все данные успешно удалены!');
 
             // Логируем успешное удаление
             Log::info('Выполнена очистка данных модуля', [
-                'servers' => $serverCount,
-                'panels' => $panelCount,
+//                'servers' => $serverCount,
+//                'panels' => $panelCount,
 //                'keys' => $keyCount,
 //                'packages' => $packageCount
             ]);
