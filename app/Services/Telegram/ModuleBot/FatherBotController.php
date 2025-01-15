@@ -220,16 +220,30 @@ class FatherBotController extends AbstractTelegramBot
             $pack = $packSalesman->pack;
             $keys = $packSalesman->keyActivates;
 
+            // Основная информация о пакете
             $message = "<b>📦 Информация о пакете:</b>\n\n";
-            $message .= "💾 Трафик: " . number_format($pack->traffic_limit / (1024*1024*1024), 1) . " GB\n";
+            $message .= "💾 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
             $message .= "⏱ Период: {$pack->period} дней\n\n";
 
-            $message .= "<b>🔑 Ключи активации:</b>\n";
-            foreach ($keys as $index => $key) {
-                $status = $key->user_tg_id ? "✅ Активирован" : "⚪️ Не активирован";
-                $message .= ($index + 1) . ". <code>{$key->id}</code> - {$status}\n";
+            // Отправляем основную информацию о пакете
+            $this->sendMessage($message);
+
+            // Отправляем ключи частями
+            $chunkSize = 50; // Количество ключей в одном сообщении
+            $keyChunks = $keys->chunk($chunkSize);
+
+            foreach ($keyChunks as $index => $chunk) {
+                $keyMessage = "<b>🔑 Ключи активации (часть " . ($index + 1) . "):</b>\n";
+                foreach ($chunk as $keyIndex => $key) {
+                    $status = $key->user_tg_id ? "✅ Активирован" : "⚪️ Не активирован";
+                    $keyMessage .= ($keyIndex + 1 + ($index * $chunkSize)) . ". <code>{$key->id}</code> - {$status}\n";
+                }
+
+                // Отправляем часть ключей
+                $this->sendMessage($keyMessage);
             }
 
+            // Кнопка для выгрузки ключей в .txt файл
             $keyboard = [
                 'inline_keyboard' => [
                     [
@@ -244,7 +258,8 @@ class FatherBotController extends AbstractTelegramBot
                 ]
             ];
 
-            $this->sendMessage($message, $keyboard);
+            // Отправляем кнопку после всех ключей
+            $this->sendMessage("Вы можете выгрузить все ключи в .txt файл:", $keyboard);
         } catch (\Exception $e) {
             Log::error('Error in showPackDetails: ' . $e->getMessage());
             $this->sendErrorMessage();
