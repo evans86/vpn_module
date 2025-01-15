@@ -253,8 +253,28 @@ class FatherBotController extends AbstractTelegramBot
                 $this->sendMessage($message, $keyboard);
             } else {
                 // Если сообщение слишком длинное, разбиваем на части
-                $this->sendMessage($message); // Отправляем информацию о пакете и ключи
-                $this->sendMessage("Вы можете выгрузить все ключи в .txt файл:", $keyboard); // Отправляем кнопку отдельно
+                $this->sendMessage("<b>📦 Информация о пакете:</b>\n\n💾 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n⏱ Период: {$pack->period} дней\n\n");
+
+                // Отправляем ключи частями
+                $chunkSize = 50; // Количество ключей в одном сообщении
+                $keyChunks = $keys->chunk($chunkSize);
+
+                $globalIndex = 1; // Глобальный счетчик для сквозной нумерации
+
+                foreach ($keyChunks as $index => $chunk) {
+                    $keyMessage = "<b>🔑 Ключи активации (часть " . ($index + 1) . "):</b>\n";
+                    foreach ($chunk as $key) {
+                        $status = $key->user_tg_id ? "✅ Активирован" : "⚪️ Не активирован";
+                        $keyMessage .= $globalIndex . ". <code>{$key->id}</code> - {$status}\n";
+                        $globalIndex++; // Увеличиваем глобальный счетчик
+                    }
+
+                    // Отправляем часть ключей
+                    $this->sendMessage($keyMessage);
+                }
+
+                // Отправляем кнопку после всех ключей
+                $this->sendMessage("Вы можете выгрузить все ключи в .txt файл:", $keyboard);
             }
         } catch (\Exception $e) {
             Log::error('Error in showPackDetails: ' . $e->getMessage());
