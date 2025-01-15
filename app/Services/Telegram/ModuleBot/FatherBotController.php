@@ -512,7 +512,7 @@ class FatherBotController extends AbstractTelegramBot
     /**
      * Toggle bot active status
      */
-    private function toggleBot(): void
+    private function toggleBot(int $messageId): void
     {
         try {
             $salesman = Salesman::where('telegram_id', $this->chatId)->first();
@@ -521,14 +521,11 @@ class FatherBotController extends AbstractTelegramBot
                 return;
             }
 
-            // Меняем статус бота
             $salesman->bot_active = !$salesman->bot_active;
             $salesman->save();
 
-            // Обновляем сообщение с информацией о боте
-            $this->showBotInfo();
+            $this->showBotInfo($messageId);
 
-            // Отправляем уведомление
             $status = $salesman->bot_active ? "включен 🟢" : "отключен 🔴";
             $this->sendMessage("✅ Бот успешно " . $status);
         } catch (Exception $e) {
