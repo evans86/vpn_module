@@ -134,12 +134,12 @@ class MarzbanAPI
                         'vless' => [
                             "id" => Str::uuid()->toString()
                         ],
-                        'trojan' => [
-                            "password" => '81zjetwO-EmHho0NL2vtlQ'
-                        ],
-                        'shadowsocks' => [
-                            "password" => 'I2kb7nKrAcSX_1QynDf_wQ'
-                        ]
+//                        'trojan' => [
+//
+//                        ],
+//                        'shadowsocks' => [
+//
+//                        ]
                     ]
                 ],
                 'verify' => false // Отключаем проверку SSL сертификата
