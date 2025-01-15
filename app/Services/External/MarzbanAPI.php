@@ -130,15 +130,15 @@ class MarzbanAPI
                         "vmess" => [
                             "id" => "35e4e39c-7d5c-4f4b-8b71-558e4f37ff53"
                         ],
-//                        'vless' => [
-//
-//                        ],
-//                        'trojan' => [
-//
-//                        ],
-//                        'shadowsocks' => [
-//
-//                        ]
+                        'vless' => [
+
+                        ],
+                        'trojan' => [
+
+                        ],
+                        'shadowsocks' => [
+
+                        ]
                     ]
                 ],
                 'verify' => false // Отключаем проверку SSL сертификата
