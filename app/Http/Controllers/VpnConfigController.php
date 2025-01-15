@@ -66,7 +66,7 @@ class VpnConfigController extends Controller
                 'username' => $serverUser->id,
                 'status' => $serverUser->status ?? 'active',
                 'data_limit' => $keyActivateUser->keyActivate->traffic_limit ?? 0,
-                'data_used' => $info['used_traffic'] ?? 0,
+                'data_used' => $info['used_traffic'],
                 'expiration_date' => $keyActivateUser->keyActivate->finish_at ?? null,
                 'days_remaining' => $keyActivateUser->keyActivate->finish_at
                     ? ceil(($keyActivateUser->keyActivate->finish_at - time()) / 86400)
