@@ -61,14 +61,12 @@ class VpnConfigController extends Controller
                 'error' => $info
             ]);
 
-            $data_used = 10;
-
             // Для браузера показываем HTML страницу
             $userInfo = [
                 'username' => $serverUser->id,
                 'status' => $serverUser->status ?? 'active',
                 'data_limit' => $keyActivateUser->keyActivate->traffic_limit ?? 0,
-                'data_used' => $serverUser->used_traffic ?? 0,
+                'data_used' => $info['used_traffic'] ?? 0,
                 'expiration_date' => $keyActivateUser->keyActivate->finish_at ?? null,
                 'days_remaining' => $keyActivateUser->keyActivate->finish_at
                     ? ceil(($keyActivateUser->keyActivate->finish_at - time()) / 86400)
