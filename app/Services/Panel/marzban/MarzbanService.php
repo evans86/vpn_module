@@ -541,9 +541,11 @@ class MarzbanService
             $userId = Str::uuid();
 
             $userData = $marzbanApi->createUser($panel->auth_token, $userId, $data_limit, $expire);
+
             Log::debug('LINKS server user', [
                 'userData' => $userData
             ]);
+
             if (empty($userData['links'])) {
                 throw new RuntimeException('Failed to get user links from Marzban API');
             }
