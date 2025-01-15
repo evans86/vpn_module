@@ -36,6 +36,17 @@ class PanelStrategy
     }
 
     /**
+     * @param int $panel_id
+     * @param string $user_id
+     * @return array
+     * @throws GuzzleException
+     */
+    public function getSubscribeInfo(int $panel_id, string $user_id): array
+    {
+        return $this->strategy->getSubscribeInfo($panel_id, $user_id);
+    }
+
+    /**
      * Обновление конфига панели
      *
      * @param int $panel_id

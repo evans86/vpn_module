@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\KeyActivateUser\KeyActivateUserRepository;
+use App\Services\Panel\PanelStrategy;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -52,6 +53,15 @@ class VpnConfigController extends Controller
                 return response(implode("\n", $connectionKeys))
                     ->header('Content-Type', 'text/plain');
             }
+
+            $panel_strategy = new PanelStrategy($serverUser->panel->panel);
+            $info = $panel_strategy->getSubscribeInfo($serverUser->panel->id, $serverUser->id);
+
+            Log::info('SHOW INFO MARZ', [
+                'error' => $info
+            ]);
+
+            $data_used = 10;
 
             // Для браузера показываем HTML страницу
             $userInfo = [

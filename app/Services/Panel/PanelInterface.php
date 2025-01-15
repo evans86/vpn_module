@@ -50,4 +50,11 @@ interface PanelInterface
      * @return void
      */
     public function deleteServerUser(int $panel_id, string $user_id): void;
+
+    /**
+     * @param int $panel_id
+     * @param string $user_id
+     * @return array
+     */
+    public function getSubscribeInfo(int $panel_id, string $user_id): array;
 }

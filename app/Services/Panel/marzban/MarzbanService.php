@@ -254,6 +254,42 @@ class MarzbanService
     }
 
     /**
+     * @throws GuzzleException
+     * @throws Exception
+     */
+    public function getUserSubscribeInfo(int $panel_id, string $user_id): array
+    {
+        Log::info('Checking user subscribe info', ['panel_id' => $panel_id, 'user_id' => $user_id]);
+
+        try {
+            $panel = $this->updateMarzbanToken($panel_id);
+            $marzbanApi = new MarzbanAPI($panel->api_address);
+            $userData = $marzbanApi->getUser($panel->auth_token, $user_id);
+
+            $info = [
+                'used_traffic' => $userData['used_traffic'],
+                'expire' => $userData['expire'],
+            ];
+//            $timeOnline = strtotime($userData['online_at']);
+//            $status = $this->determineUserStatus($timeOnline);
+
+            Log::info('User subscribe info', [
+                'panel_id' => $panel_id,
+                'user_id' => $user_id
+            ]);
+
+            return $info;
+        } catch (Exception $e) {
+            Log::error('Failed to check user status', [
+                'panel_id' => $panel_id,
+                'user_id' => $user_id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
      * Проверка онлайн статуса пользователя
      *
      * @param int $panel_id
