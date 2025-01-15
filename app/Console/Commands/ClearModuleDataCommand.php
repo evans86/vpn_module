@@ -26,12 +26,12 @@ class ClearModuleDataCommand extends Command
         try {
             // Удаляем серверы
             $serverCount = Server::count();
-            Server::query()->delete();
+            Server::query()->where('server_status', [Server::SERVER_ERROR, Server::SERVER_CONFIGURED])->delete();
             $this->info("Удалено серверов: {$serverCount}");
 
             // Удаляем панели
             $panelCount = Panel::count();
-            Panel::query()->delete();
+            Panel::query()->where('server_status', [Panel::PANEL_CONFIGURED, Panel::PANEL_ERROR])->delete();
             $this->info("Удалено панелей: {$panelCount}");
 
 //            // Удаляем ключи
