@@ -144,13 +144,15 @@
                                         <td>
                                             <div class="d-flex align-items-center">
                                                 {{ $key->deleted_at ? date('d.m.Y H:i', $key->deleted_at) : '' }}
-                                                <button class="btn btn-sm btn-link edit-date"
-                                                        data-id="{{ $key->id }}"
-                                                        data-type="deleted_at"
-                                                        data-value="{{ date('d.m.Y H:i', $key->deleted_at) }}"
-                                                        title="Изменить дату">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
+                                                @if($key->deleted_at)
+                                                    <button class="btn btn-sm btn-link edit-date"
+                                                            data-id="{{ $key->id }}"
+                                                            data-type="deleted_at"
+                                                            data-value="{{ date('d.m.Y H:i', $key->deleted_at) }}"
+                                                            title="Изменить дату">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                @endif
                                             </div>
                                         </td>
                                         <td>
