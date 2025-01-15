@@ -727,7 +727,7 @@ class MarzbanService
             $newUser = $targetMarzbanApi->createUser(
                 $targetPanel->auth_token,
                 $serverUser->id,
-                    $userData['data_limit'] ?? 0,
+                    $userData['data_limit'] - $userData['used_traffic'] ?? 0,
                     $userData['expire'] ?? 0
             );
 
