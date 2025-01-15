@@ -271,6 +271,7 @@ class MarzbanService
             $info = [
                 'used_traffic' => $userData['used_traffic'],
                 'expire' => $userData['expire'],
+                'status' => $userData['status'],
             ];
 
             Log::info('User subscribe info', [

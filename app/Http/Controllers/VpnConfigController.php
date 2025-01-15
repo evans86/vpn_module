@@ -64,7 +64,7 @@ class VpnConfigController extends Controller
             // Для браузера показываем HTML страницу
             $userInfo = [
                 'username' => $serverUser->id,
-                'status' => $serverUser->status ?? 'active',
+                'status' => $info['status'],
                 'data_limit' => $keyActivateUser->keyActivate->traffic_limit ?? 0,
                 'data_used' => $info['used_traffic'],
                 'expiration_date' => $keyActivateUser->keyActivate->finish_at ?? null,
