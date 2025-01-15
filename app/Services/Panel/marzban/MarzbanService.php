@@ -344,7 +344,7 @@ class MarzbanService
 
             // Удаляем запись из БД
             $serverUser = ServerUser::query()->where('id', $user_id)->firstOrFail();
-            
+
             // Удаляем связанную запись KeyActivateUser
             if ($serverUser->keyActivateUser) {
                 Log::info('Deleting KeyActivateUser', ['key_activate_user_id' => $serverUser->keyActivateUser->id]);
@@ -541,6 +541,9 @@ class MarzbanService
             $userId = Str::uuid();
 
             $userData = $marzbanApi->createUser($panel->auth_token, $userId, $data_limit, $expire);
+            Log::debug('LINKS server user', [
+                'userData' => $userData
+            ]);
             if (empty($userData['links'])) {
                 throw new RuntimeException('Failed to get user links from Marzban API');
             }
