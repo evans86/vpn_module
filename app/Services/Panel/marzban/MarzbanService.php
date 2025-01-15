@@ -266,12 +266,12 @@ class MarzbanService
             $marzbanApi = new MarzbanAPI($panel->api_address);
             $userData = $marzbanApi->getUser($panel->auth_token, $user_id);
 
+            Log::debug('Checking USERDATA', ['data' => $userData]);
+
             $info = [
                 'used_traffic' => $userData['used_traffic'],
                 'expire' => $userData['expire'],
             ];
-//            $timeOnline = strtotime($userData['online_at']);
-//            $status = $this->determineUserStatus($timeOnline);
 
             Log::info('User subscribe info', [
                 'panel_id' => $panel_id,
