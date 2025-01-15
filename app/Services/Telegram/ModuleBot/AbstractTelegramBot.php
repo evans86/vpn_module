@@ -195,6 +195,53 @@ abstract class AbstractTelegramBot
     }
 
     /**
+     * Редактирование сообщения
+     *
+     * @param string $text
+     * @param mixed $keyboard
+     * @param int|null $messageId
+     */
+    public function editMessage(string $text, $keyboard = null, ?int $messageId = null): void
+    {
+        try {
+            Log::debug('Editing message', [
+                'chat_id' => $this->chatId,
+                'message_id' => $messageId,
+                'text' => $text,
+                'keyboard' => $keyboard
+            ]);
+
+            $params = [
+                'chat_id' => $this->chatId,
+                'message_id' => $messageId,
+                'text' => $text,
+                'parse_mode' => 'HTML'
+            ];
+
+            if ($keyboard !== null) {
+                if (is_array($keyboard)) {
+                    if (isset($keyboard['reply_markup'])) {
+                        $params['reply_markup'] = $keyboard['reply_markup'];
+                    } else {
+                        $params['reply_markup'] = json_encode($keyboard);
+                    }
+                } elseif ($keyboard instanceof Keyboard) {
+                    $params['reply_markup'] = json_encode($keyboard->toArray());
+                }
+            }
+
+            $response = $this->telegram->editMessageText($params);
+            Log::debug('Message edited', ['response' => $response]);
+        } catch (Exception $e) {
+            Log::error('Edit message error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'trace' => $e->getTraceAsString(),
+                'params' => $params ?? null
+            ]);
+        }
+    }
+
+    /**
      * Базовый error
      */
     protected function sendErrorMessage(): void

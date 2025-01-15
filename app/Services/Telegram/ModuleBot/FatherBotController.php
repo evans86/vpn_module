@@ -99,6 +99,8 @@ class FatherBotController extends AbstractTelegramBot
                 return;
             }
 
+            $messageId = $this->update->getCallbackQuery()->getMessage()->getMessageId();
+
             switch ($params['action']) {
                 case 'change_bot':
                     $this->initiateBotChange();
@@ -117,7 +119,7 @@ class FatherBotController extends AbstractTelegramBot
                     $this->showPacksList();
                     break;
                 case 'toggle_bot':
-                    $this->toggleBot();
+                    $this->toggleBot($messageId);
                     break;
                 default:
                     Log::warning('Unknown callback action', [
@@ -458,7 +460,7 @@ class FatherBotController extends AbstractTelegramBot
     /**
      * Показать информацию о боте
      */
-    protected function showBotInfo(): void
+    protected function showBotInfo(?int $messageId = null): void
     {
         try {
             $salesman = Salesman::where('telegram_id', $this->chatId)->first();
@@ -479,7 +481,6 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "🔗 Ваш бот: $salesman->bot_link\n";
             $message .= "✅ Статус: " . ($salesman->bot_active ? "Активен" : "Отключен") . "\n\n";
 
-            // Добавляем инлайн-кнопки для управления ботом
             $keyboard = [
                 'inline_keyboard' => [
                     [
@@ -497,7 +498,11 @@ class FatherBotController extends AbstractTelegramBot
                 ]
             ];
 
-            $this->sendMessage($message, $keyboard);
+            if ($messageId) {
+                $this->editMessage($message, $keyboard, $messageId);
+            } else {
+                $this->sendMessage($message, $keyboard);
+            }
         } catch (\Exception $e) {
             Log::error('Show bot info error: ' . $e->getMessage());
             $this->sendErrorMessage();
