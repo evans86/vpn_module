@@ -135,10 +135,10 @@ class MarzbanAPI
                             "id" => Str::uuid()->toString()
                         ],
                         'trojan' => [
-
+                            "password" => '81zjetwO-EmHho0NL2vtlQ'
                         ],
                         'shadowsocks' => [
-
+                            "password" => 'I2kb7nKrAcSX_1QynDf_wQ'
                         ]
                     ]
                 ],
