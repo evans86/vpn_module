@@ -527,7 +527,7 @@ class FatherBotController extends AbstractTelegramBot
             $this->showBotInfo($messageId);
 
             $status = $salesman->bot_active ? "включен 🟢" : "отключен 🔴";
-            $this->sendMessage("✅ Бот успешно " . $status);
+//            $this->sendMessage("✅ Бот успешно " . $status);
         } catch (Exception $e) {
             Log::error('Toggle bot error: ' . $e->getMessage());
             $this->sendErrorMessage();
