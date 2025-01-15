@@ -126,7 +126,7 @@
                                                 <button class="btn btn-sm btn-link edit-date"
                                                         data-id="{{ $key->id }}"
                                                         data-type="finish_at"
-                                                        data-value="{{ date('d.m.Y H:i', $key->finish_at) }}"
+                                                        data-value="{{ date('d.m.Y H:i', $key->finish_at) ?? '' }}"
                                                         title="Изменить дату">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
@@ -293,7 +293,7 @@
 
                 // Инициализация Flatpickr для всех полей с датами
                 flatpickr.localize(flatpickr.l10ns.ru);
-                
+
                 // Обработчик клика по кнопке редактирования даты
                 $(document).on('click', '.edit-date', function(e) {
                     e.preventDefault();
@@ -301,18 +301,18 @@
                     const id = button.data('id');
                     const type = button.data('type');
                     const currentValue = button.data('value');
-                    
+
                     // Создаем временное поле ввода
                     const input = $('<input type="text" class="form-control form-control-sm d-inline-block" style="width: 150px;">');
                     input.val(currentValue);
-                    
+
                     // Заменяем текст даты на поле ввода
                     const container = button.parent();
                     const originalText = container.contents().filter(function() {
                         return this.nodeType === 3;
                     }).first();
                     originalText.replaceWith(input);
-                    
+
                     // Инициализируем Flatpickr для поля ввода
                     const fp = flatpickr(input[0], {
                         enableTime: true,
@@ -353,7 +353,7 @@
                             }
                         }
                     });
-                    
+
                     // Открываем календарь
                     fp.open();
                 });
@@ -379,15 +379,15 @@
                         success: function(response) {
                             console.log('Response:', response);
                             const panels = response.panels || [];
-                            
+
                             // Очищаем и заполняем select опциями
                             const select = $('#target-panel-select');
                             console.log('Select element:', select.length ? 'Found' : 'Not found');
                             console.log('Panels to add:', panels);
-                            
+
                             select.empty();
                             select.append('<option value="">Выберите сервер</option>');
-                            
+
                             if (panels.length > 0) {
                                 panels.forEach(function(panel) {
                                     console.log('Adding panel:', panel);
@@ -401,7 +401,7 @@
 
                                 // Проверяем количество опций после добавления
                                 console.log('Total options after adding:', select.find('option').length);
-                                
+
                                 // Инициализируем bootstrap-select
                                 select.selectpicker('destroy');
                                 select.selectpicker({
@@ -410,10 +410,10 @@
                                     liveSearch: true,
                                     width: '100%'
                                 });
-                                
+
                                 // Показываем модальное окно
                                 $('#transferKeyModal').modal('show');
-                                
+
                                 // Проверяем HTML после показа модального окна
                                 setTimeout(() => {
                                     console.log('Modal HTML after show:', $('#transferKeyModal').html());
@@ -433,10 +433,10 @@
                 // Обработчик отправки формы переноса
                 $('#transfer-key-form').on('submit', function(e) {
                     e.preventDefault();
-                    
+
                     const keyId = $('#transfer-key-id').val();
                     const targetPanelId = $('#target-panel-select').val();
-                    
+
                     if (!targetPanelId) {
                         alert('Пожалуйста, выберите сервер для переноса');
                         return;
@@ -444,7 +444,7 @@
 
                     const spinner = $(this).find('.spinner-border');
                     const submitBtn = $(this).find('button[type="submit"]');
-                    
+
                     // Блокируем кнопку и показываем спиннер
                     submitBtn.prop('disabled', true);
                     spinner.removeClass('d-none');
