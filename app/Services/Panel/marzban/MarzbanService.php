@@ -103,11 +103,14 @@ class MarzbanService
                 // Скачиваем скрипт установки
                 'wget -q -O /tmp/install_marzban.sh https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh',
 
+                // Изменяем переменную FILES_URL_PREFIX в скрипте на v0.7.0
+                'sed -i \'s|FILES_URL_PREFIX="https://raw.githubusercontent.com/Gozargah/Marzban/master"|FILES_URL_PREFIX="https://raw.githubusercontent.com/Gozargah/Marzban/v0.7.0"|g\' /tmp/install_marzban.sh',
+
                 // Делаем скрипт исполняемым
                 'chmod +x /tmp/install_marzban.sh',
 
-                // Запускаем скрипт с параметрами
-                '/tmp/install_marzban.sh install --version v0.7.0 --host ' . escapeshellarg($host)
+                // Запускаем скрипт с указанием домена
+                '/tmp/install_marzban.sh ' . escapeshellarg($host)
             ];
 
             // Выполняем команды
