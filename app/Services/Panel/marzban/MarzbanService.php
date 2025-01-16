@@ -98,12 +98,23 @@ class MarzbanService
         try {
             Log::info('Installing panel', ['host' => $host]);
 
+            // Команды для установки
             $commands = [
-                'wget ' . self::INSTALL_SCRIPT_URL,
+                // Скачиваем скрипт
+                'wget ' . self::INSTALL_SCRIPT_URL . ' -O install_marzban.sh',
+
+                // Изменяем скрипт на лету (меняем версию на v0.7.0)
+                'sed -i \'s|https://raw.githubusercontent.com/Gozargah/Marzban/master|https://raw.githubusercontent.com/Gozargah/Marzban/v0.7.0|g\' install_marzban.sh',
+                'sed -i \'s|https://github.com/$FETCH_REPO/raw/master/marzban.sh|https://github.com/$FETCH_REPO/raw/v0.7.0/marzban.sh|g\' install_marzban.sh',
+
+                // Делаем скрипт исполняемым
                 'chmod +x install_marzban.sh',
+
+                // Запускаем скрипт
                 './install_marzban.sh ' . $host
             ];
 
+            // Выполняем команды
             foreach ($commands as $command) {
                 $result = $ssh->exec($command);
                 Log::debug('Command executed', ['command' => $command, 'result' => $result]);
