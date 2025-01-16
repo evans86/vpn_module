@@ -98,12 +98,22 @@ class MarzbanService
         try {
             Log::info('Installing panel', ['host' => $host]);
 
+            // Команды для установки
             $commands = [
-                'wget ' . self::INSTALL_SCRIPT_URL,
-                'chmod +x install_marzban.sh',
-                './install_marzban.sh ' . $host
+                // Скачиваем скрипт установки
+                'wget ' . self::INSTALL_SCRIPT_URL . ' -O /tmp/install_marzban.sh',
+
+                // Изменяем переменную FILES_URL_PREFIX в скрипте на v0.7.0
+                'sed -i \'s|FILES_URL_PREFIX="https://raw.githubusercontent.com/Gozargah/Marzban/master"|FILES_URL_PREFIX="https://raw.githubusercontent.com/Gozargah/Marzban/v0.7.0"|g\' /tmp/install_marzban.sh',
+
+                // Делаем скрипт исполняемым
+                'chmod +x /tmp/install_marzban.sh',
+
+                // Запускаем скрипт с указанием домена
+                '/tmp/install_marzban.sh ' . escapeshellarg($host)
             ];
 
+            // Выполняем команды
             foreach ($commands as $command) {
                 $result = $ssh->exec($command);
                 Log::debug('Command executed', ['command' => $command, 'result' => $result]);
@@ -112,6 +122,8 @@ class MarzbanService
                     throw new RuntimeException("Command failed: $command");
                 }
             }
+
+            Log::info('Panel installed successfully', ['host' => $host]);
         } catch (Exception $e) {
             Log::error('Panel installation failed', [
                 'host' => $host,
