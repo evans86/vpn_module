@@ -113,14 +113,10 @@ class MarzbanService
             // Выполняем команды
             foreach ($commands as $command) {
                 $result = $ssh->exec($command);
-                Log::debug('Command executed', ['command' => $command, 'result' => $result]);
+                $errorOutput = $ssh->getStdError(); // Получаем вывод ошибок
+                Log::debug('Command executed', ['command' => $command, 'result' => $result, 'error' => $errorOutput]);
 
                 if ($ssh->getExitStatus() !== 0) {
-                    $errorOutput = $ssh->getStdError(); // Получаем вывод ошибок
-                    Log::error('Command failed', [
-                        'command' => $command,
-                        'error' => $errorOutput
-                    ]);
                     throw new RuntimeException("Command failed: $command. Error: $errorOutput");
                 }
             }
