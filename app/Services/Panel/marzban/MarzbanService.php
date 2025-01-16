@@ -98,16 +98,31 @@ class MarzbanService
         try {
             Log::info('Installing panel', ['host' => $host]);
 
-            // Команда для установки Marzban с указанием версии
-            $command = 'bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install --version v0.7.0 --host ' . escapeshellarg($host);
+            // Команды для установки
+            $commands = [
+                // Скачиваем скрипт
+                'curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh -o /tmp/marzban.sh',
 
-            // Выполняем команду
-            $result = $ssh->exec($command);
-            Log::debug('Command executed', ['command' => $command, 'result' => $result]);
+                // Делаем скрипт исполняемым
+                'chmod +x /tmp/marzban.sh',
 
-            // Проверяем статус выполнения команды
-            if ($ssh->getExitStatus() !== 0) {
-                throw new RuntimeException("Command failed: $command");
+                // Запускаем скрипт с параметрами
+                '/tmp/marzban.sh install --version v0.7.0 --host ' . escapeshellarg($host)
+            ];
+
+            // Выполняем команды
+            foreach ($commands as $command) {
+                $result = $ssh->exec($command);
+                Log::debug('Command executed', ['command' => $command, 'result' => $result]);
+
+                if ($ssh->getExitStatus() !== 0) {
+                    $errorOutput = $ssh->getStdError(); // Получаем вывод ошибок
+                    Log::error('Command failed', [
+                        'command' => $command,
+                        'error' => $errorOutput
+                    ]);
+                    throw new RuntimeException("Command failed: $command. Error: $errorOutput");
+                }
             }
 
             Log::info('Panel installed successfully', ['host' => $host]);
@@ -726,8 +741,8 @@ class MarzbanService
             $newUser = $targetMarzbanApi->createUser(
                 $targetPanel->auth_token,
                 $serverUser->id,
-                    $userData['data_limit'] - $userData['used_traffic'] ?? 0,
-                    $userData['expire'] ?? 0
+                $userData['data_limit'] - $userData['used_traffic'] ?? 0,
+                $userData['expire'] ?? 0
             );
 
             // 3. Обновляем данные в БД
