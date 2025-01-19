@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Module;
 
+use App\Console\Commands\TelegramWebhookCommand;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -44,7 +45,6 @@ class BotController extends Controller
                 Artisan::call('config:clear');
 
                 // Обновляем webhook с новым токеном
-                $telegram = new Api($token);
 
                 // Используем правильный URL для webhook из конфигурации
                 $webhookUrl = config('telegram.father_bot.webhook_url');
@@ -54,8 +54,9 @@ class BotController extends Controller
                     $webhookUrl = config('app.url') . '/api/telegram/father-bot/' . $token . '/init';
                 }
 
+                $telegram = new TelegramWebhookCommand();
                 // Устанавливаем webhook
-                $telegram->setWebhook(['url' => $webhookUrl]);
+                $telegram->removeWebhook('father', $token);
 
                 return redirect()->back()->with('success', 'Токен бота успешно обновлен и webhook переустановлен');
             }

@@ -25,14 +25,14 @@ class CheckServerStatusCommand extends Command
             foreach ($servers as $server) {
                 try {
                     $strategy = new ServerStrategy($server->provider);
-                    
+
                     $this->info("Checking server {$server->id} ({$server->provider})...");
                     $strategy->checkStatus();
-                    
+
                     // После checkStatus сервер должен быть либо сконфигурирован, либо остаться в статусе создан
                     $server->refresh();
                     $this->info("Server {$server->id} status: {$server->server_status}");
-                    
+
                 } catch (\Exception $e) {
                     Log::error('Error checking server status', [
                         'server_id' => $server->id,
@@ -40,9 +40,9 @@ class CheckServerStatusCommand extends Command
                         'error' => $e->getMessage(),
                         'trace' => $e->getTraceAsString()
                     ]);
-                    
-                    $this->error("Error checking server {$server->id}: {$e->getMessage()}");
-                    
+
+                    $this->error("Error checking server, retrying server {$server->id}: {$e->getMessage()}");
+
                     // Помечаем сервер как ошибочный
                     $server->server_status = Server::SERVER_ERROR;
                     $server->save();
@@ -56,7 +56,7 @@ class CheckServerStatusCommand extends Command
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             $this->error("Command failed: {$e->getMessage()}");
             return 1;
         }

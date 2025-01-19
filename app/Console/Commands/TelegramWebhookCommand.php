@@ -64,7 +64,7 @@ class TelegramWebhookCommand extends Command
         }
     }
 
-    private function removeWebhook(string $botType, ?string $token = null)
+    public function removeWebhook(string $botType, ?string $token = null)
     {
         if ($botType === 'father') {
             $token = $token ?? config('telegram.father_bot.token');
