@@ -167,7 +167,7 @@ class MarzbanAPI
 
             $response = $client->post($action, $requestParam);
 
-            Log::warning('response MARZBAN', [
+            Log::warning('response MARZBAN CREATE', [
                 'response' => $response
             ]);
 
