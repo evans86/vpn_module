@@ -129,26 +129,32 @@ class MarzbanAPI
                     'expire' => $expire, //время окончания через 30 дней
                     'proxies' => [
                         "vmess" => [
-//                            "id" => Str::uuid()->toString()
+                            "id" => Str::uuid()->toString()
                         ],
                         'vless' => [
-//                            "id" => Str::uuid()->toString()
+                            "id" => Str::uuid()->toString()
                         ],
                         'trojan' => [
-
+                            'password' => substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 16)
                         ],
                         'shadowsocks' => [
-
+                            'password' => substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 16)
                         ]
                     ],
                     'inbounds' => [
                         'vmess' => [
                             "VMESS HTTPUPGRADE NoTLS",
                         ],
-                        'vless' => [
+                        'trojan' => [
                             "VLESS HTTPUPGRADE NoTLS",
-                        ]
-                    ]
+                        ],
+                        'vless' => [
+                            "TROJAN WS NOTLS (WS)",
+                        ],
+                        'shadowsocks' => [
+                            "SHADOWSOCKS TCP (TCP)",
+                        ],
+                    ],
                 ],
                 'verify' => false // Отключаем проверку SSL сертификата
             ];
