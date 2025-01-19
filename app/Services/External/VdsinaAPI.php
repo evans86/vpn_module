@@ -341,7 +341,7 @@ class VdsinaAPI
                     'autoprolong' => $autoprolong,
                     'datacenter' => $datacenter,
                     'template' => $template,
-                    'backup_auto' => 0
+                    'backup_auto' => 0 //авто бекап
                 ]
             ];
 

@@ -171,8 +171,6 @@ class KeyActivateService
     }
 
     /**
-     * @TODO
-     *
      * Проверка и обновление статуса ключа
      *
      * @param KeyActivate $key
@@ -183,33 +181,20 @@ class KeyActivateService
         $originalStatus = $key->status;
 
         try {
-            // Проверяем срок действия для активных ключей
-            if ($key->status === KeyActivate::ACTIVE && $this->keyActivateRepository->isExpiredByTime($key)) {
-                $key = $this->keyActivateRepository->updateStatus($key, KeyActivate::EXPIRED);
-
-                $this->logger->info('Статус ключа обновлен на EXPIRED (истек срок действия)', [
-                    'source' => 'key_activate',
-                    'action' => 'update_status',
-                    'key_id' => $key->id,
-                    'old_status' => $originalStatus,
-                    'new_status' => $key->status,
-                    'finish_at' => $key->finish_at
-                ]);
-            }
-
             // Проверяем срок активации для оплаченных ключей
-            if ($key->status === KeyActivate::PAID && $this->keyActivateRepository->isActivationPeriodExpired($key)) {
-                $key = $this->keyActivateRepository->updateStatus($key, KeyActivate::EXPIRED);
 
-                $this->logger->info('Статус ключа обновлен на EXPIRED (истек срок активации)', [
-                    'source' => 'key_activate',
-                    'action' => 'update_status',
-                    'key_id' => $key->id,
-                    'old_status' => $originalStatus,
-                    'new_status' => $key->status,
-                    'deleted_at' => $key->deleted_at
-                ]);
-            }
+            $key->status = KeyActivate::EXPIRED;
+            $key->save();
+
+            $this->logger->info('Статус ключа обновлен на EXPIRED (истек срок активации)', [
+                'source' => 'key_activate',
+                'action' => 'update_status',
+                'key_id' => $key->id,
+                'old_status' => $originalStatus,
+                'new_status' => $key->status,
+                'deleted_at' => $key->deleted_at
+            ]);
+
 
             return $key;
         } catch (Exception $e) {

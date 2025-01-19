@@ -244,7 +244,7 @@ class KeyActivateRepository extends BaseRepository
         if (!$key->deleted_at) {
             return false;
         }
-        $currentTime = Carbon::now()->timestamp;
+        $currentTime = time();
         return $currentTime > $key->deleted_at;
     }
 
