@@ -5,6 +5,7 @@ namespace App\Services\External;
 use GuzzleHttp\Client;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -165,6 +166,9 @@ class MarzbanAPI
             ]);
 
             $response = $client->post($action, $requestParam);
+            Log::debug('response MARZBAN', [
+                'response' => $response
+            ]);
 
             $result = $response->getBody()->getContents();
 
