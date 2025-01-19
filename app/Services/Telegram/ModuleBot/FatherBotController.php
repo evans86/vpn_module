@@ -2,6 +2,7 @@
 
 namespace App\Services\Telegram\ModuleBot;
 
+use App\Models\KeyActivate\KeyActivate;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
 use Exception;
@@ -230,8 +231,9 @@ class FatherBotController extends AbstractTelegramBot
             // Добавляем ключи активации
             $message .= "<b>🔑 Ключи активации:</b>\n";
             foreach ($keys as $index => $key) {
-                $status = $key->user_tg_id ? "✅ Активирован" : "⚪️ Не активирован";
-                $message .= ($index + 1) . ". <code>{$key->id}</code> - {$status}\n";
+
+//                $status = $key->user_tg_id ? "✅ Активирован" : "⚪️ Не активирован";
+                $message .= ($index + 1) . ". <code>{$key->id}</code> - {$key->getTgStatusText()}\n";
             }
 
             // Кнопка для выгрузки ключей в .txt файл

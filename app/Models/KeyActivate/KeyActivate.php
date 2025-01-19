@@ -50,6 +50,22 @@ class KeyActivate extends Model
         return $this->hasOne(KeyActivateUser::class, 'key_activate_id');
     }
 
+    public function getTgStatusText(): string
+    {
+        switch ($this->status) {
+            case self::EXPIRED:
+                return '🚫 Срок действия истек';
+            case self::ACTIVE:
+                return '✅ Активирован';
+            case self::PAID:
+                return '⚪️ Не активирован';
+            case self::DELETED:
+                return 'Ключ удален';
+            default:
+                return 'Неизвестно';
+        }
+    }
+
     /**
      * Получить текстовое описание статуса
      *
