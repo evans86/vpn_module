@@ -143,12 +143,12 @@ class MarzbanAPI
                         ]
                     ],
                     'inbounds' => [
-//                        'vmess' => [
-//                            "VMESS HTTPUPGRADE NoTLS",
-//                        ],
-//                        'vless' => [
-//                            "VLESS HTTPUPGRADE NoTLS",
-//                        ],
+                        'vmess' => [
+                            "VMESS HTTPUPGRADE NoTLS",
+                        ],
+                        'vless' => [
+                            "VLESS HTTPUPGRADE NoTLS",
+                        ],
 //                        'trojan' => [
 //                            "TROJAN WS NOTLS (WS)",
 //                        ],
