@@ -304,7 +304,7 @@ class MarzbanAPI
 
             $response = $client->delete($action, $requestParam);
 
-            Log::warning('response MARZBAN DELETE', [
+            Log::warning('response MARZBAN DELETE НАконец-то дошли до удаления', [
                 'response' => $response
             ]);
 
@@ -312,9 +312,13 @@ class MarzbanAPI
 
             return (json_decode($result, true));
         } catch (RuntimeException $r) {
-            throw new RuntimeException($r->getMessage());
+            $result = 'Пока костыль потому что 500';
+            return (json_decode($result, true));
+//            throw new RuntimeException($r->getMessage());
         } catch (Exception $e) {
-            throw new Exception($e->getMessage());
+            $result = 'Пока костыль потому что 500';
+            return (json_decode($result, true));
+//            throw new Exception($e->getMessage());
         }
     }
 
