@@ -129,17 +129,17 @@ class MarzbanAPI
                     'expire' => $expire, //время окончания через 30 дней
                     'proxies' => [
                         "vmess" => [
-                            "id" => Str::uuid()->toString()
+//                            "id" => Str::uuid()->toString()
                         ],
                         'vless' => [
-                            "id" => Str::uuid()->toString()
+//                            "id" => Str::uuid()->toString()
                         ],
-//                        'trojan' => [
-//
-//                        ],
-//                        'shadowsocks' => [
-//
-//                        ]
+                        'trojan' => [
+
+                        ],
+                        'shadowsocks' => [
+
+                        ]
                     ],
                     'inbounds' => [
                         'vmess' => [
