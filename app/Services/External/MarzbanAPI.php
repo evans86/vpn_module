@@ -298,7 +298,15 @@ class MarzbanAPI
                 'verify' => false // Отключаем проверку SSL сертификата
             ]);
 
+            Log::warning('Last step MARZBAN DELETE', [
+                'response' => 'Я тут '
+            ]);
+
             $response = $client->delete($action, $requestParam);
+
+            Log::warning('response MARZBAN DELETE', [
+                'response' => $response
+            ]);
 
             $result = $response->getBody()->getContents();
 
