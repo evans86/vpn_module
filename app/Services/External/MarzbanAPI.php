@@ -142,18 +142,18 @@ class MarzbanAPI
                         ]
                     ],
                     'inbounds' => [
-                        'vmess' => [
-                            "VMESS HTTPUPGRADE NoTLS",
-                        ],
-                        'vless' => [
-                            "VLESS HTTPUPGRADE NoTLS",
-                        ],
-                        'trojan' => [
-                            "TROJAN WS NOTLS (WS)",
-                        ],
-                        'shadowsocks' => [
-                            "SHADOWSOCKS TCP (TCP)",
-                        ],
+//                        'vmess' => [
+//                            "VMESS HTTPUPGRADE NoTLS",
+//                        ],
+//                        'vless' => [
+//                            "VLESS HTTPUPGRADE NoTLS",
+//                        ],
+//                        'trojan' => [
+//                            "TROJAN WS NOTLS (WS)",
+//                        ],
+//                        'shadowsocks' => [
+//                            "SHADOWSOCKS TCP (TCP)",
+//                        ],
                     ],
                 ],
                 'verify' => false // Отключаем проверку SSL сертификата
