@@ -145,10 +145,10 @@ class MarzbanAPI
                         'vmess' => [
                             "VMESS HTTPUPGRADE NoTLS",
                         ],
-                        'trojan' => [
+                        'vless' => [
                             "VLESS HTTPUPGRADE NoTLS",
                         ],
-                        'vless' => [
+                        'trojan' => [
                             "TROJAN WS NOTLS (WS)",
                         ],
                         'shadowsocks' => [
