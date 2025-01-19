@@ -434,10 +434,10 @@ class VdsinaService
             }
 
             // Удаляем связанные панели
-            foreach ($server->panels as $panel) {
-                $panel->panel_status = Panel::PANEL_DELETED;
-                $panel->save();
-            }
+
+            $server->panel->panel_status = Panel::PANEL_DELETED;
+            $server->panel->save();
+
 
             // Удаляем сервер из базы
             $server->server_status = Server::SERVER_DELETED;
