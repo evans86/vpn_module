@@ -34,10 +34,17 @@ class ServerUserController extends Controller
             $query->where('server_user.panel_id', $request->input('panel_id'));
         }
 
+        // Фильтрация по server_id
+        if ($request->filled('server_id')) {
+            $query->whereHas('panel', function ($q) use ($request) {
+                $q->where('server_id', $request->input('server_id'));
+            });
+        }
+
         // Фильтрация по имени или IP сервера
         if ($request->filled('server')) {
             $search = $request->input('server');
-            $query->whereHas('panel.server', function($q) use ($search) {
+            $query->whereHas('panel.server', function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('ip', 'like', "%{$search}%");
             });
@@ -46,7 +53,7 @@ class ServerUserController extends Controller
         // Фильтрация по адресу панели
         if ($request->filled('panel')) {
             $search = $request->input('panel');
-            $query->whereHas('panel', function($q) use ($search) {
+            $query->whereHas('panel', function ($q) use ($search) {
                 $q->where('panel_adress', 'like', "%{$search}%");
             });
         }
