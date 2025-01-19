@@ -17,6 +17,7 @@ use Illuminate\Support\Str;
 use phpseclib\Net\SSH2;
 use Exception;
 use RuntimeException;
+use Telegram\Bot\Api;
 
 class MarzbanService
 {
@@ -756,6 +757,27 @@ class MarzbanService
                 $sourceMarzbanApi->deleteUser($sourcePanel->auth_token, $serverUser->id);
 
                 DB::commit();
+
+                // Отправляем сообщение через FatherBot
+                $message = "Ваш ключ доступа был перемещен на новый сервер для увеличения скорости работы!\n\n";
+                $message .= "Для продолжения работы, заново вставьте Вашу ссылку-подключение в клиент VPN\n";
+
+                try {
+                    $salesman = $key_activate->packSalesman->salesman;
+                    $telegram = new Api($salesman->token);
+                    $telegram->sendMessage([
+                        'chat_id' => $key_activate->user_tg_id,
+                        'text' => $message,
+                        'parse_mode' => 'HTML'
+                    ]);
+                } catch (Exception $e) {
+                    Log::error('Ошибка при отправке сообщения через FatherBot', [
+                        'error' => $e->getMessage(),
+                        'salesman_id' => $salesman->id,
+                        'telegram_id' => $salesman->telegram_id
+                    ]);
+                }
+
                 return $serverUser;
             } catch (Exception $e) {
                 DB::rollBack();
