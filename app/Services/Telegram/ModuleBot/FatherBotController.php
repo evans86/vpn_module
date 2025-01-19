@@ -231,8 +231,6 @@ class FatherBotController extends AbstractTelegramBot
             // Добавляем ключи активации
             $message .= "<b>🔑 Ключи активации:</b>\n";
             foreach ($keys as $index => $key) {
-
-//                $status = $key->user_tg_id ? "✅ Активирован" : "⚪️ Не активирован";
                 $message .= ($index + 1) . ". <code>{$key->id}</code> - {$key->getTgStatusText()}\n";
             }
 
