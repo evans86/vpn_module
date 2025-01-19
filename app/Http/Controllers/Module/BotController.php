@@ -48,14 +48,14 @@ class BotController extends Controller
                 $telegram = new Api($token);
 
                 // Используем правильный URL для webhook из конфигурации
-                $webhookUrl = config('telegram.father_bot.webhook_url');
+//                $webhookUrl = config('telegram.father_bot.webhook_url');
 
 
 
-                if (empty($webhookUrl)) {
+//                if (empty($webhookUrl)) {
                     // Если URL не настроен в конфиге, формируем URL с учетом токена
                     $webhookUrl = config('app.url') . '/api/telegram/father-bot/' . $token . '/init';
-                }
+//                }
 
                 Log::debug('telegram.father_bot.webhook_url', [
                     'webhookUrl' => $webhookUrl
