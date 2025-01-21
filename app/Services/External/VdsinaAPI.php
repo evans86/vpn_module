@@ -541,6 +541,71 @@ class VdsinaAPI
      * @return array
      * @throws GuzzleException
      */
+    public function deleteAllBackups(int $provider_id): array
+    {
+        try {
+            $action = 'server.schedule/' . $provider_id;
+
+            $requestParam = [
+                'headers' => [
+                    'Authorization' => $this->apiKey,
+                ]
+            ];
+
+            Log::info('Deleting all backups from VDSina', [
+                'provider_id' => $provider_id,
+                'action' => $action
+            ]);
+
+            $client = new Client(['base_uri' => self::HOST_COM]);
+            $response = $client->delete($action, $requestParam);
+            $result = $response->getBody()->getContents();
+            $data = json_decode($result, true);
+
+            if (!is_array($data)) {
+                Log::error('Invalid JSON response from VDSina', [
+                    'provider_id' => $provider_id,
+                    'response' => $result
+                ]);
+                throw new RuntimeException('Invalid JSON response from VDSina');
+            }
+
+            if (!isset($data['status']) || $data['status'] !== 'ok') {
+                Log::error('Error response from VDSina', [
+                    'provider_id' => $provider_id,
+                    'response' => $data
+                ]);
+                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
+            }
+
+            Log::info('Successfully deleted all backups from VDSina', [
+                'provider_id' => $provider_id
+            ]);
+
+            return $data;
+
+        } catch (GuzzleException $e) {
+            Log::error('HTTP error while deleting all backups from VDSina', [
+                'provider_id' => $provider_id,
+                'error' => $e->getMessage(),
+                'code' => $e->getCode()
+            ]);
+            throw $e;
+        } catch (Exception $e) {
+            Log::error('Error while deleting all backups from VDSina', [
+                'provider_id' => $provider_id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw new RuntimeException('Error deleting all backups from VDSina: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * @param int $provider_id
+     * @return array
+     * @throws GuzzleException
+     */
     public function deleteServer(int $provider_id): array
     {
         try {

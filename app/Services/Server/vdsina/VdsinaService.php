@@ -166,6 +166,8 @@ class VdsinaService
                 throw new RuntimeException('Server IP not found in provider response');
             }
 
+            $this->vdsinaApi->deleteAllBackups($server->provider_id);
+
             // Генерируем и обновляем пароль
             $new_password = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 16);
             Log::info('Updating server password', [
