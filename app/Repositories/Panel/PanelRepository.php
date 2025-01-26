@@ -7,6 +7,7 @@ use App\Models\Server\Server;
 use App\Repositories\BaseRepository;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class PanelRepository extends BaseRepository
 {
@@ -28,16 +29,64 @@ class PanelRepository extends BaseRepository
             ->paginate($perPage);
     }
 
+//    /**
+//     * @return Panel|null
+//     */
+//    public function getConfiguredMarzbanPanel(): ?Panel
+//    {
+//        /** @var Panel|null */
+//        return $this->query()
+//            ->where('panel_status', Panel::PANEL_CONFIGURED)
+//            ->where('panel', Panel::MARZBAN)
+//            ->first();
+//    }
+
     /**
      * @return Panel|null
      */
     public function getConfiguredMarzbanPanel(): ?Panel
     {
-        /** @var Panel|null */
-        return $this->query()
+        // Получаем все настроенные панели Marzban
+        $panels = $this->query()
             ->where('panel_status', Panel::PANEL_CONFIGURED)
             ->where('panel', Panel::MARZBAN)
-            ->first();
+            ->get();
+
+        if ($panels->isEmpty()) {
+            return null;
+        }
+
+        // Считаем количество ключей для каждой панели
+        $panelsWithKeyCount = $panels->map(function ($panel) {
+            $keyCount = $this->getKeyCountForPanel($panel->id);
+            return [
+                'panel' => $panel,
+                'key_count' => $keyCount,
+            ];
+        });
+
+        // Если на всех панелях нет ключей, выбираем случайную панель
+        if ($panelsWithKeyCount->sum('key_count') === 0) {
+            return $panels->random();
+        }
+
+        // Иначе выбираем панель с минимальным количеством ключей
+        return $panelsWithKeyCount->sortBy('key_count')->first()['panel'];
+    }
+
+    /**
+     * Получаем количество ключей, привязанных к панели
+     *
+     * @param int $panelId
+     * @return int
+     */
+    private function getKeyCountForPanel(int $panelId): int
+    {
+        // Здесь должен быть ваш код для получения количества ключей, привязанных к панели
+        // Например, если у вас есть таблица `keys`, где есть столбец `panel_id`, то:
+        return DB::table('server_user')
+            ->where('panel_id', $panelId)
+            ->count();
     }
 
     /**
