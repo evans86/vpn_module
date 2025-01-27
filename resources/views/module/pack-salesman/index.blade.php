@@ -121,7 +121,7 @@
                                                         Отметить оплаченным
                                                     </button>
                                                 @else
-                                                    <span class="badge badge-success">Оплачен</span>
+                                                    -
                                                 @endif
                                             </div>
                                         </td>
