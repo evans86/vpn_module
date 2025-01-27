@@ -556,23 +556,15 @@ class FatherBotController extends AbstractTelegramBot
                 ->count();
 
             // Получаем информацию о пользователе через Telegram API
-            $telegramUser = $this->telegram->getChat(['chat_id' => $salesman->telegram_id]);
-            $userName = isset($telegramUser['result']['first_name']) ? $telegramUser['result']['first_name'] : 'Не указано';
-            $userUsername = isset($telegramUser['result']['username']) ? '@' . $telegramUser['result']['username'] : 'Не указано';
+//            $telegramUser = $this->telegram->getChat(['chat_id' => $salesman->telegram_id]);
+            $userUsername = isset($salesman->username) ? '@' . $salesman->username : 'Не указано';
 
             // Формируем сообщение с информацией о пользователе
             $message = "👤 *Ваш профиль*\n\n";
             $message .= "🔹 Telegram ID: {$salesman->telegram_id}\n";
 
-            // Отображаем имя или никнейм пользователя
-            if ($userName !== 'Не указано') {
-                $message .= "🔹 Имя: {$userName}\n";
-            }
             if ($userUsername !== 'Не указано') {
                 $message .= "🔹 Никнейм: {$userUsername}\n";
-            }
-            if ($userName === 'Не указано' && $userUsername === 'Не указано') {
-                $message .= "🔹 Имя/Никнейм: Не указано\n";
             }
 
             // Добавляем количество активных пакетов
