@@ -307,9 +307,9 @@ class FatherBotController extends AbstractTelegramBot
             // Создаем содержимое файла
             $content = "Пакет: ID {$packSalesman->id}\n";
             $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
-            $content .= "Период: {$pack->period} дней\n\n";
+            $content .= "Период: {$pack->period} дней\n";
+            $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
             $content .= "Ключи активации:\n";
-            $content .= "Ключи можно активировать в боте: $salesman->bot_link\n";
 
             foreach ($keys as $index => $key) {
                 $status = $key->user_tg_id ? "Активирован" : "Не активирован";
