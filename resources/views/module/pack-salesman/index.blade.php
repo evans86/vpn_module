@@ -14,8 +14,8 @@
                                 <div class="col-md-3">
                                     <div class="form-group">
                                         <label for="salesman_search">Продавец</label>
-                                        <input type="text" class="form-control" id="salesman_search" name="salesman_search" 
-                                               value="{{ request('salesman_search') }}" 
+                                        <input type="text" class="form-control" id="salesman_search" name="salesman_search"
+                                               value="{{ request('salesman_search') }}"
                                                placeholder="Поиск по ID или имени">
                                     </div>
                                 </div>
@@ -32,7 +32,7 @@
                                 <div class="col-md-3">
                                     <div class="form-group">
                                         <label for="created_at">Дата создания</label>
-                                        <input type="date" class="form-control" id="created_at" name="created_at" 
+                                        <input type="date" class="form-control" id="created_at" name="created_at"
                                                value="{{ request('created_at') }}">
                                     </div>
                                 </div>
@@ -43,7 +43,7 @@
                                             <button type="submit" class="btn btn-primary">
                                                 <i class="fas fa-search"></i> Поиск
                                             </button>
-                                            <a href="{{ route('admin.module.pack-salesman.index') }}" 
+                                            <a href="{{ route('admin.module.pack-salesman.index') }}"
                                                class="btn btn-secondary">
                                                 <i class="fas fa-times"></i> Сбросить
                                             </a>
@@ -72,13 +72,13 @@
                                         <td>{{ $pack_salesman->id }}</td>
                                         <td>
                                             @if($pack_salesman->pack)
-                                                <a href="{{ route('admin.module.key-activate.index', ['pack_salesman_id' => $pack_salesman->id]) }}" 
+                                                <a href="{{ route('admin.module.key-activate.index', ['pack_salesman_id' => $pack_salesman->id]) }}"
                                                    title="Просмотреть ключи пакета">
                                                     {{ $pack_salesman->pack->name }}
                                                 </a>
                                                 <small class="d-block text-muted">
-                                                    <a href="{{ route('admin.module.key-activate.index', ['pack_salesman_id' => $pack_salesman->id]) }}" 
-                                                       class="text-primary" 
+                                                    <a href="{{ route('admin.module.key-activate.index', ['pack_salesman_id' => $pack_salesman->id]) }}"
+                                                       class="text-primary"
                                                        title="Просмотреть ключи пакета">
                                                         Кол-во ключей: {{ $pack_salesman->pack->count }}
                                                     </a>
