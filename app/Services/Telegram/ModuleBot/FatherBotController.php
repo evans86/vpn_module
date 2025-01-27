@@ -549,13 +549,40 @@ class FatherBotController extends AbstractTelegramBot
     {
         try {
             $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
+
+            // Получаем количество активных пакетов
             $activePacks = PackSalesman::where('salesman_id', $salesman->id)
                 ->where('status', PackSalesman::PAID)
                 ->count();
 
+            // Получаем информацию о пользователе через Telegram API
+            $telegramUser = $this->telegram->getChat(['chat_id' => $salesman->telegram_id]);
+            $userName = isset($telegramUser['result']['first_name']) ? $telegramUser['result']['first_name'] : 'Не указано';
+            $userUsername = isset($telegramUser['result']['username']) ? '@' . $telegramUser['result']['username'] : 'Не указано';
+
+            // Формируем сообщение с информацией о пользователе
             $message = "👤 *Ваш профиль*\n\n";
+            $message .= "🔹 Telegram ID: {$salesman->telegram_id}\n";
+
+            // Отображаем имя или никнейм пользователя
+            if ($userName !== 'Не указано') {
+                $message .= "🔹 Имя: {$userName}\n";
+            }
+            if ($userUsername !== 'Не указано') {
+                $message .= "🔹 Никнейм: {$userUsername}\n";
+            }
+            if ($userName === 'Не указано' && $userUsername === 'Не указано') {
+                $message .= "🔹 Имя/Никнейм: Не указано\n";
+            }
+
+            // Добавляем количество активных пакетов
             $message .= "📦 Активных пакетов: {$activePacks}\n";
 
+            if ($salesman->created_at) {
+                $message .= "📅 Регистрация: " . $salesman->created_at->format('d.m.Y H:i') . "\n";
+            }
+
+            // Отправляем сообщение с профилем пользователя
             $this->sendMessage($message);
         } catch (\Exception $e) {
             Log::error('Show profile error: ' . $e->getMessage());
