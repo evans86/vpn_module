@@ -114,7 +114,7 @@
                                         <td>{{ $pack_salesman->created_at->format('d.m.Y H:i') }}</td>
                                         <td>
                                             <div class="btn-group">
-                                                @if($pack_salesman->isPaid())
+                                                @if(!($pack_salesman->status == 1))
                                                     <button type="button"
                                                             class="btn btn-sm btn-success"
                                                             onclick="markAsPaid({{ $pack_salesman->id }})">
