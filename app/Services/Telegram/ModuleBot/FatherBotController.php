@@ -122,6 +122,9 @@ class FatherBotController extends AbstractTelegramBot
                 case 'toggle_bot':
                     $this->toggleBot($messageId);
                     break;
+                case 'reload_bot':
+                    $this->reloadBot();
+                    break;
                 default:
                     Log::warning('Unknown callback action', [
                         'action' => $params['action'],
@@ -489,6 +492,7 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "🔗 Ваш бот: $salesman->bot_link\n";
             $message .= "✅ Статус: " . ($salesman->bot_active ? "Активен" : "Отключен") . "\n\n";
 
+            // Добавляем кнопку для перезагрузки бота
             $keyboard = [
                 'inline_keyboard' => [
                     [
@@ -502,6 +506,12 @@ class FatherBotController extends AbstractTelegramBot
                             'text' => '🔄 Привязать нового бота',
                             'callback_data' => json_encode(['action' => 'change_bot'])
                         ]
+                    ],
+                    [
+                        [
+                            'text' => '🔄 Перезагрузить бота',
+                            'callback_data' => json_encode(['action' => 'reload_bot'])
+                        ]
                     ]
                 ]
             ];
@@ -514,6 +524,37 @@ class FatherBotController extends AbstractTelegramBot
         } catch (\Exception $e) {
             Log::error('Show bot info error: ' . $e->getMessage());
             $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Перезагружает бота, обновляя вебхук
+     */
+    private function reloadBot(): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if (!$salesman) {
+                $this->sendMessage("❌ Ошибка: продавец не найден");
+                return;
+            }
+
+            if (empty($salesman->token)) {
+                $this->sendMessage("❌ Ошибка: токен бота не установлен");
+                return;
+            }
+
+            // Создаем экземпляр API для бота продавца
+            $salesmanBot = new Api($salesman->token);
+
+            // Устанавливаем вебхук для бота продавца
+            $webhookUrl = rtrim(self::WEBHOOK_BASE_URL, '/') . '/api/telegram/salesman-bot/' . $salesman->token . '/init';
+            $salesmanBot->setWebhook(['url' => $webhookUrl]);
+
+            $this->sendMessage("✅ Бот успешно перезагружен, вебхук обновлен.");
+        } catch (\Exception $e) {
+            Log::error('Bot reload error: ' . $e->getMessage());
+            $this->sendMessage("❌ Ошибка при перезагрузке бота: " . $e->getMessage());
         }
     }
 
