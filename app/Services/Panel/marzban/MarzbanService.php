@@ -583,7 +583,7 @@ class MarzbanService
 
             $marzbanApi = new MarzbanAPI($panel->api_address);
             $userId = Str::uuid();
-            $userNameID = $userId . ' (' . $key_activate->packSalesman->salesman->bot_link . '-' . $userTgId . ')';
+            $userNameID = $userId . ' (' . $userTgId . ')';
 
             $userData = $marzbanApi->createUser($panel->auth_token, $userNameID, $data_limit, $expire);
 
