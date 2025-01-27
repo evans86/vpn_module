@@ -564,7 +564,7 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "🔹 Telegram ID: {$salesman->telegram_id}\n";
 
             if ($userUsername !== 'Не указано') {
-                $message .= "🔹 Никнейм: {$userUsername}\n";
+                $message .= "🔹 Имя: {$userUsername}\n";
             }
 
             // Добавляем количество активных пакетов
