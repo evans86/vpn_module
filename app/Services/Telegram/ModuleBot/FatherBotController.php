@@ -557,7 +557,7 @@ class FatherBotController extends AbstractTelegramBot
 
             // Получаем информацию о пользователе через Telegram API
 //            $telegramUser = $this->telegram->getChat(['chat_id' => $salesman->telegram_id]);
-            $userUsername = isset($salesman->username) ? '@' . $salesman->username : 'Не указано';
+            $userUsername = $salesman->username ?? 'Не указано';
 
             // Формируем сообщение с информацией о пользователе
             $message = "👤 *Ваш профиль*\n\n";
