@@ -115,13 +115,13 @@
                                         <td>
                                             <div class="btn-group">
                                                 @if($pack_salesman->isPaid())
+                                                    -
+                                                @else
                                                     <button type="button"
                                                             class="btn btn-sm btn-success"
                                                             onclick="markAsPaid({{ $pack_salesman->id }})">
                                                         Отметить оплаченным
                                                     </button>
-                                                @else
-                                                    -
                                                 @endif
                                             </div>
                                         </td>
