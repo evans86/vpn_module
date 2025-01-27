@@ -214,12 +214,10 @@ class FatherBotController extends AbstractTelegramBot
                 $this->sendMessage("❌ Ошибка: продавец не найден");
                 return;
             }
-
             $packSalesman = PackSalesman::with(['pack', 'keyActivates'])
                 ->where('id', $packSalesmanId)
                 ->where('salesman_id', $salesman->id)
                 ->firstOrFail();
-
             $pack = $packSalesman->pack;
             $keys = $packSalesman->keyActivates;
 
@@ -231,7 +229,15 @@ class FatherBotController extends AbstractTelegramBot
             // Добавляем ключи активации
             $message .= "<b>🔑 Ключи активации:</b>\n";
             foreach ($keys as $index => $key) {
-                $message .= ($index + 1) . ". <code>{$key->id}</code> - {$key->getTgStatusText()}\n";
+                $status = $key->user_tg_id ? "✅ Активирован" : "⚪️ Не активирован";
+                if ($key->user_tg_id) {
+                    // Получаем информацию о пользователе через Telegram API
+                    $telegramUser = $this->telegram->getChat(['chat_id' => $key->user_tg_id]);
+                    $userName = isset($telegramUser['result']['username']) ? $telegramUser['result']['username'] : "ID: {$key->user_tg_id}";
+                    $message .= ($index + 1) . ". <code>{$key->id}</code> - {$status} (Имя/Ник: {$userName})\n";
+                } else {
+                    $message .= ($index + 1) . ". <code>{$key->id}</code> - {$status}\n";
+                }
             }
 
             // Кнопка для выгрузки ключей в .txt файл
@@ -260,21 +266,24 @@ class FatherBotController extends AbstractTelegramBot
                 // Отправляем ключи частями
                 $chunkSize = 50; // Количество ключей в одном сообщении
                 $keyChunks = $keys->chunk($chunkSize);
-
                 $globalIndex = 1; // Глобальный счетчик для сквозной нумерации
-
                 foreach ($keyChunks as $index => $chunk) {
                     $keyMessage = "<b>🔑 Ключи активации (часть " . ($index + 1) . "):</b>\n";
                     foreach ($chunk as $key) {
                         $status = $key->user_tg_id ? "✅ Активирован" : "⚪️ Не активирован";
-                        $keyMessage .= $globalIndex . ". <code>{$key->id}</code> - {$status}\n";
+                        if ($key->user_tg_id) {
+                            // Получаем информацию о пользователе через Telegram API
+                            $telegramUser = $this->telegram->getChat(['chat_id' => $key->user_tg_id]);
+                            $userName = isset($telegramUser['result']['username']) ? $telegramUser['result']['username'] : "ID: {$key->user_tg_id}";
+                            $keyMessage .= $globalIndex . ". <code>{$key->id}</code> - {$status} (Имя/Ник: {$userName})\n";
+                        } else {
+                            $keyMessage .= $globalIndex . ". <code>{$key->id}</code> - {$status}\n";
+                        }
                         $globalIndex++; // Увеличиваем глобальный счетчик
                     }
-
                     // Отправляем часть ключей
                     $this->sendMessage($keyMessage);
                 }
-
                 // Отправляем кнопку после всех ключей
                 $this->sendMessage("Вы можете выгрузить все ключи в .txt файл:", $keyboard);
             }
