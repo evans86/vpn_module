@@ -76,7 +76,10 @@ class VpnConfigController extends Controller
             // Форматируем ключи для отображения
             $formattedKeys = $this->formatConnectionKeys($connectionKeys);
 
-            return response()->view('vpn.config', compact('userInfo', 'formattedKeys'));
+            // Добавляем ссылку на бота
+            $botLink = $keyActivateUser->keyActivate->packSalesman->salesman->bot_link ?? '#';
+
+            return response()->view('vpn.config', compact('userInfo', 'formattedKeys', 'botLink'));
         } catch (Exception $e) {
             Log::error('Error showing VPN config', [
                 'key_activate_id' => $key_activate_id,
