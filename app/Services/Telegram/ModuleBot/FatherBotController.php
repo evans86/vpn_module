@@ -306,13 +306,17 @@ class FatherBotController extends AbstractTelegramBot
 
             // Создаем содержимое файла
             $content = "Пакет: ID {$packSalesman->id}\n";
-            $content .= "Трафик: " . number_format($pack->traffic_limit / (1024*1024*1024), 1) . " GB\n";
+            $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
             $content .= "Период: {$pack->period} дней\n\n";
             $content .= "Ключи активации:\n";
 
             foreach ($keys as $index => $key) {
                 $status = $key->user_tg_id ? "Активирован" : "Не активирован";
-                $content .= ($index + 1) . ". {$key->id} - {$status}\n";
+                if ($key->user_tg_id) {
+                    $content .= ($index + 1) . ". {$key->id} - {$status} (ID пользователя: {$key->user_tg_id})\n";
+                } else {
+                    $content .= ($index + 1) . ". {$key->id} - {$status}\n";
+                }
             }
 
             // Создаем временный файл
