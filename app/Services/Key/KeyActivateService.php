@@ -132,6 +132,7 @@ class KeyActivateService
             // Добавляем пользователя на сервер
             $serverUser = $panelStrategy->addServerUser(
                 $panel->id,
+                $userTgId,
                 $key->traffic_limit,
                 $key->finish_at,
                 $key->id

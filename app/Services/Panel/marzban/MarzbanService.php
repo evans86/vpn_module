@@ -554,13 +554,14 @@ class MarzbanService
      * Добавление пользователи и протоколов подключения
      *
      * @param int $panel_id
+     * @param int $userTgId
      * @param int $data_limit
      * @param int $expire
      * @param string $key_activate_id
      * @return ServerUser
      * @throws GuzzleException
      */
-    public function addServerUser(int $panel_id, int $data_limit, int $expire, string $key_activate_id): ServerUser
+    public function addServerUser(int $panel_id, int $userTgId, int $data_limit, int $expire, string $key_activate_id): ServerUser
     {
         try {
             Log::info('Creating server user', [
@@ -575,10 +576,16 @@ class MarzbanService
                 throw new RuntimeException('Server not found for panel');
             }
 
+            /**
+             * @var KeyActivate $key_activate
+             */
+            $key_activate = KeyActivate::query()->where('id', $key_activate_id)->firstOrFail();
+
             $marzbanApi = new MarzbanAPI($panel->api_address);
             $userId = Str::uuid();
+            $userNameID = $userId . ' (' . $key_activate->packSalesman->salesman->bot_link . '-' . $userTgId . ')';
 
-            $userData = $marzbanApi->createUser($panel->auth_token, $userId, $data_limit, $expire);
+            $userData = $marzbanApi->createUser($panel->auth_token, $userNameID, $data_limit, $expire);
 
             Log::debug('LINKS server user', [
                 'userData' => $userData
