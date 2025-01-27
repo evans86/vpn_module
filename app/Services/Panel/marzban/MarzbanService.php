@@ -583,9 +583,8 @@ class MarzbanService
 
             $marzbanApi = new MarzbanAPI($panel->api_address);
             $userId = Str::uuid();
-            $userNameID = $userId . ' (' . $userTgId . ')';
 
-            $userData = $marzbanApi->createUser($panel->auth_token, $userNameID, $data_limit, $expire);
+            $userData = $marzbanApi->createUser($panel->auth_token, $userId, $data_limit, $expire);
 
             Log::debug('LINKS server user', [
                 'userData' => $userData
