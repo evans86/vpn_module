@@ -231,10 +231,7 @@ class FatherBotController extends AbstractTelegramBot
             foreach ($keys as $index => $key) {
                 $status = $key->user_tg_id ? "✅ Активирован" : "⚪️ Не активирован";
                 if ($key->user_tg_id) {
-                    // Получаем информацию о пользователе через Telegram API
-                    $telegramUser = $this->telegram->getChat(['chat_id' => $key->user_tg_id]);
-                    $userName = isset($telegramUser['result']['username']) ? $telegramUser['result']['username'] : "ID: {$key->user_tg_id}";
-                    $message .= ($index + 1) . ". <code>{$key->id}</code> - {$status} (Имя/Ник: {$userName})\n";
+                    $message .= ($index + 1) . ". <code>{$key->id}</code> - {$status} (ID: {$key->user_tg_id})\n";
                 } else {
                     $message .= ($index + 1) . ". <code>{$key->id}</code> - {$status}\n";
                 }
@@ -272,10 +269,7 @@ class FatherBotController extends AbstractTelegramBot
                     foreach ($chunk as $key) {
                         $status = $key->user_tg_id ? "✅ Активирован" : "⚪️ Не активирован";
                         if ($key->user_tg_id) {
-                            // Получаем информацию о пользователе через Telegram API
-                            $telegramUser = $this->telegram->getChat(['chat_id' => $key->user_tg_id]);
-                            $userName = isset($telegramUser['result']['username']) ? $telegramUser['result']['username'] : "ID: {$key->user_tg_id}";
-                            $keyMessage .= $globalIndex . ". <code>{$key->id}</code> - {$status} (Имя/Ник: {$userName})\n";
+                            $keyMessage .= $globalIndex . ". <code>{$key->id}</code> - {$status} (ID: {$key->user_tg_id})\n";
                         } else {
                             $keyMessage .= $globalIndex . ". <code>{$key->id}</code> - {$status}\n";
                         }
