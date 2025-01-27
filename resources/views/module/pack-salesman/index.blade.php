@@ -113,15 +113,17 @@
                                         </td>
                                         <td>{{ $pack_salesman->created_at->format('d.m.Y H:i') }}</td>
                                         <td>
+                                            @if(!$pack_salesman->isPaid())
                                             <div class="btn-group">
-                                                @if(!$pack_salesman->isPaid())
+
                                                     <button type="button"
                                                             class="btn btn-sm btn-success"
                                                             onclick="markAsPaid({{ $pack_salesman->id }})">
                                                         Отметить оплаченным
                                                     </button>
-                                                @endif
+
                                             </div>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
