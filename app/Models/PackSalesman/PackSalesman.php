@@ -93,7 +93,7 @@ class PackSalesman extends Model
      */
     public function isPaid(): bool
     {
-        return $this->status === self::PAID;
+        return $this->status == self::PAID;
     }
 
     /**
@@ -101,6 +101,6 @@ class PackSalesman extends Model
      */
     public function isExpired(): bool
     {
-        return $this->status === self::EXPIRED;
+        return $this->status == self::EXPIRED;
     }
 }
