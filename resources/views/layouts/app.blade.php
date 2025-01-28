@@ -46,12 +46,12 @@
         <div class="sk-child sk-bounce3"></div>
     </div>
 </div>
-@if(Auth::check())
-<div class="wrapper">
 
+<div class="wrapper">
+    @if(Auth::check())
         @include('layouts.navs.header')
         @include('layouts.navs.leftbar')
-
+    @endif
 
     <div class="content-body">
         <div class="container-fluid">
@@ -61,7 +61,7 @@
 
     @include('layouts.navs.footer')
 </div>
-@endif
+
 <!-- Required Scripts -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
