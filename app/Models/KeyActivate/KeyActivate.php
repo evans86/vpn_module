@@ -20,6 +20,7 @@ use phpseclib\Math\BigInteger;
  * @property int|null $deleted_at срок, до которого нужно активировать
  * @property int|null $status статус
  * @property PackSalesman|null $packSalesman
+ * @property KeyActivateUser|null $keyActivateUser
  */
 class KeyActivate extends Model
 {

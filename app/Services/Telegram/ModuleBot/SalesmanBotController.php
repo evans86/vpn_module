@@ -4,6 +4,7 @@ namespace App\Services\Telegram\ModuleBot;
 
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\Salesman\Salesman;
+use App\Services\Panel\PanelStrategy;
 use Illuminate\Support\Facades\Log;
 
 class SalesmanBotController extends AbstractTelegramBot
@@ -154,6 +155,13 @@ class SalesmanBotController extends AbstractTelegramBot
             $message = "📊 *Ваши активные VPN-подписки:*\n\n";
 
             foreach ($activeKeys as $key) {
+
+                $panel_strategy = new PanelStrategy($activeKeys->keyActivateUser->serverUser->panel->panel);
+                $info = $panel_strategy->getSubscribeInfo($activeKeys->keyActivateUser->serverUser->panel->id, $activeKeys->keyActivateUser->serverUser->id);
+
+                if ($info['status'] !== 'active')
+                    continue;
+
                 $finishDate = date('d.m.Y', $key->finish_at);
                 $message .= "🔑 *Подписка <code>{$key->id}</code>*\n";
                 $message .= "📅 Действует до: {$finishDate}\n";
