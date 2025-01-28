@@ -33,7 +33,7 @@
                         </div>
                         <div class="mb-4">
                             <span class="text-gray-600">Лимит трафика:</span>
-                            <span class="ml-2 font-semibold">{{ number_format($userInfo['data_limit'] / (1024*1024*1024), 1) }} GB</span>
+                            <span class="ml-2 font-semibold">{{ number_format($userInfo['data_limit'] / (1024*1024*1024), 1) }} GB ({{ number_format($userInfo['data_limit_tariff'] / (1024*1024*1024), 1) }} GB по тарифу)</span>
                         </div>
                         <div class="mb-4">
                             <span class="text-gray-600">Использовано:</span>
