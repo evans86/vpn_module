@@ -49,7 +49,9 @@
 
 <div class="wrapper">
     @include('layouts.navs.header')
-    @include('layouts.navs.leftbar')
+    @if(Auth::check())
+        @include('layouts.navs.leftbar')
+    @endif
 
     <div class="content-body">
         <div class="container-fluid">
