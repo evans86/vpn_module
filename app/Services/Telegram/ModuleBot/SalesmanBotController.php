@@ -157,7 +157,6 @@ class SalesmanBotController extends AbstractTelegramBot
             $chatId = $this->chatId;
             $this->setCurrentPage($chatId, $page);
 
-
             /**
              * @var KeyActivate[] $activeKeys
              */
@@ -179,16 +178,7 @@ class SalesmanBotController extends AbstractTelegramBot
 
             $message = "📊 *Ваши активные VPN-подписки:*\n\n";
 
-            foreach ($activeKeys as $key) {
-//                if ($key->keyActivateUser->serverUser->panel->isDeleted())
-//                    continue;
-//
-//                $panel_strategy = new PanelStrategy($key->keyActivateUser->serverUser->panel->panel);
-//                $info = $panel_strategy->getSubscribeInfo($key->keyActivateUser->serverUser->panel->id, $key->keyActivateUser->serverUser->id);
-
-//                if ($info['status'] !== 'active')
-//                    continue;
-
+            foreach ($currentPageKeys as $key) {
                 $finishDate = date('d.m.Y', $key->finish_at);
                 $message .= "🔑 *Подписка <code>{$key->id}</code>*\n";
                 $message .= "📅 Действует до: {$finishDate}\n";
@@ -220,7 +210,7 @@ class SalesmanBotController extends AbstractTelegramBot
                 ];
             }
 
-            $this->sendMessage($message);
+            $this->sendMessage($message, $keyboard);
         } catch (\Exception $e) {
             Log::error('Status action error: ' . $e->getMessage());
             $this->sendErrorMessage();
