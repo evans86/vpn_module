@@ -198,16 +198,18 @@ class SalesmanBotController extends AbstractTelegramBot
                 'inline_keyboard' => []
             ];
 
+            $paginationButtons = [];
+
             if ($page > 0) {
-                $keyboard['inline_keyboard'][] = [
-                    ['text' => '⬅️ Назад', 'callback_data' => 'status_page_' . ($page - 1)]
-                ];
+                $paginationButtons[] = ['text' => '⬅️ Назад', 'callback_data' => 'status_page_' . ($page - 1)];
             }
 
             if ($page < $totalPages - 1) {
-                $keyboard['inline_keyboard'][] = [
-                    ['text' => 'Вперед ➡️', 'callback_data' => 'status_page_' . ($page + 1)]
-                ];
+                $paginationButtons[] = ['text' => 'Вперед ➡️', 'callback_data' => 'status_page_' . ($page + 1)];
+            }
+
+            if (!empty($paginationButtons)) {
+                $keyboard['inline_keyboard'][] = $paginationButtons;
             }
 
             $this->sendMessage($message, $keyboard);
