@@ -141,6 +141,9 @@ class SalesmanBotController extends AbstractTelegramBot
     protected function actionStatus(): void
     {
         try {
+            /**
+             * @var KeyActivate[] $activeKeys
+             */
             $activeKeys = $this->keyActivateRepository->findAllActiveKeysByUser(
                 $this->chatId,
                 $this->salesman->id,
@@ -156,8 +159,8 @@ class SalesmanBotController extends AbstractTelegramBot
 
             foreach ($activeKeys as $key) {
 
-                $panel_strategy = new PanelStrategy($activeKeys->keyActivateUser->serverUser->panel->panel);
-                $info = $panel_strategy->getSubscribeInfo($activeKeys->keyActivateUser->serverUser->panel->id, $activeKeys->keyActivateUser->serverUser->id);
+                $panel_strategy = new PanelStrategy($key->keyActivateUser->serverUser->panel->panel);
+                $info = $panel_strategy->getSubscribeInfo($key->keyActivateUser->serverUser->panel->id, $key->keyActivateUser->serverUser->id);
 
                 if ($info['status'] !== 'active')
                     continue;
