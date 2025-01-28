@@ -176,7 +176,7 @@ class SalesmanBotController extends AbstractTelegramBot
             $totalPages = ceil($activeKeys->count() / $perPage);
             $currentPageKeys = $activeKeys->slice($page * $perPage, $perPage);
 
-            $message = "📊 *Ваши активные VPN-подписки:*\n\n";
+            $message = "📊 *Ваши VPN-подписки:*\n\n";
 
             foreach ($currentPageKeys as $key) {
                 $finishDate = date('d.m.Y', $key->finish_at);
