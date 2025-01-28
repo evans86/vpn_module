@@ -285,7 +285,7 @@ class KeyActivateRepository extends BaseRepository
                 ->orWhere('finish_at', '>', time());
         });
 
-        // Сортируем по created_at в порядке убывания (самый новый первый)
+        // Сортируем по created_at в порядке убывания
         $query->orderBy('created_at', 'desc');
 
         return $query->get();

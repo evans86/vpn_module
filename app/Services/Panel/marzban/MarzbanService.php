@@ -271,6 +271,7 @@ class MarzbanService
 
             $info = [
                 'used_traffic' => $userData['used_traffic'],
+                'data_limit' => $userData['data_limit'],
                 'expire' => $userData['expire'],
                 'status' => $userData['status'],
             ];
