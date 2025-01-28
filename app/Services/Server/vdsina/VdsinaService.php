@@ -87,10 +87,10 @@ class VdsinaService
                 throw new RuntimeException('Invalid server plan response from VDSina');
             }
 
-            // Ищем базовый тарифный план (id = 1)
+            // Ищем базовый тарифный план (id = 3)
             $serverPlan = null;
             foreach ($plans['data'] as $plan) {
-                if (isset($plan['id']) && $plan['id'] == 1) {
+                if (isset($plan['id']) && $plan['id'] == 3) {
                     $serverPlan = $plan;
                     break;
                 }
