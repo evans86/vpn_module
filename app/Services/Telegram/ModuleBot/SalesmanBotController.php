@@ -12,6 +12,8 @@ class SalesmanBotController extends AbstractTelegramBot
 {
     private ?Salesman $salesman;
 
+    private array $userPages = [];
+
     public function __construct(string $token)
     {
         parent::__construct($token);
@@ -42,6 +44,16 @@ class SalesmanBotController extends AbstractTelegramBot
             }
 
             $message = $this->update->getMessage();
+            $callbackQuery = $this->update->getCallbackQuery();
+
+            if ($callbackQuery) {
+                $data = $callbackQuery->getData();
+                if (strpos($data, 'status_page_') === 0) {
+                    $page = (int) str_replace('status_page_', '', $data);
+                    $this->actionStatus($page);
+                }
+                return;
+            }
 
             if (!$message || !$message->getText()) {
                 return;
@@ -139,9 +151,13 @@ class SalesmanBotController extends AbstractTelegramBot
         }
     }
 
-    protected function actionStatus(): void
+    protected function actionStatus(int $page = 0): void
     {
         try {
+            $chatId = $this->chatId;
+            $this->setCurrentPage($chatId, $page);
+
+
             /**
              * @var KeyActivate[] $activeKeys
              */
@@ -155,6 +171,11 @@ class SalesmanBotController extends AbstractTelegramBot
                 $this->sendMessage("У вас нет активных VPN-доступов.\n\nДля активации нажмите кнопку '🔑 Активировать' и введите ваш ключ.");
                 return;
             }
+
+            // Разбиваем на страницы
+            $perPage = 5;
+            $totalPages = ceil($activeKeys->count() / $perPage);
+            $currentPageKeys = $activeKeys->slice($page * $perPage, $perPage);
 
             $message = "📊 *Ваши активные VPN-подписки:*\n\n";
 
@@ -180,11 +201,40 @@ class SalesmanBotController extends AbstractTelegramBot
                 $message .= "🔗 [Открыть конфигурацию]\n(https://vpn-telegram.com/config/{$key->id})\n\n";
             }
 
+            $message .= "Страница " . ($page + 1) . " из $totalPages";
+
+            // Добавляем кнопки пагинации
+            $keyboard = [
+                'inline_keyboard' => []
+            ];
+
+            if ($page > 0) {
+                $keyboard['inline_keyboard'][] = [
+                    ['text' => '⬅️ Назад', 'callback_data' => 'status_page_' . ($page - 1)]
+                ];
+            }
+
+            if ($page < $totalPages - 1) {
+                $keyboard['inline_keyboard'][] = [
+                    ['text' => 'Вперед ➡️', 'callback_data' => 'status_page_' . ($page + 1)]
+                ];
+            }
+
             $this->sendMessage($message);
         } catch (\Exception $e) {
             Log::error('Status action error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
+    }
+
+    protected function getCurrentPage(int $chatId): int
+    {
+        return $this->userPages[$chatId] ?? 0;
+    }
+
+    protected function setCurrentPage(int $chatId, int $page): void
+    {
+        $this->userPages[$chatId] = $page;
     }
 
     protected function actionHelp(): void
