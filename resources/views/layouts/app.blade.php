@@ -48,8 +48,8 @@
 </div>
 
 <div class="wrapper">
-    @include('layouts.navs.header')
     @if(Auth::check())
+        @include('layouts.navs.header')
         @include('layouts.navs.leftbar')
     @endif
 
