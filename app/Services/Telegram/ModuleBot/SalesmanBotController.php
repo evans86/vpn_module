@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\Log;
 class SalesmanBotController extends AbstractTelegramBot
 {
     private ?Salesman $salesman;
-
     private array $userPages = [];
+    private array $userMessageIds = [];
 
     public function __construct(string $token)
     {
@@ -47,10 +47,11 @@ class SalesmanBotController extends AbstractTelegramBot
             $callbackQuery = $this->update->getCallbackQuery();
 
             if ($callbackQuery) {
+                $messageId = $callbackQuery->getMessage()->getMessageId();
                 $data = $callbackQuery->getData();
                 if (strpos($data, 'status_page_') === 0) {
                     $page = (int) str_replace('status_page_', '', $data);
-                    $this->actionStatus($page);
+                    $this->actionStatus($page, $messageId);
                 }
                 return;
             }
@@ -151,7 +152,7 @@ class SalesmanBotController extends AbstractTelegramBot
         }
     }
 
-    protected function actionStatus(int $page = 0): void
+    protected function actionStatus(int $page = 0, ?int $messageId = null): void
     {
         try {
             $chatId = $this->chatId;
@@ -212,12 +213,47 @@ class SalesmanBotController extends AbstractTelegramBot
                 $keyboard['inline_keyboard'][] = $paginationButtons;
             }
 
-            $this->sendMessage($message, $keyboard);
+            if ($messageId) {
+                $this->editMessage($message, $keyboard, $messageId);
+            } else {
+                $this->sendMessage($message, $keyboard);
+            }
+
+//            // Если message_id уже есть, обновляем сообщение
+//            $messageId = $this->getMessageId($chatId);
+//            if ($messageId) {
+//                $this->editMessageText($chatId, $messageId, $message, $keyboard);
+//            } else {
+//                // Иначе отправляем новое сообщение и сохраняем message_id
+//                $sentMessage = $this->sendMessage($message, $keyboard);
+//                $this->setMessageId($chatId, $sentMessage->getMessageId());
+//            }
         } catch (\Exception $e) {
             Log::error('Status action error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
     }
+
+//    protected function editMessageText(int $chatId, int $messageId, string $text, array $replyMarkup = []): void
+//    {
+//        $this->telegram->editMessageText([
+//            'chat_id' => $chatId,
+//            'message_id' => $messageId,
+//            'text' => $text,
+//            'parse_mode' => 'Markdown',
+//            'reply_markup' => json_encode($replyMarkup),
+//        ]);
+//    }
+
+//    protected function getMessageId(int $chatId): ?int
+//    {
+//        return $this->userMessageIds[$chatId] ?? null;
+//    }
+
+//    protected function setMessageId(int $chatId, int $messageId): void
+//    {
+//        $this->userMessageIds[$chatId] = $messageId;
+//    }
 
     protected function getCurrentPage(int $chatId): int
     {
