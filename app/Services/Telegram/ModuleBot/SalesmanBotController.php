@@ -159,14 +159,14 @@ class SalesmanBotController extends AbstractTelegramBot
             $message = "📊 *Ваши активные VPN-подписки:*\n\n";
 
             foreach ($activeKeys as $key) {
-                if ($key->keyActivateUser->serverUser->panel->isDeleted())
-                    continue;
+//                if ($key->keyActivateUser->serverUser->panel->isDeleted())
+//                    continue;
+//
+//                $panel_strategy = new PanelStrategy($key->keyActivateUser->serverUser->panel->panel);
+//                $info = $panel_strategy->getSubscribeInfo($key->keyActivateUser->serverUser->panel->id, $key->keyActivateUser->serverUser->id);
 
-                $panel_strategy = new PanelStrategy($key->keyActivateUser->serverUser->panel->panel);
-                $info = $panel_strategy->getSubscribeInfo($key->keyActivateUser->serverUser->panel->id, $key->keyActivateUser->serverUser->id);
-
-                if ($info['status'] !== 'active')
-                    continue;
+//                if ($info['status'] !== 'active')
+//                    continue;
 
                 $finishDate = date('d.m.Y', $key->finish_at);
                 $message .= "🔑 *Подписка <code>{$key->id}</code>*\n";
