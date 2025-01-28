@@ -3,6 +3,7 @@
 namespace App\Services\Telegram\ModuleBot;
 
 use App\Models\KeyActivate\KeyActivate;
+use App\Models\Panel\Panel;
 use App\Models\Salesman\Salesman;
 use App\Services\Panel\PanelStrategy;
 use Illuminate\Support\Facades\Log;
@@ -158,9 +159,11 @@ class SalesmanBotController extends AbstractTelegramBot
             $message = "📊 *Ваши активные VPN-подписки:*\n\n";
 
             foreach ($activeKeys as $key) {
-
                 $panel_strategy = new PanelStrategy($key->keyActivateUser->serverUser->panel->panel);
                 $info = $panel_strategy->getSubscribeInfo($key->keyActivateUser->serverUser->panel->id, $key->keyActivateUser->serverUser->id);
+
+                if ($key->keyActivateUser->serverUser->panel->isDeleted())
+                    continue;
 
                 if ($info['status'] !== 'active')
                     continue;
