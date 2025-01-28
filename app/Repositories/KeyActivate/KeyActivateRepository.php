@@ -282,8 +282,11 @@ class KeyActivateRepository extends BaseRepository
         // Проверяем срок действия
         $query->where(function($q) {
             $q->whereNull('finish_at')
-              ->orWhere('finish_at', '>', time());
+                ->orWhere('finish_at', '>', time());
         });
+
+        // Сортируем по created_at в порядке убывания (самый новый первый)
+        $query->orderBy('created_at', 'desc');
 
         return $query->get();
     }
