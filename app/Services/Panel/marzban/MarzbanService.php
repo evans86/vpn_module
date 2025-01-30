@@ -280,7 +280,7 @@ class MarzbanService
                 'status' => $userData['status'],
             ];
 
-            if ($info['status'] !== 'active'){
+            if ($info['status'] != 'active'){
                 $serverUser->keyActivateUser->keyActivate->status == KeyActivate::EXPIRED;
                 $serverUser->keyActivateUser->keyActivate->save();
             }
