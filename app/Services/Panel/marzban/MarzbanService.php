@@ -283,7 +283,7 @@ class MarzbanService
             Log::debug('Checking STATUS subscribe info', ['panel_id' => $panel_id, 'user_id' => $user_id, 'status' => $userData['status']]);
 
             if ($userData['status'] !== 'active'){
-                $serverUser->keyActivateUser->keyActivate->status == KeyActivate::EXPIRED;
+                $serverUser->keyActivateUser->keyActivate->status = KeyActivate::EXPIRED;
                 $serverUser->keyActivateUser->keyActivate->save();
             }
 
