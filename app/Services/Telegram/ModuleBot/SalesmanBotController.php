@@ -167,7 +167,12 @@ class SalesmanBotController extends AbstractTelegramBot
             );
 
             if ($activeKeys->isEmpty()) {
-                $this->sendMessage("У вас нет активных VPN-доступов.\n\nДля активации нажмите кнопку '🔑 Активировать' и введите ваш ключ.");
+                $keyboard = [
+                    'inline_keyboard' => [
+                        [['text' => '🔑 Активировать', 'callback_data' => 'activate_key']]
+                    ]
+                ];
+                $this->sendMessage("У вас нет активных VPN-доступов.\n\nДля активации нажмите кнопку '🔑 Активировать' и введите ваш ключ.", $keyboard);
                 return;
             }
 
@@ -188,7 +193,15 @@ class SalesmanBotController extends AbstractTelegramBot
                     $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
                 }
 
-                $message .= "🔗 [Открыть конфигурацию]\n(https://vpn-telegram.com/config/{$key->id})\n\n";
+                if ($key->traffic_used) {
+                    $trafficUsedGB = round($key->traffic_used / (1024 * 1024 * 1024), 2);
+                    $message .= "📊 Использовано: {$trafficUsedGB} GB\n";
+                }
+
+                $status = $key->status === KeyActivate::ACTIVE ? '✅ Активна' : '❌ Неактивна';
+                $message .= "📌 Статус: {$status}\n";
+
+                $message .= "🔗 [Открыть конфигурацию](https://vpn-telegram.com/config/{$key->id})\n\n";
             }
 
             $message .= "Страница " . ($page + 1) . " из $totalPages";
@@ -208,6 +221,10 @@ class SalesmanBotController extends AbstractTelegramBot
                 $paginationButtons[] = ['text' => 'Вперед ➡️', 'callback_data' => 'status_page_' . ($page + 1)];
             }
 
+            if ($page > 0) {
+                $paginationButtons[] = ['text' => 'В начало', 'callback_data' => 'status_page_0'];
+            }
+
             if (!empty($paginationButtons)) {
                 $keyboard['inline_keyboard'][] = $paginationButtons;
             }
@@ -219,7 +236,7 @@ class SalesmanBotController extends AbstractTelegramBot
             }
 
         } catch (\Exception $e) {
-            Log::error('Status action error: ' . $e->getMessage());
+            Log::error('Status action error: ' . $e->getMessage() . ' | User ID: ' . $this->chatId . ' | Page: ' . $page);
             $this->sendErrorMessage();
         }
     }
