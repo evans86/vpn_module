@@ -195,10 +195,10 @@ class SalesmanBotController extends AbstractTelegramBot
                 KeyActivate::ACTIVE
             );
 
-            // Фильтруем ключи, у которых не закончился трафик
-            $activeKeys = $activeKeys->filter(function ($key) {
-                return $key->traffic_limit === null || $key->traffic_used < $key->traffic_limit;
-            });
+//            // Фильтруем ключи, у которых не закончился трафик
+//            $activeKeys = $activeKeys->filter(function ($key) {
+//                return $key->traffic_limit === null || $key->traffic_used < $key->traffic_limit;
+//            });
 
             if ($activeKeys->isEmpty()) {
                 $keyboard = [
@@ -356,13 +356,13 @@ class SalesmanBotController extends AbstractTelegramBot
             $inactiveKeys = $this->keyActivateRepository->findAllActiveKeysByUser(
                 $this->chatId,
                 $this->salesman->id,
-                KeyActivate::ACTIVE
+                KeyActivate::EXPIRED
             );
 
-            // Фильтруем ключи, у которых закончился трафик
-            $inactiveKeys = $inactiveKeys->filter(function ($key) {
-                return $key->traffic_limit !== null && $key->traffic_used >= $key->traffic_limit;
-            });
+//            // Фильтруем ключи, у которых закончился трафик
+//            $inactiveKeys = $inactiveKeys->filter(function ($key) {
+//                return $key->traffic_limit !== null && $key->traffic_used >= $key->traffic_limit;
+//            });
 
             if ($inactiveKeys->isEmpty()) {
                 $this->sendMessage("У вас нет неактивных VPN-доступов.");
