@@ -52,14 +52,14 @@ class SalesmanBotController extends AbstractTelegramBot
 
                 // Обработка callback для пагинации активных подписок
                 if (strpos($data, 'status_page_') === 0) {
-                    $page = (int) str_replace('status_page_', '', $data);
+                    $page = (int)str_replace('status_page_', '', $data);
                     $this->actionStatus($page, $messageId);
                     return;
                 }
 
                 // Обработка callback для пагинации неактивных подписок
                 if (strpos($data, 'inactive_page_') === 0) {
-                    $page = (int) str_replace('inactive_page_', '', $data);
+                    $page = (int)str_replace('inactive_page_', '', $data);
                     $this->actionInactiveSubscriptions($page, $messageId);
                     return;
                 }
@@ -222,9 +222,15 @@ class SalesmanBotController extends AbstractTelegramBot
              * @var KeyActivate $key
              */
             foreach ($currentPageKeys as $key) {
-                // Получаем информацию о трафике с панели
-                $panelStrategy = new PanelStrategy($key->keyActivateUser->serverUser->panel->panel);
-                $info = $panelStrategy->getSubscribeInfo($key->keyActivateUser->serverUser->panel->id, $key->keyActivateUser->serverUser->id);
+                try {
+                    // Получаем информацию о трафике с панели
+                    $panelStrategy = new PanelStrategy($key->keyActivateUser->serverUser->panel->panel);
+                    $info = $panelStrategy->getSubscribeInfo($key->keyActivateUser->serverUser->panel->id, $key->keyActivateUser->serverUser->id);
+                } catch (\Exception $e) {
+                    // Логируем ошибку
+                    Log::error('Failed to get subscription info for key ' . $key->id . ': ' . $e->getMessage());
+                    $info = ['used_traffic' => null];
+                }
 
                 $finishDate = date('d.m.Y', $key->finish_at);
                 $daysRemaining = ceil(($key->finish_at - time()) / (60 * 60 * 24)); // Оставшиеся дни
@@ -293,57 +299,6 @@ class SalesmanBotController extends AbstractTelegramBot
         }
     }
 
-    protected function showSubscriptionDetails(string $keyId, ?int $messageId = null): void
-    {
-        try {
-            /**
-             * @var KeyActivate $key
-             */
-            $key = $this->keyActivateRepository->findById($keyId);
-
-            if (!$key) {
-                $this->sendMessage("Подписка не найдена.");
-                return;
-            }
-
-            $finishDate = date('d.m.Y', $key->finish_at);
-            $daysRemaining = ceil(($key->finish_at - time()) / (60 * 60 * 24)); // Оставшиеся дни
-
-            $message = "🔑 *Подписка <code>{$key->id}</code>*\n";
-            $message .= "📅 Действует до: {$finishDate}\n";
-            $message .= "⏳ Осталось: {$daysRemaining} дней\n";
-
-            if ($key->traffic_limit) {
-                $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
-                $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
-            }
-
-            if ($key->traffic_used) {
-                $trafficUsedGB = round($key->traffic_used / (1024 * 1024 * 1024), 2);
-                $message .= "📊 Использовано: {$trafficUsedGB} GB\n";
-            }
-
-            $message .= "🔗 [Открыть конфигурацию](https://vpn-telegram.com/config/{$key->id})\n\n";
-
-            // Кнопка "Назад к списку подписок"
-            $keyboard = [
-                'inline_keyboard' => [
-                    [['text' => '⬅️ Назад к списку подписок', 'callback_data' => 'status_page_0']]
-                ]
-            ];
-
-            if ($messageId) {
-                $this->editMessage($message, $keyboard, $messageId);
-            } else {
-                $this->sendMessage($message, $keyboard);
-            }
-
-        } catch (\Exception $e) {
-            Log::error('Subscription details error: ' . $e->getMessage() . ' | User ID: ' . $this->chatId . ' | Key ID: ' . $keyId);
-            $this->sendErrorMessage();
-        }
-    }
-
     protected function actionInactiveSubscriptions(int $page = 0, ?int $messageId = null): void
     {
         try {
@@ -358,11 +313,6 @@ class SalesmanBotController extends AbstractTelegramBot
                 $this->salesman->id,
                 KeyActivate::EXPIRED
             );
-
-//            // Фильтруем ключи, у которых закончился трафик
-//            $inactiveKeys = $inactiveKeys->filter(function ($key) {
-//                return $key->traffic_limit !== null && $key->traffic_used >= $key->traffic_limit;
-//            });
 
             if ($inactiveKeys->isEmpty()) {
                 $this->sendMessage("У вас нет неактивных VPN-доступов.");
@@ -428,6 +378,57 @@ class SalesmanBotController extends AbstractTelegramBot
 
         } catch (\Exception $e) {
             Log::error('Inactive subscriptions action error: ' . $e->getMessage() . ' | User ID: ' . $this->chatId . ' | Page: ' . $page);
+            $this->sendErrorMessage();
+        }
+    }
+
+    protected function showSubscriptionDetails(string $keyId, ?int $messageId = null): void
+    {
+        try {
+            /**
+             * @var KeyActivate $key
+             */
+            $key = $this->keyActivateRepository->findById($keyId);
+
+            if (!$key) {
+                $this->sendMessage("Подписка не найдена.");
+                return;
+            }
+
+            $finishDate = date('d.m.Y', $key->finish_at);
+            $daysRemaining = ceil(($key->finish_at - time()) / (60 * 60 * 24)); // Оставшиеся дни
+
+            $message = "🔑 *Подписка <code>{$key->id}</code>*\n";
+            $message .= "📅 Действует до: {$finishDate}\n";
+            $message .= "⏳ Осталось: {$daysRemaining} дней\n";
+
+            if ($key->traffic_limit) {
+                $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
+                $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
+            }
+
+            if ($key->traffic_used) {
+                $trafficUsedGB = round($key->traffic_used / (1024 * 1024 * 1024), 2);
+                $message .= "📊 Использовано: {$trafficUsedGB} GB\n";
+            }
+
+            $message .= "🔗 [Открыть конфигурацию](https://vpn-telegram.com/config/{$key->id})\n\n";
+
+            // Кнопка "Назад к списку подписок"
+            $keyboard = [
+                'inline_keyboard' => [
+                    [['text' => '⬅️ Назад к списку подписок', 'callback_data' => 'status_page_0']]
+                ]
+            ];
+
+            if ($messageId) {
+                $this->editMessage($message, $keyboard, $messageId);
+            } else {
+                $this->sendMessage($message, $keyboard);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Subscription details error: ' . $e->getMessage() . ' | User ID: ' . $this->chatId . ' | Key ID: ' . $keyId);
             $this->sendErrorMessage();
         }
     }
