@@ -59,7 +59,7 @@ class SalesmanBotController extends AbstractTelegramBot
 
                 // Обработка callback для деталей подписки
                 if (strpos($data, 'subscription_details_') === 0) {
-                    $keyId = (int) str_replace('subscription_details_', '', $data);
+                    $keyId = str_replace('subscription_details_', '', $data); // key_id как строка
                     $this->actionStatus(0, $messageId, $keyId); // Передаем keyId для отображения деталей
                     return;
                 }
@@ -161,7 +161,7 @@ class SalesmanBotController extends AbstractTelegramBot
         }
     }
 
-    protected function actionStatus(int $page = 0, ?int $messageId = null, ?int $keyId = null): void
+    protected function actionStatus(int $page = 0, ?int $messageId = null, ?string $keyId = null): void
     {
         try {
             // Если передан keyId, отображаем детали подписки
@@ -256,7 +256,7 @@ class SalesmanBotController extends AbstractTelegramBot
         }
     }
 
-    protected function showSubscriptionDetails(int $keyId, ?int $messageId = null): void
+    protected function showSubscriptionDetails(string $keyId, ?int $messageId = null): void
     {
         try {
             /**
@@ -306,6 +306,7 @@ class SalesmanBotController extends AbstractTelegramBot
             $this->sendErrorMessage();
         }
     }
+
 
     protected function getCurrentPage(int $chatId): int
     {
