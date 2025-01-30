@@ -195,11 +195,6 @@ class SalesmanBotController extends AbstractTelegramBot
                 KeyActivate::ACTIVE
             );
 
-//            // Фильтруем ключи, у которых не закончился трафик
-//            $activeKeys = $activeKeys->filter(function ($key) {
-//                return $key->traffic_limit === null || $key->traffic_used < $key->traffic_limit;
-//            });
-
             if ($activeKeys->isEmpty()) {
                 $keyboard = [
                     'inline_keyboard' => [
