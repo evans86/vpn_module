@@ -7,6 +7,7 @@ use App\Models\Panel\Panel;
 use App\Models\Salesman\Salesman;
 use App\Services\Panel\PanelStrategy;
 use Illuminate\Support\Facades\Log;
+use Telegram\Bot\Objects\CallbackQuery;
 
 class SalesmanBotController extends AbstractTelegramBot
 {
@@ -48,11 +49,20 @@ class SalesmanBotController extends AbstractTelegramBot
             if ($callbackQuery) {
                 $messageId = $callbackQuery->getMessage()->getMessageId();
                 $data = $callbackQuery->getData();
+
+                // Обработка callback для пагинации
                 if (strpos($data, 'status_page_') === 0) {
                     $page = (int) str_replace('status_page_', '', $data);
                     $this->actionStatus($page, $messageId);
+                    return;
                 }
-                return;
+
+                // Обработка callback для деталей подписки
+                if (strpos($data, 'subscription_details_') === 0) {
+                    $keyId = (int) str_replace('subscription_details_', '', $data);
+                    $this->actionStatus(0, $messageId, $keyId); // Передаем keyId для отображения деталей
+                    return;
+                }
             }
 
             if (!$message || !$message->getText()) {
@@ -151,9 +161,15 @@ class SalesmanBotController extends AbstractTelegramBot
         }
     }
 
-    protected function actionStatus(int $page = 0, ?int $messageId = null): void
+    protected function actionStatus(int $page = 0, ?int $messageId = null, ?int $keyId = null): void
     {
         try {
+            // Если передан keyId, отображаем детали подписки
+            if ($keyId !== null) {
+                $this->showSubscriptionDetails($keyId, $messageId);
+                return;
+            }
+
             $chatId = $this->chatId;
             $this->setCurrentPage($chatId, $page);
 
@@ -185,21 +201,16 @@ class SalesmanBotController extends AbstractTelegramBot
 
             foreach ($currentPageKeys as $key) {
                 $finishDate = date('d.m.Y', $key->finish_at);
+                $daysRemaining = ceil(($key->finish_at - time()) / (60 * 60 * 24)); // Оставшиеся дни
+
                 $message .= "🔑 *Подписка <code>{$key->id}</code>*\n";
                 $message .= "📅 Действует до: {$finishDate}\n";
+                $message .= "⏳ Осталось: {$daysRemaining} дней\n";
 
                 if ($key->traffic_limit) {
                     $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
                     $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
                 }
-
-                if ($key->traffic_used) {
-                    $trafficUsedGB = round($key->traffic_used / (1024 * 1024 * 1024), 2);
-                    $message .= "📊 Использовано: {$trafficUsedGB} GB\n";
-                }
-
-                $status = $key->status === KeyActivate::ACTIVE ? '✅ Активна' : '❌ Неактивна';
-                $message .= "📌 Статус: {$status}\n";
 
                 $message .= "🔗 [Открыть конфигурацию](https://vpn-telegram.com/config/{$key->id})\n\n";
             }
@@ -211,6 +222,14 @@ class SalesmanBotController extends AbstractTelegramBot
                 'inline_keyboard' => []
             ];
 
+            // Кнопки для каждой подписки
+            foreach ($currentPageKeys as $key) {
+                $keyboard['inline_keyboard'][] = [
+                    ['text' => '🔍 Подробнее о подписке ' . $key->id, 'callback_data' => 'subscription_details_' . $key->id]
+                ];
+            }
+
+            // Кнопки пагинации
             $paginationButtons = [];
 
             if ($page > 0) {
@@ -219,10 +238,6 @@ class SalesmanBotController extends AbstractTelegramBot
 
             if ($page < $totalPages - 1) {
                 $paginationButtons[] = ['text' => 'Вперед ➡️', 'callback_data' => 'status_page_' . ($page + 1)];
-            }
-
-            if ($page > 0) {
-                $paginationButtons[] = ['text' => 'В начало', 'callback_data' => 'status_page_0'];
             }
 
             if (!empty($paginationButtons)) {
@@ -237,6 +252,57 @@ class SalesmanBotController extends AbstractTelegramBot
 
         } catch (\Exception $e) {
             Log::error('Status action error: ' . $e->getMessage() . ' | User ID: ' . $this->chatId . ' | Page: ' . $page);
+            $this->sendErrorMessage();
+        }
+    }
+
+    protected function showSubscriptionDetails(int $keyId, ?int $messageId = null): void
+    {
+        try {
+            /**
+             * @var KeyActivate $key
+             */
+            $key = $this->keyActivateRepository->findById($keyId);
+
+            if (!$key) {
+                $this->sendMessage("Подписка не найдена.");
+                return;
+            }
+
+            $finishDate = date('d.m.Y', $key->finish_at);
+            $daysRemaining = ceil(($key->finish_at - time()) / (60 * 60 * 24)); // Оставшиеся дни
+
+            $message = "🔑 *Подписка <code>{$key->id}</code>*\n";
+            $message .= "📅 Действует до: {$finishDate}\n";
+            $message .= "⏳ Осталось: {$daysRemaining} дней\n";
+
+            if ($key->traffic_limit) {
+                $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
+                $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
+            }
+
+            if ($key->traffic_used) {
+                $trafficUsedGB = round($key->traffic_used / (1024 * 1024 * 1024), 2);
+                $message .= "📊 Использовано: {$trafficUsedGB} GB\n";
+            }
+
+            $message .= "🔗 [Открыть конфигурацию](https://vpn-telegram.com/config/{$key->id})\n\n";
+
+            // Кнопка "Назад к списку подписок"
+            $keyboard = [
+                'inline_keyboard' => [
+                    [['text' => '⬅️ Назад к списку подписок', 'callback_data' => 'status_page_0']]
+                ]
+            ];
+
+            if ($messageId) {
+                $this->editMessage($message, $keyboard, $messageId);
+            } else {
+                $this->sendMessage($message, $keyboard);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Subscription details error: ' . $e->getMessage() . ' | User ID: ' . $this->chatId . ' | Key ID: ' . $keyId);
             $this->sendErrorMessage();
         }
     }
