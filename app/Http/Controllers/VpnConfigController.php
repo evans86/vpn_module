@@ -53,6 +53,7 @@ class VpnConfigController extends Controller
                 str_contains($userAgent, 'shadowrocket') ||
                 str_contains($userAgent, 'surge') ||
                 str_contains($userAgent, 'quantumult') ||
+                str_contains($userAgent, 'Streisand') ||
                 str_contains($userAgent, 'loon');
 
             if ($isVpnClient || request()->wantsJson()) {
