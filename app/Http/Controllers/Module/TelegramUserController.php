@@ -24,6 +24,8 @@ class TelegramUserController extends Controller
             $query->where('telegram_id', $request->input('telegram_id'));
         }
 
+        $query->orderBy('created_at', 'desc');
+
         $users = $query->paginate(10);
 
         return view('module.telegram-users.index', [
