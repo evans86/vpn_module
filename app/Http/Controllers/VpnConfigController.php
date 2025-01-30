@@ -40,6 +40,9 @@ class VpnConfigController extends Controller
                 throw new RuntimeException('Invalid connection keys format');
             }
 
+            $userAgent = request()->header('User-Agent') ?? 'Unknown';
+            Log::warning('Incoming request with User-Agent:', ['User-Agent' => $userAgent]);
+
             // Проверяем User-Agent на наличие клиентов VPN
             $userAgent = strtolower(request()->header('User-Agent') ?? '');
             $isVpnClient = str_contains($userAgent, 'v2rayng') ||
