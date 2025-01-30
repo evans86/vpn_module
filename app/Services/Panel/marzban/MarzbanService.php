@@ -263,6 +263,10 @@ class MarzbanService
         Log::info('Checking user subscribe info', ['panel_id' => $panel_id, 'user_id' => $user_id]);
 
         try {
+            /**
+             * @var ServerUser $serverUser
+             */
+            $serverUser = ServerUser::query()->where('id', $user_id)->firstOrFail();
             $panel = $this->updateMarzbanToken($panel_id);
             $marzbanApi = new MarzbanAPI($panel->api_address);
             $userData = $marzbanApi->getUser($panel->auth_token, $user_id);
@@ -275,6 +279,11 @@ class MarzbanService
                 'expire' => $userData['expire'],
                 'status' => $userData['status'],
             ];
+
+            if ($info['status'] !== 'active'){
+                $serverUser->keyActivateUser->keyActivate->status == KeyActivate::EXPIRED;
+                $serverUser->keyActivateUser->keyActivate->save();
+            }
 
             Log::info('User subscribe info', [
                 'panel_id' => $panel_id,
