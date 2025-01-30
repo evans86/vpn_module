@@ -45,16 +45,53 @@ class VpnConfigController extends Controller
 
             // Проверяем User-Agent на наличие клиентов VPN
             $userAgent = strtolower(request()->header('User-Agent') ?? '');
-            $isVpnClient = str_contains($userAgent, 'v2rayng') ||
-                str_contains($userAgent, 'nekobox') ||
-                str_contains($userAgent, 'nekoray') ||
-                str_contains($userAgent, 'singbox') ||
-                str_contains($userAgent, 'hiddify') ||
-                str_contains($userAgent, 'shadowrocket') ||
-                str_contains($userAgent, 'surge') ||
-                str_contains($userAgent, 'quantumult') ||
-                str_contains($userAgent, 'streisand') ||
-                str_contains($userAgent, 'loon');
+            $isVpnClient = str_contains($userAgent, 'v2rayng') || // V2RayNG (Android)
+                str_contains($userAgent, 'nekobox') || // NekoBox (Android)
+                str_contains($userAgent, 'nekoray') || // NekoRay (Windows)
+                str_contains($userAgent, 'singbox') || // Sing-Box (кроссплатформенный)
+                str_contains($userAgent, 'hiddify') || // Hiddify (кроссплатформенный)
+                str_contains($userAgent, 'shadowrocket') || // Shadowrocket (iOS)
+                str_contains($userAgent, 'surge') || // Surge (iOS/macOS)
+                str_contains($userAgent, 'quantumult') || // Quantumult (iOS)
+                str_contains($userAgent, 'quantumult x') || // Quantumult X (iOS)
+                str_contains($userAgent, 'loon') || // Loon (iOS)
+                str_contains($userAgent, 'streisand') || // Streisand (кроссплатформенный)
+                str_contains($userAgent, 'clash') || // Clash (кроссплатформенный)
+                str_contains($userAgent, 'clashx') || // ClashX (macOS)
+                str_contains($userAgent, 'clash for windows') || // Clash for Windows
+                str_contains($userAgent, 'clash.android') || // Clash for Android
+                str_contains($userAgent, 'clash.meta') || // Clash.Meta (кроссплатформенный)
+                str_contains($userAgent, 'v2rayu') || // V2RayU (macOS)
+                str_contains($userAgent, 'v2rayn') || // V2RayN (Windows)
+                str_contains($userAgent, 'v2rayx') || // V2RayX (macOS)
+                str_contains($userAgent, 'qv2ray') || // Qv2ray (кроссплатформенный)
+                str_contains($userAgent, 'trojan') || // Trojan clients (общий)
+                str_contains($userAgent, 'trojan-go') || // Trojan-Go clients
+                str_contains($userAgent, 'wireguard') || // WireGuard clients
+                str_contains($userAgent, 'openvpn') || // OpenVPN clients
+                str_contains($userAgent, 'openconnect') || // OpenConnect clients
+                str_contains($userAgent, 'softether') || // SoftEther VPN clients
+                str_contains($userAgent, 'shadowsocks') || // Shadowsocks clients
+                str_contains($userAgent, 'shadowsocksr') || // ShadowsocksR clients
+                str_contains($userAgent, 'ssr') || // SSR clients
+                str_contains($userAgent, 'outline') || // Outline clients
+                str_contains($userAgent, 'zerotier') || // ZeroTier clients
+                str_contains($userAgent, 'tailscale') || // Tailscale clients
+                str_contains($userAgent, 'windscribe') || // Windscribe clients
+                str_contains($userAgent, 'protonvpn') || // ProtonVPN clients
+                str_contains($userAgent, 'nordvpn') || // NordVPN clients
+                str_contains($userAgent, 'expressvpn') || // ExpressVPN clients
+                str_contains($userAgent, 'pritunl') || // Pritunl clients
+                str_contains($userAgent, 'openwrt') || // OpenWRT (роутеры с VPN)
+                str_contains($userAgent, 'dd-wrt') || // DD-WRT (роутеры с VPN)
+                str_contains($userAgent, 'merlin') || // Asus Merlin (роутеры с VPN)
+                str_contains($userAgent, 'pivpn') || // PiVPN (Raspberry Pi)
+                str_contains($userAgent, 'algo') || // Algo VPN
+                str_contains($userAgent, 'strongswan') || // StrongSwan clients
+                str_contains($userAgent, 'ikev2') || // IKEv2 clients
+                str_contains($userAgent, 'ipsec') || // IPSec clients
+                str_contains($userAgent, 'l2tp') || // L2TP clients
+                str_contains($userAgent, 'pptp'); // PPTP clients
 
             if ($isVpnClient || request()->wantsJson()) {
                 // Для VPN клиентов возвращаем строку с конфигурациями
