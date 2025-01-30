@@ -5,6 +5,7 @@ namespace App\Services\Telegram\ModuleBot;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\Panel\Panel;
 use App\Models\Salesman\Salesman;
+use App\Models\TelegramUser\TelegramUser;
 use App\Services\Panel\PanelStrategy;
 use Illuminate\Support\Facades\Log;
 use Telegram\Bot\Objects\CallbackQuery;
@@ -114,9 +115,48 @@ class SalesmanBotController extends AbstractTelegramBot
         }
     }
 
+    protected function ensureTelegramUserExists(): void
+    {
+        try {
+            // Получаем данные пользователя из Telegram
+            $message = $this->update->getMessage();
+            $from = $message->getFrom();
+
+            $telegramId = $from->getId();
+            $username = $from->getUsername();
+            $firstName = $from->getFirstName();
+
+            // Проверяем, существует ли пользователь в таблице
+            $existingUser = TelegramUser::where('telegram_id', $telegramId)
+                ->where('salesman_id', $this->salesman->id)
+                ->first();
+
+            if (!$existingUser) {
+                // Создаем нового пользователя
+                TelegramUser::create([
+                    'salesman_id' => $this->salesman->id,
+                    'telegram_id' => $telegramId,
+                    'username' => $username,
+                    'first_name' => $firstName,
+                    'status' => 1, // пока статус "активен"
+                ]);
+
+                Log::debug('New Telegram user added', [
+                    'telegram_id' => $telegramId,
+                    'username' => $username,
+                    'salesman_id' => $this->salesman->id,
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Failed to ensure Telegram user exists: ' . $e->getMessage());
+        }
+    }
+
     protected function start(): void
     {
         try {
+            $this->ensureTelegramUserExists();
+
             $message = "👋 Добро пожаловать в VPN бот!\n\n";
             $message .= "🔸 Активируйте ваш VPN доступ\n";
             $message .= "🔸 Проверяйте статус подключения\n";

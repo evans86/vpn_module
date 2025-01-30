@@ -7,6 +7,7 @@ use App\Http\Controllers\Module\PackController;
 use App\Http\Controllers\Module\PackSalesmanController;
 use App\Http\Controllers\Module\KeyActivateController;
 use App\Http\Controllers\Module\BotController;
+use App\Http\Controllers\Module\TelegramUserController;
 use App\Http\Controllers\VpnConfigController;
 use App\Http\Controllers\LogController;
 use App\Http\Controllers\Module\ServerUserController;
@@ -112,6 +113,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::prefix('bot')->name('bot.')->group(function () {
                 Route::get('/', [BotController::class, 'index'])->name('index');
                 Route::post('/update-token', [BotController::class, 'updateToken'])->name('update-token');
+            });
+
+            // Telegram User Routes
+            Route::prefix('telegram-users')->name('telegram-users.')->group(function () {
+                Route::get('/', [TelegramUserController::class, 'index'])->name('index');
+                Route::post('/{id}/toggle-status', [TelegramUserController::class, 'toggleStatus'])->name('toggle-status');
             });
         });
 
