@@ -218,10 +218,13 @@ class SalesmanBotController extends AbstractTelegramBot
 
             $message = "📊 *Ваши VPN-подписки:*\n\n";
 
+            /**
+             * @var KeyActivate $key
+             */
             foreach ($currentPageKeys as $key) {
                 // Получаем информацию о трафике с панели
-                $panelStrategy = new PanelStrategy($key->serverUser->panel->panel);
-                $info = $panelStrategy->getSubscribeInfo($key->serverUser->panel->id, $key->serverUser->id);
+                $panelStrategy = new PanelStrategy($key->keyActivateUser->serverUser->panel->panel);
+                $info = $panelStrategy->getSubscribeInfo($key->keyActivateUser->serverUser->panel->id, $key->keyActivateUser->serverUser->id);
 
                 $finishDate = date('d.m.Y', $key->finish_at);
                 $daysRemaining = ceil(($key->finish_at - time()) / (60 * 60 * 24)); // Оставшиеся дни
