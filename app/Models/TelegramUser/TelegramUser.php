@@ -27,7 +27,7 @@ class TelegramUser extends Model
     protected $guarded = false;
     protected $table = 'telegram_user_salesman';
 
-    public function panel(): BelongsTo
+    public function salesman(): BelongsTo
     {
         return $this->belongsTo(Salesman::class, 'salesman_id');
     }
