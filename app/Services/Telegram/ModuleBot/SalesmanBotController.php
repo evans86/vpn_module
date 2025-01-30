@@ -50,17 +50,30 @@ class SalesmanBotController extends AbstractTelegramBot
                 $messageId = $callbackQuery->getMessage()->getMessageId();
                 $data = $callbackQuery->getData();
 
-                // Обработка callback для пагинации
+                // Обработка callback для пагинации активных подписок
                 if (strpos($data, 'status_page_') === 0) {
                     $page = (int) str_replace('status_page_', '', $data);
                     $this->actionStatus($page, $messageId);
                     return;
                 }
 
+                // Обработка callback для пагинации неактивных подписок
+                if (strpos($data, 'inactive_page_') === 0) {
+                    $page = (int) str_replace('inactive_page_', '', $data);
+                    $this->actionInactiveSubscriptions($page, $messageId);
+                    return;
+                }
+
                 // Обработка callback для деталей подписки
                 if (strpos($data, 'subscription_details_') === 0) {
-                    $keyId = str_replace('subscription_details_', '', $data); // key_id как строка
-                    $this->actionStatus(0, $messageId, $keyId); // Передаем keyId для отображения деталей
+                    $keyId = str_replace('subscription_details_', '', $data);
+                    $this->actionStatus(0, $messageId, $keyId);
+                    return;
+                }
+
+                // Обработка callback для просмотра неактивных подписок
+                if ($data === 'inactive_subscriptions') {
+                    $this->actionInactiveSubscriptions(0, $messageId);
                     return;
                 }
             }
@@ -182,10 +195,16 @@ class SalesmanBotController extends AbstractTelegramBot
                 KeyActivate::ACTIVE
             );
 
+            // Фильтруем ключи, у которых не закончился трафик
+            $activeKeys = $activeKeys->filter(function ($key) {
+                return $key->traffic_limit === null || $key->traffic_used < $key->traffic_limit;
+            });
+
             if ($activeKeys->isEmpty()) {
                 $keyboard = [
                     'inline_keyboard' => [
-                        [['text' => '🔑 Активировать', 'callback_data' => 'activate_key']]
+                        [['text' => '🔑 Активировать', 'callback_data' => 'activate_key']],
+                        [['text' => '📋 Просмотр неактивных', 'callback_data' => 'inactive_subscriptions']]
                     ]
                 ];
                 $this->sendMessage("У вас нет активных VPN-доступов.\n\nДля активации нажмите кнопку '🔑 Активировать' и введите ваш ключ.", $keyboard);
@@ -200,6 +219,10 @@ class SalesmanBotController extends AbstractTelegramBot
             $message = "📊 *Ваши VPN-подписки:*\n\n";
 
             foreach ($currentPageKeys as $key) {
+                // Получаем информацию о трафике с панели
+                $panelStrategy = new PanelStrategy($key->serverUser->panel->panel);
+                $info = $panelStrategy->getSubscribeInfo($key->serverUser->panel->id, $key->serverUser->id);
+
                 $finishDate = date('d.m.Y', $key->finish_at);
                 $daysRemaining = ceil(($key->finish_at - time()) / (60 * 60 * 24)); // Оставшиеся дни
 
@@ -210,6 +233,11 @@ class SalesmanBotController extends AbstractTelegramBot
                 if ($key->traffic_limit) {
                     $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
                     $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
+                }
+
+                if ($info['used_traffic']) {
+                    $trafficUsedGB = round($info['used_traffic'] / (1024 * 1024 * 1024), 2);
+                    $message .= "📊 Использовано: {$trafficUsedGB} GB\n";
                 }
 
                 $message .= "🔗 [Открыть конфигурацию](https://vpn-telegram.com/config/{$key->id})\n\n";
@@ -234,12 +262,17 @@ class SalesmanBotController extends AbstractTelegramBot
 
             if ($page > 0) {
                 $paginationButtons[] = ['text' => '⬅️ Назад', 'callback_data' => 'status_page_' . ($page - 1)];
-                $paginationButtons[] = ['text' => 'В начало', 'callback_data' => 'status_page_0']; // Кнопка "В начало"
+                $paginationButtons[] = ['text' => 'В начало', 'callback_data' => 'status_page_0'];
             }
 
             if ($page < $totalPages - 1) {
                 $paginationButtons[] = ['text' => 'Вперед ➡️', 'callback_data' => 'status_page_' . ($page + 1)];
             }
+
+            // Кнопка "Просмотр неактивных"
+            $keyboard['inline_keyboard'][] = [
+                ['text' => '📋 Просмотр неактивных', 'callback_data' => 'inactive_subscriptions']
+            ];
 
             if (!empty($paginationButtons)) {
                 $keyboard['inline_keyboard'][] = $paginationButtons;
@@ -308,6 +341,93 @@ class SalesmanBotController extends AbstractTelegramBot
         }
     }
 
+    protected function actionInactiveSubscriptions(int $page = 0, ?int $messageId = null): void
+    {
+        try {
+            $chatId = $this->chatId;
+            $this->setCurrentPage($chatId, $page);
+
+            /**
+             * @var KeyActivate[] $inactiveKeys
+             */
+            $inactiveKeys = $this->keyActivateRepository->findAllActiveKeysByUser(
+                $this->chatId,
+                $this->salesman->id,
+                KeyActivate::ACTIVE
+            );
+
+            // Фильтруем ключи, у которых закончился трафик
+            $inactiveKeys = $inactiveKeys->filter(function ($key) {
+                return $key->traffic_limit !== null && $key->traffic_used >= $key->traffic_limit;
+            });
+
+            if ($inactiveKeys->isEmpty()) {
+                $this->sendMessage("У вас нет неактивных VPN-доступов.");
+                return;
+            }
+
+            // Разбиваем на страницы
+            $perPage = 5;
+            $totalPages = ceil($inactiveKeys->count() / $perPage);
+            $currentPageKeys = $inactiveKeys->slice($page * $perPage, $perPage);
+
+            $message = "📋 *Неактивные VPN-подписки:*\n\n";
+
+            foreach ($currentPageKeys as $key) {
+                $finishDate = date('d.m.Y', $key->finish_at);
+                $daysRemaining = ceil(($key->finish_at - time()) / (60 * 60 * 24)); // Оставшиеся дни
+
+                $message .= "🔑 *Подписка <code>{$key->id}</code>*\n";
+                $message .= "📅 Действует до: {$finishDate}\n";
+                $message .= "⏳ Осталось: {$daysRemaining} дней\n";
+
+                if ($key->traffic_limit) {
+                    $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
+                    $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
+                }
+
+                $message .= "🔗 [Открыть конфигурацию](https://vpn-telegram.com/config/{$key->id})\n\n";
+            }
+
+            $message .= "Страница " . ($page + 1) . " из $totalPages";
+
+            // Добавляем кнопки пагинации
+            $keyboard = [
+                'inline_keyboard' => []
+            ];
+
+            // Кнопки пагинации
+            $paginationButtons = [];
+
+            if ($page > 0) {
+                $paginationButtons[] = ['text' => '⬅️ Назад', 'callback_data' => 'inactive_page_' . ($page - 1)];
+                $paginationButtons[] = ['text' => 'В начало', 'callback_data' => 'inactive_page_0'];
+            }
+
+            if ($page < $totalPages - 1) {
+                $paginationButtons[] = ['text' => 'Вперед ➡️', 'callback_data' => 'inactive_page_' . ($page + 1)];
+            }
+
+            // Кнопка "Назад к активным"
+            $keyboard['inline_keyboard'][] = [
+                ['text' => '⬅️ Назад к активным', 'callback_data' => 'status_page_0']
+            ];
+
+            if (!empty($paginationButtons)) {
+                $keyboard['inline_keyboard'][] = $paginationButtons;
+            }
+
+            if ($messageId) {
+                $this->editMessage($message, $keyboard, $messageId);
+            } else {
+                $this->sendMessage($message, $keyboard);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Inactive subscriptions action error: ' . $e->getMessage() . ' | User ID: ' . $this->chatId . ' | Page: ' . $page);
+            $this->sendErrorMessage();
+        }
+    }
 
     protected function getCurrentPage(int $chatId): int
     {
