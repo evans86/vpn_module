@@ -234,6 +234,7 @@ class SalesmanBotController extends AbstractTelegramBot
 
             if ($page > 0) {
                 $paginationButtons[] = ['text' => '⬅️ Назад', 'callback_data' => 'status_page_' . ($page - 1)];
+                $paginationButtons[] = ['text' => 'В начало', 'callback_data' => 'status_page_0']; // Кнопка "В начало"
             }
 
             if ($page < $totalPages - 1) {
