@@ -59,7 +59,7 @@
                                         <td><strong>{{ $user->id }}</strong></td>
                                         <td>{{ $user->telegram_id }}</td>
                                         <td>{{ $user->username }}</td>
-                                        <td>{{ $user->salesman->name ?? 'Нет' }}</td>
+                                        <td>{{ $user->salesman->bot_link ?? 'Нет' }}</td>
                                         <td>
                                             <button
                                                 class="btn btn-sm status-toggle {{ $user->status ? 'btn-success' : 'btn-danger' }}"
