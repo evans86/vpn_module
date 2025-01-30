@@ -25,33 +25,31 @@ class VpnConfigController extends Controller
     public function show(string $key_activate_id): Response
     {
         try {
-            // Получаем запись key_activate_user с отношениями
             $keyActivateUser = $this->keyActivateUserRepository->findByKeyActivateIdWithRelations($key_activate_id);
-
-            // Получаем информацию о пользователе сервера
             $serverUser = $keyActivateUser->serverUser;
             if (!$serverUser) {
                 throw new RuntimeException('Server user not found');
             }
 
-            // Декодируем ключи подключения
             $connectionKeys = json_decode($serverUser->keys, true);
             if (!$connectionKeys) {
                 throw new RuntimeException('Invalid connection keys format');
             }
 
-            // Проверяем User-Agent на наличие клиентов VPN
             $userAgent = strtolower(request()->header('User-Agent') ?? '');
             $isVpnClient = str_contains($userAgent, 'v2rayng') ||
                 str_contains($userAgent, 'nekobox') ||
                 str_contains($userAgent, 'nekoray') ||
                 str_contains($userAgent, 'singbox') ||
-                str_contains($userAgent, 'hiddify');
+                str_contains($userAgent, 'hiddify') ||
+                str_contains($userAgent, 'shadowrocket') ||
+                str_contains($userAgent, 'surge') ||
+                str_contains($userAgent, 'quantumult') ||
+                str_contains($userAgent, 'loon');
 
             if ($isVpnClient || request()->wantsJson()) {
-                // Для VPN клиентов возвращаем строку с конфигурациями
-                return response(implode("\n", $connectionKeys))
-                    ->header('Content-Type', 'text/plain');
+                return response(json_encode($connectionKeys, JSON_PRETTY_PRINT))
+                    ->header('Content-Type', 'application/json');
             }
 
             $panel_strategy = new PanelStrategy($serverUser->panel->panel);
@@ -61,7 +59,6 @@ class VpnConfigController extends Controller
                 'error' => $info
             ]);
 
-            // Для браузера показываем HTML страницу
             $userInfo = [
                 'username' => $serverUser->id,
                 'status' => $info['status'],
@@ -74,10 +71,7 @@ class VpnConfigController extends Controller
                     : null
             ];
 
-            // Форматируем ключи для отображения
             $formattedKeys = $this->formatConnectionKeys($connectionKeys);
-
-            // Добавляем ссылку на бота
             $botLink = $keyActivateUser->keyActivate->packSalesman->salesman->bot_link ?? '#';
 
             return response()->view('vpn.config', compact('userInfo', 'formattedKeys', 'botLink'));
