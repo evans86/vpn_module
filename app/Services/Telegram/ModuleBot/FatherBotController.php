@@ -2,7 +2,6 @@
 
 namespace App\Services\Telegram\ModuleBot;
 
-use App\Models\KeyActivate\KeyActivate;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
 use Exception;
