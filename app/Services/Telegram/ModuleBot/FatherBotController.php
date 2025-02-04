@@ -568,8 +568,10 @@ class FatherBotController extends AbstractTelegramBot
                     ['text' => '📦 Пакеты']
                 ],
                 [
-                    ['text' => '👤 Профиль'],
-                    ['text' => '❓ Помощь']
+                    ['text' => '🪪 Личный кабинет'],
+                ],
+                [
+                    ['text' => '🌎 Помощь']
                 ]
             ],
             'resize_keyboard' => true,
