@@ -199,7 +199,7 @@ class FatherBotController extends AbstractTelegramBot
                 return;
             }
 
-            $message = "<blockquote><b>✅ Пакеты:</b></blockquote>\n\n";
+            $message = "<blockquote><b>📦 Пакеты:</b></blockquote>\n\n";
             $keyboard = ['inline_keyboard' => []];
 
             foreach ($packs as $packSalesman) {
