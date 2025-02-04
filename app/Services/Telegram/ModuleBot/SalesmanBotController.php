@@ -349,7 +349,9 @@ class SalesmanBotController extends AbstractTelegramBot
             );
 
             if ($inactiveKeys->isEmpty()) {
-                $this->sendMessage("У вас нет неактивных VPN-доступов.");
+                $this->sendMessage("Упс…<br>
+Кажется, что у вас <code>нет активный ключей</code>, но после покупки – они обязательно здесь будут Вас ждать!
+");
                 return;
             }
 
