@@ -168,7 +168,8 @@ abstract class AbstractTelegramBot
             $params = [
                 'chat_id' => $this->chatId,
                 'text' => $text,
-                'parse_mode' => 'HTML'
+                'parse_mode' => 'HTML',
+                'disable_web_page_preview' => true
             ];
 
             if ($keyboard !== null) {
