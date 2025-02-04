@@ -195,11 +195,11 @@ class FatherBotController extends AbstractTelegramBot
                 ->get();
 
             if ($packs->isEmpty()) {
-                $this->sendMessage("❌ У вас нет активных пакетов");
+                $this->sendMessage("❌ Кажется, что у вас <b>нет</b> активных <b>пакетов</b>, успейте приобрести пакет ключей и начать свой бизнес!");
                 return;
             }
 
-            $message = "<b>📦 Ваши пакеты доступов:</b>\n\n";
+            $message = "<blockquote><b>✅ Пакеты:</b></blockquote>\n\n";
             $keyboard = ['inline_keyboard' => []];
 
             foreach ($packs as $packSalesman) {
@@ -762,18 +762,18 @@ class FatherBotController extends AbstractTelegramBot
             $userUsername = $salesman->username ?? 'Не указано';
 
             // Формируем сообщение с информацией о пользователе
-            $message = "👤 *Ваш профиль*\n\n";
-            $message .= "🔹 Telegram ID: {$salesman->telegram_id}\n";
+            $message = "<blockquote><b>🪪 Личный кабинет</b></blockquote>\n\n";
+            $message .= "🆔 <b>Telegram ID: <code>{$salesman->telegram_id}</code></b>\n";
 
             if ($userUsername !== 'Не указано') {
-                $message .= "🔹 Имя: {$userUsername}\n";
+                $message .= "📟 <b>Имя:</b> <code>{$userUsername}</code>\n";
             }
 
             // Добавляем количество активных пакетов
-            $message .= "📦 Активных пакетов: {$activePacks}\n";
+            $message .= "📦 <b>Активных пакетов: <code>{$activePacks}</code></b>\n";
 
             if ($salesman->created_at) {
-                $message .= "📅 Регистрация: " . $salesman->created_at->format('d.m.Y H:i') . "\n";
+                $message .= "📅 <b>Регистрация: <code>" . $salesman->created_at->format('d.m.Y H:i') . "</code></b>\n";
             }
 
             // Отправляем сообщение с профилем пользователя
