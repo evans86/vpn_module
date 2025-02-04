@@ -544,7 +544,7 @@ class FatherBotController extends AbstractTelegramBot
                 $this->salesmanService->create($this->chatId, $this->username == null ? null : $this->firstName);
             }
 
-            $message = "👋 _Добро пожаловать в систему управления VPN-доступами!_\n\n\n";
+            $message = "👋 <i>Добро пожаловать в систему управления VPN-доступами!</i>\n\n\n";
             $message .= "🌍 Хотите зарабатывать на продаже VPN? С нами это просто и удобно!\n\n\n";
             $message .= "🚀 Что вы получите:\n\n";
             $message .= "🔹 Готовую систему - покупайте пакеты ключей и создавайте своего бота за считанные минуты\n\n";
@@ -594,7 +594,7 @@ class FatherBotController extends AbstractTelegramBot
             $this->telegram->sendMessage([
                 'chat_id' => $this->chatId,
                 'text' => '👋 Выберите действие:',
-                'parse_mode' => 'Markdown',
+                'parse_mode' => 'HTML',
                 'reply_markup' => json_encode($keyboard)
             ]);
         }
