@@ -163,7 +163,14 @@ class FatherBotController extends AbstractTelegramBot
             $salesman->state = self::STATE_WAITING_TOKEN;
             $salesman->save();
 
-            $this->sendMessage("<b>🔄 Введите токен нового бота:</b>\n\nТокен можно получить в @BotFather\n\n⚠️ Внимание: после смены бота все старые ссылки перестанут работать!");
+            $message = "<b>Введите токен вашего бота:</b>\n\n";
+            $message .= "🔑 <b><i>Как выпустить токен?</b></i>\n\n";
+            $message .= "1️⃣ Открываем в телеграмме @BotFather и нажимаем start/начать\n\n";
+            $message .= "2️⃣ Выбираем команду /newbot\n\n";
+            $message .= "3️⃣ Вводим любое название для бота. Потом вводим никнейм бота на английском слитно, которое обязательно заканчивается на слово _bot\n\n";
+            $message .= "4️⃣ Придёт сообщение, где после API будет находится наш токен.\n\n";
+
+            $this->sendMessage($message);
         } catch (Exception $e) {
             Log::error('Initiate bot change error: ' . $e->getMessage());
             $this->sendErrorMessage();
@@ -638,7 +645,7 @@ class FatherBotController extends AbstractTelegramBot
                 return;
             }
 
-            $message = "<b>🤖 Информация о вашем боте:</b>\n\n";
+            $message = "<blockquote>🤖 Информация о вашем боте:</blockquote><\n\n";
             $message .= "🔗 Ваш бот: $salesman->bot_link\n";
             $message .= "✅ Статус: " . ($salesman->bot_active ? "Активен" : "Отключен") . "\n\n";
 
@@ -649,11 +656,15 @@ class FatherBotController extends AbstractTelegramBot
                         [
                             'text' => $salesman->bot_active ? '🔴 Отключить бота' : '🟢 Включить бота',
                             'callback_data' => json_encode(['action' => 'toggle_bot'])
-                        ]
+                        ],
+//                        [
+//                            'text' => '📁 Купить пакеты',
+//                            'callback_data' => json_encode(['action' => 'buy_packs'])
+//                        ],
                     ],
                     [
                         [
-                            'text' => '🔄 Привязать нового бота',
+                            'text' => '♻️ Привязать нового бота',
                             'callback_data' => json_encode(['action' => 'change_bot'])
                         ]
                     ],
