@@ -584,6 +584,7 @@ class FatherBotController extends AbstractTelegramBot
             $this->telegram->sendMessage([
                 'chat_id' => $this->chatId,
                 'text' => '👋 Выберите действие:',
+                'parse_mode' => 'HTML',
                 'reply_markup' => json_encode($keyboard)
             ]);
         }
