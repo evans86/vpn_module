@@ -66,10 +66,10 @@ class FatherBotController extends AbstractTelegramBot
                     case '📦 Пакеты':
                         $this->showPacksList();
                         break;
-                    case '👤 Профиль':
+                    case '🪪 Личный кабинет':
                         $this->showProfile();
                         break;
-                    case '❓ Помощь':
+                    case '🌎 Помощь':
                         $this->showHelp();
                         break;
                     default:
