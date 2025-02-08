@@ -201,6 +201,7 @@ class FatherBotController extends AbstractTelegramBot
             $packs = PackSalesman::where('salesman_id', $salesman->id)
                 ->where('status', PackSalesman::PAID)
                 ->with('pack')
+                ->orderBy('created_at', 'desc')
                 ->paginate($perPage, ['*'], 'page', $page);
 
             if ($packs->isEmpty()) {
