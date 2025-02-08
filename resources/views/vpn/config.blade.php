@@ -128,7 +128,6 @@
 
     @push('scripts')
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
         <script>
             function copyCurrentUrl() {
                 const url = window.location.href;
@@ -152,30 +151,21 @@
                     alert('Ссылка для QR-кода отсутствует или некорректна.');
                     return;
                 }
-
-                const encodedLink = encodeURIComponent(link);
-
                 const qrModal = document.getElementById('qrModal');
                 const qrcodeElement = document.getElementById('qrcode');
                 qrcodeElement.innerHTML = '';
-
-                // Создаем QR-код
-                const qr = new QRCode(qrcodeElement, {
-                    text: encodedLink,
+                new QRCode(qrcodeElement, {
+                    text: link,
                     width: 256,
                     height: 256,
-                    colorDark: '#000000',
-                    colorLight: '#ffffff',
-                    correctLevel: QRCode.CorrectLevel.H
                 });
-
                 qrModal.classList.remove('hidden');
             }
-
             function closeQR() {
                 const qrModal = document.getElementById('qrModal');
                 qrModal.classList.add('hidden');
             }
+
         </script>
     @endpush
 @endsection
