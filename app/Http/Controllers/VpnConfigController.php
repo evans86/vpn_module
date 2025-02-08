@@ -34,6 +34,10 @@ class VpnConfigController extends Controller
                 throw new RuntimeException('Server user not found');
             }
 
+            Log::debug('SHOW INFO ENCODE CONNECTION KEYS', [
+                'MY_KEYS' => $serverUser->keys,
+            ]);
+
             // Декодируем ключи подключения
             $connectionKeys = json_decode($serverUser->keys, true);
 
