@@ -152,16 +152,21 @@
                     return;
                 }
 
+                // Кодируем ссылку для безопасности
+                const encodedLink = encodeURIComponent(link);
+
                 const qrModal = document.getElementById('qrModal');
                 const qrcodeElement = document.getElementById('qrcode');
+                qrcodeElement.innerHTML = ''; // Очищаем предыдущий QR-код
 
-                qrcodeElement.innerHTML = '';
+                // Создаем новый QR-код
                 new QRCode(qrcodeElement, {
-                    text: link,
+                    text: encodedLink, // Используем закодированную ссылку
                     width: 256,
                     height: 256,
                 });
 
+                // Показываем модальное окно
                 qrModal.classList.remove('hidden');
             }
 
