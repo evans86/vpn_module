@@ -464,29 +464,3 @@
     border-top: 1px solid #eee;
     padding: 1.5rem;
 }
-
-.notification {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    padding: 10px 20px;
-    background-color: #4caf50; /* Зеленый цвет */
-    color: white;
-    border-radius: 5px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    font-size: 14px;
-    z-index: 1000;
-    opacity: 0;
-    transform: translateY(20px);
-    transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-.notification.hidden {
-    opacity: 0;
-    transform: translateY(20px);
-}
-
-.notification:not(.hidden) {
-    opacity: 1;
-    transform: translateY(0);
-}
