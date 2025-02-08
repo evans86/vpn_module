@@ -126,7 +126,15 @@ class FatherBotController extends AbstractTelegramBot
                     }
                     break;
                 case 'show_packs':
-                    $this->showPacksList();
+                    // Если передана страница, используем её, иначе показываем первую страницу
+                    $page = $params['page'] ?? 1;
+                    $this->showPacksList($page);
+                    break;
+                case 'packs_page':
+                    // Обработка пагинации
+                    if (isset($params['page'])) {
+                        $this->showPacksList($params['page']);
+                    }
                     break;
                 case 'toggle_bot':
                     $this->toggleBot($messageId);
@@ -178,9 +186,9 @@ class FatherBotController extends AbstractTelegramBot
     }
 
     /**
-     * Показать список пакетов продавца
+     * Показать список пакетов продавца с пагинацией
      */
-    private function showPacksList(): void
+    private function showPacksList(int $page = 1): void
     {
         try {
             $salesman = Salesman::where('telegram_id', $this->chatId)->first();
@@ -189,10 +197,14 @@ class FatherBotController extends AbstractTelegramBot
                 return;
             }
 
+            // Количество пакетов на страницу
+            $perPage = 10;
+
+            // Получаем пакеты с пагинацией
             $packs = PackSalesman::where('salesman_id', $salesman->id)
                 ->where('status', PackSalesman::PAID)
                 ->with('pack')
-                ->get();
+                ->paginate($perPage, ['*'], 'page', $page);
 
             if ($packs->isEmpty()) {
                 $this->sendMessage("❌ Кажется, что у вас <b>нет</b> активных <b>пакетов</b>, успейте приобрести пакет ключей и начать свой бизнес!");
@@ -202,6 +214,7 @@ class FatherBotController extends AbstractTelegramBot
             $message = "<blockquote><b>📦 Пакеты ключей:</b></blockquote>\n\n";
             $keyboard = ['inline_keyboard' => []];
 
+            // Добавляем пакеты на текущую страницу
             foreach ($packs as $packSalesman) {
                 $pack = $packSalesman->pack;
                 $keyboard['inline_keyboard'][] = [
@@ -213,6 +226,35 @@ class FatherBotController extends AbstractTelegramBot
                         ])
                     ]
                 ];
+            }
+
+            // Добавляем кнопки пагинации
+            if ($packs->hasPages()) {
+                $paginationButtons = [];
+
+                // Кнопка "Назад"
+                if ($packs->currentPage() > 1) {
+                    $paginationButtons[] = [
+                        'text' => '⬅️ Назад',
+                        'callback_data' => json_encode([
+                            'action' => 'packs_page',
+                            'page' => $packs->currentPage() - 1
+                        ])
+                    ];
+                }
+
+                // Кнопка "Вперед"
+                if ($packs->hasMorePages()) {
+                    $paginationButtons[] = [
+                        'text' => 'Вперед ➡️',
+                        'callback_data' => json_encode([
+                            'action' => 'packs_page',
+                            'page' => $packs->currentPage() + 1
+                        ])
+                    ];
+                }
+
+                $keyboard['inline_keyboard'][] = $paginationButtons;
             }
 
             $this->sendMessage($message, $keyboard);
