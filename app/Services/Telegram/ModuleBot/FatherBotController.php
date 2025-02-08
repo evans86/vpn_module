@@ -255,7 +255,6 @@ class FatherBotController extends AbstractTelegramBot
                 $keyboard['inline_keyboard'][] = $paginationButtons;
             }
 
-            // Если есть message_id, используем editMessageText, иначе sendMessage
             if ($messageId) {
                 $this->editMessage($message, $keyboard, $messageId);
             } else {
@@ -508,11 +507,7 @@ class FatherBotController extends AbstractTelegramBot
 
             foreach ($keys as $index => $key) {
                 $status = $key->user_tg_id ? "Активирован" : "Не активирован";
-//                if ($key->user_tg_id) {
-//                    $content .= ($index + 1) . ". {$key->id} - {$status} (ID пользователя: {$key->user_tg_id})\n";
-//                } else {
                 $content .= ($index + 1) . ". {$key->id} - {$status}\n";
-//                }
             }
 
             // Создаем временный файл
