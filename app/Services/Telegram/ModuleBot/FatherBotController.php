@@ -163,8 +163,8 @@ class FatherBotController extends AbstractTelegramBot
             $salesman->state = self::STATE_WAITING_TOKEN;
             $salesman->save();
 
-            $message = "<b>Введите токен вашего бота:</b>\n\n";
-            $message .= "🔑 <b><i>Как выпустить токен?</b></i>\n\n";
+            $message = "<i><b>Введите токен вашего бота:</b></i>\n\n";
+            $message .= "🔑 <i><b>Как выпустить токен?</b></i>\n\n";
             $message .= "1️⃣ Открываем в телеграмме @BotFather и нажимаем start/начать\n\n";
             $message .= "2️⃣ Выбираем команду /newbot\n\n";
             $message .= "3️⃣ Вводим любое название для бота. Потом вводим никнейм бота на английском слитно, которое обязательно заканчивается на слово _bot\n\n";
@@ -712,7 +712,7 @@ class FatherBotController extends AbstractTelegramBot
             $webhookUrl = rtrim(self::WEBHOOK_BASE_URL, '/') . '/api/telegram/salesman-bot/' . $salesman->token . '/init';
             $salesmanBot->setWebhook(['url' => $webhookUrl]);
 
-            $this->sendMessage("✅ Бот успешно перезагружен, вебхук обновлен.");
+            $this->sendMessage("✅ Бот успешно перезагружен, Webhook обновлен.");
         } catch (\Exception $e) {
             Log::error('Bot reload error: ' . $e->getMessage());
             $this->sendMessage("❌ Ошибка при перезагрузке бота: " . $e->getMessage());
