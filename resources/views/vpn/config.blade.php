@@ -154,14 +154,20 @@
                 }
 
                 const encodedLink = encodeURIComponent(link);
+
                 const qrModal = document.getElementById('qrModal');
                 const qrcodeElement = document.getElementById('qrcode');
                 qrcodeElement.innerHTML = '';
 
-                const qr = qrcode(0, 'M'); // Создаем QR-код
-                qr.addData(encodedLink);
-                qr.make();
-                qrcodeElement.innerHTML = qr.createSvgTag(256, 256); // Добавляем SVG
+                // Создаем QR-код
+                const qr = new QRCode(qrcodeElement, {
+                    text: encodedLink,
+                    width: 256,
+                    height: 256,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.H
+                });
 
                 qrModal.classList.remove('hidden');
             }
