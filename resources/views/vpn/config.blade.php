@@ -152,6 +152,8 @@
                     return;
                 }
 
+                console.log('Encoded Link Length:', encodeURIComponent(link).length);
+
                 const qrModal = document.getElementById('qrModal');
                 const qrcodeElement = document.getElementById('qrcode');
                 qrcodeElement.innerHTML = '';
@@ -166,6 +168,7 @@
 
                 qrModal.classList.remove('hidden');
             }
+
             function closeQR() {
                 const qrModal = document.getElementById('qrModal');
                 qrModal.classList.add('hidden');
