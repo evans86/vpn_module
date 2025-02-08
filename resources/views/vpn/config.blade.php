@@ -153,6 +153,7 @@
                 }
 
                 console.log('Encoded Link Length:', encodeURIComponent(link).length);
+                console.log('Encoded Link Length:', link);
 
                 // const encodedLink = encodeURIComponent(link);
 
