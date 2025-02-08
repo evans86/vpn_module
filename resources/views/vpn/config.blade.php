@@ -152,8 +152,11 @@
                     return;
                 }
 
-                // Кодируем всю строку конфигурации
-                const encodedLink = encodeURIComponent(link);
+                // Удаляем всё после символа #
+                const cleanedLink = link.split('#')[0];
+
+                // Кодируем очищенную строку
+                const encodedLink = encodeURIComponent(cleanedLink);
 
                 const qrModal = document.getElementById('qrModal');
                 const qrcodeElement = document.getElementById('qrcode');
