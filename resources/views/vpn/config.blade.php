@@ -161,7 +161,7 @@
                     width: 256,
                     height: 256,
                     correctLevel: QRCode.CorrectLevel.H, // Уровень коррекции ошибок H (высокий)
-                    version: 20 // Укажите более высокую версию
+                    version: 40 // Укажите более высокую версию
                 });
 
                 qrModal.classList.remove('hidden');
