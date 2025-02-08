@@ -70,15 +70,6 @@
                                 (осталось {{ $days }} {{ $daysText }})
                             </div>
                         </div>
-
-                        <div>
-                            <span class="text-gray-600">Действует до:</span>
-                            <span
-                                class="ml-2 font-semibold">{{ date('d.m.Y H:i', $userInfo['expiration_date']) }}</span>
-                            <div class="text-sm text-gray-500 mt-1">(осталось {{ $userInfo['days_remaining'] }} дней)
-                            </div>
-                        </div>
-
                     </div>
                 </div>
             </div>
