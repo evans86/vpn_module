@@ -126,14 +126,34 @@
         </div>
     </div>
 
+    <div id="copy-notification" class="notification hidden"></div>
+
     @push('scripts')
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
         <script src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
         <script>
+            let copyNotificationTimeout;
+
+            function showCopyNotification(message) {
+                const notification = document.getElementById('copy-notification');
+                notification.textContent = message; // Устанавливаем текст уведомления
+                notification.classList.remove('hidden'); // Показываем уведомление
+
+                // Очищаем предыдущий таймаут, если он существует
+                if (copyNotificationTimeout) {
+                    clearTimeout(copyNotificationTimeout);
+                }
+
+                // Скрываем уведомление через 2 секунды
+                copyNotificationTimeout = setTimeout(() => {
+                    notification.classList.add('hidden');
+                }, 2000);
+            }
+
             function copyCurrentUrl() {
                 const url = window.location.href;
                 navigator.clipboard.writeText(url).then(() => {
-                    alert('Ссылка скопирована в буфер обмена!');
+                    showCopyNotification('Ссылка скопирована в буфер обмена!');
                 }).catch(() => {
                     alert('Не удалось скопировать ссылку.');
                 });
@@ -141,7 +161,7 @@
 
             function copyToClipboard(text, protocol) {
                 navigator.clipboard.writeText(text).then(() => {
-                    alert(`Конфигурация ${protocol} скопирована в буфер обмена!`);
+                    showCopyNotification(`Конфигурация ${protocol} скопирована в буфер обмена!`);
                 }).catch(() => {
                     alert('Не удалось скопировать конфигурацию.');
                 });
