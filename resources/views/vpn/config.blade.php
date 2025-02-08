@@ -190,7 +190,7 @@
                     backgroundOptions: {
                         color: "#ffffff", // Цвет фона
                     },
-                    image: "https://yt3.googleusercontent.com/5445ZfkWuo8ncv4HIrAT0Ys2IUYSqaBBf7rMzxamlOBg2LWmXHMMGMWQ3qVAVVSwYaX5bFLI9A=s900-c-k-c0x00ffffff-no-rj", // Можно добавить логотип в центр QR-кода (URL изображения)
+                    image: "", // Можно добавить логотип в центр QR-кода (URL изображения)
                     imageOptions: {
                         crossOrigin: "anonymous", // Настройки кросс-оригина для изображения
                         margin: 10 // Отступ вокруг изображения
