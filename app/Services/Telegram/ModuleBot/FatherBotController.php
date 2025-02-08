@@ -92,7 +92,6 @@ class FatherBotController extends AbstractTelegramBot
     {
         try {
             Log::info('Processing callback data', ['data' => $data]);
-
             $params = json_decode($data, true);
             if (!$params || !isset($params['action'])) {
                 Log::error('Invalid callback data', ['data' => $data]);
@@ -126,14 +125,12 @@ class FatherBotController extends AbstractTelegramBot
                     }
                     break;
                 case 'show_packs':
-                    // Если передана страница, используем её, иначе показываем первую страницу
                     $page = $params['page'] ?? 1;
-                    $this->showPacksList($page);
+                    $this->showPacksList($page, $messageId);
                     break;
                 case 'packs_page':
-                    // Обработка пагинации
                     if (isset($params['page'])) {
-                        $this->showPacksList($params['page']);
+                        $this->showPacksList($params['page'], $messageId);
                     }
                     break;
                 case 'toggle_bot':
@@ -188,7 +185,7 @@ class FatherBotController extends AbstractTelegramBot
     /**
      * Показать список пакетов продавца с пагинацией
      */
-    private function showPacksList(int $page = 1): void
+    private function showPacksList(int $page = 1, ?int $messageId = null): void
     {
         try {
             $salesman = Salesman::where('telegram_id', $this->chatId)->first();
@@ -257,7 +254,12 @@ class FatherBotController extends AbstractTelegramBot
                 $keyboard['inline_keyboard'][] = $paginationButtons;
             }
 
-            $this->sendMessage($message, $keyboard);
+            // Если есть message_id, используем editMessageText, иначе sendMessage
+            if ($messageId) {
+                $this->editMessage($message, $keyboard, $messageId);
+            } else {
+               $this->sendMessage($message, $keyboard);
+            }
         } catch (\Exception $e) {
             Log::error('Error in showPacksList: ' . $e->getMessage());
             $this->sendErrorMessage();
