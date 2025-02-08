@@ -154,12 +154,14 @@
 
                 console.log('Encoded Link Length:', encodeURIComponent(link).length);
 
+                const encodedLink = encodeURIComponent(link);
+
                 const qrModal = document.getElementById('qrModal');
                 const qrcodeElement = document.getElementById('qrcode');
                 qrcodeElement.innerHTML = '';
 
                 new QRCode(qrcodeElement, {
-                    text: link,
+                    text: encodedLink,
                     width: 256,
                     height: 256,
                     correctLevel: QRCode.CorrectLevel.H, // Уровень коррекции ошибок H (высокий)
