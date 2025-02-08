@@ -151,16 +151,25 @@
                     alert('Ссылка для QR-кода отсутствует или некорректна.');
                     return;
                 }
+
+                // Кодируем всю строку конфигурации
+                const encodedLink = encodeURIComponent(link);
+
                 const qrModal = document.getElementById('qrModal');
                 const qrcodeElement = document.getElementById('qrcode');
-                qrcodeElement.innerHTML = '';
+                qrcodeElement.innerHTML = ''; // Очищаем предыдущий QR-код
+
+                // Создаем QR-код
                 new QRCode(qrcodeElement, {
-                    text: link,
+                    text: encodedLink, // Используем закодированную строку
                     width: 256,
                     height: 256,
                 });
+
+                // Показываем модальное окно
                 qrModal.classList.remove('hidden');
             }
+
             function closeQR() {
                 const qrModal = document.getElementById('qrModal');
                 qrModal.classList.add('hidden');
