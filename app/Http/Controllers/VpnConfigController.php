@@ -36,6 +36,11 @@ class VpnConfigController extends Controller
 
             // Декодируем ключи подключения
             $connectionKeys = json_decode($serverUser->keys, true);
+
+            Log::debug('SHOW INFO DRCODED CONNECTION KEYS', [
+                'MY_KEYS' => $connectionKeys,
+            ]);
+
             if (!$connectionKeys) {
                 throw new RuntimeException('Invalid connection keys format');
             }
