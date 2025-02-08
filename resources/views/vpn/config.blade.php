@@ -152,15 +152,15 @@
                     return;
                 }
 
+                const encodedLink = encodeURIComponent(link);
                 const qrModal = document.getElementById('qrModal');
                 const qrcodeElement = document.getElementById('qrcode');
-
                 qrcodeElement.innerHTML = '';
-                new QRCode(qrcodeElement, {
-                    text: link,
-                    width: 256,
-                    height: 256,
-                });
+
+                const qr = qrcode(0, 'M'); // Создаем QR-код
+                qr.addData(encodedLink);
+                qr.make();
+                qrcodeElement.innerHTML = qr.createSvgTag(256, 256); // Добавляем SVG
 
                 qrModal.classList.remove('hidden');
             }
