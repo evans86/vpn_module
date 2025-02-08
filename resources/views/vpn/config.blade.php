@@ -47,6 +47,30 @@
                                 <div class="bg-blue-600 h-2.5 rounded-full" style="width: {{ $percentage }}%"></div>
                             </div>
                         </div>
+
+                        <div>
+                            <span class="text-gray-600">Действует до:</span>
+                            <span class="ml-2 font-semibold">{{ date('d.m.Y H:i', $userInfo['expiration_date']) }}</span>
+                            @php
+                                $days = $userInfo['days_remaining'];
+                                $lastDigit = $days % 10;
+                                $lastTwoDigits = $days % 100;
+
+                                if ($lastTwoDigits >= 11 && $lastTwoDigits <= 19) {
+                                    $daysText = 'дней';
+                                } elseif ($lastDigit === 1) {
+                                    $daysText = 'день';
+                                } elseif ($lastDigit >= 2 && $lastDigit <= 4) {
+                                    $daysText = 'дня';
+                                } else {
+                                    $daysText = 'дней';
+                                }
+                            @endphp
+                            <div class="text-sm text-gray-500 mt-1">
+                                (осталось {{ $days }} {{ $daysText }})
+                            </div>
+                        </div>
+
                         <div>
                             <span class="text-gray-600">Действует до:</span>
                             <span
@@ -54,6 +78,7 @@
                             <div class="text-sm text-gray-500 mt-1">(осталось {{ $userInfo['days_remaining'] }} дней)
                             </div>
                         </div>
+
                     </div>
                 </div>
             </div>
