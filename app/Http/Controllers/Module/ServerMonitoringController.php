@@ -27,7 +27,7 @@ class ServerMonitoringController extends Controller
         /**
          * @var Panel $panel
          */
-        $panel = Panel::query()->where('status', Panel::PANEL_CONFIGURED)->first();
+        $panel = Panel::query()->where('panel_status', Panel::PANEL_CONFIGURED)->first();
         $strategy = new PanelStrategy($panel->panel);
         $panel_stats = $strategy->getServerStats($panel->id);
 
