@@ -7,6 +7,7 @@ use App\Http\Controllers\Module\PackController;
 use App\Http\Controllers\Module\PackSalesmanController;
 use App\Http\Controllers\Module\KeyActivateController;
 use App\Http\Controllers\Module\BotController;
+use App\Http\Controllers\Module\ServerMonitoringController;
 use App\Http\Controllers\Module\TelegramUserController;
 use App\Http\Controllers\VpnConfigController;
 use App\Http\Controllers\LogController;
@@ -101,6 +102,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::get('/', [KeyActivateController::class, 'index'])->name('index');
                 Route::delete('/{id}', [KeyActivateController::class, 'destroy'])->name('destroy');
                 Route::post('/update-date', [KeyActivateController::class, 'updateDate'])->name('update-date');
+            });
+
+            // Server Monitoring Routes
+            Route::prefix('server-monitoring')->name('server-monitoring.')->group(function () {
+                Route::get('/', [ServerMonitoringController::class, 'index'])->name('index');
             });
 
             // Server User Routes

@@ -33,6 +33,17 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
     }
 
     /**
+     * @param int $panel_id
+     * @return array
+     * @throws GuzzleException
+     */
+    public function getServerStats(int $panel_id): array
+    {
+        $marzbanServer = new MarzbanService();
+        return $marzbanServer->getServerStats($panel_id);
+    }
+
+    /**
      * Обновление конфигурации панели
      *
      * @param int $panel_id

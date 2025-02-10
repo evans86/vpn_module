@@ -271,6 +271,43 @@ class MarzbanAPI
     }
 
     /**
+     * @param string $token
+     * @return mixed
+     * @throws GuzzleException
+     * @throws Exception
+     */
+    public function getServerStats(string $token)
+    {
+        try {
+            $action = 'system';
+
+            $requestParam = [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json'
+                ],
+                'verify' => false // Отключаем проверку SSL сертификата
+            ];
+
+            $client = new Client([
+                'base_uri' => $this->host . '/api/',
+                'verify' => false // Отключаем проверку SSL сертификата
+            ]);
+
+            $response = $client->get($action, $requestParam);
+
+            $result = $response->getBody()->getContents();
+
+            return (json_decode($result, true));
+        } catch (RuntimeException $r) {
+            throw new RuntimeException($r->getMessage());
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage());
+        }
+    }
+
+    /**
      * Удаление пользователя в панели marzban
      *
      * @param string $token

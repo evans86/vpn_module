@@ -304,6 +304,29 @@ class MarzbanService
     }
 
     /**
+     * @param int $panel_id
+     * @return array
+     * @throws GuzzleException
+     * @throws Exception
+     */
+    public function getServerStats(int $panel_id): array
+    {
+        try {
+            $panel = $this->updateMarzbanToken($panel_id);
+            $marzbanApi = new MarzbanAPI($panel->api_address);
+            $serverStats = $marzbanApi->getServerStats($panel->auth_token);
+
+            return $serverStats;
+        } catch (Exception $e) {
+            Log::error('Failed to check user status', [
+                'panel_id' => $panel_id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
      * Проверка онлайн статуса пользователя
      *
      * @param int $panel_id
