@@ -298,7 +298,8 @@ class MarzbanAPI
             $response = $client->get($action, $requestParam);
 
             Log::warning('STATS RESULT', [
-                'response' => $response
+                'response' => $response,
+                'panel_id' => $token
             ]);
 
             $result = $response->getBody()->getContents();
