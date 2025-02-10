@@ -316,6 +316,10 @@ class MarzbanService
             $marzbanApi = new MarzbanAPI($panel->api_address);
             $serverStats = $marzbanApi->getServerStats($panel->auth_token);
 
+            Log::debug('GET SERVER STATS', [
+                'panel_id' => $panel_id
+            ]);
+
             return $serverStats;
         } catch (Exception $e) {
             Log::error('Failed to check user status', [
