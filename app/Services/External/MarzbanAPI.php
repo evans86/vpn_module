@@ -297,6 +297,10 @@ class MarzbanAPI
 
             $response = $client->get($action, $requestParam);
 
+            Log::warning('STATS RESULT', [
+                'response' => $response
+            ]);
+
             $result = $response->getBody()->getContents();
 
             return (json_decode($result, true));
