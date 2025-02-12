@@ -14,6 +14,18 @@ class ServerUserRepository extends BaseRepository
     }
 
     /**
+     * @param string $id
+     * @return ServerUser|null
+     */
+    public function findById(string $id): ?ServerUser
+    {
+        /** @var ServerUser|null */
+        return $this->query()
+            ->where('id', $id)
+            ->first();
+    }
+
+    /**
      * @param int $userId
      * @param int $serverId
      * @return ServerUser|null

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ServerUser\ServerUser;
 use App\Repositories\KeyActivateUser\KeyActivateUserRepository;
+use App\Repositories\ServerUser\ServerUserRepository;
 use App\Services\Panel\PanelStrategy;
 use Exception;
 use Illuminate\Support\Facades\Log;
@@ -13,10 +14,15 @@ use Symfony\Component\HttpFoundation\Response;
 class VpnConfigController extends Controller
 {
     private KeyActivateUserRepository $keyActivateUserRepository;
+    private ServerUserRepository $serverUserRepository;
 
-    public function __construct(KeyActivateUserRepository $keyActivateUserRepository)
+    public function __construct(
+        KeyActivateUserRepository $keyActivateUserRepository,
+        ServerUserRepository $serverUserRepository
+    )
     {
         $this->keyActivateUserRepository = $keyActivateUserRepository;
+        $this->serverUserRepository = $serverUserRepository;
     }
 
     /**
@@ -29,12 +35,9 @@ class VpnConfigController extends Controller
             // Получаем запись key_activate_user с отношениями
             $keyActivateUser = $this->keyActivateUserRepository->findByKeyActivateIdWithRelations($key_activate_id);
 
-            Log::warning('$keyActivateUser:', ['keyActivateUser' => $keyActivateUser]);
-
             // Получаем информацию о пользователе сервера
-//            $serverUser = $keyActivateUser->serverUser;
-            $serverUser = ServerUser::query()->where('id', $keyActivateUser->server_user_id)->first();
-            Log::warning('$serverUser:', ['serverUser' => $serverUser]);
+            $serverUser = $this->serverUserRepository->findById($keyActivateUser->server_user_id);
+
             if (!$serverUser) {
                 throw new RuntimeException('Server user not found');
             }
