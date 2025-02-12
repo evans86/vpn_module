@@ -9,6 +9,7 @@ use App\Models\ServerMonitoring\ServerMonitoring;
 use App\Services\Panel\PanelStrategy;
 use Carbon\Carbon;
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Support\Facades\Log;
 
 class ServerMonitoringController extends Controller
 {
@@ -58,6 +59,10 @@ class ServerMonitoringController extends Controller
             ];
         }
 
-        return view('module.server-monitoring.index');
+        // Логируем данные для отладки
+        Log::info('Statistics data:', ['statistics' => $statistics]);
+
+        // Передаем данные в представление
+        return view('module.server-monitoring.index', compact('statistics'));
     }
 }
