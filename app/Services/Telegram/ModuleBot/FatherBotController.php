@@ -579,7 +579,7 @@ class FatherBotController extends AbstractTelegramBot
                 $content .= "Не активированные ключи активации:\n";
             }
 
-            if (empty($keys)) {
+            if (!empty($keys)) {
                 $content .= "Нет не активированных ключей активации\n";
             }else{
                 foreach ($keys as $index => $key) {
