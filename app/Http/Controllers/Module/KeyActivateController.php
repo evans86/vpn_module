@@ -105,10 +105,14 @@ class KeyActivateController extends Controller
      * Remove the specified key activate
      * @param string $id
      * @return JsonResponse
+     * @throws GuzzleException
      */
     public function destroy(string $id): JsonResponse
     {
         try {
+            /**
+             * @var KeyActivate $key
+             */
             $key = KeyActivate::with(['keyActivateUser.serverUser.panel'])->findOrFail($id);
 
             $this->logger->info('Начало удаления ключа активации', [

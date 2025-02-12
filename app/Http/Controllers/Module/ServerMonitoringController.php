@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
-use App\Logging\DatabaseLogger;
 use App\Models\Panel\Panel;
 use App\Models\ServerMonitoring\ServerMonitoring;
 use App\Services\Panel\PanelStrategy;
@@ -13,15 +12,6 @@ use Illuminate\Support\Facades\Log;
 
 class ServerMonitoringController extends Controller
 {
-    private DatabaseLogger $logger;
-
-    public function __construct(
-        DatabaseLogger $logger
-    )
-    {
-        $this->logger = $logger;
-    }
-
     /**
      * @throws GuzzleException
      */
@@ -65,10 +55,8 @@ class ServerMonitoringController extends Controller
             ];
         }
 
-        // Логируем данные для отладки
         Log::info('Statistics data:', ['statistics' => $statistics]);
 
-        // Передаем данные в представление
         return view('module.server-monitoring.index', compact('statistics'));
     }
 }

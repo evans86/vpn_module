@@ -41,6 +41,9 @@ class ServerUserTransferController extends Controller
             ]);
 
             // Получаем текущую панель ключа
+            /**
+             * @var KeyActivate $key
+             */
             $key = KeyActivate::with('keyActivateUser.serverUser')->findOrFail($validated['key_id']);
 
             Log::info('Key data:', [
@@ -55,7 +58,7 @@ class ServerUserTransferController extends Controller
             // Получаем все активные панели, кроме текущей
             $panels = Panel::with('server')
                 ->where('panel_status', 2)
-                ->when($currentPanelId, function($query) use ($currentPanelId) {
+                ->when($currentPanelId, function ($query) use ($currentPanelId) {
                     return $query->where('id', '!=', $currentPanelId);
                 })
                 ->get();

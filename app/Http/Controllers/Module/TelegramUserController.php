@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
 use App\Models\TelegramUser\TelegramUser;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class TelegramUserController extends Controller
@@ -36,7 +37,7 @@ class TelegramUserController extends Controller
     /**
      * Переключает статус пользователя.
      */
-    public function toggleStatus($id)
+    public function toggleStatus($id): JsonResponse
     {
         $user = TelegramUser::findOrFail($id);
         $user->status = !$user->status;

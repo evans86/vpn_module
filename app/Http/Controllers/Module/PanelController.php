@@ -154,73 +154,6 @@ class PanelController extends Controller
         }
     }
 
-//    /**
-//     * Store a newly created panel.
-//     *
-//     * @param Request $request
-//     * @return RedirectResponse
-//     */
-//    public function store(Request $request): RedirectResponse
-//    {
-//        try {
-//            $this->logger->debug('Request data', [
-//                'source' => 'panel',
-//                'action' => 'store',
-//                'user_id' => auth()->id(),
-//                'request_data' => $request->all()
-//            ]);
-//
-//            $validated = $request->validate([
-//                'server_id' => ['required'],
-////                'panel_adress' => ['required'],
-////                'panel_port' => ['required'],
-//            ]);
-//
-//            $server = Server::find($validated['server_id']);
-//            if (empty($server)) {
-//                return redirect()->back()->with('error', 'Сервер не найден');
-//            }
-//
-//            DB::beginTransaction();
-//
-//            // Создаем панель
-//            $panel = Panel::create([
-//                'server_id' => $validated['server_id'],
-//                'panel_adress' => $validated['panel_adress'],
-//                'panel_port' => $validated['panel_port'],
-//                'panel_status' => Panel::PANEL_CREATED
-//            ]);
-//
-//            $this->logger->info('Создание панели', [
-//                'source' => 'panel',
-//                'action' => 'store',
-//                'user_id' => auth()->id(),
-//                'panel_id' => $panel->id
-//            ]);
-//
-//            DB::commit();
-//
-//            return redirect()
-//                ->route('admin.module.panel.index')
-//                ->with('success', 'Панель успешно создана');
-//
-//        } catch (Exception $e) {
-//            DB::rollBack();
-//
-//            $this->logger->error('Ошибка при создании панели', [
-//                'source' => 'panel',
-//                'action' => 'store',
-//                'user_id' => auth()->id(),
-//                'error' => $e->getMessage()
-//            ]);
-//
-//            return redirect()
-//                ->back()
-//                ->with('error', 'Ошибка при создании панели: ' . $e->getMessage())
-//                ->withInput();
-//        }
-//    }
-
     /**
      * Configure panel.
      *
@@ -294,7 +227,7 @@ class PanelController extends Controller
     }
 
     /**
-     * @TODO
+     * @TODO нужен или нет
      *
      * Check panel status
      * @param Panel $panel
@@ -340,7 +273,7 @@ class PanelController extends Controller
     }
 
     /**
-     * @TODO не работает правльно
+     * @TODO не работает правильно
      * Update panel admin credentials.
      *
      * @param Panel $panel
