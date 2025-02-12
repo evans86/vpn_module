@@ -317,7 +317,7 @@ class MarzbanService
             $serverStats = $marzbanApi->getServerStats($panel->auth_token);
 
             Log::warning('GET SERVER STATS', [
-                '$serverStats' => $serverStats
+                '$serverStats' => $serverStats['mem_total']
             ]);
 
             $statistics = [
