@@ -41,17 +41,12 @@
     </div>
 
     @push('js')
+        <!-- Подключаем Chart.js и плагин zoom -->
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
-        <script>
-            @foreach($statistics as $panelId => $panelData)
-            // Данные для графиков
-            const labels{{ $panelId }} = {!! json_encode($panelData['data']->pluck('created_at')) !!};
-            const cpuData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.cpu_usage')) !!};
-            const memoryData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.mem_used_gb')) !!};
-            const usersData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.online_users')) !!};
 
-            // Настройки для всех графиков
+        <script>
+            // Настройки для всех графиков (выносим за пределы цикла)
             const commonOptions = {
                 responsive: true,
                 maintainAspectRatio: false,
@@ -93,6 +88,13 @@
                     },
                 },
             };
+
+            @foreach($statistics as $panelId => $panelData)
+            // Данные для графиков
+            const labels{{ $panelId }} = {!! json_encode($panelData['data']->pluck('created_at')) !!};
+            const cpuData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.cpu_usage')) !!};
+            const memoryData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.mem_used_gb')) !!};
+            const usersData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.online_users')) !!};
 
             // График CPU
             new Chart(document.getElementById('chart-cpu-{{ $panelId }}'), {

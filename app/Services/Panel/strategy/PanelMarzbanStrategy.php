@@ -33,7 +33,6 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
     }
 
     /**
-     * @param int $panel_id
      * @return void
      * @throws GuzzleException
      */
