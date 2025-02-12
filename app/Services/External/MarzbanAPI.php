@@ -167,10 +167,6 @@ class MarzbanAPI
 
             $response = $client->post($action, $requestParam);
 
-            Log::warning('response MARZBAN CREATE', [
-                'response' => $response
-            ]);
-
             $result = $response->getBody()->getContents();
 
             return (json_decode($result, true));
@@ -333,10 +329,6 @@ class MarzbanAPI
             $client = new Client([
                 'base_uri' => $this->host . '/api/user/',
                 'verify' => false // Отключаем проверку SSL сертификата
-            ]);
-
-            Log::warning('Last step MARZBAN DELETE', [
-                'response' => 'Я тут '
             ]);
 
             $response = $client->delete($action, $requestParam);
