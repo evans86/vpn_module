@@ -287,12 +287,12 @@ class MarzbanAPI
                     'Content-Type' => 'application/json',
                     'Accept' => 'application/json'
                 ],
-                'verify' => false // Отключаем проверку SSL сертификата
+//                'verify' => false // Отключаем проверку SSL сертификата
             ];
 
             $client = new Client([
                 'base_uri' => $this->host . '/api/',
-                'verify' => false // Отключаем проверку SSL сертификата
+//                'verify' => false // Отключаем проверку SSL сертификата
             ]);
 
             $response = $client->get($action, $requestParam);
