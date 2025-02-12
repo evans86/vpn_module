@@ -7,9 +7,11 @@ use App\Dto\Server\ServerFactory;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\Panel\Panel;
 use App\Models\Server\Server;
+use App\Models\ServerMonitoring\ServerMonitoring;
 use App\Models\ServerUser\ServerUser;
 use App\Services\External\MarzbanAPI;
 use App\Services\Key\KeyActivateUserService;
+use Carbon\Carbon;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -304,45 +306,65 @@ class MarzbanService
     }
 
     /**
-     * @param int $panel_id
-     * @return array
      * @throws GuzzleException
      * @throws Exception
      */
-    public function getServerStats(int $panel_id): array
+    public function getServerStats(): void
     {
         try {
-            $panel = $this->updateMarzbanToken($panel_id);
-            $marzbanApi = new MarzbanAPI($panel->api_address);
-            $serverStats = $marzbanApi->getServerStats($panel->auth_token);
+            $panels = Panel::query()->where('panel_status', Panel::PANEL_CONFIGURED)->get();
 
-            Log::warning('GET SERVER STATS', [
-                '$serverStats' => $serverStats
-            ]);
+            $panels->each(function ($panel) {
+                // Обработка каждой панели
+                Log::info('Panel ID: ' . $panel->id);
+                $panel = $this->updateMarzbanToken($panel->id);
+                $marzbanApi = new MarzbanAPI($panel->api_address);
+                $serverStats = $marzbanApi->getServerStats($panel->auth_token);
+                $statistics = json_encode($serverStats);
+                ServerMonitoring::create([
+                    'panel_id' => $panel->id,
+                    'statistics' => $statistics
+                ]);
+            });
 
-            $statistics = [
-                'mem_total' => $serverStats['mem_total'], //общая память
-                'mem_used' => $serverStats['mem_used'], //используемая память
-                'cpu_cores' => $serverStats['cpu_cores'], //количество ядер
-                'cpu_usage' => $serverStats['cpu_usage'], //использование процессора
-                'total_user' => $serverStats['total_user'], //количество пользователей
-                'online_users' => $serverStats['online_users'], //количество онлайн пользователей
-                'users_active' => $serverStats['users_active'], //количество активных пользователей
-                'users_on_hold' => $serverStats['users_on_hold'], //количество пользователей в ожидании
-                'users_disabled' => $serverStats['users_disabled'], //количество отключенных пользователей
-                'users_expired' => $serverStats['users_expired'], //количество просроченных пользователей
-                'users_limited' => $serverStats['users_limited'], //количество ограниченных пользователей
-                'incoming_bandwidth' => $serverStats['incoming_bandwidth'], //входящий трафик
-                'outgoing_bandwidth' => $serverStats['outgoing_bandwidth'], //исходящий трафик
-                'incoming_bandwidth_speed' => $serverStats['incoming_bandwidth_speed'], //скорость входящего трафика
-                'outgoing_bandwidth_speed' => $serverStats['outgoing_bandwidth_speed'], //скорость исходящего трафика
-            ];
-//            Log::debug('STATISTICS array', ['$statistics' => $statistics]);
-            return $statistics;
+            self::cleanOldStatistics();
+
         } catch (Exception $e) {
             Log::error('Failed to check user status', [
-                'panel_id' => $panel_id,
                 'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * @throws Exception
+     */
+    public function cleanOldStatistics(): void
+    {
+        try {
+            // Вычисляем дату, которая была неделю назад
+            $oneWeekAgo = Carbon::now()->subWeek();
+
+            Log::info('Starting cleanup of records older than one week.', [
+                'cleanup_date' => $oneWeekAgo,
+            ]);
+
+            // Удаляем все записи старше недели
+            ServerMonitoring::where('created_at', '<', $oneWeekAgo)
+                ->chunkById(100, function ($records) {
+                    foreach ($records as $record) {
+                        $record->delete();
+                    }
+                });
+
+            Log::info('Cleanup completed.', [
+                'cleanup_date' => $oneWeekAgo,
+            ]);
+        } catch (Exception $e) {
+            // Логируем ошибку, если что-то пошло не так
+            Log::error('Failed to clean old records.', [
+                'error' => $e->getMessage(),
             ]);
             throw $e;
         }

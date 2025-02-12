@@ -36,12 +36,12 @@ class PanelStrategy
     }
 
     /**
-     * @param int $panel_id
-     * @return array
+     * @return void
+     * @throws GuzzleException
      */
-    public function getServerStats(int $panel_id): array
+    public function getServerStats(): void
     {
-        return $this->strategy->getServerStats($panel_id);
+        $this->strategy->getServerStats();
     }
 
     /**

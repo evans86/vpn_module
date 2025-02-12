@@ -1,67 +1,110 @@
-@extends('layouts.app', ['page' => __('Мониторинг нагрузки'), 'pageSlug' => 'server-monitoring'])
+@extends('layouts.app', ['page' => __('Мониторинг серверов'), 'pageSlug' => 'server-monitoring'])
 
 @section('content')
-    <div class="container mx-auto px-6 py-12">
-        <div class="bg-white rounded-lg shadow-lg p-6">
-{{--            <h1 class="text-2xl font-bold mb-4">Мониторинг нагрузки сервера</h1>--}}
-
-            @if(!empty($systemData))
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- Версия сервера -->
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <span class="text-gray-600">Версия сервера:</span>
-                        <span class="ml-2 font-semibold">{{ $systemData['version'] }}</span>
-                    </div>
-
-                    <!-- Использование памяти -->
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <span class="text-gray-600">Использование памяти:</span>
-                        <span class="ml-2 font-semibold">{{ number_format($systemData['mem_used'] / 1024 / 1024, 2) }} MB / {{ number_format($systemData['mem_total'] / 1024 / 1024, 2) }} MB</span>
-                        <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
-                            @php
-                                $memoryUsagePercentage = ($systemData['mem_used'] / $systemData['mem_total']) * 100;
-                            @endphp
-                            <div class="bg-blue-600 h-2.5 rounded-full"
-                                 style="width: {{ $memoryUsagePercentage }}%"></div>
+    <div class="container-fluid">
+        <div class="row">
+            @foreach($statistics as $panelId => $panelData)
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4 class="card-title">Статистика панели: {{ $panelData['panel']->name }}</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <canvas id="chart-cpu-{{ $panelId }}" height="150"></canvas>
+                                </div>
+                            </div>
+                            <div class="row mt-4">
+                                <div class="col-md-12">
+                                    <canvas id="chart-memory-{{ $panelId }}" height="150"></canvas>
+                                </div>
+                            </div>
+                            <div class="row mt-4">
+                                <div class="col-md-12">
+                                    <canvas id="chart-users-{{ $panelId }}" height="150"></canvas>
+                                </div>
+                            </div>
                         </div>
                     </div>
-
-                    <!-- Использование CPU -->
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <span class="text-gray-600">Использование CPU:</span>
-                        <span class="ml-2 font-semibold">{{ $systemData['cpu_usage'] }}%</span>
-                        <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
-                            <div class="bg-blue-600 h-2.5 rounded-full"
-                                 style="width: {{ $systemData['cpu_usage'] }}%"></div>
-                        </div>
-                    </div>
-
-                    <!-- Количество пользователей -->
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <span class="text-gray-600">Пользователи:</span>
-                        <span
-                            class="ml-2 font-semibold">{{ $systemData['users_active'] }} / {{ $systemData['total_user'] }}</span>
-                    </div>
-
-                    <!-- Входящий трафик -->
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <span class="text-gray-600">Входящий трафик:</span>
-                        <span class="ml-2 font-semibold">{{ number_format($systemData['incoming_bandwidth'] / 1024 / 1024, 2) }} MB</span>
-                        <span class="text-sm text-gray-500">(Скорость: {{ number_format($systemData['incoming_bandwidth_speed'] / 1024, 2) }} KB/s)</span>
-                    </div>
-
-                    <!-- Исходящий трафик -->
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <span class="text-gray-600">Исходящий трафик:</span>
-                        <span class="ml-2 font-semibold">{{ number_format($systemData['outgoing_bandwidth'] / 1024 / 1024, 2) }} MB</span>
-                        <span class="text-sm text-gray-500">(Скорость: {{ number_format($systemData['outgoing_bandwidth_speed'] / 1024, 2) }} KB/s)</span>
-                    </div>
                 </div>
-            @else
-                <div class="text-center text-gray-600 py-6">
-                    Не удалось загрузить данные мониторинга.
-                </div>
-            @endif
+            @endforeach
         </div>
     </div>
+
+    @push('js')
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+            @foreach($statistics as $panelId => $panelData)
+            // Данные для графиков
+            const labels{{ $panelId }} = {!! json_encode($panelData['data']->pluck('created_at')) !!};
+            const cpuData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.cpu_usage')) !!};
+            const memoryData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.mem_used')) !!};
+            const usersData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.online_users')) !!};
+
+            // График CPU
+            new Chart(document.getElementById('chart-cpu-{{ $panelId }}'), {
+                type: 'line',
+                data: {
+                    labels: labels{{ $panelId }},
+                    datasets: [{
+                        label: 'Использование CPU (%)',
+                        data: cpuData{{ $panelId }},
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        fill: false,
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // График памяти
+            new Chart(document.getElementById('chart-memory-{{ $panelId }}'), {
+                type: 'line',
+                data: {
+                    labels: labels{{ $panelId }},
+                    datasets: [{
+                        label: 'Использование памяти (байты)',
+                        data: memoryData{{ $panelId }},
+                        borderColor: 'rgba(153, 102, 255, 1)',
+                        fill: false,
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // График онлайн-пользователей
+            new Chart(document.getElementById('chart-users-{{ $panelId }}'), {
+                type: 'line',
+                data: {
+                    labels: labels{{ $panelId }},
+                    datasets: [{
+                        label: 'Онлайн-пользователи',
+                        data: usersData{{ $panelId }},
+                        borderColor: 'rgba(255, 159, 64, 1)',
+                        fill: false,
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+            @endforeach
+        </script>
+    @endpush
 @endsection

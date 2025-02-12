@@ -60,8 +60,7 @@ interface PanelInterface
     public function getSubscribeInfo(int $panel_id, string $user_id): array;
 
     /**
-     * @param int $panel_id
-     * @return array
+     * @return void
      */
-    public function getServerStats(int $panel_id): array;
+    public function getServerStats(): void;
 }
