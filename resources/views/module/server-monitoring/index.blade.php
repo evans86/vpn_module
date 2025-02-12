@@ -39,7 +39,7 @@
                                         <div class="card-body">
                                             <h5 class="card-title">Трафик</h5>
                                             <p class="card-text">
-                                                {{ number_format(($panelData['data']->last()['statistics']['incoming_bandwidth'] ?? 0) / (1024 * 1024 * 1024), 2) }} GB
+                                                {{ number_format(($panelData['data']->last()['statistics']['outgoing_bandwidth'] ?? 0) / (1024 * 1024 * 1024), 2) }} GB
                                             </p>
                                         </div>
                                     </div>
