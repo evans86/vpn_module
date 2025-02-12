@@ -3,7 +3,7 @@
 @section('content')
     <style>
         .chart-container {
-            height: 300px; /* Фиксированная высота для графиков */
+            height: 400px; /* Фиксированная высота для графиков */
             position: relative; /* Для корректного отображения Chart.js */
         }
     </style>
@@ -37,24 +37,6 @@
                                                 На удержании: {{ $panelData['data']->last()['statistics']['users_on_hold'] ?? 0 }}<br>
                                                 Отключены: {{ $panelData['data']->last()['statistics']['users_disabled'] ?? 0 }}
                                             </p>
-{{--                                            <p class="card-text">--}}
-{{--                                                Активные/Всего: {{ $panelData['data']->last()['statistics']['users_active'] ?? 0 }} / {{ $panelData['data']->last()['statistics']['total_user'] ?? 0 }}--}}
-{{--                                            </p>--}}
-{{--                                            <p class="card-text">--}}
-{{--                                                Онлайн сейчас: {{ $panelData['data']->last()['statistics']['online_users'] ?? 0 }}--}}
-{{--                                            </p>--}}
-{{--                                            <p class="card-text">--}}
-{{--                                                Истекший срок: {{ $panelData['data']->last()['statistics']['users_expired'] ?? 0 }}--}}
-{{--                                            </p>--}}
-{{--                                            <p class="card-text">--}}
-{{--                                                Лимит трафика: {{ $panelData['data']->last()['statistics']['users_limited'] ?? 0 }}--}}
-{{--                                            </p>--}}
-{{--                                            <p class="card-text">--}}
-{{--                                                На удержании: {{ $panelData['data']->last()['statistics']['users_on_hold'] ?? 0 }}--}}
-{{--                                            </p>--}}
-{{--                                            <p class="card-text">--}}
-{{--                                                Отключены: {{ $panelData['data']->last()['statistics']['users_disabled'] ?? 0 }}--}}
-{{--                                            </p>--}}
                                         </div>
                                     </div>
                                 </div>
