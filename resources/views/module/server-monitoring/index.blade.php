@@ -1,6 +1,13 @@
 @extends('layouts.app', ['page' => __('Мониторинг серверов'), 'pageSlug' => 'server-monitoring'])
 
 @section('content')
+    <style>
+        .chart-container {
+            height: 300px; /* Фиксированная высота для графиков */
+            position: relative; /* Для корректного отображения Chart.js */
+        }
+    </style>
+
     <div class="container-fluid">
         @foreach($statistics as $panelId => $panelData)
             <div class="row mb-4">
@@ -14,7 +21,9 @@
                             <div class="row mb-4">
                                 <div class="col-12">
                                     <h5>Использование CPU (%)</h5>
-                                    <canvas id="chart-cpu-{{ $panelId }}" height="100"></canvas>
+                                    <div class="chart-container">
+                                        <canvas id="chart-cpu-{{ $panelId }}"></canvas>
+                                    </div>
                                 </div>
                             </div>
 
@@ -22,7 +31,9 @@
                             <div class="row mb-4">
                                 <div class="col-12">
                                     <h5>Использование памяти (ГБ)</h5>
-                                    <canvas id="chart-memory-{{ $panelId }}" height="100"></canvas>
+                                    <div class="chart-container">
+                                        <canvas id="chart-memory-{{ $panelId }}"></canvas>
+                                    </div>
                                 </div>
                             </div>
 
@@ -30,7 +41,9 @@
                             <div class="row mb-4">
                                 <div class="col-12">
                                     <h5>Онлайн-пользователи</h5>
-                                    <canvas id="chart-users-{{ $panelId }}" height="100"></canvas>
+                                    <div class="chart-container">
+                                        <canvas id="chart-users-{{ $panelId }}"></canvas>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -49,7 +62,7 @@
             // Настройки для всех графиков (выносим за пределы цикла)
             const commonOptions = {
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: false, // Отключаем автоматическое соотношение сторон
                 plugins: {
                     zoom: {
                         zoom: {
