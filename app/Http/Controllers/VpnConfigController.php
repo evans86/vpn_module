@@ -7,6 +7,7 @@ use App\Repositories\KeyActivateUser\KeyActivateUserRepository;
 use App\Repositories\ServerUser\ServerUserRepository;
 use App\Services\Panel\PanelStrategy;
 use Exception;
+use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
@@ -28,13 +29,13 @@ class VpnConfigController extends Controller
     /**
      * @param string $key_activate_id
      * @return Response
+     * @throws GuzzleException
      */
     public function show(string $key_activate_id): Response
     {
         try {
             // Получаем запись key_activate_user с отношениями
             $keyActivateUser = $this->keyActivateUserRepository->findByKeyActivateIdWithRelations($key_activate_id);
-
             // Получаем информацию о пользователе сервера
             $serverUser = $this->serverUserRepository->findById($keyActivateUser->server_user_id);
 
@@ -42,16 +43,8 @@ class VpnConfigController extends Controller
                 throw new RuntimeException('Server user not found');
             }
 
-//            Log::debug('SHOW INFO ENCODE CONNECTION KEYS', [
-//                'MY_KEYS' => $serverUser->keys,
-//            ]);
-
             // Декодируем ключи подключения
             $connectionKeys = json_decode($serverUser->keys, true);
-
-//            Log::debug('SHOW INFO DRCODED CONNECTION KEYS', [
-//                'MY_KEYS' => $connectionKeys,
-//            ]);
 
             if (!$connectionKeys) {
                 throw new RuntimeException('Invalid connection keys format');

@@ -212,12 +212,13 @@ class FatherBotController extends AbstractTelegramBot
             $message = "<blockquote><b>📦 Пакеты ключей:</b></blockquote>\n\n";
             $keyboard = ['inline_keyboard' => []];
 
+//            📦 ID: 46|Трафик: 20GB|Активация: 240 часов|
             // Добавляем пакеты на текущую страницу
             foreach ($packs as $packSalesman) {
                 $pack = $packSalesman->pack;
                 $keyboard['inline_keyboard'][] = [
                     [
-                        'text' => "📦 ID: {$packSalesman->id}",
+                        'text' => "📦 ID: {$packSalesman->id}|Трафик: {$pack->traffic}GB|Активация: {$pack->period} дней",
                         'callback_data' => json_encode([
                             'action' => 'show_pack',
                             'pack_id' => $packSalesman->id
