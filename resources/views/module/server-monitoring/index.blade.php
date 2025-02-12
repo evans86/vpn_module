@@ -134,16 +134,6 @@
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- График нагрузки -->
-                            <div class="row mb-4">
-                                <div class="col-12">
-                                    <h5>Нагрузка панели (%)</h5>
-                                    <div class="chart-container">
-                                        <canvas id="chart-load-{{ $panelId }}"></canvas>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -209,13 +199,6 @@
             const memoryData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.mem_used_gb')) !!};
             const usersData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.online_users')) !!};
 
-            // Данные для графика нагрузки
-            const loadData{{ $panelId }} = {!! json_encode($panelData['data']->map(function ($stat) {
-                    $cpuUsage = $stat['statistics']['cpu_usage'] ?? 0;
-                    $memoryUsage = ($stat['statistics']['mem_used'] ?? 0) / ($stat['statistics']['mem_total'] ?? 1) * 100;
-                    return max($cpuUsage, $memoryUsage);
-                })) !!};
-
             // График CPU
             new Chart(document.getElementById('chart-cpu-{{ $panelId }}'), {
                 type: 'line',
@@ -255,21 +238,6 @@
                         label: 'Онлайн-пользователи',
                         data: usersData{{ $panelId }},
                         borderColor: 'rgba(255, 159, 64, 1)',
-                        fill: false,
-                    }]
-                },
-                options: commonOptions,
-            });
-
-            // График нагрузки
-            new Chart(document.getElementById('chart-load-{{ $panelId }}'), {
-                type: 'line',
-                data: {
-                    labels: labels{{ $panelId }},
-                    datasets: [{
-                        label: 'Нагрузка панели (%)',
-                        data: loadData{{ $panelId }},
-                        borderColor: 'rgba(255, 99, 132, 1)',
                         fill: false,
                     }]
                 },
