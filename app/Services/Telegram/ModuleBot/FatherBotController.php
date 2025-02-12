@@ -114,14 +114,39 @@ class FatherBotController extends AbstractTelegramBot
                         $this->exportKeysToFile($params['pack_id']);
                     }
                     break;
+                case 'export_keys_only':
+                    if (isset($params['pack_id'])) {
+                        $this->exportKeysOnlyToFile($params['pack_id']);
+                    }
+                    break;
                 case 'export_unactivated_keys':
                     if (isset($params['pack_id'])) {
                         $this->exportUnactivatedKeysToFile($params['pack_id']);
                     }
                     break;
-                case 'export_keys_only':
+                case 'export_unactivated_keys_only':
                     if (isset($params['pack_id'])) {
-                        $this->exportKeysOnlyToFile($params['pack_id']);
+                        $this->exportUnactivatedKeysOnlyToFile($params['pack_id']);
+                    }
+                    break;
+                case 'export_keys_with_traffic':
+                    if (isset($params['pack_id'])) {
+                        $this->exportKeysWithTrafficToFile($params['pack_id']);
+                    }
+                    break;
+                case 'export_keys_with_traffic_only':
+                    if (isset($params['pack_id'])) {
+                        $this->exportKeysWithTrafficOnlyToFile($params['pack_id']);
+                    }
+                    break;
+                case 'export_used_keys':
+                    if (isset($params['pack_id'])) {
+                        $this->exportUsedKeysToFile($params['pack_id']);
+                    }
+                    break;
+                case 'export_used_keys_only':
+                    if (isset($params['pack_id'])) {
+                        $this->exportUsedKeysOnlyToFile($params['pack_id']);
                     }
                     break;
                 case 'show_packs':
@@ -311,27 +336,64 @@ class FatherBotController extends AbstractTelegramBot
                 'inline_keyboard' => [
                     [
                         [
-                            'text' => '📥 Выгрузить все ключи в .txt файл',
+                            'text' => '📥 Выгрузить все ключи',
                             'callback_data' => json_encode([
                                 'action' => 'export_keys',
                                 'pack_id' => $packSalesmanId
                             ])
-                        ]
-                    ],
-                    [
+                        ],
                         [
-                            'text' => '📥 Выгрузить неактивированные ключи в .txt файл',
+                            'text' => '(Без текста)',
                             'callback_data' => json_encode([
-                                'action' => 'export_unactivated_keys',
+                                'action' => 'export_keys_only',
                                 'pack_id' => $packSalesmanId
                             ])
                         ]
                     ],
                     [
                         [
-                            'text' => '📥 Выгрузить только ключи (без текста)',
+                            'text' => '📥 Выгрузить не активированные',
                             'callback_data' => json_encode([
-                                'action' => 'export_keys_only',
+                                'action' => 'export_unactivated_keys',
+                                'pack_id' => $packSalesmanId
+                            ])
+                        ],
+                        [
+                            'text' => '(Без текста)',
+                            'callback_data' => json_encode([
+                                'action' => 'export_unactivated_keys_only',
+                                'pack_id' => $packSalesmanId
+                            ])
+                        ]
+                    ],
+                    [
+                        [
+                            'text' => '📥 Выгрузить с остатком трафика',
+                            'callback_data' => json_encode([
+                                'action' => 'export_keys_with_traffic',
+                                'pack_id' => $packSalesmanId
+                            ])
+                        ],
+                        [
+                            'text' => '(Без текста)',
+                            'callback_data' => json_encode([
+                                'action' => 'export_keys_with_traffic_only',
+                                'pack_id' => $packSalesmanId
+                            ])
+                        ]
+                    ],
+                    [
+                        [
+                            'text' => '📥 Выгрузить использованные',
+                            'callback_data' => json_encode([
+                                'action' => 'export_used_keys',
+                                'pack_id' => $packSalesmanId
+                            ])
+                        ],
+                        [
+                            'text' => '(Без текста)',
+                            'callback_data' => json_encode([
+                                'action' => 'export_used_keys_only',
                                 'pack_id' => $packSalesmanId
                             ])
                         ]
@@ -375,119 +437,57 @@ class FatherBotController extends AbstractTelegramBot
     }
 
     /**
-     * Экспорт только ключей в текстовый файл (без текста)
+     * Выгрузить все ключи | (Без текста)
+     *
+     * @param int $packSalesmanId
+     * @return void
      */
     private function exportKeysOnlyToFile(int $packSalesmanId): void
     {
-        try {
-            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-            if (!$salesman) {
-                $this->sendMessage("❌ Ошибка: продавец не найден");
-                return;
-            }
-
-            $packSalesman = PackSalesman::with(['pack', 'keyActivates'])
-                ->where('id', $packSalesmanId)
-                ->where('salesman_id', $salesman->id)
-                ->firstOrFail();
-
-            $keys = $packSalesman->keyActivates->whereNull('user_tg_id');
-
-            // Создаем содержимое файла
-            $content = "";
-            foreach ($keys as $key) {
-                $content .= "{$key->id}\n";
-            }
-
-            // Создаем временный файл
-            $fileName = "keys_only_{$packSalesman->id}.txt";
-            $tempPath = storage_path('app/temp/' . $fileName);
-
-            // Создаем директорию если её нет
-            if (!file_exists(storage_path('app/temp'))) {
-                mkdir(storage_path('app/temp'), 0777, true);
-            }
-
-            // Записываем содержимое в файл
-            file_put_contents($tempPath, $content);
-
-            // Отправляем файл
-            $this->telegram->sendDocument([
-                'chat_id' => $this->chatId,
-                'document' => fopen($tempPath, 'r'),
-                'caption' => "📥 Выгрузка только ключей для пакета {$packSalesman->id}"
-            ]);
-
-            // Удаляем временный файл
-            unlink($tempPath);
-        } catch (\Exception $e) {
-            Log::error('Error in exportKeysOnlyToFile: ' . $e->getMessage());
-            $this->sendErrorMessage();
-        }
+        $this->exportKeysToFile($packSalesmanId, false);
     }
 
     /**
-     * Экспорт не активированных ключей в текстовый файл
+     * Выгрузить не активированные | (Без текста)
+     *
+     * @param int $packSalesmanId
+     * @return void
      */
-    private function exportUnactivatedKeysToFile(int $packSalesmanId): void
+    private function exportUnactivatedKeysOnlyToFile(int $packSalesmanId): void
     {
-        try {
-            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-            if (!$salesman) {
-                $this->sendMessage("❌ Ошибка: продавец не найден");
-                return;
-            }
-
-            $packSalesman = PackSalesman::with(['pack', 'keyActivates'])
-                ->where('id', $packSalesmanId)
-                ->where('salesman_id', $salesman->id)
-                ->firstOrFail();
-
-            $pack = $packSalesman->pack;
-            $keys = $packSalesman->keyActivates->whereNull('user_tg_id');
-
-            // Создаем содержимое файла
-            $content = "Пакет: ID {$packSalesman->id}\n";
-            $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
-            $content .= "Период: {$pack->period} дней\n";
-            $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
-            $content .= "Неактивированные ключи активации:\n";
-
-            foreach ($keys as $index => $key) {
-                $content .= ($index + 1) . ". {$key->id}\n";
-            }
-
-            // Создаем временный файл
-            $fileName = "unactivated_keys_{$packSalesman->id}.txt";
-            $tempPath = storage_path('app/temp/' . $fileName);
-
-            // Создаем директорию если её нет
-            if (!file_exists(storage_path('app/temp'))) {
-                mkdir(storage_path('app/temp'), 0777, true);
-            }
-
-            // Записываем содержимое в файл
-            file_put_contents($tempPath, $content);
-
-            // Отправляем файл
-            $this->telegram->sendDocument([
-                'chat_id' => $this->chatId,
-                'document' => fopen($tempPath, 'r'),
-                'caption' => "📥 Выгрузка неактивированных ключей для пакета {$pack->id}"
-            ]);
-
-            // Удаляем временный файл
-            unlink($tempPath);
-        } catch (\Exception $e) {
-            Log::error('Error in exportUnactivatedKeysToFile: ' . $e->getMessage());
-            $this->sendErrorMessage();
-        }
+        $this->exportUnactivatedKeysToFile($packSalesmanId, false);
     }
 
     /**
-     * Экспорт всех ключей в текстовый файл
+     * Выгрузить с остатком трафика | (Без текста)
+     *
+     * @param int $packSalesmanId
+     * @return void
      */
-    private function exportKeysToFile(int $packSalesmanId): void
+    private function exportKeysWithTrafficOnlyToFile(int $packSalesmanId): void
+    {
+        $this->exportKeysWithTrafficToFile($packSalesmanId, false);
+    }
+
+    /**
+     * Выгрузить использованные | (Без текста)
+     *
+     * @param int $packSalesmanId
+     * @return void
+     */
+    private function exportUsedKeysOnlyToFile(int $packSalesmanId): void
+    {
+        $this->exportUsedKeysToFile($packSalesmanId, false);
+    }
+
+    /**
+     * Выгрузить все ключи
+     *
+     * @param int $packSalesmanId
+     * @param bool $withText
+     * @return void
+     */
+    private function exportKeysToFile(int $packSalesmanId, bool $withText = true): void
     {
         try {
             $salesman = Salesman::where('telegram_id', $this->chatId)->first();
@@ -505,15 +505,17 @@ class FatherBotController extends AbstractTelegramBot
             $keys = $packSalesman->keyActivates;
 
             // Создаем содержимое файла
-            $content = "Пакет: ID {$packSalesman->id}\n";
-            $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
-            $content .= "Период: {$pack->period} дней\n";
-            $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
-            $content .= "Ключи активации:\n";
+            $content = "";
+            if ($withText) {
+                $content .= "Пакет: ID {$packSalesman->id}\n";
+                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
+                $content .= "Период: {$pack->period} дней\n";
+                $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
+                $content .= "Ключи активации:\n";
+            }
 
             foreach ($keys as $index => $key) {
-                $status = $key->user_tg_id ? "Активирован" : "Не активирован";
-                $content .= ($index + 1) . ". {$key->id} - {$status}\n";
+                $content .= "{$key->id}\n";
             }
 
             // Создаем временный файл
@@ -542,6 +544,370 @@ class FatherBotController extends AbstractTelegramBot
             $this->sendErrorMessage();
         }
     }
+
+    /**
+     * Выгрузить не активированные
+     *
+     * @param int $packSalesmanId
+     * @param bool $withText
+     * @return void
+     */
+    private function exportUnactivatedKeysToFile(int $packSalesmanId, bool $withText = true): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if (!$salesman) {
+                $this->sendMessage("❌ Ошибка: продавец не найден");
+                return;
+            }
+
+            $packSalesman = PackSalesman::with(['pack', 'keyActivates'])
+                ->where('id', $packSalesmanId)
+                ->where('salesman_id', $salesman->id)
+                ->firstOrFail();
+
+            $pack = $packSalesman->pack;
+            $keys = $packSalesman->keyActivates->whereNull('user_tg_id');
+
+            // Создаем содержимое файла
+            $content = "";
+            if ($withText) {
+                $content .= "Пакет: ID {$packSalesman->id}\n";
+                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
+                $content .= "Период: {$pack->period} дней\n";
+                $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
+                $content .= "Неактивированные ключи активации:\n";
+            }
+
+            foreach ($keys as $index => $key) {
+                $content .= "{$key->id}\n";
+            }
+
+            // Создаем временный файл
+            $fileName = "unactivated_keys_{$packSalesman->id}.txt";
+            $tempPath = storage_path('app/temp/' . $fileName);
+
+            // Создаем директорию если её нет
+            if (!file_exists(storage_path('app/temp'))) {
+                mkdir(storage_path('app/temp'), 0777, true);
+            }
+
+            // Записываем содержимое в файл
+            file_put_contents($tempPath, $content);
+
+            // Отправляем файл
+            $this->telegram->sendDocument([
+                'chat_id' => $this->chatId,
+                'document' => fopen($tempPath, 'r'),
+                'caption' => "📥 Выгрузка не активированных ключей для пакета {$pack->id}"
+            ]);
+
+            // Удаляем временный файл
+            unlink($tempPath);
+        } catch (\Exception $e) {
+            Log::error('Error in exportUnactivatedKeysToFile: ' . $e->getMessage());
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Выгрузить с остатком трафика
+     *
+     * @param int $packSalesmanId
+     * @param bool $withText
+     * @return void
+     */
+    private function exportKeysWithTrafficToFile(int $packSalesmanId, bool $withText = true): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if (!$salesman) {
+                $this->sendMessage("❌ Ошибка: продавец не найден");
+                return;
+            }
+
+            $packSalesman = PackSalesman::with(['pack', 'keyActivates'])
+                ->where('id', $packSalesmanId)
+                ->where('salesman_id', $salesman->id)
+                ->firstOrFail();
+
+            $pack = $packSalesman->pack;
+            $keys = $packSalesman->keyActivates->where('traffic_used', '<', $pack->traffic_limit);
+
+            // Создаем содержимое файла
+            $content = "";
+            if ($withText) {
+                $content .= "Пакет: ID {$packSalesman->id}\n";
+                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
+                $content .= "Период: {$pack->period} дней\n";
+                $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
+                $content .= "Ключи с остатком трафика:\n";
+            }
+
+            foreach ($keys as $index => $key) {
+                $content .= "{$key->id}\n";
+            }
+
+            // Создаем временный файл
+            $fileName = "keys_with_traffic_{$packSalesman->id}.txt";
+            $tempPath = storage_path('app/temp/' . $fileName);
+
+            // Создаем директорию если её нет
+            if (!file_exists(storage_path('app/temp'))) {
+                mkdir(storage_path('app/temp'), 0777, true);
+            }
+
+            // Записываем содержимое в файл
+            file_put_contents($tempPath, $content);
+
+            // Отправляем файл
+            $this->telegram->sendDocument([
+                'chat_id' => $this->chatId,
+                'document' => fopen($tempPath, 'r'),
+                'caption' => "📥 Выгрузка ключей с остатком трафика для пакета {$pack->id}"
+            ]);
+
+            // Удаляем временный файл
+            unlink($tempPath);
+        } catch (\Exception $e) {
+            Log::error('Error in exportKeysWithTrafficToFile: ' . $e->getMessage());
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Выгрузить использованные
+     *
+     * @param int $packSalesmanId
+     * @param bool $withText
+     * @return void
+     */
+    private function exportUsedKeysToFile(int $packSalesmanId, bool $withText = true): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if (!$salesman) {
+                $this->sendMessage("❌ Ошибка: продавец не найден");
+                return;
+            }
+
+            $packSalesman = PackSalesman::with(['pack', 'keyActivates'])
+                ->where('id', $packSalesmanId)
+                ->where('salesman_id', $salesman->id)
+                ->firstOrFail();
+
+            $pack = $packSalesman->pack;
+            $keys = $packSalesman->keyActivates->whereNotNull('user_tg_id');
+
+            // Создаем содержимое файла
+            $content = "";
+            if ($withText) {
+                $content .= "Пакет: ID {$packSalesman->id}\n";
+                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
+                $content .= "Период: {$pack->period} дней\n";
+                $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
+                $content .= "Использованные ключи:\n";
+            }
+
+            foreach ($keys as $index => $key) {
+                $content .= "{$key->id}\n";
+            }
+
+            // Создаем временный файл
+            $fileName = "used_keys_{$packSalesman->id}.txt";
+            $tempPath = storage_path('app/temp/' . $fileName);
+
+            // Создаем директорию если её нет
+            if (!file_exists(storage_path('app/temp'))) {
+                mkdir(storage_path('app/temp'), 0777, true);
+            }
+
+            // Записываем содержимое в файл
+            file_put_contents($tempPath, $content);
+
+            // Отправляем файл
+            $this->telegram->sendDocument([
+                'chat_id' => $this->chatId,
+                'document' => fopen($tempPath, 'r'),
+                'caption' => "📥 Выгрузка использованных ключей для пакета {$pack->id}"
+            ]);
+
+            // Удаляем временный файл
+            unlink($tempPath);
+        } catch (\Exception $e) {
+            Log::error('Error in exportUsedKeysToFile: ' . $e->getMessage());
+            $this->sendErrorMessage();
+        }
+    }
+
+//    /**
+//     * Экспорт только ключей в текстовый файл (без текста)
+//     */
+//    private function exportKeysOnlyToFile(int $packSalesmanId): void
+//    {
+//        try {
+//            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+//            if (!$salesman) {
+//                $this->sendMessage("❌ Ошибка: продавец не найден");
+//                return;
+//            }
+//
+//            $packSalesman = PackSalesman::with(['pack', 'keyActivates'])
+//                ->where('id', $packSalesmanId)
+//                ->where('salesman_id', $salesman->id)
+//                ->firstOrFail();
+//
+//            $keys = $packSalesman->keyActivates->whereNull('user_tg_id');
+//
+//            // Создаем содержимое файла
+//            $content = "";
+//            foreach ($keys as $key) {
+//                $content .= "{$key->id}\n";
+//            }
+//
+//            // Создаем временный файл
+//            $fileName = "keys_only_{$packSalesman->id}.txt";
+//            $tempPath = storage_path('app/temp/' . $fileName);
+//
+//            // Создаем директорию если её нет
+//            if (!file_exists(storage_path('app/temp'))) {
+//                mkdir(storage_path('app/temp'), 0777, true);
+//            }
+//
+//            // Записываем содержимое в файл
+//            file_put_contents($tempPath, $content);
+//
+//            // Отправляем файл
+//            $this->telegram->sendDocument([
+//                'chat_id' => $this->chatId,
+//                'document' => fopen($tempPath, 'r'),
+//                'caption' => "📥 Выгрузка только ключей для пакета {$packSalesman->id}"
+//            ]);
+//
+//            // Удаляем временный файл
+//            unlink($tempPath);
+//        } catch (\Exception $e) {
+//            Log::error('Error in exportKeysOnlyToFile: ' . $e->getMessage());
+//            $this->sendErrorMessage();
+//        }
+//    }
+
+//    /**
+//     * Экспорт не активированных ключей в текстовый файл
+//     */
+//    private function exportUnactivatedKeysToFile(int $packSalesmanId): void
+//    {
+//        try {
+//            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+//            if (!$salesman) {
+//                $this->sendMessage("❌ Ошибка: продавец не найден");
+//                return;
+//            }
+//
+//            $packSalesman = PackSalesman::with(['pack', 'keyActivates'])
+//                ->where('id', $packSalesmanId)
+//                ->where('salesman_id', $salesman->id)
+//                ->firstOrFail();
+//
+//            $pack = $packSalesman->pack;
+//            $keys = $packSalesman->keyActivates->whereNull('user_tg_id');
+//
+//            // Создаем содержимое файла
+//            $content = "Пакет: ID {$packSalesman->id}\n";
+//            $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
+//            $content .= "Период: {$pack->period} дней\n";
+//            $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
+//            $content .= "Неактивированные ключи активации:\n";
+//
+//            foreach ($keys as $index => $key) {
+//                $content .= ($index + 1) . ". {$key->id}\n";
+//            }
+//
+//            // Создаем временный файл
+//            $fileName = "unactivated_keys_{$packSalesman->id}.txt";
+//            $tempPath = storage_path('app/temp/' . $fileName);
+//
+//            // Создаем директорию если её нет
+//            if (!file_exists(storage_path('app/temp'))) {
+//                mkdir(storage_path('app/temp'), 0777, true);
+//            }
+//
+//            // Записываем содержимое в файл
+//            file_put_contents($tempPath, $content);
+//
+//            // Отправляем файл
+//            $this->telegram->sendDocument([
+//                'chat_id' => $this->chatId,
+//                'document' => fopen($tempPath, 'r'),
+//                'caption' => "📥 Выгрузка неактивированных ключей для пакета {$pack->id}"
+//            ]);
+//
+//            // Удаляем временный файл
+//            unlink($tempPath);
+//        } catch (\Exception $e) {
+//            Log::error('Error in exportUnactivatedKeysToFile: ' . $e->getMessage());
+//            $this->sendErrorMessage();
+//        }
+//    }
+
+//    /**
+//     * Экспорт всех ключей в текстовый файл
+//     */
+//    private function exportKeysToFile(int $packSalesmanId): void
+//    {
+//        try {
+//            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+//            if (!$salesman) {
+//                $this->sendMessage("❌ Ошибка: продавец не найден");
+//                return;
+//            }
+//
+//            $packSalesman = PackSalesman::with(['pack', 'keyActivates'])
+//                ->where('id', $packSalesmanId)
+//                ->where('salesman_id', $salesman->id)
+//                ->firstOrFail();
+//
+//            $pack = $packSalesman->pack;
+//            $keys = $packSalesman->keyActivates;
+//
+//            // Создаем содержимое файла
+//            $content = "Пакет: ID {$packSalesman->id}\n";
+//            $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
+//            $content .= "Период: {$pack->period} дней\n";
+//            $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
+//            $content .= "Ключи активации:\n";
+//
+//            foreach ($keys as $index => $key) {
+//                $status = $key->user_tg_id ? "Активирован" : "Не активирован";
+//                $content .= ($index + 1) . ". {$key->id} - {$status}\n";
+//            }
+//
+//            // Создаем временный файл
+//            $fileName = "keys_{$packSalesman->id}.txt";
+//            $tempPath = storage_path('app/temp/' . $fileName);
+//
+//            // Создаем директорию если её нет
+//            if (!file_exists(storage_path('app/temp'))) {
+//                mkdir(storage_path('app/temp'), 0777, true);
+//            }
+//
+//            // Записываем содержимое в файл
+//            file_put_contents($tempPath, $content);
+//
+//            // Отправляем файл
+//            $this->telegram->sendDocument([
+//                'chat_id' => $this->chatId,
+//                'document' => fopen($tempPath, 'r'),
+//                'caption' => "📥 Выгрузка ключей для пакета {$pack->id}"
+//            ]);
+//
+//            // Удаляем временный файл
+//            unlink($tempPath);
+//        } catch (\Exception $e) {
+//            Log::error('Error in exportKeysToFile: ' . $e->getMessage());
+//            $this->sendErrorMessage();
+//        }
+//    }
 
     /**
      * Handle bot token from user
