@@ -576,11 +576,15 @@ class FatherBotController extends AbstractTelegramBot
                 $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
                 $content .= "Период: {$pack->period} дней\n";
                 $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
-                $content .= "Неактивированные ключи активации:\n";
+                $content .= "Не активированные ключи активации:\n";
             }
 
-            foreach ($keys as $index => $key) {
-                $content .= "{$key->id}\n";
+            if (empty($keys)) {
+                $content .= "Нет не активированных ключей активации\n";
+            }else{
+                foreach ($keys as $index => $key) {
+                    $content .= "{$key->id}\n";
+                }
             }
 
             // Создаем временный файл
