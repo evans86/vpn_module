@@ -282,7 +282,7 @@ class MarzbanService
 
             Log::debug('Checking STATUS subscribe info', ['panel_id' => $panel_id, 'user_id' => $user_id, 'status' => $userData['status']]);
 
-            if ($userData['status'] !== 'active'){
+            if ($userData['status'] !== 'active') {
                 $serverUser->keyActivateUser->keyActivate->status = KeyActivate::EXPIRED;
                 $serverUser->keyActivateUser->keyActivate->save();
             }
@@ -337,7 +337,7 @@ class MarzbanService
                 'incoming_bandwidth_speed' => $serverStats['incoming_bandwidth_speed'], //скорость входящего трафика
                 'outgoing_bandwidth_speed' => $serverStats['outgoing_bandwidth_speed'], //скорость исходящего трафика
             ];
-
+            Log::debug('STATISTICS array', ['$statistics' => $statistics]);
             return $statistics;
         } catch (Exception $e) {
             Log::error('Failed to check user status', [
