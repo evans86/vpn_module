@@ -581,6 +581,9 @@ class FatherBotController extends AbstractTelegramBot
 
             Log::warning('$keys ' .  $keys);
 
+            if (is_null($keys))
+                $content .= "Нет не активированных ключей";
+
             foreach ($keys as $index => $key) {
                 $content .= "{$key->id}\n";
             }
