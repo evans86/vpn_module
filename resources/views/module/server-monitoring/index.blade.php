@@ -4,7 +4,7 @@
     <div class="container-fluid">
         <div class="row">
             @foreach($statistics as $panelId => $panelData)
-                <div class="col-lg-6">
+                <div class="col-lg-4 col-md-6">
                     <div class="card">
                         <div class="card-header">
                             <h4 class="card-title">Статистика панели: {{ $panelData['panel']->name }}</h4>
@@ -39,7 +39,7 @@
             // Данные для графиков
             const labels{{ $panelId }} = {!! json_encode($panelData['data']->pluck('created_at')) !!};
             const cpuData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.cpu_usage')) !!};
-            const memoryData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.mem_used')) !!};
+            const memoryData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.mem_used_gb')) !!};
             const usersData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.online_users')) !!};
 
             // График CPU
@@ -57,7 +57,11 @@
                 options: {
                     scales: {
                         y: {
-                            beginAtZero: true
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Процент использования'
+                            }
                         }
                     }
                 }
@@ -69,7 +73,7 @@
                 data: {
                     labels: labels{{ $panelId }},
                     datasets: [{
-                        label: 'Использование памяти (байты)',
+                        label: 'Использование памяти (ГБ)',
                         data: memoryData{{ $panelId }},
                         borderColor: 'rgba(153, 102, 255, 1)',
                         fill: false,
@@ -78,7 +82,11 @@
                 options: {
                     scales: {
                         y: {
-                            beginAtZero: true
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Гигабайты (ГБ)'
+                            }
                         }
                     }
                 }
@@ -99,7 +107,11 @@
                 options: {
                     scales: {
                         y: {
-                            beginAtZero: true
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Количество пользователей'
+                            }
                         }
                     }
                 }
