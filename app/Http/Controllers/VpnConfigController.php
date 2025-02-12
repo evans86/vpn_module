@@ -33,7 +33,7 @@ class VpnConfigController extends Controller
 
             // Получаем информацию о пользователе сервера
 //            $serverUser = $keyActivateUser->serverUser;
-            $serverUser = ServerUser::query()->where('server_user_id', $keyActivateUser->server_user_id)->first();
+            $serverUser = ServerUser::query()->where('id', $keyActivateUser->server_user_id)->first();
             Log::warning('$serverUser:', ['serverUser' => $serverUser]);
             if (!$serverUser) {
                 throw new RuntimeException('Server user not found');
