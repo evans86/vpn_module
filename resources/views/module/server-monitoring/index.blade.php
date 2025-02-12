@@ -30,11 +30,11 @@
                                         <div class="card-body">
                                             <h5 class="card-title">Пользователи</h5>
                                             <p class="card-text">
-                                                Активные/Всего: {{ $panelData['data']->last()['statistics']['users_active'] ?? 0 }} / {{ $panelData['data']->last()['statistics']['total_user'] ?? 0 }}
-                                                Онлайн сейчас: {{ $panelData['data']->last()['statistics']['online_users'] ?? 0 }}
-                                                Истекший срок: {{ $panelData['data']->last()['statistics']['users_expired'] ?? 0 }}
-                                                Лимит трафика: {{ $panelData['data']->last()['statistics']['users_limited'] ?? 0 }}
-                                                На удержании: {{ $panelData['data']->last()['statistics']['users_on_hold'] ?? 0 }}
+                                                Активные/Всего: {{ $panelData['data']->last()['statistics']['users_active'] ?? 0 }} / {{ $panelData['data']->last()['statistics']['total_user'] ?? 0 }}<br>
+                                                Онлайн сейчас: {{ $panelData['data']->last()['statistics']['online_users'] ?? 0 }}<br>
+                                                Истекший срок: {{ $panelData['data']->last()['statistics']['users_expired'] ?? 0 }}<br>
+                                                Лимит трафика: {{ $panelData['data']->last()['statistics']['users_limited'] ?? 0 }}<br>
+                                                На удержании: {{ $panelData['data']->last()['statistics']['users_on_hold'] ?? 0 }}<br>
                                                 Отключены: {{ $panelData['data']->last()['statistics']['users_disabled'] ?? 0 }}
                                             </p>
 {{--                                            <p class="card-text">--}}
