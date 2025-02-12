@@ -14,9 +14,48 @@
                 <div class="col-12">
                     <div class="card">
                         <div class="card-header">
-                            <h4 class="card-title">Статистика панели: {{ $panelData['panel']->name }}</h4>
+                            <h4 class="card-title">
+                                <a href="{{ $panelData['panel']->panel_adress }}" target="_blank" class="text-primary">
+                                    Статистика панели ID {{ $panelData['panel']->id }}
+                                    <i class="fas fa-external-link-alt fa-sm"></i>
+                                </a>
+                            </h4>
                         </div>
                         <div class="card-body">
+                            <!-- Краткая статистика -->
+                            <div class="row mb-4">
+                                <div class="col-md-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h5 class="card-title">Пользователи</h5>
+                                            <p class="card-text">
+                                                {{ $panelData['data']->last()['statistics']['users_active'] ?? 0 }} / {{ $panelData['data']->last()['statistics']['total_user'] ?? 0 }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h5 class="card-title">Трафик</h5>
+                                            <p class="card-text">
+                                                {{ number_format(($panelData['data']->last()['statistics']['incoming_bandwidth'] ?? 0) / (1024 * 1024 * 1024), 2) }} GB
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h5 class="card-title">Память</h5>
+                                            <p class="card-text">
+                                                {{ number_format(($panelData['data']->last()['statistics']['mem_used'] ?? 0) / (1024 * 1024 * 1024), 2) }} GB / {{ number_format(($panelData['data']->last()['statistics']['mem_total'] ?? 0) / (1024 * 1024 * 1024), 2) }} GB
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- График CPU -->
                             <div class="row mb-4">
                                 <div class="col-12">
