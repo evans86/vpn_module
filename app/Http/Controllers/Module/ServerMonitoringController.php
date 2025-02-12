@@ -31,7 +31,7 @@ class ServerMonitoringController extends Controller
         $strategy = new PanelStrategy($panel->panel);
         $panel_stats = $strategy->getServerStats($panel->id);
 
-//        var_dump($panel_stats);
+        var_dump($panel_stats);
 
         return view('module.server-monitoring.index');
     }
