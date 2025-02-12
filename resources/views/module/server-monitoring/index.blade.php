@@ -24,6 +24,14 @@
         .axis text {
             font-size: 12px;
         }
+        .legend {
+            font-size: 12px;
+        }
+        .zoom {
+            cursor: move;
+            fill: none;
+            pointer-events: all;
+        }
     </style>
 
     <div class="container-fluid">
@@ -160,7 +168,7 @@
         <script>
             // Функция для создания графика
             function createChart(containerId, data, label, color) {
-                const margin = { top: 20, right: 30, bottom: 30, left: 40 };
+                const margin = { top: 20, right: 30, bottom: 50, left: 50 };
                 const width = document.getElementById(containerId).clientWidth - margin.left - margin.right;
                 const height = 300 - margin.top - margin.bottom;
 
@@ -212,6 +220,46 @@
                     .attr('stroke', color)
                     .attr('stroke-width', 2)
                     .attr('fill', 'none');
+
+                // Добавляем подписи осей
+                svg.append('text')
+                    .attr('transform', `translate(${width / 2},${height + margin.bottom - 10})`)
+                    .style('text-anchor', 'middle')
+                    .text('Время');
+
+                svg.append('text')
+                    .attr('transform', 'rotate(-90)')
+                    .attr('y', -margin.left)
+                    .attr('x', -height / 2)
+                    .attr('dy', '1em')
+                    .style('text-anchor', 'middle')
+                    .text(label);
+
+                // Добавляем легенду
+                svg.append('text')
+                    .attr('x', width - 10)
+                    .attr('y', 10)
+                    .attr('text-anchor', 'end')
+                    .style('fill', color)
+                    .text(label);
+
+                // Добавляем возможность масштабирования и перемещения
+                const zoom = d3.zoom()
+                    .scaleExtent([1, 10])
+                    .translateExtent([[0, 0], [width, height]])
+                    .extent([[0, 0], [width, height]])
+                    .on('zoom', (event) => {
+                        const newX = event.transform.rescaleX(x);
+                        const newY = event.transform.rescaleY(y);
+
+                        svg.select('.line')
+                            .attr('d', line.x(d => newX(d.created_at)).y(d => newY(d.value)));
+
+                        svg.select('.axis-x').call(d3.axisBottom(newX));
+                        svg.select('.axis-y').call(d3.axisLeft(newY));
+                    });
+
+                svg.call(zoom);
             }
 
             @foreach($statistics as $panelId => $panelData)
