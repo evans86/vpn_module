@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ServerUser\ServerUser;
 use App\Repositories\KeyActivateUser\KeyActivateUserRepository;
 use App\Services\Panel\PanelStrategy;
 use Exception;
@@ -29,10 +30,11 @@ class VpnConfigController extends Controller
             $keyActivateUser = $this->keyActivateUserRepository->findByKeyActivateIdWithRelations($key_activate_id);
 
             Log::warning('$keyActivateUser:', ['keyActivateUser' => $keyActivateUser]);
-            Log::warning('$serverUser:', ['serverUser' => $keyActivateUser->serverUser]);
 
             // Получаем информацию о пользователе сервера
-            $serverUser = $keyActivateUser->serverUser;
+//            $serverUser = $keyActivateUser->serverUser;
+            $serverUser = ServerUser::query()->where('server_user_id', $keyActivateUser->server_user_id)->first();
+            Log::warning('$serverUser:', ['serverUser' => $serverUser]);
             if (!$serverUser) {
                 throw new RuntimeException('Server user not found');
             }
