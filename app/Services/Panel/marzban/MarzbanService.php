@@ -316,8 +316,8 @@ class MarzbanService
             $marzbanApi = new MarzbanAPI($panel->api_address);
             $serverStats = $marzbanApi->getServerStats($panel->auth_token);
 
-            Log::debug('GET SERVER STATS', [
-                'panel_id' => $panel_id
+            Log::warning('GET SERVER STATS', [
+                '$serverStats' => $serverStats
             ]);
 
             return $serverStats;
