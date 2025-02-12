@@ -73,6 +73,38 @@
                                 </div>
                             </div>
 
+                            <!-- Анализ нагрузки -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h5 class="card-title">Анализ нагрузки</h5>
+                                            @php
+                                                // Расчёт нагрузки
+                                                $cpuUsage = $panelData['data']->last()['statistics']['cpu_usage'] ?? 0;
+                                                $memoryUsage = ($panelData['data']->last()['statistics']['mem_used'] ?? 0) / ($panelData['data']->last()['statistics']['mem_total'] ?? 1) * 100;
+                                                $load = max($cpuUsage, $memoryUsage);
+
+                                                // Определение уровня нагрузки
+                                                if ($load < 30) {
+                                                    $loadLevel = 'Низкая';
+                                                    $loadColor = 'success';
+                                                } elseif ($load < 70) {
+                                                    $loadLevel = 'Средняя';
+                                                    $loadColor = 'warning';
+                                                } else {
+                                                    $loadLevel = 'Высокая';
+                                                    $loadColor = 'danger';
+                                                }
+                                            @endphp
+                                            <p class="card-text">
+                                                Нагрузка: <span class="text-{{ $loadColor }}">{{ $loadLevel }}</span> ({{ number_format($load, 2) }}%)
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- График CPU -->
                             <div class="row mb-4">
                                 <div class="col-12">
@@ -99,6 +131,16 @@
                                     <h5>Онлайн-пользователи</h5>
                                     <div class="chart-container">
                                         <canvas id="chart-users-{{ $panelId }}"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- График нагрузки -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h5>Нагрузка панели (%)</h5>
+                                    <div class="chart-container">
+                                        <canvas id="chart-load-{{ $panelId }}"></canvas>
                                     </div>
                                 </div>
                             </div>
@@ -154,6 +196,8 @@
                             display: true,
                             text: 'Значение',
                         },
+                        min: 0,
+                        max: 100, // Нагрузка от 0% до 100%
                     },
                 },
             };
@@ -164,6 +208,13 @@
             const cpuData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.cpu_usage')) !!};
             const memoryData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.mem_used_gb')) !!};
             const usersData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.online_users')) !!};
+
+            // Данные для графика нагрузки
+            const loadData{{ $panelId }} = {!! json_encode($panelData['data']->map(function ($stat) {
+                    $cpuUsage = $stat['statistics']['cpu_usage'] ?? 0;
+                    $memoryUsage = ($stat['statistics']['mem_used'] ?? 0) / ($stat['statistics']['mem_total'] ?? 1) * 100;
+                    return max($cpuUsage, $memoryUsage);
+                })) !!};
 
             // График CPU
             new Chart(document.getElementById('chart-cpu-{{ $panelId }}'), {
@@ -204,6 +255,21 @@
                         label: 'Онлайн-пользователи',
                         data: usersData{{ $panelId }},
                         borderColor: 'rgba(255, 159, 64, 1)',
+                        fill: false,
+                    }]
+                },
+                options: commonOptions,
+            });
+
+            // График нагрузки
+            new Chart(document.getElementById('chart-load-{{ $panelId }}'), {
+                type: 'line',
+                data: {
+                    labels: labels{{ $panelId }},
+                    datasets: [{
+                        label: 'Нагрузка панели (%)',
+                        data: loadData{{ $panelId }},
+                        borderColor: 'rgba(255, 99, 132, 1)',
                         fill: false,
                     }]
                 },
