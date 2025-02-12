@@ -321,13 +321,24 @@ class MarzbanService
             ]);
 
             $statistics = [
-                'used_traffic' => $serverStats['used_traffic'],
-                'data_limit' => $userData['data_limit'],
-                'expire' => $userData['expire'],
-                'status' => $userData['status'],
+                'mem_total' => $serverStats['mem_total'], //общая память
+                'mem_used' => $serverStats['mem_used'], //используемая память
+                'cpu_cores' => $serverStats['cpu_cores'], //количество ядер
+                'cpu_usage' => $serverStats['cpu_usage'], //использование процессора
+                'total_user' => $serverStats['total_user'], //количество пользователей
+                'online_users' => $serverStats['online_users'], //количество онлайн пользователей
+                'users_active' => $serverStats['users_active'], //количество активных пользователей
+                'users_on_hold' => $serverStats['users_on_hold'], //количество пользователей в ожидании
+                'users_disabled' => $serverStats['users_disabled'], //количество отключенных пользователей
+                'users_expired' => $serverStats['users_expired'], //количество просроченных пользователей
+                'users_limited' => $serverStats['users_limited'], //количество ограниченных пользователей
+                'incoming_bandwidth' => $serverStats['incoming_bandwidth'], //входящий трафик
+                'outgoing_bandwidth' => $serverStats['outgoing_bandwidth'], //исходящий трафик
+                'incoming_bandwidth_speed' => $serverStats['incoming_bandwidth_speed'], //скорость входящего трафика
+                'outgoing_bandwidth_speed' => $serverStats['outgoing_bandwidth_speed'], //скорость исходящего трафика
             ];
 
-            return $serverStats;
+            return $statistics;
         } catch (Exception $e) {
             Log::error('Failed to check user status', [
                 'panel_id' => $panel_id,
