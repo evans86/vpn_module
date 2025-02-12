@@ -588,7 +588,6 @@ class FatherBotController extends AbstractTelegramBot
                 $content .= "{$key->id}\n";
             }
 
-
             // Создаем временный файл
             $fileName = "unactivated_keys_{$packSalesman->id}.txt";
             $tempPath = storage_path('app/temp/' . $fileName);
