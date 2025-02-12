@@ -10,15 +10,27 @@
                             <h4 class="card-title">Статистика панели: {{ $panelData['panel']->name }}</h4>
                         </div>
                         <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <canvas id="chart-cpu-{{ $panelId }}" height="150"></canvas>
+                            <!-- График CPU -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h5>Использование CPU (%)</h5>
+                                    <canvas id="chart-cpu-{{ $panelId }}" height="100"></canvas>
                                 </div>
-                                <div class="col-md-4">
-                                    <canvas id="chart-memory-{{ $panelId }}" height="150"></canvas>
+                            </div>
+
+                            <!-- График памяти -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h5>Использование памяти (ГБ)</h5>
+                                    <canvas id="chart-memory-{{ $panelId }}" height="100"></canvas>
                                 </div>
-                                <div class="col-md-4">
-                                    <canvas id="chart-users-{{ $panelId }}" height="150"></canvas>
+                            </div>
+
+                            <!-- График онлайн-пользователей -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h5>Онлайн-пользователи</h5>
+                                    <canvas id="chart-users-{{ $panelId }}" height="100"></canvas>
                                 </div>
                             </div>
                         </div>
@@ -30,6 +42,7 @@
 
     @push('js')
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
         <script>
             @foreach($statistics as $panelId => $panelData)
             // Данные для графиков
@@ -37,6 +50,49 @@
             const cpuData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.cpu_usage')) !!};
             const memoryData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.mem_used_gb')) !!};
             const usersData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.online_users')) !!};
+
+            // Настройки для всех графиков
+            const commonOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    zoom: {
+                        zoom: {
+                            wheel: {
+                                enabled: true, // Включаем масштабирование колесом мыши
+                            },
+                            pinch: {
+                                enabled: true, // Включаем масштабирование на touch-устройствах
+                            },
+                            mode: 'x', // Масштабирование только по оси X
+                        },
+                        pan: {
+                            enabled: true, // Включаем перемещение графика
+                            mode: 'x', // Перемещение только по оси X
+                        },
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Время',
+                        },
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Значение',
+                        },
+                    },
+                },
+            };
 
             // График CPU
             new Chart(document.getElementById('chart-cpu-{{ $panelId }}'), {
@@ -50,17 +106,7 @@
                         fill: false,
                     }]
                 },
-                options: {
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Процент использования'
-                            }
-                        }
-                    }
-                }
+                options: commonOptions,
             });
 
             // График памяти
@@ -75,17 +121,7 @@
                         fill: false,
                     }]
                 },
-                options: {
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Гигабайты (ГБ)'
-                            }
-                        }
-                    }
-                }
+                options: commonOptions,
             });
 
             // График онлайн-пользователей
@@ -100,17 +136,7 @@
                         fill: false,
                     }]
                 },
-                options: {
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Количество пользователей'
-                            }
-                        }
-                    }
-                }
+                options: commonOptions,
             });
             @endforeach
         </script>
