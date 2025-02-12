@@ -32,11 +32,6 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
         return $marzbanServer->getUserSubscribeInfo($panel_id, $user_id);
     }
 
-    /**
-     * @param int $panel_id
-     * @return array
-     * @throws GuzzleException
-     */
     public function getServerStats(int $panel_id): array
     {
         $marzbanServer = new MarzbanService();

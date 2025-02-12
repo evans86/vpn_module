@@ -35,11 +35,6 @@ class PanelStrategy
         $this->strategy->create($server_id);
     }
 
-    /**
-     * @param int $panel_id
-     * @return array
-     * @throws GuzzleException
-     */
     public function getServerStats(int $panel_id): array
     {
         $this->strategy->getServerStats($panel_id);

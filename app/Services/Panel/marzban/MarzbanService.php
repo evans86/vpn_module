@@ -317,10 +317,10 @@ class MarzbanService
             $serverStats = $marzbanApi->getServerStats($panel->auth_token);
 
             Log::warning('GET SERVER STATS', [
-                '$serverStats' => $serverStats['mem_total']
+                '$serverStats' => $serverStats
             ]);
 
-            $statistics = [
+            return [
                 'mem_total' => $serverStats['mem_total'], //общая память
                 'mem_used' => $serverStats['mem_used'], //используемая память
                 'cpu_cores' => $serverStats['cpu_cores'], //количество ядер
@@ -337,8 +337,8 @@ class MarzbanService
                 'incoming_bandwidth_speed' => $serverStats['incoming_bandwidth_speed'], //скорость входящего трафика
                 'outgoing_bandwidth_speed' => $serverStats['outgoing_bandwidth_speed'], //скорость исходящего трафика
             ];
-            Log::debug('STATISTICS array', ['$statistics' => $statistics]);
-            return $statistics;
+//            Log::debug('STATISTICS array', ['$statistics' => $statistics]);
+//             $statistics;
         } catch (Exception $e) {
             Log::error('Failed to check user status', [
                 'panel_id' => $panel_id,
