@@ -320,6 +320,13 @@ class MarzbanService
                 '$serverStats' => $serverStats
             ]);
 
+            $statistics = [
+                'used_traffic' => $serverStats['used_traffic'],
+                'data_limit' => $userData['data_limit'],
+                'expire' => $userData['expire'],
+                'status' => $userData['status'],
+            ];
+
             return $serverStats;
         } catch (Exception $e) {
             Log::error('Failed to check user status', [
