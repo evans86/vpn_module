@@ -27,12 +27,12 @@ class ServerMonitoringController extends Controller
      */
     public function index()
     {
-//        /**
-//         * @var Panel $panel
-//         */
-//        $panel = Panel::query()->where('panel_status', Panel::PANEL_CONFIGURED)->first();
-//        $strategy = new PanelStrategy($panel->panel);
-//        $strategy->getServerStats();
+        /**
+         * @var Panel $panel
+         */
+        $panel = Panel::query()->where('panel_status', Panel::PANEL_CONFIGURED)->first();
+        $strategy = new PanelStrategy($panel->panel);
+        $strategy->getServerStats();
 
         // Получаем все сконфигурированные панели
         $panels = Panel::query()->where('panel_status', Panel::PANEL_CONFIGURED)->get();
