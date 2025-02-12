@@ -35,7 +35,7 @@ class KeyActivateRepository extends BaseRepository
         }
 
         if (!empty($filters['pack_id'])) {
-            $query->whereHas('packSalesman.pack', function($q) use ($filters) {
+            $query->whereHas('packSalesman.pack', function ($q) use ($filters) {
                 $q->where('id', $filters['pack_id']);
             });
         }
@@ -45,8 +45,8 @@ class KeyActivateRepository extends BaseRepository
         }
 
         if (!empty($filters['telegram_id'])) {
-            $query->whereHas('packSalesman', function($q) use ($filters) {
-                $q->whereHas('salesman', function($sq) use ($filters) {
+            $query->whereHas('packSalesman', function ($q) use ($filters) {
+                $q->whereHas('salesman', function ($sq) use ($filters) {
                     $sq->where('telegram_id', $filters['telegram_id']);
                 });
             });
@@ -271,7 +271,7 @@ class KeyActivateRepository extends BaseRepository
     {
         $query = $this->query()
             ->where('user_tg_id', $userTgId)
-            ->whereHas('packSalesman', function($q) use ($salesmanId) {
+            ->whereHas('packSalesman', function ($q) use ($salesmanId) {
                 $q->where('salesman_id', $salesmanId);
             });
 
@@ -280,7 +280,7 @@ class KeyActivateRepository extends BaseRepository
         }
 
         // Проверяем срок действия
-        $query->where(function($q) {
+        $query->where(function ($q) {
             $q->whereNull('finish_at')
                 ->orWhere('finish_at', '>', time());
         });

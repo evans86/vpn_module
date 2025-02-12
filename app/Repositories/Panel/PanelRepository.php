@@ -29,18 +29,6 @@ class PanelRepository extends BaseRepository
             ->paginate($perPage);
     }
 
-//    /**
-//     * @return Panel|null
-//     */
-//    public function getConfiguredMarzbanPanel(): ?Panel
-//    {
-//        /** @var Panel|null */
-//        return $this->query()
-//            ->where('panel_status', Panel::PANEL_CONFIGURED)
-//            ->where('panel', Panel::MARZBAN)
-//            ->first();
-//    }
-
     /**
      * @return Panel|null
      */
@@ -82,8 +70,6 @@ class PanelRepository extends BaseRepository
      */
     private function getKeyCountForPanel(int $panelId): int
     {
-        // Здесь должен быть ваш код для получения количества ключей, привязанных к панели
-        // Например, если у вас есть таблица `keys`, где есть столбец `panel_id`, то:
         return DB::table('server_user')
             ->where('panel_id', $panelId)
             ->count();
@@ -129,9 +115,9 @@ class PanelRepository extends BaseRepository
 
         // Фильтр по серверу (минимум 3 символа)
         if (!empty($filters['server']) && strlen($filters['server']) >= 3) {
-            $query->whereHas('server', function($q) use ($filters) {
+            $query->whereHas('server', function ($q) use ($filters) {
                 $q->where('name', 'like', "%{$filters['server']}%")
-                  ->orWhere('ip', 'like', "%{$filters['server']}%");
+                    ->orWhere('ip', 'like', "%{$filters['server']}%");
             });
         }
 

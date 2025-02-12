@@ -41,15 +41,15 @@ class LogRepository extends BaseRepository
 
         if (!empty($filters['search'])) {
             $searchTerm = $filters['search'];
-            $query->where(function(Builder $q) use ($searchTerm) {
+            $query->where(function (Builder $q) use ($searchTerm) {
                 $q->where('message', 'like', '%' . $searchTerm . '%')
-                  ->orWhere('context', 'like', '%' . $searchTerm . '%');
+                    ->orWhere('context', 'like', '%' . $searchTerm . '%');
             });
         }
 
         return $query->orderBy('created_at', 'desc')
-                    ->paginate($perPage)
-                    ->withQueryString();
+            ->paginate($perPage)
+            ->withQueryString();
     }
 
     /**
