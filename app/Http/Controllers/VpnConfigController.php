@@ -28,6 +28,8 @@ class VpnConfigController extends Controller
             // Получаем запись key_activate_user с отношениями
             $keyActivateUser = $this->keyActivateUserRepository->findByKeyActivateIdWithRelations($key_activate_id);
 
+            Log::warning('$keyActivateUser:', ['keyActivateUser' => $keyActivateUser]);
+
             // Получаем информацию о пользователе сервера
             $serverUser = $keyActivateUser->serverUser;
             if (!$serverUser) {
