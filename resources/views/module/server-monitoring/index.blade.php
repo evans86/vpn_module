@@ -83,12 +83,7 @@
                                                 // Расчёт нагрузки
                                                 $cpuUsage = $panelData['data']->last()['statistics']['cpu_usage'] ?? 0;
                                                 $memoryUsage = ($panelData['data']->last()['statistics']['mem_used'] ?? 0) / ($panelData['data']->last()['statistics']['mem_total'] ?? 1);
-                                                $onlineUsers = $panelData['data']->last()['statistics']['online_users'] ?? 0;
-                                                $totalUsers = $panelData['data']->last()['statistics']['total_user'] ?? 1;
-                                                $userLoad = $onlineUsers / $totalUsers;
-
-                                                // Нагрузка с учётом CPU, памяти и онлайн-пользователей
-                                                $load = (($cpuUsage + $memoryUsage + $userLoad) / 3) * 100;
+                                                $load = (($cpuUsage + $memoryUsage) / 2) * 100;
 
                                                 // Определение уровня нагрузки
                                                 if ($load < 30) {
@@ -104,9 +99,6 @@
                                             @endphp
                                             <p class="card-text">
                                                 Нагрузка: <span class="text-{{ $loadColor }}">{{ $loadLevel }}</span> ({{ number_format($load, 2) }}%)
-                                            </p>
-                                            <p class="card-text">
-                                                Онлайн-пользователи: {{ $onlineUsers }} / {{ $totalUsers }}
                                             </p>
                                         </div>
                                     </div>
@@ -221,10 +213,7 @@
             const loadData{{ $panelId }} = {!! json_encode($panelData['data']->map(function ($stat) {
                     $cpuUsage = $stat['statistics']['cpu_usage'] ?? 0;
                     $memoryUsage = ($stat['statistics']['mem_used'] ?? 0) / ($stat['statistics']['mem_total'] ?? 1);
-                    $onlineUsers = $stat['statistics']['online_users'] ?? 0;
-                    $totalUsers = $stat['statistics']['total_user'] ?? 1;
-                    $userLoad = $onlineUsers / $totalUsers;
-                    return (($cpuUsage + $memoryUsage + $userLoad) / 3) * 100;
+                    return (($cpuUsage + $memoryUsage) / 2) * 100;
                 })) !!};
 
             // График CPU
