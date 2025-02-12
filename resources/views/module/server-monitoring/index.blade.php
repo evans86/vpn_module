@@ -24,7 +24,8 @@
                         <div class="card-body">
                             <!-- Краткая статистика -->
                             <div class="row mb-4">
-                                <div class="col-md-4">
+                                <!-- Пользователи -->
+                                <div class="col-md-3">
                                     <div class="card bg-light">
                                         <div class="card-body">
                                             <h5 class="card-title">Пользователи</h5>
@@ -34,17 +35,33 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
+
+                                <!-- Входящий трафик -->
+                                <div class="col-md-3">
                                     <div class="card bg-light">
                                         <div class="card-body">
-                                            <h5 class="card-title">Трафик</h5>
+                                            <h5 class="card-title">Входящий трафик</h5>
+                                            <p class="card-text">
+                                                {{ number_format(($panelData['data']->last()['statistics']['incoming_bandwidth'] ?? 0) / (1024 * 1024 * 1024), 2) }} GB
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Исходящий трафик -->
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h5 class="card-title">Исходящий трафик</h5>
                                             <p class="card-text">
                                                 {{ number_format(($panelData['data']->last()['statistics']['outgoing_bandwidth'] ?? 0) / (1024 * 1024 * 1024), 2) }} GB
                                             </p>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
+
+                                <!-- Память -->
+                                <div class="col-md-3">
                                     <div class="card bg-light">
                                         <div class="card-body">
                                             <h5 class="card-title">Память</h5>
