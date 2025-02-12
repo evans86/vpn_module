@@ -289,7 +289,7 @@ class FatherBotController extends AbstractTelegramBot
             if ($messageId) {
                 $this->editMessage($message, $keyboard, $messageId);
             } else {
-               $this->sendMessage($message, $keyboard);
+                $this->sendMessage($message, $keyboard);
             }
         } catch (\Exception $e) {
             Log::error('Error in showPacksList: ' . $e->getMessage());
@@ -579,13 +579,12 @@ class FatherBotController extends AbstractTelegramBot
                 $content .= "Не активированные ключи активации:\n";
             }
 
-            if (is_null($keys)) {
-                $content .= "Нет не активированных ключей активации\n";
-            }else{
-                foreach ($keys as $index => $key) {
-                    $content .= "{$key->id}\n";
-                }
+            Log::warning('$keys ' .  $keys);
+
+            foreach ($keys as $index => $key) {
+                $content .= "{$key->id}\n";
             }
+
 
             // Создаем временный файл
             $fileName = "unactivated_keys_{$packSalesman->id}.txt";
