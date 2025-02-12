@@ -313,7 +313,7 @@ class MarzbanService
     {
         try {
             $panel = $this->updateMarzbanToken($panel_id);
-            Log::warning('$panel', ['panel' => $panel]);
+            Log::warning('$panel', ['panel' => $panel->auth_token]);
             $marzbanApi = new MarzbanAPI($panel->api_address);
             $serverStats = $marzbanApi->getServerStats($panel->auth_token);
 
