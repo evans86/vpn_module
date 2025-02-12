@@ -298,6 +298,7 @@ class MarzbanAPI
             $response = $client->get($action, $requestParam);
 
             Log::warning('STATS RESULT', [
+                'base_uri' => $this->host . '/api/' . $action,
                 'response' => $response,
                 'panel_id' => $token
             ]);
