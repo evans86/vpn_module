@@ -19,7 +19,7 @@ class WebhookController extends Controller
     public function fatherBot(Request $request, string $token): JsonResponse
     {
         try {
-            Log::debug('Received webhook for father bot', [
+            Log::info('Received webhook for father bot', [
                 'token' => substr($token, 0, 10) . '...',
                 'request_body' => $request->getContent(),
                 'headers' => $request->headers->all()
@@ -55,7 +55,7 @@ class WebhookController extends Controller
     public function salesmanBot(Request $request, string $token): JsonResponse
     {
         try {
-            Log::debug('Received webhook for salesman bot', [
+            Log::info('Received webhook for salesman bot', [
                 'token' => substr($token, 0, 10) . '...',
                 'request_body' => $request->getContent(),
                 'headers' => $request->headers->all()

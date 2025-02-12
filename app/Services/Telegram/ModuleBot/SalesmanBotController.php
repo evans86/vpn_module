@@ -3,11 +3,11 @@
 namespace App\Services\Telegram\ModuleBot;
 
 use App\Models\KeyActivate\KeyActivate;
-use App\Models\Panel\Panel;
 use App\Models\Salesman\Salesman;
 use App\Models\TelegramUser\TelegramUser;
 use App\Services\Panel\PanelStrategy;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 
 class SalesmanBotController extends AbstractTelegramBot
 {
@@ -22,10 +22,10 @@ class SalesmanBotController extends AbstractTelegramBot
         $this->salesman = $this->salesmanRepository->findByToken($token);
         if (!$this->salesman) {
             Log::error('Salesman not found for token: ' . substr($token, 0, 10) . '...');
-            throw new \RuntimeException('Salesman not found');
+            throw new RuntimeException('Salesman not found');
         }
 
-        Log::debug('Initialized SalesmanBotController', [
+        Log::info('Initialized SalesmanBotController', [
             'salesman_id' => $this->salesman->id,
             'token' => substr($token, 0, 10) . '...'
         ]);
@@ -140,7 +140,7 @@ class SalesmanBotController extends AbstractTelegramBot
                     'status' => 1, // пока статус "активен"
                 ]);
 
-                Log::debug('New Telegram user added', [
+                Log::info('New Telegram user added', [
                     'telegram_id' => $telegramId,
                     'username' => $username,
                     'salesman_id' => $this->salesman->id,

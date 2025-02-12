@@ -131,10 +131,6 @@ class VpnConfigController extends Controller
             // Форматируем ключи для отображения
             $formattedKeys = $this->formatConnectionKeys($connectionKeys);
 
-            Log::debug('SHOW INFO MARZ', [
-                'MY_KEYS' => $formattedKeys,
-            ]);
-
             // Добавляем ссылку на бота
             $botLink = $keyActivateUser->keyActivate->packSalesman->salesman->bot_link ?? '#';
 

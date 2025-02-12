@@ -80,7 +80,7 @@ class PanelStrategy
      */
     public function addServerUser(int $panel_id, int $userTgId, int $data_limit, int $expire, string $key_activate_id): ServerUser
     {
-      return $this->strategy->addServerUser($panel_id, $userTgId, $data_limit, $expire, $key_activate_id);
+        return $this->strategy->addServerUser($panel_id, $userTgId, $data_limit, $expire, $key_activate_id);
     }
 
     /**

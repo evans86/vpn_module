@@ -184,7 +184,6 @@ class MarzbanAPI
     /**
      * @TODO метод на будущее
      *
-     *
      * Обновление у пользователя даты окончания и лимита трафика
      *
      * @param string $token
@@ -271,6 +270,8 @@ class MarzbanAPI
     }
 
     /**
+     * Статистика панели (сервера)
+     *
      * @param string $token
      * @return mixed
      * @throws GuzzleException

@@ -16,8 +16,9 @@ class SalesmanService
 
     public function __construct(
         SalesmanRepository $salesmanRepository,
-        DatabaseLogger $logger
-    ) {
+        DatabaseLogger     $logger
+    )
+    {
         $this->salesmanRepository = $salesmanRepository;
         $this->logger = $logger;
     }

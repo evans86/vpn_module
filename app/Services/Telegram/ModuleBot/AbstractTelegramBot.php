@@ -62,7 +62,7 @@ abstract class AbstractTelegramBot
     public function init(): void
     {
         try {
-            Log::debug('Initializing bot', [
+            Log::info('Initializing bot', [
                 'update_raw' => request()->all()
             ]);
 
@@ -80,7 +80,7 @@ abstract class AbstractTelegramBot
                 $this->firstName = $this->update->getCallbackQuery()->getFrom()->getFirstName();
             }
 
-            Log::debug('Bot initialized', [
+            Log::info('Bot initialized', [
                 'chat_id' => $this->chatId,
                 'username' => $this->username,
                 'first_name' => $this->firstName
@@ -112,7 +112,7 @@ abstract class AbstractTelegramBot
 
             $webhookUrl = rtrim(self::WEBHOOK_BASE_URL, '/') . '/' . $path;
 
-            Log::debug('Setting webhook URL', [
+            Log::info('Setting webhook URL', [
                 'url' => $webhookUrl,
                 'bot_type' => $botType,
                 'token' => substr($token, 0, 10) . '...'
@@ -123,7 +123,7 @@ abstract class AbstractTelegramBot
 
             $response = $this->telegram->setWebhook(['url' => $webhookUrl]);
 
-            Log::debug('Webhook set response', [
+            Log::info('Webhook set response', [
                 'response' => $response,
                 'bot_type' => $botType
             ]);
@@ -159,12 +159,6 @@ abstract class AbstractTelegramBot
     public function sendMessage(string $text, $keyboard = null): void
     {
         try {
-            Log::debug('Sending message', [
-                'chat_id' => $this->chatId,
-                'text' => $text,
-                'keyboard' => $keyboard
-            ]);
-
             $params = [
                 'chat_id' => $this->chatId,
                 'text' => $text,
@@ -184,8 +178,7 @@ abstract class AbstractTelegramBot
                 }
             }
 
-            $response = $this->telegram->sendMessage($params);
-            Log::debug('Message sent', ['response' => $response]);
+            $this->telegram->sendMessage($params);
         } catch (Exception $e) {
             Log::error('Send message error: ' . $e->getMessage(), [
                 'exception' => $e,
@@ -205,13 +198,6 @@ abstract class AbstractTelegramBot
     public function editMessage(string $text, $keyboard = null, ?int $messageId = null): void
     {
         try {
-            Log::debug('Editing message', [
-                'chat_id' => $this->chatId,
-                'message_id' => $messageId,
-                'text' => $text,
-                'keyboard' => $keyboard
-            ]);
-
             $params = [
                 'chat_id' => $this->chatId,
                 'message_id' => $messageId,
@@ -231,8 +217,7 @@ abstract class AbstractTelegramBot
                 }
             }
 
-            $response = $this->telegram->editMessageText($params);
-            Log::debug('Message edited', ['response' => $response]);
+            $this->telegram->editMessageText($params);
         } catch (Exception $e) {
             Log::error('Edit message error: ' . $e->getMessage(), [
                 'exception' => $e,

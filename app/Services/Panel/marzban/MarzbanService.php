@@ -109,7 +109,7 @@ class MarzbanService
 
             foreach ($commands as $command) {
                 $result = $ssh->exec($command);
-                Log::debug('Command executed', ['command' => $command, 'result' => $result]);
+                Log::info('Command executed', ['command' => $command, 'result' => $result]);
 
                 if ($ssh->getExitStatus() !== 0) {
                     throw new RuntimeException("Command failed: $command");
@@ -273,7 +273,7 @@ class MarzbanService
             $marzbanApi = new MarzbanAPI($panel->api_address);
             $userData = $marzbanApi->getUser($panel->auth_token, $user_id);
 
-            Log::debug('Checking USERDATA', ['data' => $userData]);
+            Log::info('Checking USERDATA', ['data' => $userData]);
 
             $info = [
                 'used_traffic' => $userData['used_traffic'],
@@ -282,7 +282,7 @@ class MarzbanService
                 'status' => $userData['status'],
             ];
 
-            Log::debug('Checking STATUS subscribe info', ['panel_id' => $panel_id, 'user_id' => $user_id, 'status' => $userData['status']]);
+            Log::info('Checking STATUS subscribe info', ['panel_id' => $panel_id, 'user_id' => $user_id, 'status' => $userData['status']]);
 
             if ($userData['status'] !== 'active') {
                 $serverUser->keyActivateUser->keyActivate->status = KeyActivate::EXPIRED;
@@ -664,10 +664,6 @@ class MarzbanService
             $userId = Str::uuid();
 
             $userData = $marzbanApi->createUser($panel->auth_token, $userId, $data_limit, $expire);
-
-            Log::debug('LINKS server user', [
-                'userData' => $userData
-            ]);
 
             if (empty($userData['links'])) {
                 throw new RuntimeException('Failed to get user links from Marzban API');
