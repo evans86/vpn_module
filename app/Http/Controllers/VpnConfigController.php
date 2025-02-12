@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ServerUser\ServerUser;
 use App\Repositories\KeyActivateUser\KeyActivateUserRepository;
 use App\Repositories\ServerUser\ServerUserRepository;
 use App\Services\Panel\PanelStrategy;
