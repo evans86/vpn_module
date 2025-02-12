@@ -30,19 +30,22 @@
                                         <div class="card-body">
                                             <h5 class="card-title">Пользователи</h5>
                                             <p class="card-text">
-                                                Активные: {{ $panelData['data']->last()['statistics']['users_active'] ?? 0 }} / {{ $panelData['data']->last()['statistics']['total_user'] ?? 0 }}
+                                                Активные/Всего: {{ $panelData['data']->last()['statistics']['users_active'] ?? 0 }} / {{ $panelData['data']->last()['statistics']['total_user'] ?? 0 }}
+                                            </p>
+                                            <p class="card-text">
+                                                Онлайн сейчас: {{ $panelData['data']->last()['statistics']['online_users'] ?? 0 }}
+                                            </p>
+                                            <p class="card-text">
+                                                Истекший срок: {{ $panelData['data']->last()['statistics']['users_expired'] ?? 0 }}
+                                            </p>
+                                            <p class="card-text">
+                                                Лимит трафика: {{ $panelData['data']->last()['statistics']['users_limited'] ?? 0 }}
                                             </p>
                                             <p class="card-text">
                                                 На удержании: {{ $panelData['data']->last()['statistics']['users_on_hold'] ?? 0 }}
                                             </p>
                                             <p class="card-text">
                                                 Отключены: {{ $panelData['data']->last()['statistics']['users_disabled'] ?? 0 }}
-                                            </p>
-                                            <p class="card-text">
-                                                Истекшие: {{ $panelData['data']->last()['statistics']['users_expired'] ?? 0 }}
-                                            </p>
-                                            <p class="card-text">
-                                                Ограниченные: {{ $panelData['data']->last()['statistics']['users_limited'] ?? 0 }}
                                             </p>
                                         </div>
                                     </div>
