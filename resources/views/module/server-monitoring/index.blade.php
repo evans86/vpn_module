@@ -2,34 +2,30 @@
 
 @section('content')
     <div class="container-fluid">
-        <div class="row">
-            @foreach($statistics as $panelId => $panelData)
-                <div class="col-lg-4 col-md-6">
+        @foreach($statistics as $panelId => $panelData)
+            <div class="row mb-4">
+                <div class="col-12">
                     <div class="card">
                         <div class="card-header">
                             <h4 class="card-title">Статистика панели: {{ $panelData['panel']->name }}</h4>
                         </div>
                         <div class="card-body">
                             <div class="row">
-                                <div class="col-md-12">
+                                <div class="col-md-4">
                                     <canvas id="chart-cpu-{{ $panelId }}" height="150"></canvas>
                                 </div>
-                            </div>
-                            <div class="row mt-4">
-                                <div class="col-md-12">
+                                <div class="col-md-4">
                                     <canvas id="chart-memory-{{ $panelId }}" height="150"></canvas>
                                 </div>
-                            </div>
-                            <div class="row mt-4">
-                                <div class="col-md-12">
+                                <div class="col-md-4">
                                     <canvas id="chart-users-{{ $panelId }}" height="150"></canvas>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            @endforeach
-        </div>
+            </div>
+        @endforeach
     </div>
 
     @push('js')
