@@ -147,43 +147,38 @@
     </div>
 
     @push('js')
-        <!-- Подключаем Chart.js, адаптер для дат и плагин zoom -->
+        <!-- Подключаем Chart.js и плагин zoom -->
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
 
         <script>
-            // Настройки для всех графиков
+            // Настройки для всех графиков (выносим за пределы цикла)
             const commonOptions = {
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: false, // Отключаем автоматическое соотношение сторон
                 plugins: {
                     zoom: {
                         zoom: {
-                            wheel: { enabled: true },
-                            pinch: { enabled: true },
-                            mode: 'x',
+                            wheel: {
+                                enabled: true, // Включаем масштабирование колесом мыши
+                            },
+                            pinch: {
+                                enabled: true, // Включаем масштабирование на touch-устройствах
+                            },
+                            mode: 'x', // Масштабирование только по оси X
                         },
                         pan: {
-                            enabled: true,
-                            mode: 'x',
+                            enabled: true, // Включаем перемещение графика
+                            mode: 'x', // Перемещение только по оси X
                         },
                     },
                     tooltip: {
                         mode: 'index',
                         intersect: false,
                     },
-                    decimation: {
-                        enabled: true,
-                        algorithm: 'min-max',
-                    },
                 },
                 scales: {
                     x: {
-                        type: 'time',
-                        time: {
-                            unit: 'hour',
-                        },
                         display: true,
                         title: {
                             display: true,
@@ -196,6 +191,7 @@
                             display: true,
                             text: 'Значение',
                         },
+                        // Убираем фиксированные min и max, чтобы график масштабировался автоматически
                     },
                 },
             };
@@ -206,12 +202,6 @@
             const cpuData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.cpu_usage')) !!};
             const memoryData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.mem_used_gb')) !!};
             const usersData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.online_users')) !!};
-
-            // Проверка данных
-            console.log('Labels:', labels{{ $panelId }});
-            console.log('CPU Data:', cpuData{{ $panelId }});
-            console.log('Memory Data:', memoryData{{ $panelId }});
-            console.log('Users Data:', usersData{{ $panelId }});
 
             // График CPU
             new Chart(document.getElementById('chart-cpu-{{ $panelId }}'), {
