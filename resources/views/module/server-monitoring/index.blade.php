@@ -207,6 +207,12 @@
             const memoryData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.mem_used_gb')) !!};
             const usersData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.online_users')) !!};
 
+            // Проверка данных
+            console.log('Labels:', labels{{ $panelId }});
+            console.log('CPU Data:', cpuData{{ $panelId }});
+            console.log('Memory Data:', memoryData{{ $panelId }});
+            console.log('Users Data:', usersData{{ $panelId }});
+
             // График CPU
             new Chart(document.getElementById('chart-cpu-{{ $panelId }}'), {
                 type: 'line',
