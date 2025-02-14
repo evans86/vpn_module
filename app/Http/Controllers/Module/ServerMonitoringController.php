@@ -21,8 +21,8 @@ class ServerMonitoringController extends Controller
         $panels = Panel::query()->where('panel_status', Panel::PANEL_CONFIGURED);
 
         // Если передан panel_id, фильтруем по конкретной панели
-        if ($request->filled('panel_id')) {
-            $panels->where('id', $request->panel_id);
+        if ($request->route('panel_id')) {
+            $panels->where('id', $request->route('panel_id'));
         }
 
         $panels = $panels->get();
