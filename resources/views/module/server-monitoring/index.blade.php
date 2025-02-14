@@ -183,6 +183,11 @@
                         type: 'time',
                         time: {
                             unit: 'hour',
+                            displayFormats: {
+                                hour: 'HH:mm',
+                                day: 'dd.MM.yyyy',
+                            },
+                            tooltipFormat: 'dd.MM.yyyy HH:mm',
                         },
                         display: true,
                         title: {
