@@ -14,7 +14,7 @@
                     <div class="card-body">
                         <!-- Основная информация о логе -->
                         <div class="row mb-4">
-                            <div class="col-md-6">
+                            <div class="col-md-3">
                                 <div class="info-box">
                                     <span class="info-box-icon bg-info">
                                         <i class="fas fa-clock"></i>
@@ -25,7 +25,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-3">
                                 <div class="info-box">
                                     <span class="info-box-icon bg-{{ $log->getLevelColorClass() }}">
                                         <i class="fas {{ $log->getLevelIcon() }}"></i>
@@ -36,11 +36,7 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- Дополнительные детали -->
-                        <div class="row mb-4">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="info-box">
                                     <span class="info-box-icon bg-secondary">
                                         <i class="fas fa-user"></i>
@@ -51,7 +47,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="info-box">
                                     <span class="info-box-icon bg-secondary">
                                         <i class="fas fa-network-wired"></i>
@@ -62,22 +58,11 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                <div class="info-box">
-                                    <span class="info-box-icon bg-secondary">
-                                        <i class="fas fa-desktop"></i>
-                                    </span>
-                                    <div class="info-box-content">
-                                        <span class="info-box-text">User Agent</span>
-                                        <span class="info-box-number">{{ $log->user_agent }}</span>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
 
-                        <!-- Сообщение и контекст -->
-                        <div class="row">
-                            <div class="col-md-8">
+                        <!-- Сообщение -->
+                        <div class="row mb-4">
+                            <div class="col-md-12">
                                 <div class="card">
                                     <div class="card-header">
                                         <h5 class="card-title">Сообщение</h5>
@@ -87,17 +72,19 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                @if($log->context)
-                                    <div class="card">
-                                        <div class="card-header">
-                                            <h5 class="card-title">Контекст</h5>
-                                        </div>
-                                        <div class="card-body">
-                                            <pre class="context-box">{{ json_encode($log->context, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
-                                        </div>
+                        </div>
+
+                        <!-- Контекст -->
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="card-title">Контекст</h5>
                                     </div>
-                                @endif
+                                    <div class="card-body">
+                                        <pre class="context-box">{{ json_encode($log->context, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -153,7 +140,7 @@
         }
 
         .context-box {
-            max-height: 300px;
+            max-height: 500px; /* Увеличил высоту для контекста */
             overflow-y: auto;
         }
     </style>
