@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Module;
 use App\Http\Controllers\Controller;
 use App\Models\Panel\Panel;
 use App\Models\ServerMonitoring\ServerMonitoring;
-use App\Services\Panel\PanelStrategy;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Log;
 
@@ -15,17 +15,17 @@ class ServerMonitoringController extends Controller
     /**
      * @throws GuzzleException
      */
-    public function index()
+    public function index(Request $request)
     {
-//        /**
-//         * @var Panel $panel
-//         */
-//        $panel = Panel::query()->where('panel_status', Panel::PANEL_CONFIGURED)->first();
-//        $strategy = new PanelStrategy($panel->panel);
-//        $strategy->getServerStats();
-
         // Получаем все сконфигурированные панели
-        $panels = Panel::query()->where('panel_status', Panel::PANEL_CONFIGURED)->get();
+        $panels = Panel::query()->where('panel_status', Panel::PANEL_CONFIGURED);
+
+        // Если передан panel_id, фильтруем по конкретной панели
+        if ($request->filled('panel_id')) {
+            $panels->where('id', $request->panel_id);
+        }
+
+        $panels = $panels->get();
 
         // Собираем статистику для каждой панели
         $statistics = [];

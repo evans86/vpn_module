@@ -119,16 +119,19 @@
                                                class="dropdown-item">
                                                 <i class="fas fa-users"></i> Пользователи
                                             </a>
-{{--                                            <button type="button" class="dropdown-item" data-toggle="modal"--}}
-{{--                                                    data-target="#editPanelModal{{ $panel->id }}">--}}
-{{--                                                <i class="fas fa-key"></i> Изменить учетные данные--}}
-{{--                                            </button>--}}
                                             <form action="{{ route('admin.module.panel.update-config', $panel) }}" method="POST" class="d-inline">
                                                 @csrf
                                                 <button type="submit" class="dropdown-item">
                                                     <i class="fas fa-sync"></i> Обновить конфигурацию
                                                 </button>
                                             </form>
+                                            <!-- Кнопка "Статистика" для настроенных панелей -->
+                                            @if($panel->panel_status === \App\Models\Panel\Panel::PANEL_CONFIGURED)
+                                                <a href="{{ route('admin.module.server-monitoring.index', ['panel_id' => $panel->id]) }}"
+                                                   class="dropdown-item">
+                                                    <i class="fas fa-chart-line"></i> Статистика
+                                                </a>
+                                            @endif
                                             <button type="button" class="dropdown-item text-danger"
                                                     onclick="deletePanel({{ $panel->id }})">
                                                 <i class="fas fa-trash"></i> Удалить

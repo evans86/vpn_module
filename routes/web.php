@@ -107,6 +107,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             // Server Monitoring Routes
             Route::prefix('server-monitoring')->name('server-monitoring.')->group(function () {
                 Route::get('/', [ServerMonitoringController::class, 'index'])->name('index');
+                Route::get('/{panel_id?}', [ServerMonitoringController::class, 'index'])->name('index');
             });
 
             // Server User Routes
