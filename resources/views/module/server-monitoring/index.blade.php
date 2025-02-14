@@ -147,48 +147,38 @@
     </div>
 
     @push('js')
-        <!-- Подключаем Chart.js, адаптер для дат и плагин zoom -->
+        <!-- Подключаем Chart.js и плагин zoom -->
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
 
         <script>
-            // Настройки для всех графиков
+            // Настройки для всех графиков (выносим за пределы цикла)
             const commonOptions = {
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: false, // Отключаем автоматическое соотношение сторон
                 plugins: {
                     zoom: {
                         zoom: {
-                            wheel: { enabled: true },
-                            pinch: { enabled: true },
-                            mode: 'x',
+                            wheel: {
+                                enabled: true, // Включаем масштабирование колесом мыши
+                            },
+                            pinch: {
+                                enabled: true, // Включаем масштабирование на touch-устройствах
+                            },
+                            mode: 'x', // Масштабирование только по оси X
                         },
                         pan: {
-                            enabled: true,
-                            mode: 'x',
+                            enabled: true, // Включаем перемещение графика
+                            mode: 'x', // Перемещение только по оси X
                         },
                     },
                     tooltip: {
                         mode: 'index',
                         intersect: false,
                     },
-                    decimation: {
-                        enabled: true,
-                        algorithm: 'min-max',
-                    },
                 },
                 scales: {
                     x: {
-                        type: 'time',
-                        time: {
-                            unit: 'hour',
-                            displayFormats: {
-                                hour: 'HH:mm',
-                                day: 'dd.MM.yyyy',
-                            },
-                            tooltipFormat: 'dd.MM.yyyy HH:mm',
-                        },
                         display: true,
                         title: {
                             display: true,
@@ -201,6 +191,7 @@
                             display: true,
                             text: 'Значение',
                         },
+                        // Убираем фиксированные min и max, чтобы график масштабировался автоматически
                     },
                 },
             };
