@@ -255,8 +255,9 @@
     <orderEntry type="library" name="LineIcons" level="application" />
     <orderEntry type="library" name="toastr.js" level="application" />
     <orderEntry type="library" name="bootstrap" level="application" />
-    <orderEntry type="library" name="qrcode-generator" level="application" />
     <orderEntry type="library" name="qrcodejs" level="application" />
     <orderEntry type="library" name="qr-code-styling" level="application" />
+    <orderEntry type="library" name="qrcode-generator" level="application" />
+    <orderEntry type="library" name="plotly-2.24.1" level="application" />
   </component>
 </module>
