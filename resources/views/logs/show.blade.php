@@ -13,7 +13,8 @@
                     </div>
                     <div class="card-body">
                         <div class="row">
-                            <div class="col-md-6">
+                            <!-- Левая колонка: Детали лога -->
+                            <div class="col-md-8">
                                 <table class="table">
                                     <tr>
                                         <th>Время:</th>
@@ -45,9 +46,9 @@
                                         <td>{{ $log->user_agent }}</td>
                                     </tr>
                                 </table>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="card">
+
+                                <!-- Сообщение -->
+                                <div class="card mt-3">
                                     <div class="card-header">
                                         <h5 class="card-title">Сообщение</h5>
                                     </div>
@@ -55,14 +56,17 @@
                                         <pre class="message-box">{{ $log->message }}</pre>
                                     </div>
                                 </div>
+                            </div>
+
+                            <!-- Правая колонка: Контекст -->
+                            <div class="col-md-4">
                                 @if($log->context)
-                                    <div class="card mt-3">
+                                    <div class="card">
                                         <div class="card-header">
                                             <h5 class="card-title">Контекст</h5>
                                         </div>
                                         <div class="card-body">
-                                            <pre
-                                                class="context-box">{{ json_encode($log->context, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+                                            <pre class="context-box">{{ json_encode($log->context, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
                                         </div>
                                     </div>
                                 @endif
@@ -83,6 +87,12 @@
             border-radius: 4px;
             white-space: pre-wrap;
             word-wrap: break-word;
+        }
+
+        /* Стили для улучшения отображения контекста */
+        .context-box {
+            max-height: 400px;
+            overflow-y: auto;
         }
     </style>
 @endpush
