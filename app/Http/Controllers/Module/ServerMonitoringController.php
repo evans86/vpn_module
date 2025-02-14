@@ -35,23 +35,24 @@ class ServerMonitoringController extends Controller
             $panelStats = ServerMonitoring::where('panel_id', $panel->id)
                 ->where('created_at', '>=', $oneWeekAgo)
                 ->orderBy('created_at', 'asc')
-                ->get();
+                ->get()
+                ->groupBy(function ($item) {
+                    return $item->created_at->format('Y-m-d H:00'); // Агрегация по часам
+                })
+                ->map(function ($group) {
+                    return [
+                        'created_at' => $group->first()->created_at->format('Y-m-d H:i:s'),
+                        'statistics' => [
+                            'cpu_usage' => $group->avg('statistics->cpu_usage'),
+                            'mem_used_gb' => $group->avg('statistics->mem_used_gb'),
+                            'online_users' => $group->avg('statistics->online_users'),
+                        ],
+                    ];
+                });
 
-            // Формируем данные для графика
             $statistics[$panel->id] = [
                 'panel' => $panel,
-                'data' => $panelStats->map(function ($stat) {
-                    $stats = json_decode($stat->statistics, true);
-
-                    // Конвертируем память из байтов в гигабайты
-                    $stats['mem_used_gb'] = $stats['mem_used'] / (1024 * 1024 * 1024); // 1 ГБ = 1024 МБ = 1024 * 1024 КБ = 1024 * 1024 * 1024 Б
-                    $stats['mem_total_gb'] = $stats['mem_total'] / (1024 * 1024 * 1024);
-
-                    return [
-                        'created_at' => $stat->created_at->format('Y-m-d H:i:s'),
-                        'statistics' => $stats,
-                    ];
-                }),
+                'data' => $panelStats,
             ];
         }
 

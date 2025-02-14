@@ -152,33 +152,37 @@
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
 
         <script>
-            // Настройки для всех графиков (выносим за пределы цикла)
+            // Настройки для всех графиков
             const commonOptions = {
                 responsive: true,
-                maintainAspectRatio: false, // Отключаем автоматическое соотношение сторон
+                maintainAspectRatio: false,
                 plugins: {
                     zoom: {
                         zoom: {
-                            wheel: {
-                                enabled: true, // Включаем масштабирование колесом мыши
-                            },
-                            pinch: {
-                                enabled: true, // Включаем масштабирование на touch-устройствах
-                            },
-                            mode: 'x', // Масштабирование только по оси X
+                            wheel: { enabled: true },
+                            pinch: { enabled: true },
+                            mode: 'x',
                         },
                         pan: {
-                            enabled: true, // Включаем перемещение графика
-                            mode: 'x', // Перемещение только по оси X
+                            enabled: true,
+                            mode: 'x',
                         },
                     },
                     tooltip: {
                         mode: 'index',
                         intersect: false,
                     },
+                    decimation: {
+                        enabled: true,
+                        algorithm: 'min-max',
+                    },
                 },
                 scales: {
                     x: {
+                        type: 'time',
+                        time: {
+                            unit: 'hour',
+                        },
                         display: true,
                         title: {
                             display: true,
@@ -191,7 +195,6 @@
                             display: true,
                             text: 'Значение',
                         },
-                        // Убираем фиксированные min и max, чтобы график масштабировался автоматически
                     },
                 },
             };
