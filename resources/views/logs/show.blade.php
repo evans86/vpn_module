@@ -139,9 +139,9 @@
             word-wrap: break-word;
         }
 
+        /* Убрали max-height и overflow-y для контекста */
         .context-box {
-            max-height: 500px; /* Увеличил высоту для контекста */
-            overflow-y: auto;
+            /* Убираем ограничение по высоте и скролл */
         }
     </style>
 @endpush
