@@ -152,6 +152,10 @@
             const memoryData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.mem_used_gb')) !!};
             const usersData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.online_users')) !!};
 
+            // Вычисляем диапазон для последних 12 часов
+            const lastTimestamp = new Date(labels{{ $panelId }}[labels{{ $panelId }}.length - 1]);
+            const startTimestamp = new Date(lastTimestamp.getTime() - 12 * 60 * 60 * 1000); // 12 часов назад
+
             // График CPU
             Plotly.newPlot(`chart-cpu-{{ $panelId }}`, [{
                 x: labels{{ $panelId }},
@@ -162,7 +166,10 @@
                 line: { color: 'rgba(75, 192, 192, 1)' },
             }], {
                 title: 'Использование CPU (%)',
-                xaxis: { title: 'Время' },
+                xaxis: {
+                    title: 'Время',
+                    range: [startTimestamp, lastTimestamp], // Устанавливаем диапазон для последних 12 часов
+                },
                 yaxis: { title: 'Значение' },
                 showlegend: true,
             });
@@ -177,7 +184,10 @@
                 line: { color: 'rgba(153, 102, 255, 1)' },
             }], {
                 title: 'Использование памяти (ГБ)',
-                xaxis: { title: 'Время' },
+                xaxis: {
+                    title: 'Время',
+                    range: [startTimestamp, lastTimestamp], // Устанавливаем диапазон для последних 12 часов
+                },
                 yaxis: { title: 'Значение' },
                 showlegend: true,
             });
@@ -192,7 +202,10 @@
                 line: { color: 'rgba(255, 159, 64, 1)' },
             }], {
                 title: 'Онлайн-пользователи',
-                xaxis: { title: 'Время' },
+                xaxis: {
+                    title: 'Время',
+                    range: [startTimestamp, lastTimestamp], // Устанавливаем диапазон для последних 12 часов
+                },
                 yaxis: { title: 'Значение' },
                 showlegend: true,
             });
