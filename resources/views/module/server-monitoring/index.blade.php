@@ -153,8 +153,8 @@
             const usersData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.online_users')) !!};
 
             // Вычисляем диапазон для последних 12 часов
-            const lastTimestamp = new Date(labels{{ $panelId }}[labels{{ $panelId }}.length - 1]);
-            const startTimestamp = new Date(lastTimestamp.getTime() - 12 * 60 * 60 * 1000); // 12 часов назад
+            const lastTimestamp{{ $panelId }} = new Date(labels{{ $panelId }}[labels{{ $panelId }}.length - 1]);
+            const startTimestamp{{ $panelId }} = new Date(lastTimestamp{{ $panelId }}.getTime() - 12 * 60 * 60 * 1000); // 12 часов назад
 
             // График CPU
             Plotly.newPlot(`chart-cpu-{{ $panelId }}`, [{
@@ -168,7 +168,7 @@
                 title: 'Использование CPU (%)',
                 xaxis: {
                     title: 'Время',
-                    range: [startTimestamp, lastTimestamp], // Устанавливаем диапазон для последних 12 часов
+                    range: [startTimestamp{{ $panelId }}, lastTimestamp{{ $panelId }}], // Устанавливаем диапазон для последних 12 часов
                 },
                 yaxis: { title: 'Значение' },
                 showlegend: true,
@@ -186,7 +186,7 @@
                 title: 'Использование памяти (ГБ)',
                 xaxis: {
                     title: 'Время',
-                    range: [startTimestamp, lastTimestamp], // Устанавливаем диапазон для последних 12 часов
+                    range: [startTimestamp{{ $panelId }}, lastTimestamp{{ $panelId }}], // Устанавливаем диапазон для последних 12 часов
                 },
                 yaxis: { title: 'Значение' },
                 showlegend: true,
@@ -204,7 +204,7 @@
                 title: 'Онлайн-пользователи',
                 xaxis: {
                     title: 'Время',
-                    range: [startTimestamp, lastTimestamp], // Устанавливаем диапазон для последних 12 часов
+                    range: [startTimestamp{{ $panelId }}, lastTimestamp{{ $panelId }}], // Устанавливаем диапазон для последних 12 часов
                 },
                 yaxis: { title: 'Значение' },
                 showlegend: true,
