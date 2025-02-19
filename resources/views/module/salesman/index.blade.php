@@ -32,7 +32,7 @@
                                             <button type="submit" class="btn btn-primary">
                                                 <i class="fas fa-search"></i> Поиск
                                             </button>
-                                            <a href="{{ route('admin.module.salesman.index') }}" 
+                                            <a href="{{ route('admin.module.salesman.index') }}"
                                                class="btn btn-secondary">
                                                 <i class="fas fa-times"></i> Сбросить
                                             </a>
@@ -81,11 +81,18 @@
                                             </button>
                                         </td>
                                         <td>
-                                            <button
-                                                class="btn btn-sm btn-primary assign-pack-btn"
-                                                data-salesman-id="{{ $salesman->id }}">
-                                                Предоставить пакет
-                                            </button>
+                                            <div class="btn-group" role="group">
+                                                <button
+                                                    class="btn btn-sm btn-primary assign-pack-btn mr-2"
+                                                    data-salesman-id="{{ $salesman->id }}">
+                                                    Предоставить пакет
+                                                </button>
+                                                <button
+                                                    class="btn btn-sm btn-info assign-panel-btn"
+                                                    data-salesman-id="{{ $salesman->id }}">
+                                                    Привязать панель
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -132,6 +139,38 @@
             </div>
         </div>
     </div>
+
+    <!-- Модальное окно для выбора панели -->
+    <div class="modal fade" id="panelModal" tabindex="-1" role="dialog" aria-labelledby="panelModalLabel"
+         aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="panelModalLabel">Привязать панель</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="assignPanelForm">
+                        <input type="hidden" id="salesmanIdForPanel" name="salesman_id">
+                        <div class="form-group">
+                            <label for="panelId">Выберите панель</label>
+                            <select class="form-control" id="panelId" name="panel_id" required>
+                                @foreach($panels as $panel)
+                                    <option value="{{ $panel->id }}">{{ $panel->adress }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="assignPanelButton">Привязать</button>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @push('js')
@@ -173,6 +212,38 @@
                     },
                     error: function (xhr) {
                         showNotification('error', xhr.responseJSON?.message || 'Произошла ошибка при назначении пакета');
+                    }
+                });
+            });
+
+            // Обработчик клика по кнопке "Привязать панель"
+            $('.assign-panel-btn').on('click', function () {
+                const salesmanId = $(this).data('salesman-id');
+                $('#salesmanIdForPanel').val(salesmanId);
+                $('#panelModal').modal('show');
+            });
+
+            // Обработчик клика по кнопке "Привязать" в модальном окне
+            $('#assignPanelButton').on('click', function () {
+                const salesmanId = $('#salesmanIdForPanel').val();
+                const panelId = $('#panelId').val();
+
+                $.ajax({
+                    url: `/admin/module/salesman/${salesmanId}/assign-panel`,
+                    method: 'POST',
+                    data: {
+                        panel_id: panelId
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            showNotification('success', 'Панель успешно привязана');
+                            $('#panelModal').modal('hide');
+                        } else {
+                            showNotification('error', response.message || 'Произошла ошибка');
+                        }
+                    },
+                    error: function (xhr) {
+                        showNotification('error', xhr.responseJSON?.message || 'Произошла ошибка при привязке панели');
                     }
                 });
             });

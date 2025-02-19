@@ -21,7 +21,8 @@
         "laravel/tinker": "^2.0",
         "laravel/ui": "^3.4",
         "phpseclib/phpseclib": "~2.0",
-        "ext-curl": "*"
+        "ext-curl": "*",
+      "ext-http": "*"
     },
     "require-dev": {
         "codeception/codeception": "^4.2",

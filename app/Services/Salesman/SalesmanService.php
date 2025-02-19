@@ -8,6 +8,7 @@ use App\Models\Salesman\Salesman;
 use App\Repositories\Salesman\SalesmanRepository;
 use App\Logging\DatabaseLogger;
 use Exception;
+use http\Exception\RuntimeException;
 
 class SalesmanService
 {
@@ -127,6 +128,27 @@ class SalesmanService
                 'trace' => $e->getTraceAsString()
             ]);
             throw $e;
+        }
+    }
+
+    /**
+     * @throws Exception
+     */
+    public function assignPanel(int $salesmanId, int $panelId): void
+    {
+        try {
+            $salesman = $this->salesmanRepository->findByIdOrFail($salesmanId);
+            $salesman->panel_id = $panelId;
+            if (!$salesman->save())
+                throw new RuntimeException('Salesman dont create');
+
+            if (!$salesman->save())
+                throw new RuntimeException('Pack Salesman dont create');
+
+        } catch (RuntimeException $r) {
+            throw new RuntimeException($r->getMessage());
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage());
         }
     }
 

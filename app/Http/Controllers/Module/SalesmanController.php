@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
+use App\Repositories\Panel\PanelRepository;
 use App\Repositories\Salesman\SalesmanRepository;
 use App\Services\Salesman\SalesmanService;
 use App\Services\Pack\PackSalesmanService;
@@ -20,18 +21,21 @@ class SalesmanController extends Controller
     private SalesmanRepository $salesmanRepository;
     private PackSalesmanService $packSalesmanService;
     private PackRepository $packRepository;
+    private PanelRepository $panelRepository;
 
     public function __construct(
         SalesmanService     $salesmanService,
         SalesmanRepository  $salesmanRepository,
         PackSalesmanService $packSalesmanService,
-        PackRepository      $packRepository
+        PackRepository      $packRepository,
+        PanelRepository     $panelRepository
     )
     {
         $this->salesmanService = $salesmanService;
         $this->salesmanRepository = $salesmanRepository;
         $this->packSalesmanService = $packSalesmanService;
         $this->packRepository = $packRepository;
+        $this->panelRepository = $panelRepository;
     }
 
     /**
@@ -52,8 +56,9 @@ class SalesmanController extends Controller
             $filters = array_filter($request->only(['id', 'telegram_id']));
             $salesmen = $this->salesmanRepository->getPaginated(20, $filters);
             $packs = $this->packRepository->getAllActive();
+            $panels = $this->panelRepository->getAllConfiguredPanels();
 
-            return view('module.salesman.index', compact('salesmen', 'filters', 'packs'));
+            return view('module.salesman.index', compact('salesmen', 'filters', 'packs', 'panels'));
         } catch (Exception $e) {
             Log::error('Error accessing salesman list', [
                 'source' => 'salesman',
@@ -95,6 +100,39 @@ class SalesmanController extends Controller
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'salesman_id' => $id,
+                'user_id' => auth()->id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function assignPanel(Request $request, int $id): JsonResponse
+    {
+        try {
+            Log::info('Assigning panel to salesman', [
+                'source' => 'salesman',
+                'salesman_id' => $id,
+                'panel_id' => $request->input('panel_id'),
+                'user_id' => auth()->id()
+            ]);
+
+            $this->salesmanService->assignPanel($id, $request->input('panel_id'));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Panel assigned successfully',
+            ]);
+        } catch (Exception $e) {
+            Log::error('Error assigning panel to salesman', [
+                'source' => 'salesman',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'salesman_id' => $id,
+                'panel_id' => $request->input('panel_id'),
                 'user_id' => auth()->id()
             ]);
 

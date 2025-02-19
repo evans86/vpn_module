@@ -119,6 +119,7 @@ class KeyActivateService
                 throw new RuntimeException('Ключ уже используется другим пользователем');
             }
 
+            $salesman = $key->packSalesman->salesman;
             // Получаем активную панель Marzban
             $panel = $this->panelRepository->getConfiguredMarzbanPanel();
 
