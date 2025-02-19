@@ -58,8 +58,8 @@ class SalesmanController extends Controller
             $packs = $this->packRepository->getAllActive();
             $panels = $this->panelRepository->getAllConfiguredPanels();
 
-            Log::debug('PANELS', [
-                'source' => $panels
+            Log::error('PANELS', [
+                '$panels' => $panels
             ]);
 
             return view('module.salesman.index', compact('salesmen', 'filters', 'packs', 'panels'));
