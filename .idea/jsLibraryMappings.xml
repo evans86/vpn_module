@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="JavaScriptLibraryMappings">
-    <file url="PROJECT" libraries="{plotly-2.24.1}" />
+    <file url="PROJECT" libraries="{LineIcons, bootstrap, clipboard.js, font-awesome, jquery-3.6.0, toastr.js}" />
   </component>
 </project>
