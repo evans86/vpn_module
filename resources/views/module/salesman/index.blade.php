@@ -158,7 +158,7 @@
                             <label for="panelId">Выберите панель</label>
                             <select class="form-control" id="panelId" name="panel_id" required>
                                 @foreach($panels as $panel)
-                                    <option value="{{ $panel->id }}"></option>
+                                    <option value="{{ $panel->id }}">{{ $panel->panel_adress }}</option>
                                 @endforeach
                             </select>
                         </div>
