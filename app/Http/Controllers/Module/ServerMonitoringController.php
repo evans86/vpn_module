@@ -8,6 +8,7 @@ use App\Models\ServerMonitoring\ServerMonitoring;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class ServerMonitoringController extends Controller
@@ -17,45 +18,45 @@ class ServerMonitoringController extends Controller
      */
     public function index(Request $request)
     {
-        // Получаем все сконфигурированные панели
         $panels = Panel::query()->where('panel_status', Panel::PANEL_CONFIGURED);
 
-        // Если передан panel_id, фильтруем по конкретной панели
         if ($request->route('panel_id')) {
             $panels->where('id', $request->route('panel_id'));
         }
 
         $panels = $panels->get();
 
-        // Собираем статистику для каждой панели
         $statistics = [];
         foreach ($panels as $panel) {
-            // Получаем данные за последнюю неделю
             $oneWeekAgo = Carbon::now()->subWeek();
-            $panelStats = ServerMonitoring::where('panel_id', $panel->id)
-                ->where('created_at', '>=', $oneWeekAgo)
-                ->orderBy('created_at', 'asc')
-                ->get();
 
-            // Формируем данные для графика
-            $statistics[$panel->id] = [
-                'panel' => $panel,
-                'data' => $panelStats->map(function ($stat) {
-                    $stats = json_decode($stat->statistics, true);
+            // Используем кэширование
+            $statistics[$panel->id] = Cache::remember('panel_stats_' . $panel->id, 1000, function () use ($panel, $oneWeekAgo) {
+                $data = [];
 
-                    // Конвертируем память из байтов в гигабайты
-                    $stats['mem_used_gb'] = $stats['mem_used'] / (1024 * 1024 * 1024); // 1 ГБ = 1024 МБ = 1024 * 1024 КБ = 1024 * 1024 * 1024 Б
-                    $stats['mem_total_gb'] = $stats['mem_total'] / (1024 * 1024 * 1024);
+                ServerMonitoring::where('panel_id', $panel->id)
+                    ->where('created_at', '>=', $oneWeekAgo)
+                    ->orderBy('created_at', 'asc')
+                    ->select(['id', 'panel_id', 'statistics', 'created_at'])
+                    ->chunk(100, function ($stats) use (&$data) {
+                        foreach ($stats as $stat) {
+                            $stats = json_decode($stat->statistics, true);
+                            $stats['mem_used_gb'] = $stats['mem_used'] / (1024 * 1024 * 1024);
+                            $stats['mem_total_gb'] = $stats['mem_total'] / (1024 * 1024 * 1024);
 
-                    return [
-                        'created_at' => $stat->created_at->format('Y-m-d H:i:s'),
-                        'statistics' => $stats,
-                    ];
-                }),
-            ];
+                            $data[] = [
+                                'created_at' => $stat->created_at->format('Y-m-d H:i:s'),
+                                'statistics' => $stats,
+                            ];
+                        }
+                    });
+
+                return [
+                    'panel' => $panel,
+                    'data' => $data,
+                ];
+            });
         }
-
-        Log::info('Statistics data:', ['statistics' => $statistics]);
 
         return view('module.server-monitoring.index', compact('statistics'));
     }
