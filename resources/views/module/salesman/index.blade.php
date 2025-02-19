@@ -152,6 +152,7 @@
                     </button>
                 </div>
                 <div class="modal-body">
+                    <pre>{{ print_r($panels->toArray(), true) }}</pre>
                     <form id="assignPanelForm">
                         <input type="hidden" id="salesmanIdForPanel" name="salesman_id">
                         <div class="form-group">
