@@ -81,17 +81,33 @@
                                             </button>
                                         </td>
                                         <td>
-                                            <div class="btn-group" role="group">
+                                            <div class="d-flex align-items-center">
                                                 <button
                                                     class="btn btn-sm btn-primary assign-pack-btn mr-2"
                                                     data-salesman-id="{{ $salesman->id }}">
                                                     Предоставить пакет
                                                 </button>
-                                                <button
-                                                    class="btn btn-sm btn-info assign-panel-btn"
-                                                    data-salesman-id="{{ $salesman->id }}">
-                                                    Привязать панель
-                                                </button>
+                                                @if($salesman->panel)
+                                                    <div class="d-flex align-items-center">
+                                                        <a href="{{ route('admin.module.panel.index', ['panel_id' => $salesman->panel->id]) }}"
+                                                           class="text-primary mr-2"
+                                                           title="{{ $salesman->panel->panel_adress }}">
+                                                            {{ Str::limit($salesman->panel->panel_adress, 20) }}
+                                                        </a>
+                                                        <button
+                                                            class="btn btn-sm btn-danger reset-panel-btn"
+                                                            data-salesman-id="{{ $salesman->id }}"
+                                                            title="Сбросить панель">
+                                                            <i class="fas fa-times"></i>
+                                                        </button>
+                                                    </div>
+                                                @else
+                                                    <button
+                                                        class="btn btn-sm btn-info assign-panel-btn"
+                                                        data-salesman-id="{{ $salesman->id }}">
+                                                        Привязать панель
+                                                    </button>
+                                                @endif
                                             </div>
                                         </td>
                                     </tr>
@@ -184,6 +200,28 @@
                 }
             });
 
+            $('.reset-panel-btn').on('click', function () {
+                const salesmanId = $(this).data('salesman-id');
+
+                if (confirm('Вы уверены, что хотите отвязать панель?')) {
+                    $.ajax({
+                        url: `/admin/module/salesman/${salesmanId}/reset-panel`,
+                        method: 'POST',
+                        success: function (response) {
+                            if (response.success) {
+                                showNotification('success', response.message);
+                                location.reload(); // Перезагружаем страницу для обновления данных
+                            } else {
+                                showNotification('error', response.message);
+                            }
+                        },
+                        error: function (xhr) {
+                            showNotification('error', xhr.responseJSON?.message || 'Произошла ошибка при отвязке панели');
+                        }
+                    });
+                }
+            });
+
             // Обработчик клика по кнопке "Предоставить пакет"
             $('.assign-pack-btn').on('click', function () {
                 const salesmanId = $(this).data('salesman-id');
@@ -237,6 +275,7 @@
                     success: function (response) {
                         if (response.success) {
                             showNotification('success', 'Панель успешно привязана');
+                            location.reload(); // Перезагружаем страницу для обновления данных
                             $('#panelModal').modal('hide');
                         } else {
                             showNotification('error', response.message || 'Произошла ошибка');

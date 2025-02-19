@@ -153,6 +153,27 @@ class SalesmanService
     }
 
     /**
+     * @throws Exception
+     */
+    public function resetPanel(int $salesmanId): void
+    {
+        try {
+            $salesman = $this->salesmanRepository->findByIdOrFail($salesmanId);
+            $salesman->panel_id = null;
+            if (!$salesman->save())
+                throw new RuntimeException('Salesman dont create');
+
+            if (!$salesman->save())
+                throw new RuntimeException('Pack Salesman dont create');
+
+        } catch (RuntimeException $r) {
+            throw new RuntimeException($r->getMessage());
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage());
+        }
+    }
+
+    /**
      * Обновление токена бота продавца
      *
      * @param SalesmanDto $salesmanDto

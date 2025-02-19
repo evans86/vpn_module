@@ -144,6 +144,43 @@ class SalesmanController extends Controller
     }
 
     /**
+     * Reset panel for salesman
+     *
+     * @param int $id
+     * @return JsonResponse
+     */
+    public function resetPanel(int $id): JsonResponse
+    {
+        try {
+            Log::info('Resetting panel for salesman', [
+                'source' => 'salesman',
+                'salesman_id' => $id,
+                'user_id' => auth()->id()
+            ]);
+
+            $this->salesmanService->resetPanel($id);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Панель успешно отвязана',
+            ]);
+        } catch (Exception $e) {
+            Log::error('Error resetting panel for salesman', [
+                'source' => 'salesman',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'salesman_id' => $id,
+                'user_id' => auth()->id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Assign pack to salesman
      * @param Request $request
      * @param int $id

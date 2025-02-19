@@ -73,6 +73,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/{id}/toggle-status', [SalesmanController::class, 'toggleStatus'])->name('toggle-status');
                 Route::post('/{id}/assign-pack', [SalesmanController::class, 'assignPack'])->name('assign-pack');
                 Route::post('/{id}/assign-panel', [SalesmanController::class, 'assignPanel'])->name('assign-panel');
+                Route::post('/{id}/reset-panel', [SalesmanController::class, 'resetPanel'])->name('reset-panel');
             });
 
             // Pack Routes
