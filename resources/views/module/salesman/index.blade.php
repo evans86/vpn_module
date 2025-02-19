@@ -158,9 +158,13 @@
                         <div class="form-group">
                             <label for="panelId">Выберите панель</label>
                             <select class="form-control" id="panelId" name="panel_id" required>
-                                @foreach($panels as $panel)
-                                    <option value="{{ $panel->id }}">{{ $panel->adress }}</option>
-                                @endforeach
+                                @if(isset($panels) && count($panels) > 0)
+                                    @foreach($panels as $panel)
+                                        <option value="{{ $panel->id }}">{{ $panel->adress }}</option>
+                                    @endforeach
+                                @else
+                                    <option value="">Нет доступных панелей</option>
+                                @endif
                             </select>
                         </div>
                     </form>
