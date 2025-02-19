@@ -152,14 +152,13 @@
                     </button>
                 </div>
                 <div class="modal-body">
-                    <pre>{{ print_r($panels->toArray(), true) }}</pre>
                     <form id="assignPanelForm">
                         <input type="hidden" id="salesmanIdForPanel" name="salesman_id">
                         <div class="form-group">
                             <label for="panelId">Выберите панель</label>
                             <select class="form-control" id="panelId" name="panel_id" required>
                                 @foreach($panels as $panel)
-                                    <option value="{{ $panel->id }}">{{ $panel->adress }}</option>
+                                    <option value="{{ $panel->id }}"></option>
                                 @endforeach
                             </select>
                         </div>

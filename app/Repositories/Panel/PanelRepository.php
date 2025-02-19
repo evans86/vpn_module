@@ -29,6 +29,10 @@ class PanelRepository extends BaseRepository
             ->paginate($perPage);
     }
 
+    /**
+     * Get all active panels
+     * @return Collection
+     */
     public function getAllConfiguredPanels(): Collection
     {
         // Получаем все настроенные панели Marzban

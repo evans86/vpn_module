@@ -58,10 +58,6 @@ class SalesmanController extends Controller
             $packs = $this->packRepository->getAllActive();
             $panels = $this->panelRepository->getAllConfiguredPanels();
 
-            Log::error('PANELS', [
-                '$panels' => $panels
-            ]);
-
             return view('module.salesman.index', compact('salesmen', 'filters', 'packs', 'panels'));
         } catch (Exception $e) {
             Log::error('Error accessing salesman list', [
