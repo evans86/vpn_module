@@ -30,16 +30,12 @@
                                         <div class="card-body">
                                             <h5 class="card-title">Пользователи</h5>
                                             <p class="card-text">
-                                                @php
-                                                    $lastData = end($panelData['data']); // Получаем последний элемент массива
-                                                    $stats = $lastData['statistics'] ?? [];
-                                                @endphp
-                                                Активные/Всего: {{ $stats['users_active'] ?? 0 }} / {{ $stats['total_user'] ?? 0 }}<br>
-                                                Онлайн сейчас: {{ $stats['online_users'] ?? 0 }}<br>
-                                                Истекший срок: {{ $stats['users_expired'] ?? 0 }}<br>
-                                                Лимит трафика: {{ $stats['users_limited'] ?? 0 }}<br>
-                                                На удержании: {{ $stats['users_on_hold'] ?? 0 }}<br>
-                                                Отключены: {{ $stats['users_disabled'] ?? 0 }}
+                                                Активные/Всего: {{ $panelData['data']->last()['statistics']['users_active'] ?? 0 }} / {{ $panelData['data']->last()['statistics']['total_user'] ?? 0 }}<br>
+                                                Онлайн сейчас: {{ $panelData['data']->last()['statistics']['online_users'] ?? 0 }}<br>
+                                                Истекший срок: {{ $panelData['data']->last()['statistics']['users_expired'] ?? 0 }}<br>
+                                                Лимит трафика: {{ $panelData['data']->last()['statistics']['users_limited'] ?? 0 }}<br>
+                                                На удержании: {{ $panelData['data']->last()['statistics']['users_on_hold'] ?? 0 }}<br>
+                                                Отключены: {{ $panelData['data']->last()['statistics']['users_disabled'] ?? 0 }}
                                             </p>
                                         </div>
                                     </div>
@@ -51,7 +47,7 @@
                                         <div class="card-body">
                                             <h5 class="card-title">Входящий трафик</h5>
                                             <p class="card-text">
-                                                {{ number_format(($stats['incoming_bandwidth'] ?? 0) / (1024 * 1024 * 1024), 2) }} GB
+                                                {{ number_format(($panelData['data']->last()['statistics']['incoming_bandwidth'] ?? 0) / (1024 * 1024 * 1024), 2) }} GB
                                             </p>
                                         </div>
                                     </div>
@@ -63,7 +59,7 @@
                                         <div class="card-body">
                                             <h5 class="card-title">Исходящий трафик</h5>
                                             <p class="card-text">
-                                                {{ number_format(($stats['outgoing_bandwidth'] ?? 0) / (1024 * 1024 * 1024), 2) }} GB
+                                                {{ number_format(($panelData['data']->last()['statistics']['outgoing_bandwidth'] ?? 0) / (1024 * 1024 * 1024), 2) }} GB
                                             </p>
                                         </div>
                                     </div>
@@ -75,7 +71,7 @@
                                         <div class="card-body">
                                             <h5 class="card-title">Память</h5>
                                             <p class="card-text">
-                                                {{ number_format(($stats['mem_used'] ?? 0) / (1024 * 1024 * 1024), 2) }} GB / {{ number_format(($stats['mem_total'] ?? 0) / (1024 * 1024 * 1024), 2) }} GB
+                                                {{ number_format(($panelData['data']->last()['statistics']['mem_used'] ?? 0) / (1024 * 1024 * 1024), 2) }} GB / {{ number_format(($panelData['data']->last()['statistics']['mem_total'] ?? 0) / (1024 * 1024 * 1024), 2) }} GB
                                             </p>
                                         </div>
                                     </div>
@@ -90,8 +86,8 @@
                                             <h5 class="card-title">Анализ нагрузки</h5>
                                             @php
                                                 // Расчёт нагрузки
-                                                $cpuUsage = $stats['cpu_usage'] ?? 0;
-                                                $memoryUsage = ($stats['mem_used'] ?? 0) / ($stats['mem_total'] ?? 1) * 100;
+                                                $cpuUsage = $panelData['data']->last()['statistics']['cpu_usage'] ?? 0;
+                                                $memoryUsage = ($panelData['data']->last()['statistics']['mem_used'] ?? 0) / ($panelData['data']->last()['statistics']['mem_total'] ?? 1) * 100;
                                                 $load = max($cpuUsage, $memoryUsage);
 
                                                 // Определение уровня нагрузки
@@ -151,10 +147,10 @@
         <script>
             @foreach($statistics as $panelId => $panelData)
             // Данные для графиков
-            const labels{{ $panelId }} = {!! json_encode(array_column($panelData['data'], 'created_at')) !!};
-            const cpuData{{ $panelId }} = {!! json_encode(array_column($panelData['data'], 'statistics.cpu_usage')) !!};
-            const memoryData{{ $panelId }} = {!! json_encode(array_column($panelData['data'], 'statistics.mem_used_gb')) !!};
-            const usersData{{ $panelId }} = {!! json_encode(array_column($panelData['data'], 'statistics.online_users')) !!};
+            const labels{{ $panelId }} = {!! json_encode($panelData['data']->pluck('created_at')) !!};
+            const cpuData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.cpu_usage')) !!};
+            const memoryData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.mem_used_gb')) !!};
+            const usersData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.online_users')) !!};
 
             // Вычисляем диапазон для последних 12 часов
             const lastTimestamp{{ $panelId }} = new Date(labels{{ $panelId }}[labels{{ $panelId }}.length - 1]);
