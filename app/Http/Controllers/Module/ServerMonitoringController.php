@@ -8,8 +8,8 @@ use App\Models\ServerMonitoring\ServerMonitoring;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use GuzzleHttp\Exception\GuzzleException;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class ServerMonitoringController extends Controller
 {
@@ -31,7 +31,7 @@ class ServerMonitoringController extends Controller
             $oneWeekAgo = Carbon::now()->subWeek();
 
             // Используем кэширование
-            $statistics[$panel->id] = Cache::remember('panel_stats_' . $panel->id, 1000, function () use ($panel, $oneWeekAgo) {
+            $statistics[$panel->id] = Cache::remember('panel_stats_' . $panel->id, 3600, function () use ($panel, $oneWeekAgo) {
                 $data = [];
 
                 ServerMonitoring::where('panel_id', $panel->id)
