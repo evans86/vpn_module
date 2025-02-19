@@ -32,7 +32,7 @@ class ServerMonitoringController extends Controller
         $statistics = [];
         foreach ($panels as $panel) {
             // Получаем данные за последнюю неделю
-            $oneWeekAgo = Carbon::now()->subWeek();
+            $oneWeekAgo = Carbon::now()->subDays(3);
             $panelStats = ServerMonitoring::where('panel_id', $panel->id)
                 ->where('created_at', '>=', $oneWeekAgo)
                 ->orderBy('created_at', 'asc')
