@@ -242,9 +242,15 @@ class FatherBotController extends AbstractTelegramBot
             foreach ($packs as $packSalesman) {
                 $pack = $packSalesman->pack;
 
-                $text = "📦 ID: {$packSalesman->id}";
-                $text .= "|Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB|";
-                $text .= "Активация: {$pack->period} дней";
+                // Проверяем, существует ли основной пакет
+                if ($pack) {
+                    $text = "📦 ID: {$packSalesman->id}";
+                    $text .= "|Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB|";
+                    $text .= "Активация: {$pack->period} дней";
+                } else {
+                    // Если пакет удален, выводим сообщение об этом
+                    $text = "📦 ID: {$packSalesman->id}|❌ Основной тариф удален";
+                }
 
                 $keyboard['inline_keyboard'][] = [
                     [
