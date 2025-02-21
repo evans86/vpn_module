@@ -52,6 +52,12 @@ class PanelRepository extends BaseRepository
         $panels = $this->query()
             ->where('panel_status', Panel::PANEL_CONFIGURED)
             ->where('panel', Panel::MARZBAN)
+            ->whereNotIn('id', function ($query) {
+                // Исключаем панели, которые привязаны к продавцам
+                $query->select('panel_id')
+                    ->from('salesman')
+                    ->whereNotNull('panel_id');
+            })
             ->get();
 
         if ($panels->isEmpty()) {
