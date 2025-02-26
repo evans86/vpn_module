@@ -515,7 +515,7 @@ class SalesmanBotController extends AbstractTelegramBot
                 return;
             }
 
-            if ($botIdFromToken != $this->chatId) {
+            if ($botIdFromToken != $this->telegram->getMe()->id) {
                 $this->sendMessage("❌ Ключ не принадлежит боту активации.\n\nПожалуйста, проверьте правильность введенного ключа.");
                 return;
             }
