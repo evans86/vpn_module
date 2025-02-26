@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $username
  * @property string $telegram_id
  * @property int|null $panel_id
+ * @property string $token
+ * @property string $bot_link
  * @property string $status
  * @property string $created_at
  * @property Panel|null $panel

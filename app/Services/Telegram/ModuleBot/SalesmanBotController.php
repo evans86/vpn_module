@@ -506,9 +506,15 @@ class SalesmanBotController extends AbstractTelegramBot
     {
         try {
             $key = $this->keyActivateRepository->findById($keyId);
+            $botIdFromToken = explode(':', $key->packSalesman->salesman->token)[0];
 
             if (!$key) {
                 $this->sendMessage("❌ Ключ не найден.\n\nПожалуйста, проверьте правильность введенного ключа.");
+                return;
+            }
+
+            if ($botIdFromToken != $this->chatId) {
+                $this->sendMessage("❌ Ключ не принадлежит боту активации.\n\nПожалуйста, проверьте правильность введенного ключа.");
                 return;
             }
 
