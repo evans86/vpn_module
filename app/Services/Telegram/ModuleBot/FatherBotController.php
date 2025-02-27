@@ -913,7 +913,7 @@ class FatherBotController extends AbstractTelegramBot
                 'inline_keyboard' => [
                     [
                         [
-                            'text' => $salesman->bot_active ? '🔴 Отключить бота' : '🟢 Включить бота',
+                            'text' => $salesman->bot_active ? '🟢 Отключить бота' : '🔴 Включить бота',
                             'callback_data' => json_encode(['action' => 'toggle_bot'])
                         ],
 //                        [

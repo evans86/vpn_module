@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $bot_link
  * @property string $status
  * @property string $created_at
+ * @property string $bot_active
  * @property Panel|null $panel
  * @property string $updated_at
  */
