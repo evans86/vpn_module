@@ -115,6 +115,10 @@ class VpnConfigController extends Controller
                 'error' => $info
             ]);
 
+            Log::debug('finish_at', [
+                'finish_at' => $keyActivateUser->keyActivate->finish_at
+            ]);
+
             // Для браузера показываем HTML страницу
             $userInfo = [
                 'username' => $serverUser->id,
@@ -123,9 +127,7 @@ class VpnConfigController extends Controller
                 'data_limit_tariff' => $keyActivateUser->keyActivate->traffic_limit ?? 0,
                 'data_used' => $info['used_traffic'],
                 'expiration_date' => $keyActivateUser->keyActivate->finish_at ?? null,
-                'days_remaining' => $keyActivateUser->keyActivate->finish_at
-                    ? ceil(($keyActivateUser->keyActivate->finish_at - time()) / 86400)
-                    : null
+                'days_remaining' => $keyActivateUser->keyActivate->finish_at ? ceil(($keyActivateUser->keyActivate->finish_at - time()) / 86400) : null
             ];
 
             // Форматируем ключи для отображения
