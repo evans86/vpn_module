@@ -115,8 +115,8 @@ class VpnConfigController extends Controller
                 'error' => $info
             ]);
 
-            Log::debug('finish_at', [
-                'finish_at' => $keyActivateUser->keyActivate->finish_at
+            Log::debug('keyActivate', [
+                'keyActivate' => $keyActivateUser->keyActivate
             ]);
 
             // Для браузера показываем HTML страницу
