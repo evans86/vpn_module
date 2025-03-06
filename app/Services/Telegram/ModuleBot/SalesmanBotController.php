@@ -488,10 +488,10 @@ class SalesmanBotController extends AbstractTelegramBot
         $text .= "🔹 <b>Проверка статуса:</b>\n\n";
         $text .= "1️⃣ Нажмите кнопку '📊 Статус'\n";
         $text .= "2️⃣ Просмотрите информацию о вашем доступе и конфигурации\n\n";
-        $text .= "📁 <b>Инструкции по настройке VPN BOT-T:</b>\n\n";
-        $text .= "- <a href=\"https://teletype.in/@bott_manager/LKuCGQBcrZIK\">Инструкция для Android</a> 📱\n";
-        $text .= "- <a href=\"https://teletype.in/@bott_manager/R4GreUy2998\">Инструкция для IOS</a> 🍏\n";
-        $text .= "- <a href=\"https://teletype.in/@bott_manager/DrVW5lc3OA6\">Инструкция для Windows</a> 🖥️\n\n";
+        $text .= "📁 <b>Инструкции по настройке VPN:</b>\n\n";
+        $text .= "- <a href=\"https://teletype.in/@bott_manager/LKuCGQBcrZIw\">Инструкция для Android</a> 📱\n";
+        $text .= "- <a href=\"https://teletype.in/@bott_manager/R4GreUy29982w\">Инструкция для IOS</a> 🍏\n";
+        $text .= "- <a href=\"https://teletype.in/@bott_manager/DrVW5lc3OA65g\">Инструкция для Windows</a> 🖥️\n\n";
         $text .= "👨🏻‍💻 По всем вопросам обращайтесь к <a href=\"ссылка на акк поддержки\">администратору</a> бота.\n\n";
 //        $text .= "🌍 <a href=\"ссылка на покупку ключа\">Купить ключ</a>\n";
 //        $text .= "🖥️ <a href=\"https://teletype.in/@bott_manager/DrVW5lc3OA6\">Инструкция для Windows</a> | <a href=\"ссылка на клиент Windows\">Скачать клиент для Windows</a>\n";
@@ -589,13 +589,13 @@ class SalesmanBotController extends AbstractTelegramBot
                 [
                     [
                         'text' => '🍏 iOS - Hiddify',
-                        'url' => 'https://apps.apple.com/app/hiddify/id6451357551'
+                        'url' => 'https://apps.apple.com/ru/app/hiddify-proxy-vpn/id6596777532'
                     ]
                 ],
                 [
                     [
                         'text' => '🖥️ Windows - Hiddify',
-                        'url' => 'https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Windows-Setup-x64.Msix'
+                        'url' => 'https://apps.microsoft.com/detail/9pdfnl3qv2s5?hl=en-US&gl=US'
                     ]
                 ]
             ]
