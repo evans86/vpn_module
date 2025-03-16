@@ -489,9 +489,9 @@ class SalesmanBotController extends AbstractTelegramBot
         $text .= "1️⃣ Нажмите кнопку '📊 Статус'\n";
         $text .= "2️⃣ Просмотрите информацию о вашем доступе и конфигурации\n\n";
         $text .= "📁 <b>Инструкции по настройке VPN:</b>\n\n";
-        $text .= "- <a href=\"https://teletype.in/@bott_manager/LKuCGQBcrZIw\">Инструкция для Android</a> 📱\n";
-        $text .= "- <a href=\"https://teletype.in/@bott_manager/R4GreUy29982w\">Инструкция для IOS</a> 🍏\n";
-        $text .= "- <a href=\"https://teletype.in/@bott_manager/DrVW5lc3OA65g\">Инструкция для Windows</a> 🖥️\n\n";
+        $text .= "- <a href=\"https://docs.google.com/document/d/1ma6QZjKgwLHdS2457I8C6k22gC2Cq3Yic8bLiMeXmeY/edit?usp=sharing\">Инструкция для Android</a> 📱\n";
+        $text .= "- <a href=\"https://docs.google.com/document/d/1f3iS-V0kFVQEA3i1hYOEaAoNMucgF60XiDZZdhRl59Q/edit?usp=sharing\">Инструкция для IOS</a> 🍏\n";
+        $text .= "- <a href=\"https://docs.google.com/document/d/1jXNpuNY9eET1LXyVmRjHSoX6YRX9RlWGJQFSEJE_2Jg/edit?usp=sharing\">Инструкция для Windows</a> 🖥️\n\n";
         $text .= "👨🏻‍💻 По всем вопросам обращайтесь к <a href=\"ссылка на акк поддержки\">администратору</a> бота.\n\n";
 //        $text .= "🌍 <a href=\"ссылка на покупку ключа\">Купить ключ</a>\n";
 //        $text .= "🖥️ <a href=\"https://teletype.in/@bott_manager/DrVW5lc3OA6\">Инструкция для Windows</a> | <a href=\"ссылка на клиент Windows\">Скачать клиент для Windows</a>\n";
