@@ -6,10 +6,10 @@ class PackDto
 {
     public int $id;
     public int $price;
-    public int $period;
+    public int $period; //30 дней
     public int $traffic_limit;
     public int $count;
-    public int $activate_time;
+    public int $activate_time; //240 часов
     public bool $status;
 
     public function getArray(): array

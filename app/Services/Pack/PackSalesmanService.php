@@ -112,15 +112,15 @@ class PackSalesmanService
             for ($i = 0; $i < $pack->count; $i++) {
                 $now = time();
                 $period_days = min($pack->period, 365 * 2);
-                $activate_days = min($pack->activate_time, 90);
-                $finish_at = $now + ($period_days * 24 * 60 * 60);
+                $activate_days = $pack->activate_time / 86400;
+//                $finish_at = $now + ($period_days * 24 * 60 * 60);
                 $deleted_at = $now + ($activate_days * 24 * 60 * 60);
 
                 try {
                     $this->keyActivateService->create(
                         $pack->traffic_limit,
                         $pack_salesman->id,
-                        $finish_at,
+                        null,
                         $deleted_at,
                         null
                     );

@@ -7,7 +7,7 @@ class KeyActivateDto
     public string $id;
     public int $traffic_limit;
     public int $pack_salesman_id;
-    public int $finish_at;
+    public ?int $finish_at;
     public ?int $user_tg_id;
     public int $deleted_at;
     public int $status;

@@ -40,12 +40,12 @@ class KeyActivateService
      *
      * @param int|null $traffic_limit
      * @param int $pack_salesman_id
-     * @param int $finish_at
+     * @param int|null $finish_at
      * @param int $deleted_at
      * @return KeyActivate
      * @throws Exception
      */
-    public function create(?int $traffic_limit, int $pack_salesman_id, int $finish_at, int $deleted_at): KeyActivate
+    public function create(?int $traffic_limit, int $pack_salesman_id, ?int $finish_at, int $deleted_at): KeyActivate
     {
         try {
             $packSalesman = $this->packSalesmanRepository->findByIdOrFail($pack_salesman_id);
@@ -134,12 +134,14 @@ class KeyActivateService
             // Создаем стратегию для работы с панелью
             $panelStrategy = new PanelStrategy(Panel::MARZBAN);
 
+            $finishAt = time() + ($key->packSalesman->pack->period * 24 * 60 * 60);
+
             // Добавляем пользователя на сервер
             $serverUser = $panelStrategy->addServerUser(
                 $panel->id,
                 $userTgId,
                 $key->traffic_limit,
-                $key->finish_at,
+                $finishAt,
                 $key->id
             );
 
