@@ -122,14 +122,17 @@
                                         </td>
                                         <td>
                                             <div class="d-flex align-items-center">
-                                                {{ date('d.m.Y H:i', $key->finish_at) }}
-                                                <button class="btn btn-sm btn-link edit-date"
-                                                        data-id="{{ $key->id }}"
-                                                        data-type="finish_at"
-                                                        data-value="{{ date('d.m.Y H:i', $key->finish_at) }}"
-                                                        title="Изменить дату">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
+                                                {{ $key->finish_at ? date('d.m.Y H:i', $key->finish_at) : '' }}
+                                                @if($key->finish_at)
+{{--                                                {{ date('d.m.Y H:i', $key->finish_at) }}--}}
+                                                    <button class="btn btn-sm btn-link edit-date"
+                                                            data-id="{{ $key->id }}"
+                                                            data-type="finish_at"
+                                                            data-value="{{ date('d.m.Y H:i', $key->finish_at) }}"
+                                                            title="Изменить дату">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                @endif
                                             </div>
                                         </td>
                                         <td>
