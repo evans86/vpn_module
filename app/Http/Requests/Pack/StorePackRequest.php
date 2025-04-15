@@ -48,12 +48,12 @@ class StorePackRequest extends FormRequest
             // Конвертируем GB в байты
             $validated['traffic_limit'] = $validated['traffic_limit'] * 1024 * 1024 * 1024;
         }
-        
-        if (isset($validated['activate_time']) && $validated['activate_time'] < 3600) {
+
+        if (isset($validated['activate_time']) && $validated['activate_time'] < 9000) {
             // Конвертируем часы в секунды
             $validated['activate_time'] = $validated['activate_time'] * 3600;
         }
-        
+
         // По умолчанию пакет активен
         $validated['status'] = true;
 
