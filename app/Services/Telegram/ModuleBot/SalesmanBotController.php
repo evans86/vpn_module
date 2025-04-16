@@ -76,6 +76,12 @@ class SalesmanBotController extends AbstractTelegramBot
                     $this->actionInactiveSubscriptions(0, $messageId);
                     return;
                 }
+
+                // Обработка callback для просмотра неактивных подписок
+                if ($data === 'activate_key') {
+                    $this->actionActivate();
+                    return;
+                }
             }
 
             if (!$message || !$message->getText()) {
