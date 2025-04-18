@@ -46,7 +46,9 @@ class ExpiredKeysCommand extends Command
     public function handle()
     {
         try {
-            $keys = KeyActivate::where('status', KeyActivate::PAID)->where('deleted_at', '<', time())->get();
+            $keys = KeyActivate::where('status', KeyActivate::PAID)
+                ->where('deleted_at', '<', now())
+                ->get();
 
             $this->info("Found {$keys->count()} keys to check");
 
