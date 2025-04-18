@@ -11,47 +11,36 @@ use Illuminate\Support\Facades\Log;
 
 class ClearModuleDataCommand extends Command
 {
-    protected $signature = 'module:clear-data {--force : Принудительное удаление без подтверждения}';
+    protected $signature = 'module:update-data {--force : Принудительное удаление без подтверждения}';
     protected $description = 'Удаление всех серверов, панелей, ключей и пакетов продавцов';
 
     public function handle()
     {
-        if (!$this->option('force') && !$this->confirm('Вы уверены, что хотите удалить ВСЕ данные? Это действие необратимо!')) {
+        if (!$this->option('force') && !$this->confirm('Вы уверены, что хотите обновить ВСЕ данные? Это действие необратимо!')) {
             $this->info('Операция отменена.');
             return;
         }
 
-        $this->info('Начинаем удаление данных...');
+        $this->info('Начинаем обновление данных...');
 
         try {
-            // Удаляем серверы
-//            $serverCount = Server::count();
-//            Server::query()->where('server_status', [Server::SERVER_ERROR, Server::SERVER_CONFIGURED])->delete();
-//            $this->info("Удалено серверов: {$serverCount}");
-//
-//            // Удаляем панели
-//            $panelCount = Panel::count();
-//            Panel::query()->where('server_status', [Panel::PANEL_CONFIGURED, Panel::PANEL_ERROR])->delete();
-//            $this->info("Удалено панелей: {$panelCount}");
 
-//            // Удаляем ключи
-            $keyCount = KeyActivate::count();
-            KeyActivate::query()->delete();
-            $this->info("Удалено ключей: {$keyCount}");
-//
-//            // Удаляем пакеты продавцов
-            $packageCount = PackSalesman::count();
-            PackSalesman::query()->delete();
-            $this->info("Удалено пакетов: {$packageCount}");
+            $keyActivates = KeyActivate::where('status', KeyActivate::PAID)
+                ->where('finish_at', '!=', null)->where('user_tg_id', '=', null)
+                ->get();
 
-            $this->info('Все данные успешно удалены!');
+            $count = $keyActivates->count();
+            $this->info("получено ключей: {$count}");
+
+            foreach ($keyActivates as $keyActivate) {
+                $keyActivate->finish_at = null;
+                $keyActivate->save();
+            }
+
 
             // Логируем успешное удаление
-            Log::info('Выполнена очистка данных модуля', [
-//                'servers' => $serverCount,
-//                'panels' => $panelCount,
-//                'keys' => $keyCount,
-//                'packages' => $packageCount
+            Log::info('Выполнено обновление данных', [
+
             ]);
 
         } catch (\Exception $e) {
