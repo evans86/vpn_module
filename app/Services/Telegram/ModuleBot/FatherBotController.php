@@ -4,6 +4,8 @@ namespace App\Services\Telegram\ModuleBot;
 
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
+use DateInterval;
+use DateTime;
 use Exception;
 use Telegram\Bot\Api;
 use Illuminate\Support\Facades\Log;
@@ -241,12 +243,16 @@ class FatherBotController extends AbstractTelegramBot
             // Добавляем пакеты на текущую страницу
             foreach ($packs as $packSalesman) {
                 $pack = $packSalesman->pack;
+                $date = new DateTime($packSalesman->created_at);
+                $date->add(new DateInterval("P{$pack->period}D"));
+                $formattedDate = $date->format('d.m.Y');
 
                 // Проверяем, существует ли основной пакет
                 if ($pack) {
-                    $text = "📦 ID: {$packSalesman->id}";
-                    $text .= "|Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB|";
-                    $text .= "Активация: {$pack->period} дней";
+//                    $text = "📦 ID: {$packSalesman->id}";
+                    $text = "|Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB|";
+                    $text .= "Период: {$pack->period} дней|";
+                    $text .= "Активировать до: {$formattedDate}";
                 } else {
                     // Если пакет удален, выводим сообщение об этом
                     $text = "📦 ID: {$packSalesman->id}|❌ Основной тариф удален";
