@@ -128,7 +128,7 @@ class MarzbanAPI
                     'username' => $userId,
                     'data_limit' => $data_limit, //лимит 25 гигов
                     'expire' => $expire, //время окончания через 30 дней
-                    'max_connections' => 1,
+//                    'max_connections' => 1,
                     'proxies' => [
                         "vmess" => [
                             "id" => Str::uuid()->toString()
