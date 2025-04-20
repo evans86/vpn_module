@@ -335,7 +335,7 @@ class FatherBotController extends AbstractTelegramBot
                 // Основная информация о пакете
                 $message = "<b>📦 Информация о пакете:</b>\n\n";
                 $message .= "💾 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
-                $message .= "⏱ Период: {$pack->period} дней\n\n";
+                $message .= "⏱ Период: {$pack->period} дней\n";
                 $message .= "⏱ Активировать до: {$formattedDate}\n\n";
             } else {
                 // Если пакет удален, выводим сообщение об этом
