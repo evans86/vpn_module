@@ -250,12 +250,13 @@ class FatherBotController extends AbstractTelegramBot
                     $date->add(new DateInterval("P{$pack->period}D"));
                     $formattedDate = $date->format('d.m.Y');
 //                    $text = "📦 ID: {$packSalesman->id}";
-                    $text = "|Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB|";
+                    $text = "📦 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB|";
                     $text .= "Период: {$pack->period} дней|";
                     $text .= "Активировать до: {$formattedDate}";
                 } else {
                     // Если пакет удален, выводим сообщение об этом
-                    $text = "📦 ID: {$packSalesman->id}|❌ Основной тариф удален";
+//                    $text = "📦 ID: {$packSalesman->id}|❌ Основной тариф удален";
+                    $text = "❌ Основной тариф удален";
                 }
 
                 $keyboard['inline_keyboard'][] = [
