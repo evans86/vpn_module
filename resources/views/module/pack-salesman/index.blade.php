@@ -58,7 +58,6 @@
                                 <thead>
                                 <tr>
                                     <th><strong>#</strong></th>
-                                    <th><strong>Пакет</strong></th>
                                     <th><strong>Ключи</strong></th>
                                     <th><strong>Продавец</strong></th>
                                     <th><strong>Цена</strong></th>
