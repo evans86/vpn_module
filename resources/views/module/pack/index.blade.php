@@ -14,21 +14,21 @@
 
                     <form method="GET" action="/admin/module/pack" class="mb-4">
                         <div class="row">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="form-group">
                                     <label for="id">ID пакета</label>
                                     <input type="number" class="form-control" id="id" name="id"
                                            value="{{ request('id') }}" placeholder="Введите ID пакета">
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="form-group">
                                     <label for="title">Название</label>
                                     <input type="text" class="form-control" id="title" name="title"
                                            value="{{ request('title') }}" placeholder="Введите название пакета">
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="form-group">
                                     <label for="status">Статус</label>
                                     <select class="form-control" id="status" name="status">
