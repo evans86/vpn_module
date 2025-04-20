@@ -142,7 +142,7 @@
                             <label for="packId">Выберите пакет</label>
                             <select class="form-control" id="packId" name="pack_id" required>
                                 @foreach($packs as $pack)
-                                    <option value="{{ $pack->id }}">{{ $pack->name }} - {{ $pack->price }}₽</option>
+                                    <option value="{{ $pack->id }}">{{ $pack->title }}: {{ $pack->price }}₽</option>
                                 @endforeach
                             </select>
                         </div>

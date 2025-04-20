@@ -203,7 +203,6 @@ class KeyActivateService
                 'deleted_at' => $key->deleted_at
             ]);
 
-
             return $key;
         } catch (Exception $e) {
             $this->logger->error('Ошибка при обновлении статуса ключа', [

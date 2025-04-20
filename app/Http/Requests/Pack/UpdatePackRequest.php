@@ -24,6 +24,7 @@ class UpdatePackRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'title' => 'required|string',
             'price' => 'required|integer|min:0',
             'period' => 'required|integer|min:1',
             'traffic_limit' => 'required|integer|min:1',

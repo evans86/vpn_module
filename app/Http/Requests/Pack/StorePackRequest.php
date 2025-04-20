@@ -25,6 +25,7 @@ class StorePackRequest extends FormRequest
     {
         return [
             'price' => 'required|integer|min:0',
+            'title' => 'required|string',
             'period' => 'required|integer|min:1',
             'traffic_limit' => 'required|integer|min:1',
             'count' => 'required|integer|min:1',

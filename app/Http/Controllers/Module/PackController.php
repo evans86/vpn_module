@@ -35,7 +35,8 @@ class PackController extends Controller
     public function index(Request $request)
     {
         try {
-            $filters = array_filter($request->only(['id', 'status']));
+            $filters = array_filter($request->only(['id', 'status', 'title']));
+
             $packs = $this->packService->getAllPaginated($filters);
 
             $this->logger->info('Просмотр списка пакетов', [

@@ -5,6 +5,7 @@ namespace App\Dto\Pack;
 class PackDto
 {
     public int $id;
+    public ?string $title;
     public int $price;
     public int $period; //30 дней
     public int $traffic_limit;
@@ -16,6 +17,7 @@ class PackDto
     {
         return [
             'id' => $this->id,
+            'title' => $this->title,
             'price' => $this->price,
             'period' => $this->period,
             'traffic_limit' => $this->traffic_limit,

@@ -59,6 +59,7 @@
                                 <tr>
                                     <th><strong>#</strong></th>
                                     <th><strong>Пакет</strong></th>
+                                    <th><strong>Ключи</strong></th>
                                     <th><strong>Продавец</strong></th>
                                     <th><strong>Цена</strong></th>
                                     <th><strong>Статус</strong></th>
@@ -72,15 +73,15 @@
                                         <td>{{ $pack_salesman->id }}</td>
                                         <td>
                                             @if($pack_salesman->pack)
-                                                <a href="{{ route('admin.module.key-activate.index', ['pack_salesman_id' => $pack_salesman->id]) }}"
-                                                   title="Просмотреть ключи пакета">
-                                                    {{ $pack_salesman->pack->name }}
+                                                <a href="{{ route('admin.module.pack.index', ['title' => $pack_salesman->pack->title]) }}"
+                                                   title="Просмотреть пакет">
+                                                    {{ $pack_salesman->pack->title }}
                                                 </a>
                                                 <small class="d-block text-muted">
                                                     <a href="{{ route('admin.module.key-activate.index', ['pack_salesman_id' => $pack_salesman->id]) }}"
                                                        class="text-primary"
                                                        title="Просмотреть ключи пакета">
-                                                        Кол-во ключей: {{ $pack_salesman->pack->count }}
+                                                        Ключи пакета: {{ $pack_salesman->pack->count }}
                                                     </a>
                                                 </small>
                                             @else

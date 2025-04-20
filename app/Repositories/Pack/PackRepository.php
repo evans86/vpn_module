@@ -35,6 +35,10 @@ class PackRepository extends BaseRepository implements PackRepositoryInterface
             $query->where('status', $filters['status']);
         }
 
+        if (isset($filters['title'])) {
+            $query->where('title', 'like', '%' . $filters['title'] . '%');
+        }
+
         return $query->orderBy('created_at', 'desc')->paginate($perPage);
     }
 

@@ -9,6 +9,7 @@ class PackFactory
     public static function fromEntity(Pack $pack): PackDto
     {
         $dto = new PackDto();
+        $dto->title = $pack->title;
         $dto->id = $pack->id;
         $dto->price = $pack->price;
         $dto->period = $pack->period;

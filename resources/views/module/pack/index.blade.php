@@ -23,6 +23,13 @@
                             </div>
                             <div class="col-md-4">
                                 <div class="form-group">
+                                    <label for="title">Название</label>
+                                    <input type="text" class="form-control" id="title" name="title"
+                                           value="{{ request('title') }}" placeholder="Введите название пакета">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
                                     <label for="status">Статус</label>
                                     <select class="form-control" id="status" name="status">
                                         <option value="">Все статусы</option>
@@ -40,7 +47,7 @@
                                         <button type="submit" class="btn btn-primary">
                                             <i class="fas fa-search"></i> Поиск
                                         </button>
-                                        <a href="{{ route('admin.module.pack.index') }}" 
+                                        <a href="{{ route('admin.module.pack.index') }}"
                                            class="btn btn-secondary">
                                             <i class="fas fa-times"></i> Сбросить
                                         </a>
@@ -67,6 +74,7 @@
                             <thead>
                             <tr>
                                 <th>ID</th>
+                                <th>Название</th>
                                 <th>Цена</th>
                                 <th>Период</th>
                                 <th>Трафик</th>
@@ -80,6 +88,7 @@
                             @forelse($packs as $pack)
                                 <tr>
                                     <td>{{ $pack->id }}</td>
+                                    <td>{{ $pack->title }}</td>
                                     <td>{{ $pack->price }} ₽</td>
                                     <td>{{ $pack->period }} дней</td>
                                     <td>{{ number_format($pack->traffic_limit / (1024*1024*1024), 1) }} GB</td>
@@ -124,6 +133,10 @@
             <div class="form-group">
                 <label for="price">Цена (₽)</label>
                 <input type="number" class="form-control" id="price" name="price" required min="0">
+            </div>
+            <div class="form-group">
+                <label for="title">Название</label>
+                <input type="text" class="form-control" id="title" name="title" required min="0">
             </div>
             <div class="form-group">
                 <label for="period">Период действия (дней)</label>
