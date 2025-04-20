@@ -239,7 +239,6 @@ class FatherBotController extends AbstractTelegramBot
             $message = "<blockquote><b>📦 Пакеты ключей:</b></blockquote>\n\n";
             $keyboard = ['inline_keyboard' => []];
 
-//            📦 ID: 46|Трафик: 20GB|Активация: 240 часов|
             // Добавляем пакеты на текущую страницу
             foreach ($packs as $packSalesman) {
                 $pack = $packSalesman->pack;
@@ -249,13 +248,11 @@ class FatherBotController extends AbstractTelegramBot
                     $date = new DateTime($packSalesman->created_at);
                     $date->add(new DateInterval("P{$pack->period}D"));
                     $formattedDate = $date->format('d.m.Y');
-//                    $text = "📦 ID: {$packSalesman->id}";
-                    $text = "📦 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB|";
-                    $text .= "Период: {$pack->period} дней|";
+
+                    $text = "📦 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
+                    $text .= "Период: {$pack->period} дней\n";
                     $text .= "Активировать до: {$formattedDate}";
                 } else {
-                    // Если пакет удален, выводим сообщение об этом
-//                    $text = "📦 ID: {$packSalesman->id}|❌ Основной тариф удален";
                     $text = "❌ Основной тариф удален";
                 }
 
