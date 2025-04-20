@@ -504,7 +504,10 @@ class MarzbanService
 
         $json_config = [
             "log" => [
-                "loglevel" => "info"
+                "loglevel" => "debug",
+                "access" => "/var/lib/marzban/access.log",
+                "error" => "/var/lib/marzban/error.log",
+                "dnsLog" => true
             ],
             "inbounds" => [
                 [
