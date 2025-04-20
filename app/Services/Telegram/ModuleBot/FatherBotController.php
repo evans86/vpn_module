@@ -250,7 +250,7 @@ class FatherBotController extends AbstractTelegramBot
                     $formattedDate = $date->format('d.m.Y');
                     $traffic = number_format($pack->traffic_limit / (1024 * 1024 * 1024));
 
-                    $text = "📦{$traffic}GB  Период:{$pack->period}д  Активировать до:{$formattedDate}";
+                    $text = "📦{$traffic}GB| Период: {$pack->period}д| Активировать до: {$formattedDate}";
 
 //                    $text = "📦 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB|";
 //                    $text .= "Период: {$pack->period} дней|";
