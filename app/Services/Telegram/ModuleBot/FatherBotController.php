@@ -248,9 +248,9 @@ class FatherBotController extends AbstractTelegramBot
                     $date = new DateTime($packSalesman->created_at);
                     $date->add(new DateInterval("P{$pack->period}D"));
                     $formattedDate = $date->format('d.m.Y');
-                    $traffic = number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1);
+                    $traffic = number_format($pack->traffic_limit / (1024 * 1024 * 1024));
 
-                    $text = "📦{$traffic}GB  🗓️{$pack->period}д  🏁{$formattedDate}";
+                    $text = "📦{$traffic}GB  Период:{$pack->period}д  Активировать до:{$formattedDate}";
 
 //                    $text = "📦 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB|";
 //                    $text .= "Период: {$pack->period} дней|";
