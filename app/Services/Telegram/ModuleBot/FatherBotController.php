@@ -243,12 +243,12 @@ class FatherBotController extends AbstractTelegramBot
             // Добавляем пакеты на текущую страницу
             foreach ($packs as $packSalesman) {
                 $pack = $packSalesman->pack;
-                $date = new DateTime($packSalesman->created_at);
-                $date->add(new DateInterval("P{$pack->period}D"));
-                $formattedDate = $date->format('d.m.Y');
 
                 // Проверяем, существует ли основной пакет
                 if ($pack) {
+                    $date = new DateTime($packSalesman->created_at);
+                    $date->add(new DateInterval("P{$pack->period}D"));
+                    $formattedDate = $date->format('d.m.Y');
 //                    $text = "📦 ID: {$packSalesman->id}";
                     $text = "|Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB|";
                     $text .= "Период: {$pack->period} дней|";
