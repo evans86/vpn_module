@@ -182,7 +182,7 @@ class VdsinaService
 
             // Создаем или обновляем DNS запись
             $serverName = $vdsina_server['data']['name'];
-            $serverIp = $vdsina_server['data']['ip'][0]['ip'];
+            $serverIp = $vdsina_server['data']['ip']['ip'];
 
             Log::info('Creating/updating DNS record', [
                 'server_id' => $server_id,
