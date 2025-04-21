@@ -162,6 +162,10 @@ class VdsinaService
             // Получаем информацию о сервере от провайдера
             $vdsina_server = $this->vdsinaApi->getServerById($server->provider_id);
 
+            Log::warning('THIS DATA VDSINA', [
+                'SERVER' => $vdsina_server,
+            ]);
+
             if (!isset($vdsina_server['data']['ip'][0]['ip'])) {
                 throw new RuntimeException('Server IP not found in provider response');
             }
