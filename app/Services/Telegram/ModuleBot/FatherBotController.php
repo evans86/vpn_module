@@ -246,7 +246,7 @@ class FatherBotController extends AbstractTelegramBot
                 // Проверяем, существует ли основной пакет
                 if ($pack) {
                     $date = new DateTime($packSalesman->created_at);
-                    $date->add(new DateInterval("P{$pack->period}D"));
+                    $date->add(new DateInterval("PT{$pack->activate_time}S"));
                     $formattedDate = $date->format('d.m.Y');
                     $traffic = number_format($pack->traffic_limit / (1024 * 1024 * 1024));
 
@@ -330,7 +330,7 @@ class FatherBotController extends AbstractTelegramBot
 
             if ($pack) {
                 $date = new DateTime($packSalesman->created_at);
-                $date->add(new DateInterval("P{$pack->period}D"));
+                $date->add(new DateInterval("PT{$pack->activate_time}S"));
                 $formattedDate = $date->format('d.m.Y');
                 // Основная информация о пакете
                 $message = "<b>📦 Информация о пакете:</b>\n\n";
