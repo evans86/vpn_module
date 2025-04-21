@@ -166,7 +166,7 @@ class VdsinaService
                 'SERVER' => $vdsina_server,
             ]);
 
-            if (!isset($vdsina_server['data']['ip'][0]['ip'])) {
+            if (!isset($vdsina_server['data']['ip']['ip'])) {
                 throw new RuntimeException('Server IP not found in provider response');
             }
 
