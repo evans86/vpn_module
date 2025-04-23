@@ -14,7 +14,8 @@
                                 <div class="col-md-3">
                                     <div class="form-group">
                                         <label for="salesman_search">Продавец</label>
-                                        <input type="text" class="form-control" id="salesman_search" name="salesman_search"
+                                        <input type="text" class="form-control" id="salesman_search"
+                                               name="salesman_search"
                                                value="{{ request('salesman_search') }}"
                                                placeholder="Поиск по ID или имени">
                                     </div>
@@ -24,8 +25,13 @@
                                         <label for="status">Статус</label>
                                         <select class="form-control" id="status" name="status">
                                             <option value="">Все статусы</option>
-                                            <option value="paid" {{ request('status') == 'paid' ? 'selected' : '' }}>Оплачен</option>
-                                            <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Ожидает оплаты</option>
+                                            <option value="paid" {{ request('status') == 'paid' ? 'selected' : '' }}>
+                                                Оплачен
+                                            </option>
+                                            <option
+                                                value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>
+                                                Ожидает оплаты
+                                            </option>
                                         </select>
                                     </div>
                                 </div>
@@ -89,9 +95,13 @@
                                         </td>
                                         <td>
                                             @if($pack_salesman->salesman)
-                                                {{ $pack_salesman->salesman->username }}
+                                                <a href="{{ route('admin.module.salesman.index', ['username' => $pack_salesman->salesman->username]) }}"
+                                                   title="Просмотреть продавца">
+                                                    {{ $pack_salesman->salesman->username }}
+                                                </a>
                                                 <small class="d-block">
-                                                    <a href="/admin/module/salesman?telegram_id={{ $pack_salesman->salesman->telegram_id }}" class="text-primary">
+                                                    <a href="/admin/module/salesman?telegram_id={{ $pack_salesman->salesman->telegram_id }}"
+                                                       class="text-primary">
                                                         ID: {{ $pack_salesman->salesman->telegram_id }}
                                                     </a>
                                                 </small>
@@ -150,12 +160,12 @@
                         headers: {
                             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                         },
-                        success: function(response) {
+                        success: function (response) {
                             if (response.success) {
                                 location.reload();
                             }
                         },
-                        error: function(xhr) {
+                        error: function (xhr) {
                             alert('Произошла ошибка при обновлении статуса');
                         }
                     });
