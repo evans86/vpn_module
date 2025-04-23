@@ -25,6 +25,13 @@
                                                value="{{ request('telegram_id') }}" placeholder="Введите Telegram ID">
                                     </div>
                                 </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="title">Username</label>
+                                        <input type="text" class="form-control" id="username" name="username"
+                                               value="{{ request('username') }}" placeholder="Введите username">
+                                    </div>
+                                </div>
                                 <div class="col-md-2">
                                     <div class="form-group">
                                         <label>&nbsp;</label>

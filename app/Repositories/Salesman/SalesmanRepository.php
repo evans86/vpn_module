@@ -56,6 +56,10 @@ class SalesmanRepository extends BaseRepository
             $query->where('telegram_id', $filters['telegram_id']);
         }
 
+        if (isset($filters['username'])) {
+            $query->where('username', 'like', '%' . $filters['username'] . '%');
+        }
+
         return $query
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);

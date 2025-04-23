@@ -53,7 +53,7 @@ class SalesmanController extends Controller
                 'user_id' => auth()->id()
             ]);
 
-            $filters = array_filter($request->only(['id', 'telegram_id']));
+            $filters = array_filter($request->only(['id', 'telegram_id', 'username']));
             $salesmen = $this->salesmanRepository->getPaginated(20, $filters);
             $packs = $this->packRepository->getAllActive();
             $panels = $this->panelRepository->getAllConfiguredPanels();
