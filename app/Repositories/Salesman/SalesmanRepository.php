@@ -60,6 +60,10 @@ class SalesmanRepository extends BaseRepository
             $query->where('username', 'like', '%' . $filters['username'] . '%');
         }
 
+        if (isset($filters['bot_link'])) {
+            $query->where('bot_link', 'like', '%' . $filters['bot_link'] . '%');
+        }
+
         return $query
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);

@@ -11,25 +11,32 @@
                     <div class="card-body">
                         <form method="GET" action="{{ url('/admin/module/salesman') }}" class="mb-4">
                             <div class="row">
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <div class="form-group">
                                         <label for="id">ID</label>
                                         <input type="number" class="form-control" id="id" name="id"
                                                value="{{ request('id') }}" placeholder="Введите ID">
                                     </div>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <div class="form-group">
                                         <label for="telegram_id">Telegram ID</label>
                                         <input type="number" class="form-control" id="telegram_id" name="telegram_id"
                                                value="{{ request('telegram_id') }}" placeholder="Введите Telegram ID">
                                     </div>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <div class="form-group">
                                         <label for="title">Username</label>
                                         <input type="text" class="form-control" id="username" name="username"
                                                value="{{ request('username') }}" placeholder="Введите username">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="title">Ссылка на бота</label>
+                                        <input type="text" class="form-control" id="bot_link" name="bot_link"
+                                               value="{{ request('bot_link') }}" placeholder="Введите ссылку на бота">
                                     </div>
                                 </div>
                                 <div class="col-md-2">
