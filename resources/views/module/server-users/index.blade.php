@@ -22,24 +22,24 @@
                                 <div class="col-md-3">
                                     <div class="form-group">
                                         <label for="id">ID</label>
-                                        <input type="text" class="form-control" id="id" name="id" 
-                                               value="{{ request('id') }}" 
+                                        <input type="text" class="form-control" id="id" name="id"
+                                               value="{{ request('id') }}"
                                                placeholder="Поиск по ID">
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="form-group">
                                         <label for="server">Сервер</label>
-                                        <input type="text" class="form-control" id="server" name="server" 
-                                               value="{{ request('server') }}" 
+                                        <input type="text" class="form-control" id="server" name="server"
+                                               value="{{ request('server') }}"
                                                placeholder="Поиск по имени или IP">
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <div class="form-group">
                                         <label for="panel">Панель</label>
-                                        <input type="text" class="form-control" id="panel" name="panel" 
-                                               value="{{ request('panel') }}" 
+                                        <input type="text" class="form-control" id="panel" name="panel"
+                                               value="{{ request('panel') }}"
                                                placeholder="Поиск по адресу">
                                     </div>
                                 </div>
@@ -50,7 +50,7 @@
                                             <button type="submit" class="btn btn-primary">
                                                 <i class="fas fa-search"></i> Поиск
                                             </button>
-                                            <a href="{{ route('admin.module.server-users.index') }}" 
+                                            <a href="{{ route('admin.module.server-users.index') }}"
                                                class="btn btn-secondary">
                                                 <i class="fas fa-times"></i> Сбросить
                                             </a>
@@ -74,10 +74,19 @@
                                 <tbody>
                                     @foreach($serverUsers as $user)
                                         <tr>
-                                            <td>{{ $user->id }}</td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <span>{{ substr($user->id, 0, 8) }}...</span>
+                                                    <button class="btn btn-sm btn-link ml-2"
+                                                            data-clipboard-text="{{ $user->id }}"
+                                                            title="Копировать ID">
+                                                        <i class="fas fa-copy"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
                                             <td>
                                                 @if($user->panel && $user->panel->server)
-                                                    <a href="{{ route('admin.module.server.index', ['server_id' => $user->panel->server->id]) }}" 
+                                                    <a href="{{ route('admin.module.server.index', ['server_id' => $user->panel->server->id]) }}"
                                                        class="text-primary">
                                                         {{ $user->panel->server->name }}
                                                     </a>
@@ -87,8 +96,8 @@
                                             </td>
                                             <td>
                                                 @if($user->panel)
-                                                    <a href="{{ route('admin.module.panel.index', ['panel_id' => $user->panel->id]) }}" 
-                                                       class="text-primary" 
+                                                    <a href="{{ route('admin.module.panel.index', ['panel_id' => $user->panel->id]) }}"
+                                                       class="text-primary"
                                                        title="{{ $user->panel->panel_adress }}">
                                                         {{ Str::limit($user->panel->panel_adress, 30) }}
                                                     </a>

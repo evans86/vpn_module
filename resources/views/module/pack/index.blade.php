@@ -151,11 +151,11 @@
                 <label for="count">Количество ключей</label>
                 <input type="number" class="form-control" id="count" name="count" required min="1" value="5">
             </div>
-            <div class="form-group">
-                <label for="activate_time">Время на активацию (часов)</label>
-                <input type="number" class="form-control" id="activate_time" name="activate_time" required min="1"
-                       value="24">
-            </div>
+{{--            <div class="form-group">--}}
+{{--                <label for="activate_time">Время на активацию (часов)</label>--}}
+{{--                <input type="number" class="form-control" id="activate_time" name="activate_time" required min="1"--}}
+{{--                       value="24">--}}
+{{--            </div>--}}
             <div class="modal-footer px-0 pb-0">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
                 <button type="submit" class="btn btn-primary">Создать</button>

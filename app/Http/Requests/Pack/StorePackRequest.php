@@ -29,7 +29,7 @@ class StorePackRequest extends FormRequest
             'period' => 'required|integer|min:1',
             'traffic_limit' => 'required|integer|min:1',
             'count' => 'required|integer|min:1',
-            'activate_time' => 'required|integer|min:1'
+//            'activate_time' => 'required|integer|min:1'
         ];
     }
 
@@ -45,14 +45,14 @@ class StorePackRequest extends FormRequest
         $validated = parent::validated();
 
         // Конвертируем только если данные еще не были сконвертированы
-        if (isset($validated['traffic_limit']) && $validated['traffic_limit'] < 1024*1024*1024) {
+        if (isset($validated['traffic_limit']) && $validated['traffic_limit'] < 1024 * 1024 * 1024) {
             // Конвертируем GB в байты
             $validated['traffic_limit'] = $validated['traffic_limit'] * 1024 * 1024 * 1024;
         }
 
-        if (isset($validated['activate_time']) && $validated['activate_time'] < 9000) {
+        if (isset($validated['period'])) {
             // Конвертируем часы в секунды
-            $validated['activate_time'] = $validated['activate_time'] * 3600;
+            $validated['activate_time'] = $validated['period'] * 24 * 3600;
         }
 
         // По умолчанию пакет активен
