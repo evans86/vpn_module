@@ -1,5 +1,5 @@
 {{-- Logo --}}
-<div class="deznav">
+<div class="deznav" style="width: 280px; transition: all 0.3s ease;">
     <div class="deznav-scroll">
         <ul class="metismenu" id="menu">
             <li>

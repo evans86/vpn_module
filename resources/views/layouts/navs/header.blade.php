@@ -1,19 +1,13 @@
-<!--*******************
-    Preloader start
-********************-->
-<div class="nav-header">
-    <a href="{{ route('admin.module.server.index') }}" class="brand-logo">
-        <h4 class="logo-text">VPN Admin</h4>
-    </a>
-</div>
-
 <div class="header">
     <div class="header-content">
         <nav class="navbar navbar-expand">
             <div class="collapse navbar-collapse justify-content-between">
                 <div class="header-left">
+                    <button class="menu-toggle-btn" id="menuToggleButton">
+                        <i class="fas fa-bars"></i>
+                    </button>
                     <div class="dashboard_bar">
-                        Панель управления
+                        VPN Admin
                     </div>
                 </div>
                 <ul class="navbar-nav header-right">
@@ -21,7 +15,7 @@
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle user-dropdown" href="javascript:void(0);"
                                data-toggle="dropdown">
-                                <span class="text-black">{{ Auth::user()->name }}</span>
+                                <span class="user-name">{{ Auth::user()->name }}</span>
                             </a>
                             <div class="dropdown-menu dropdown-menu-right">
                                 <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
@@ -83,6 +77,15 @@
         color: #16181b;
         text-decoration: none;
         background-color: #f8f9fa;
+    }
+
+    .header-left {
+        display: flex;
+        align-items: center;
+    }
+
+    .dashboard_bar {
+        margin-left: 12px;
     }
 </style>
 

@@ -25,15 +25,30 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet"
           href="{{ \App\Helpers\AssetHelper::asset('mota/centre/bootstrap-select/dist/css/bootstrap-select.min.css') }}">
-    <link rel="stylesheet" href="{{ \App\Helpers\AssetHelper::asset('mota/centre/jqvmap/css/jqvmap.min.css') }}">
-    <link rel="stylesheet" href="{{ \App\Helpers\AssetHelper::asset('mota/centre/chartist/css/chartist.min.css') }}">
+    {{--    <link rel="stylesheet" href="{{ \App\Helpers\AssetHelper::asset('mota/centre/jqvmap/css/jqvmap.min.css') }}">--}}
+    {{--    <link rel="stylesheet" href="{{ \App\Helpers\AssetHelper::asset('mota/centre/chartist/css/chartist.min.css') }}">--}}
     <link rel="stylesheet" href="{{ \App\Helpers\AssetHelper::asset('mota/css/style.css') }}">
     <link rel="stylesheet" href="{{ \App\Helpers\AssetHelper::asset('mota/css/custom.css') }}">
-    <link rel="stylesheet" href="{{ \App\Helpers\AssetHelper::asset('mota/css/custom-fixes.css') }}">
+    <style>
+        /* Временный стиль для скрытия меню, если custom.css не подключён */
+        body.menu-collapsed .deznav {
+            width: 0 !important;
+            min-width: 0 !important;
+            overflow: hidden !important;
+            transition: width 0.3s;
+        }
+        body.menu-collapsed .content-body {
+            margin-left: 0 !important;
+            transition: margin 0.3s;
+        }
+    </style>
 
     <!-- Additional CSS -->
-    <link rel="stylesheet" href="https://cdn.lineicons.com/2.0/LineIcons.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    {{--    <link rel="stylesheet" href="https://cdn.lineicons.com/2.0/LineIcons.css">--}}
+    {{--    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">--}}
+    <!-- Подключение AOS (анимация) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aos@2.3.1/dist/aos.css" />
+    <script src="https://cdn.jsdelivr.net/npm/aos@2.3.1/dist/aos.js"></script>
 
     @stack('css')
 </head>
@@ -63,18 +78,26 @@
 </div>
 
 <!-- Required Scripts -->
+<!-- jQuery (должен быть до metisMenu) -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<!-- metisMenu -->
+<link rel="stylesheet" href="/mota/centre/metismenu/css/metisMenu.min.css">
+<script src="/mota/centre/metismenu/js/metisMenu.min.js"></script>
+<!-- PerfectScrollbar -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/perfect-scrollbar@1.5.5/css/perfect-scrollbar.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/perfect-scrollbar@1.5.5/dist/perfect-scrollbar.min.js"></script>
+<!-- custom scripts -->
+<script src="{{ \App\Helpers\AssetHelper::asset('mota/js/custom.min.js') }}"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/4.6.2/js/bootstrap.bundle.min.js"></script>
 <script
     src="{{ \App\Helpers\AssetHelper::asset('mota/centre/bootstrap-select/dist/js/bootstrap-select.min.js') }}"></script>
 <script src="{{ \App\Helpers\AssetHelper::asset('mota/centre/chartist/js/chartist.min.js') }}"></script>
 <script
     src="{{ \App\Helpers\AssetHelper::asset('mota/centre/chartist-plugin-tooltips/js/chartist-plugin-tooltip.min.js') }}"></script>
-<script src="{{ \App\Helpers\AssetHelper::asset('mota/centre/jqvmap/js/jquery.vmap.min.js') }}"></script>
-<script src="{{ \App\Helpers\AssetHelper::asset('mota/centre/jqvmap/js/jquery.vmap.usa.js') }}"></script>
-<script src="{{ \App\Helpers\AssetHelper::asset('mota/js/plugins-init/jqvmap-init.js') }}"></script>
-<script src="{{ \App\Helpers\AssetHelper::asset('mota/js/custom.min.js') }}"></script>
-<script src="{{ \App\Helpers\AssetHelper::asset('mota/js/deznav-init.js') }}"></script>
+{{--<script src="{{ \App\Helpers\AssetHelper::asset('mota/centre/jqvmap/js/jquery.vmap.min.js') }}"></script>--}}
+{{--<script src="{{ \App\Helpers\AssetHelper::asset('mota/centre/jqvmap/js/jquery.vmap.usa.js') }}"></script>--}}
+{{--<script src="{{ \App\Helpers\AssetHelper::asset('mota/js/plugins-init/jqvmap-init.js') }}"></script>--}}
+{{--<script src="{{ \App\Helpers\AssetHelper::asset('mota/js/deznav-init.js') }}"></script>--}}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"></script>
 
@@ -86,6 +109,16 @@
 <!-- Initialize AOS -->
 <script>
     AOS.init();
+    document.addEventListener('DOMContentLoaded', function() {
+        const menuBtn = document.getElementById('menuToggleButton');
+        if (menuBtn) {
+            menuBtn.addEventListener('click', function() {
+                document.body.classList.toggle('menu-collapsed');
+            });
+        } else {
+            console.log('Menu button not found');
+        }
+    });
 </script>
 
 @stack('js')

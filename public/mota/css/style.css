@@ -11243,13 +11243,13 @@ html[dir="rtl"] [direction="rtl"][data-sidebar-style="compact"]:not([data-layout
   100% {
     transform: rotate(0); } }
 .deznav {
-  width: 17.1875rem;
+  /*width: 17.1875rem;*/
   padding-bottom: 0;
   height: calc(100% - 80px);
   position: absolute;
-  top: 5rem;
+  top: 55px;
   padding-top: 0;
-  z-index: 5;
+  /*z-index: 5;*/
   background-color: #fff;
   transition: all .2s ease;
   box-shadow: 0px 40px 40px 0px rgba(82, 63, 105, 0.1); }
