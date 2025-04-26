@@ -29,6 +29,12 @@ class Kernel extends ConsoleKernel
             ->everyFiveMinutes()
             ->withoutOverlapping()
             ->appendOutputTo(storage_path('logs/server-status.log'));
+
+        // Проверяем истекающие ключи каждый день в 10:00
+        $schedule->command('notify:expiring-keys')
+            ->dailyAt('10:00')
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/key-notifications.log'));
     }
 
     /**

@@ -9,6 +9,7 @@ use App\Repositories\PackSalesman\PackSalesmanRepository;
 use App\Repositories\Panel\PanelRepository;
 use App\Logging\DatabaseLogger;
 use App\Services\Panel\PanelStrategy;
+use App\Services\Notification\NotificationService;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Str;
@@ -21,18 +22,21 @@ class KeyActivateService
     private PackSalesmanRepository $packSalesmanRepository;
     private DatabaseLogger $logger;
     private PanelRepository $panelRepository;
+    private NotificationService $notificationService;
 
     public function __construct(
         KeyActivateRepository  $keyActivateRepository,
         PackSalesmanRepository $packSalesmanRepository,
         PanelRepository        $panelRepository,
-        DatabaseLogger         $logger
+        DatabaseLogger         $logger,
+        NotificationService    $notificationService
     )
     {
         $this->keyActivateRepository = $keyActivateRepository;
         $this->packSalesmanRepository = $packSalesmanRepository;
         $this->panelRepository = $panelRepository;
         $this->logger = $logger;
+        $this->notificationService = $notificationService;
     }
 
     /**
@@ -163,6 +167,10 @@ class KeyActivateService
                 'finish_at' => $key->finish_at
             ]);
 
+            // Отправляем уведомление продавцу об активации ключа
+            $packSalesman = $this->packSalesmanRepository->findByIdOrFail($key->pack_salesman_id);
+            $this->notificationService->sendKeyActivatedNotification($packSalesman->salesman->telegram_id, $key->id);
+
             return $activatedKey;
         } catch (Exception $e) {
             $this->logger->error('Ошибка при активации ключа', [
@@ -193,6 +201,12 @@ class KeyActivateService
 
             $key->status = KeyActivate::EXPIRED;
             $key->save();
+
+            // Отправляем уведомление продавцу о деактивации ключа
+            if ($key->pack_salesman_id) {
+                $packSalesman = $this->packSalesmanRepository->findByIdOrFail($key->pack_salesman_id);
+                $this->notificationService->sendKeyDeactivatedNotification($packSalesman->salesman->telegram_id, $key->id);
+            }
 
             $this->logger->info('Статус ключа обновлен на EXPIRED (истек срок активации)', [
                 'source' => 'key_activate',

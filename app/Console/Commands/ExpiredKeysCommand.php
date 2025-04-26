@@ -47,7 +47,7 @@ class ExpiredKeysCommand extends Command
     {
         try {
             $keys = KeyActivate::where('status', KeyActivate::PAID)
-                ->where('deleted_at', '<', now())
+                ->where('deleted_at', '<', now()->timestamp)
                 ->get();
 
             $this->info("Found {$keys->count()} keys to check");
