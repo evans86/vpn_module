@@ -96,6 +96,11 @@
                                         </td>
                                         <td>
                                             <div class="d-flex align-items-center">
+                                                <a href="{{ route('admin.module.salesman.show', $salesman->id) }}"
+                                                   class="btn btn-sm btn-info mr-2"
+                                                   title="Подробная информация">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
                                                 <button
                                                     class="btn btn-sm btn-primary assign-pack-btn mr-2"
                                                     data-salesman-id="{{ $salesman->id }}">
@@ -355,6 +360,7 @@
         .btn-link {
             padding: 0 5px;
         }
+
         .btn-link:hover {
             text-decoration: none;
         }

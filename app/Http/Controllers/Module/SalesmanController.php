@@ -72,6 +72,83 @@ class SalesmanController extends Controller
     }
 
     /**
+     * Display salesman dashboard
+     *
+     * @param int $id
+     * @return View
+     */
+    public function show(int $id): View
+    {
+        try {
+            $salesman = $this->salesmanRepository->findById($id);
+            $packs = $this->packRepository->getAllActive();
+            $panels = $this->panelRepository->getAllConfiguredPanels();
+
+            // Статистика продавца (нужно реализовать соответствующие методы в репозиториях)
+//            $stats = [
+//                'total_clients' => $this->salesmanRepository->getTotalClientsCount($id),
+//                'active_clients' => $this->salesmanRepository->getActiveClientsCount($id),
+//                'total_income' => $this->salesmanRepository->getTotalIncome($id),
+//            ];
+
+            // Активности продавца (логи действий)
+//            $activities = $this->salesmanRepository->getActivities($id)->paginate(10);
+
+            return view('module.salesman.show', compact(
+                'salesman',
+                'packs',
+                'panels',
+//                'stats',
+//                'activities'
+            ));
+        } catch (Exception $e) {
+            Log::error('Error accessing salesman dashboard', [
+                'source' => 'salesman',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'salesman_id' => $id,
+                'user_id' => auth()->id()
+            ]);
+
+            abort(404, 'Продавец не найден');
+        }
+    }
+
+//    /**
+//     * Remove pack from salesman
+//     *
+//     * @param Request $request
+//     * @param int $id
+//     * @return JsonResponse
+//     */
+//    public function removePack(Request $request, int $id): JsonResponse
+//    {
+//        try {
+//            $packId = $request->input('pack_id');
+//            $this->packSalesmanService->delete($packId, $id);
+//
+//            return response()->json([
+//                'success' => true,
+//                'message' => 'Пакет успешно удален у продавца',
+//            ]);
+//        } catch (Exception $e) {
+//            Log::error('Error removing pack from salesman', [
+//                'source' => 'salesman',
+//                'error' => $e->getMessage(),
+//                'trace' => $e->getTraceAsString(),
+//                'salesman_id' => $id,
+//                'pack_id' => $request->input('pack_id'),
+//                'user_id' => auth()->id()
+//            ]);
+//
+//            return response()->json([
+//                'success' => false,
+//                'message' => $e->getMessage()
+//            ], 500);
+//        }
+//    }
+
+    /**
      * Toggle salesman status
      *
      * @param int $id

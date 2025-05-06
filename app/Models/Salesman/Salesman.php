@@ -2,6 +2,7 @@
 
 namespace App\Models\Salesman;
 
+use App\Models\Pack\Pack;
 use App\Models\Panel\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -33,5 +34,25 @@ class Salesman extends Model
     public function panel(): BelongsTo
     {
         return $this->belongsTo(Panel::class, 'panel_id');
+    }
+
+//    public function clients()
+//    {
+//        return $this->hasMany(Client::class);
+//    }
+//
+//    public function payments()
+//    {
+//        return $this->hasMany(Payment::class);
+//    }
+//
+//    public function activities()
+//    {
+//        return $this->hasMany(SalesmanActivity::class);
+//    }
+
+    public function packs()
+    {
+        return $this->belongsToMany(Pack::class)->withTimestamps();
     }
 }

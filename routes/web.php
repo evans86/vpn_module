@@ -67,6 +67,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             // Salesman Routes
             Route::prefix('salesman')->name('salesman.')->group(function () {
                 Route::get('/', [SalesmanController::class, 'index'])->name('index');
+                Route::get('/{salesman}', [SalesmanController::class, 'show'])->name('show');
                 Route::post('/', [SalesmanController::class, 'store'])->name('store');
                 Route::put('/{salesman}', [SalesmanController::class, 'update'])->name('update');
                 Route::delete('/{salesman}', [SalesmanController::class, 'destroy'])->name('destroy');
@@ -74,6 +75,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/{id}/assign-pack', [SalesmanController::class, 'assignPack'])->name('assign-pack');
                 Route::post('/{id}/assign-panel', [SalesmanController::class, 'assignPanel'])->name('assign-panel');
                 Route::post('/{id}/reset-panel', [SalesmanController::class, 'resetPanel'])->name('reset-panel');
+//                Route::post('/{id}/remove-pack', [SalesmanController::class, 'removePack'])->name('remove-pack');
             });
 
             // Pack Routes
