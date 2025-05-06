@@ -101,32 +101,32 @@
                                                    title="Подробная информация">
                                                     <i class="fas fa-eye"></i>
                                                 </a>
-                                                <button
-                                                    class="btn btn-sm btn-primary assign-pack-btn mr-2"
-                                                    data-salesman-id="{{ $salesman->id }}">
-                                                    Предоставить пакет
-                                                </button>
-                                                @if($salesman->panel)
-                                                    <div class="d-flex align-items-center">
-                                                        <a href="{{ route('admin.module.panel.index', ['panel_id' => $salesman->panel->id]) }}"
-                                                           class="text-primary mr-2"
-                                                           title="{{ $salesman->panel->panel_adress }}">
-                                                            {{ Str::limit($salesman->panel->panel_adress, 20) }}
-                                                        </a>
-                                                        <button
-                                                            class="btn btn-sm btn-danger reset-panel-btn"
-                                                            data-salesman-id="{{ $salesman->id }}"
-                                                            title="Сбросить панель">
-                                                            <i class="fas fa-times"></i>
-                                                        </button>
-                                                    </div>
-                                                @else
-                                                    <button
-                                                        class="btn btn-sm btn-info assign-panel-btn"
-                                                        data-salesman-id="{{ $salesman->id }}">
-                                                        Привязать панель
-                                                    </button>
-                                                @endif
+{{--                                                <button--}}
+{{--                                                    class="btn btn-sm btn-primary assign-pack-btn mr-2"--}}
+{{--                                                    data-salesman-id="{{ $salesman->id }}">--}}
+{{--                                                    Предоставить пакет--}}
+{{--                                                </button>--}}
+{{--                                                @if($salesman->panel)--}}
+{{--                                                    <div class="d-flex align-items-center">--}}
+{{--                                                        <a href="{{ route('admin.module.panel.index', ['panel_id' => $salesman->panel->id]) }}"--}}
+{{--                                                           class="text-primary mr-2"--}}
+{{--                                                           title="{{ $salesman->panel->panel_adress }}">--}}
+{{--                                                            {{ Str::limit($salesman->panel->panel_adress, 20) }}--}}
+{{--                                                        </a>--}}
+{{--                                                        <button--}}
+{{--                                                            class="btn btn-sm btn-danger reset-panel-btn"--}}
+{{--                                                            data-salesman-id="{{ $salesman->id }}"--}}
+{{--                                                            title="Сбросить панель">--}}
+{{--                                                            <i class="fas fa-times"></i>--}}
+{{--                                                        </button>--}}
+{{--                                                    </div>--}}
+{{--                                                @else--}}
+{{--                                                    <button--}}
+{{--                                                        class="btn btn-sm btn-info assign-panel-btn"--}}
+{{--                                                        data-salesman-id="{{ $salesman->id }}">--}}
+{{--                                                        Привязать панель--}}
+{{--                                                    </button>--}}
+{{--                                                @endif--}}
                                             </div>
                                         </td>
                                     </tr>
