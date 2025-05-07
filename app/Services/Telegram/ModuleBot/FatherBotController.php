@@ -82,10 +82,10 @@ class FatherBotController extends AbstractTelegramBot
                     case '🌎 Помощь':
                         $this->showHelp();
                         break;
-                    case '✏️ Изменить текст помощи':
+                    case '✏️ Изменить текст "❓ Помощь"':
                         $this->initiateHelpTextChange();
                         break;
-                    case '🔄 Сбросить текст помощи':
+                    case '🔄 Сбросить текст "❓ Помощь"':
                         $this->resetHelpText();
                         break;
                     default:
