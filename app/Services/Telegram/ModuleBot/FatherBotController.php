@@ -433,6 +433,7 @@ class FatherBotController extends AbstractTelegramBot
             }
 
             $message = "<blockquote><b>📦 Пакеты ключей:</b></blockquote>\n\n";
+            $message .= "<b>✅ Для проверки конфигурации отправьте ключ боту.</b>\n\n";
             $keyboard = ['inline_keyboard' => []];
 
             // Добавляем пакеты на текущую страницу
