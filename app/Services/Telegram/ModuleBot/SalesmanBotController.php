@@ -612,8 +612,8 @@ class SalesmanBotController extends AbstractTelegramBot
         $this->sendMessage($text, $keyboard);
     }
 
-    private function isValidKeyFormat(string $text): bool
-    {
-        return strlen($text) === 36; // Пример для UUID
-    }
+//    private function isValidKeyFormat(string $text): bool
+//    {
+//        return strlen($text) === 36; // Пример для UUID
+//    }
 }

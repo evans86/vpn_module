@@ -2,8 +2,10 @@
 
 namespace App\Services\Telegram\ModuleBot;
 
+use App\Models\KeyActivate\KeyActivate;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
+use App\Services\Panel\PanelStrategy;
 use DateInterval;
 use DateTime;
 use Exception;
@@ -68,6 +70,12 @@ class FatherBotController extends AbstractTelegramBot
                     return;
                 }
 
+                // Проверяем, является ли сообщение ключом VPN
+                if ($this->isValidKeyFormat($text)) {
+                    $this->handleKeyInfoRequest($text);
+                    return;
+                }
+
                 // Обработка команд меню
                 switch ($text) {
                     case '🤖 Мой бот':
@@ -97,6 +105,96 @@ class FatherBotController extends AbstractTelegramBot
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Обрабатывает запрос информации о ключе
+     */
+    protected function handleKeyInfoRequest(string $keyId): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if (!$salesman) {
+                $this->sendMessage("❌ Ошибка: продавец не найден");
+                return;
+            }
+
+            // Ищем ключ среди ключей этого продавца
+            /**
+             * @var KeyActivate|null $key
+             */
+            $key = KeyActivate::where('id', $keyId)
+                ->whereHas('packSalesman', function($query) use ($salesman) {
+                    $query->where('salesman_id', $salesman->id);
+                })
+                ->with(['packSalesman.pack', 'keyActivateUser.serverUser.panel'])
+                ->first();
+
+            if (!$key) {
+                $this->sendMessage("❌ Ключ <code>{$keyId}</code> не найден среди ваших ключей");
+                return;
+            }
+
+            $message = "🔍 <b>Информация о ключе:</b> <code>{$keyId}</code>\n\n";
+
+            // Основная информация
+            $message .= "📦 <b>Пакет:</b> ";
+            if ($key->packSalesman && $key->packSalesman->pack) {
+                $trafficGB = number_format($key->packSalesman->pack->traffic_limit / (1024 * 1024 * 1024), 1);
+                $message .= "{$trafficGB} GB на {$key->packSalesman->pack->period} дней\n";
+            } else {
+                $message .= "неизвестен (возможно, пакет удален)\n";
+            }
+
+            // Статус ключа
+            $status = "⚪️ Не активирован";
+            if ($key->user_tg_id) {
+                $status = "✅ Активирован (ID: {$key->user_tg_id})";
+            } elseif ($key->status == KeyActivate::EXPIRED) {
+                $status = "🔴 Просрочен";
+            }
+            $message .= "📊 <b>Статус:</b> {$status}\n";
+
+            try {
+                // Получаем информацию о трафике с панели
+                $panelStrategy = new PanelStrategy($key->keyActivateUser->serverUser->panel->panel);
+                $info = $panelStrategy->getSubscribeInfo($key->keyActivateUser->serverUser->panel->id, $key->keyActivateUser->serverUser->id);
+            } catch (\Exception $e) {
+                // Логируем ошибку
+                Log::error('Failed to get subscription info for key ' . $key->id . ': ' . $e->getMessage());
+                $info = ['used_traffic' => null];
+            }
+
+            // Даты
+            if ($key->created_at) {
+                $message .= "📅 <b>Создан:</b> " . $key->created_at->format('d.m.Y H:i') . "\n";
+            }
+
+            if ($key->finish_at) {
+                $message .= "✅ <b>Активировать до:</b> " . date('d.m.Y', $key->deleted_at) . "\n";
+            }
+
+            if ($key->finish_at) {
+                $message .= "⏳ <b>Действует до:</b> " . date('d.m.Y', $key->finish_at) . "\n";
+                $message .= "⏳ <b>Осталось дней:</b> " . ceil(($key->finish_at - time()) / (60 * 60 * 24)) . "\n";
+            }
+
+            // Трафик
+            if ($key->traffic_limit) {
+                $trafficGB = number_format($key->traffic_limit / (1024 * 1024 * 1024), 2);
+                $trafficUsedGB = round($info['used_traffic'] / (1024 * 1024 * 1024), 2);
+
+                $message .= "📶 <b>Трафик:</b>\n";
+                $message .= "   • Лимит: {$trafficGB} GB\n";
+                $message .= "   • Использовано: {$trafficUsedGB} GB\n";
+            }
+
+            $this->sendMessage($message);
+
+        } catch (Exception $e) {
+            Log::error('Key info request error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
     }
