@@ -168,15 +168,15 @@ class FatherBotController extends AbstractTelegramBot
             }
 
             // Даты
-            if ($key->created_at) {
+            if ($key->created_at && !is_null($key->created_at)) {
                 $message .= "📅 <b>Создан:</b> " . $key->created_at->format('d.m.Y H:i') . "\n";
             }
 
-            if ($key->finish_at) {
+            if ($key->deleted_at && !is_null($key->deleted_at)) {
                 $message .= "✅ <b>Активировать до:</b> " . date('d.m.Y', $key->deleted_at) . "\n";
             }
 
-            if ($key->finish_at) {
+            if ($key->finish_at && !is_null($key->finish_at)) {
                 $message .= "⏳ <b>Действует до:</b> " . date('d.m.Y', $key->finish_at) . "\n";
                 $message .= "⏳ <b>Осталось дней:</b> " . ceil(($key->finish_at - time()) / (60 * 60 * 24)) . "\n";
             }
