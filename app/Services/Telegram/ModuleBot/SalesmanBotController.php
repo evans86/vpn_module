@@ -486,6 +486,13 @@ class SalesmanBotController extends AbstractTelegramBot
 
     protected function actionHelp(): void
     {
+        // Если есть кастомный текст помощи, используем его
+        if (!empty($this->salesman->custom_help_text)) {
+            $this->sendMessage($this->salesman->custom_help_text);
+            return;
+        }
+
+        // Стандартный текст помощи
         $text = "<blockquote><b>❓ Помощь</b></blockquote>\n\n\n";
         $text .= "🔹 <b>Активация VPN:</b>\n\n";
         $text .= "1️⃣ Нажмите '🔑 Активировать'\n";
@@ -499,11 +506,6 @@ class SalesmanBotController extends AbstractTelegramBot
         $text .= "- <a href=\"https://docs.google.com/document/d/1f3iS-V0kFVQEA3i1hYOEaAoNMucgF60XiDZZdhRl59Q/edit?usp=sharing\">Инструкция для IOS</a> 🍏\n";
         $text .= "- <a href=\"https://docs.google.com/document/d/1jXNpuNY9eET1LXyVmRjHSoX6YRX9RlWGJQFSEJE_2Jg/edit?usp=sharing\">Инструкция для Windows</a> 🖥️\n\n";
         $text .= "👨🏻‍💻 По всем вопросам обращайтесь к <a href=\"ссылка на акк поддержки\">администратору</a> бота.\n\n";
-//        $text .= "🌍 <a href=\"ссылка на покупку ключа\">Купить ключ</a>\n";
-//        $text .= "🖥️ <a href=\"https://teletype.in/@bott_manager/DrVW5lc3OA6\">Инструкция для Windows</a> | <a href=\"ссылка на клиент Windows\">Скачать клиент для Windows</a>\n";
-//        $text .= "📱 <a href=\"ссылка\">Инструкция для Android</a> | <a href=\"ссылка на клиент Android\">Скачать клиент для Android</a>\n";
-//        $text .= "🍏 <a href=\"https://teletype.in/@bott_manager/R4GreUy2998\">Инструкция для IOS</a> | <a href=\"ссылка на клиент IOS\">Скачать клиент для IOS</a>\n";
-//        $text .= "🆘 <a href=\"ссылка на акк поддержки\">Обратиться за помощью</a>";
 
         $this->sendMessage($text);
     }

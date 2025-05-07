@@ -14,6 +14,8 @@ class FatherBotController extends AbstractTelegramBot
 {
     private const STATE_WAITING_TOKEN = 'waiting_token';
 
+    private const STATE_WAITING_HELP_TEXT = 'waiting_help_text';
+
     public function __construct(string $token)
     {
         parent::__construct($token);
@@ -55,8 +57,14 @@ class FatherBotController extends AbstractTelegramBot
 
                 // Проверяем состояние ожидания токена
                 $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+
                 if ($salesman && $salesman->state === self::STATE_WAITING_TOKEN) {
                     $this->handleBotToken($text);
+                    return;
+                }
+
+                if ($salesman && $salesman->state === self::STATE_WAITING_HELP_TEXT) {
+                    $this->handleHelpTextUpdate($text);
                     return;
                 }
 
@@ -73,6 +81,12 @@ class FatherBotController extends AbstractTelegramBot
                         break;
                     case '🌎 Помощь':
                         $this->showHelp();
+                        break;
+                    case '✏️ Изменить текст помощи':
+                        $this->initiateHelpTextChange();
+                        break;
+                    case '🔄 Сбросить текст помощи':
+                        $this->resetHelpText();
                         break;
                     default:
                         $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню для выбора действия.');
@@ -176,6 +190,90 @@ class FatherBotController extends AbstractTelegramBot
             Log::error('Process callback error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()
             ]);
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Инициирует процесс изменения текста помощи
+     */
+    protected function initiateHelpTextChange(): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if (!$salesman) {
+                $this->sendMessage("❌ Ошибка: продавец не найден");
+                return;
+            }
+
+            $salesman->state = self::STATE_WAITING_HELP_TEXT;
+            $salesman->save();
+
+            $message = "✏️ <b>Введите новый текст для раздела 'Помощь' в вашем боте:</b>\n\n";
+            $message .= "• Можно использовать HTML-разметку\n";
+            $message .= "• Максимальная длина: 4000 символов\n";
+            $message .= "• Отправьте /cancel для отмены";
+
+            $this->sendMessage($message);
+        } catch (Exception $e) {
+            Log::error('Initiate help text change error: ' . $e->getMessage());
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Обрабатывает обновление текста помощи
+     */
+    protected function handleHelpTextUpdate(string $text): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if (!$salesman) {
+                $this->sendMessage("❌ Ошибка: продавец не найден");
+                return;
+            }
+
+            if (strtolower($text) === '/cancel') {
+                $salesman->state = null;
+                $salesman->save();
+                $this->sendMessage("❌ Изменение текста помощи отменено");
+                return;
+            }
+
+            if (strlen($text) > 4000) {
+                $this->sendMessage("❌ Текст слишком длинный (максимум 4000 символов)");
+                return;
+            }
+
+            $salesman->custom_help_text = $text;
+            $salesman->state = null;
+            $salesman->save();
+
+            $this->sendMessage("✅ Текст помощи успешно обновлен!\n\nПредпросмотр:\n\n" . $text);
+        } catch (Exception $e) {
+            Log::error('Help text update error: ' . $e->getMessage());
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Сбрасывает текст помощи к стандартному
+     */
+    protected function resetHelpText(): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            if (!$salesman) {
+                $this->sendMessage("❌ Ошибка: продавец не найден");
+                return;
+            }
+
+            $salesman->custom_help_text = null;
+            $salesman->save();
+
+            $this->sendMessage("✅ Текст помощи сброшен к стандартному");
+        } catch (Exception $e) {
+            Log::error('Reset help text error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
     }
@@ -854,9 +952,11 @@ class FatherBotController extends AbstractTelegramBot
                 ],
                 [
                     ['text' => '🪪 Личный кабинет'],
+                    ['text' => '🌎 Помощь']
                 ],
                 [
-                    ['text' => '🌎 Помощь']
+                    ['text' => '✏️ Изменить текст "помощи"'],
+                    ['text' => '🔄 Сбросить текст "помощи"']
                 ]
             ],
             'resize_keyboard' => true,

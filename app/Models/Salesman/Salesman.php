@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $panel_id
  * @property string $token
  * @property string $bot_link
+ * @property string $custom_help_text
  * @property string $status
  * @property string $created_at
  * @property string $bot_active
