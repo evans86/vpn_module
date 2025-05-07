@@ -209,7 +209,7 @@ class FatherBotController extends AbstractTelegramBot
             $salesman->state = self::STATE_WAITING_HELP_TEXT;
             $salesman->save();
 
-            $message = "✏️ <b>Введите новый текст для раздела 'Помощь' в вашем боте:</b>\n\n";
+            $message = "✏️ <b>Введите новый текст для раздела '❓ Помощь' в вашем боте:</b>\n\n";
             $message .= "• Можно использовать HTML-разметку\n";
             $message .= "• Максимальная длина: 4000 символов\n";
             $message .= "• Отправьте /cancel для отмены";
