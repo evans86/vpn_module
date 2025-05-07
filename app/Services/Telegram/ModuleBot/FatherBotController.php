@@ -255,7 +255,6 @@ class FatherBotController extends AbstractTelegramBot
                 $panelStrategy = new PanelStrategy($key->keyActivateUser->serverUser->panel->panel);
                 $info = $panelStrategy->getSubscribeInfo($key->keyActivateUser->serverUser->panel->id, $key->keyActivateUser->serverUser->id);
             } catch (\Exception $e) {
-                // Логируем ошибку
                 Log::error('Failed to get subscription info for key ' . $key->id . ': ' . $e->getMessage());
                 $info = ['used_traffic' => null];
             }
