@@ -525,9 +525,9 @@ class FatherBotController extends AbstractTelegramBot
             $keys = $packSalesman->keyActivates;
 
             if ($pack) {
-                $date = new DateTime($packSalesman->created_at);
-                $date->add(new DateInterval("PT{$pack->activate_time}S"));
-                $formattedDate = $date->format('d.m.Y');
+//                $date = new DateTime($packSalesman->created_at);
+//                $date->add(new DateInterval("PT{$pack->activate_time}S"));
+//                $formattedDate = $date->format('d.m.Y');
                 // Основная информация о пакете
                 $message = "<b>📦 Информация о пакете:</b>\n\n";
                 $message .= "💾 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
