@@ -80,7 +80,7 @@
                                     <th><strong>Продавец</strong></th>
                                     <th><strong>Дата окончания</strong></th>
                                     <th><strong>Telegram ID</strong></th>
-                                    <th><strong>Активировать до</strong></th>
+{{--                                    <th><strong>Активировать до</strong></th>--}}
                                     <th><strong>Пользователь сервера</strong></th>
                                     <th><strong>Статус</strong></th>
                                     <th></th>
@@ -144,20 +144,20 @@
                                                 -
                                             @endif
                                         </td>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                {{ $key->deleted_at ? date('d.m.Y H:i', $key->deleted_at) : '' }}
-                                                @if($key->deleted_at)
-                                                    <button class="btn btn-sm btn-link edit-date"
-                                                            data-id="{{ $key->id }}"
-                                                            data-type="deleted_at"
-                                                            data-value="{{ date('d.m.Y H:i', $key->deleted_at) }}"
-                                                            title="Изменить дату">
-                                                        <i class="fas fa-edit"></i>
-                                                    </button>
-                                                @endif
-                                            </div>
-                                        </td>
+{{--                                        <td>--}}
+{{--                                            <div class="d-flex align-items-center">--}}
+{{--                                                {{ $key->deleted_at ? date('d.m.Y H:i', $key->deleted_at) : '' }}--}}
+{{--                                                @if($key->deleted_at)--}}
+{{--                                                    <button class="btn btn-sm btn-link edit-date"--}}
+{{--                                                            data-id="{{ $key->id }}"--}}
+{{--                                                            data-type="deleted_at"--}}
+{{--                                                            data-value="{{ date('d.m.Y H:i', $key->deleted_at) }}"--}}
+{{--                                                            title="Изменить дату">--}}
+{{--                                                        <i class="fas fa-edit"></i>--}}
+{{--                                                    </button>--}}
+{{--                                                @endif--}}
+{{--                                            </div>--}}
+{{--                                        </td>--}}
                                         <td>
                                             @if($key->keyActivateUser && $key->keyActivateUser->serverUser)
                                                 <a href="{{ route('admin.module.server-users.index', ['id' => $key->keyActivateUser->server_user_id]) }}"

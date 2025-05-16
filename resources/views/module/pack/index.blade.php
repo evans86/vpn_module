@@ -79,7 +79,7 @@
                                 <th>Период</th>
                                 <th>Трафик</th>
                                 <th>Ключи</th>
-                                <th>Время активации</th>
+{{--                                <th>Время активации</th>--}}
                                 <th>Статус</th>
                                 <th>Действия</th>
                             </tr>
@@ -93,7 +93,7 @@
                                     <td>{{ $pack->period }} дней</td>
                                     <td>{{ number_format($pack->traffic_limit / (1024*1024*1024), 1) }} GB</td>
                                     <td>{{ $pack->count }}</td>
-                                    <td>{{ floor($pack->activate_time / 3600) }} ч.</td>
+{{--                                    <td>{{ floor($pack->activate_time / 3600) }} ч.</td>--}}
                                     <td>
                                         <span class="badge badge-{{ $pack->status ? 'success' : 'danger' }}">
                                             {{ $pack->status ? 'Активен' : 'Неактивен' }}

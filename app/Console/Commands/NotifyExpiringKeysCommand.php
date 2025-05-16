@@ -8,6 +8,7 @@ use App\Services\Notification\NotificationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use Symfony\Component\Routing\Annotation\Route;
 
 class NotifyExpiringKeysCommand extends Command
 {
@@ -30,7 +31,7 @@ class NotifyExpiringKeysCommand extends Command
     public function handle()
     {
         try {
-            $this->notifyUnactivatedKeys();
+//            $this->notifyUnactivatedKeys();
             $this->notifyExpiringActiveKeys();
         } catch (\Exception $e) {
             Log::error('Error in NotifyExpiringKeysCommand', [
@@ -44,6 +45,8 @@ class NotifyExpiringKeysCommand extends Command
     }
 
     /**
+     * TODO пока отключен
+     *
      * Уведомление об истечении срока для не активированных ключей
      *
      * @return void

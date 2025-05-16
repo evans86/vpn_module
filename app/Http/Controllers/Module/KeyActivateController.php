@@ -265,7 +265,7 @@ class KeyActivateController extends Controller
         try {
             $validated = $request->validate([
                 'id' => 'required|uuid|exists:key_activate,id',
-                'type' => 'required|in:finish_at,deleted_at',
+                'type' => 'required|in:finish_at',
                 'value' => 'required|integer'
             ]);
 

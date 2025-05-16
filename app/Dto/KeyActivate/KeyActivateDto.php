@@ -9,7 +9,7 @@ class KeyActivateDto
     public int $pack_salesman_id;
     public ?int $finish_at;
     public ?int $user_tg_id;
-    public int $deleted_at;
+    public ?int $deleted_at;
     public int $status;
 
     public function getArray(): array

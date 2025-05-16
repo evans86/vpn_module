@@ -264,9 +264,9 @@ class FatherBotController extends AbstractTelegramBot
                 $message .= "📅 <b>Создан:</b> " . $key->created_at->format('d.m.Y H:i') . "\n";
             }
 
-            if ($key->deleted_at && !is_null($key->deleted_at)) {
-                $message .= "✅ <b>Активировать до:</b> " . date('d.m.Y', $key->deleted_at) . "\n";
-            }
+//            if ($key->deleted_at && !is_null($key->deleted_at)) {
+//                $message .= "✅ <b>Активировать до:</b> " . date('d.m.Y', $key->deleted_at) . "\n";
+//            }
 
             if ($key->finish_at && !is_null($key->finish_at)) {
                 $message .= "⏳ <b>Действует до:</b> " . date('d.m.Y', $key->finish_at) . "\n";
@@ -446,7 +446,7 @@ class FatherBotController extends AbstractTelegramBot
                     $formattedDate = $date->format('d.m.Y');
                     $traffic = number_format($pack->traffic_limit / (1024 * 1024 * 1024));
 
-                    $text = "📦{$traffic}GB| Период: {$pack->period}д| Активировать до: {$formattedDate}";
+                    $text = "📦{$traffic}GB| Период: {$pack->period}д";
 
 //                    $text = "📦 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB|";
 //                    $text .= "Период: {$pack->period} дней|";
@@ -532,7 +532,7 @@ class FatherBotController extends AbstractTelegramBot
                 $message = "<b>📦 Информация о пакете:</b>\n\n";
                 $message .= "💾 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
                 $message .= "⏱ Период: {$pack->period} дней\n";
-                $message .= "🏁 Активировать до: {$formattedDate}\n\n";
+//                $message .= "🏁 Активировать до: {$formattedDate}\n\n";
             } else {
                 // Если пакет удален, выводим сообщение об этом
                 $message = "<b>📦 Информация о пакете:</b>|❌ Основной тариф удален";

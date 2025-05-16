@@ -45,11 +45,11 @@ class KeyActivateService
      * @param int|null $traffic_limit
      * @param int $pack_salesman_id
      * @param int|null $finish_at
-     * @param int $deleted_at
+     * @param int|null $deleted_at
      * @return KeyActivate
      * @throws Exception
      */
-    public function create(?int $traffic_limit, int $pack_salesman_id, ?int $finish_at, int $deleted_at): KeyActivate
+    public function create(?int $traffic_limit, int $pack_salesman_id, ?int $finish_at, ?int $deleted_at): KeyActivate
     {
         try {
             $packSalesman = $this->packSalesmanRepository->findByIdOrFail($pack_salesman_id);

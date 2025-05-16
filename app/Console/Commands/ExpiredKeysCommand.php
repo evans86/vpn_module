@@ -7,6 +7,9 @@ use App\Services\Key\KeyActivateService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * TODO Пока отключен
+ */
 class ExpiredKeysCommand extends Command
 {
     /**
