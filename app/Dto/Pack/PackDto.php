@@ -10,7 +10,7 @@ class PackDto
     public int $period; //30 дней
     public int $traffic_limit;
     public int $count;
-    public int $activate_time; //240 часов
+    public ?int $activate_time; //240 часов
     public bool $status;
 
     public function getArray(): array
