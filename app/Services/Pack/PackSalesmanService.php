@@ -135,7 +135,7 @@ class PackSalesmanService
             $message .= "📦 Количество ключей: {$pack->count}\n";
             $message .= "⏱ Период действия: {$pack->period} дней\n";
             $message .= "💾 Лимит трафика: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
-            $message .= "⚡️ Время на активацию: " . intval($pack->activate_time / 86400) . " день(ей)\n\n";
+//            $message .= "⚡️ Время на активацию: " . intval($pack->activate_time / 86400) . " день(ей)\n\n";
 
             try {
                 $telegram = new Api(config('telegram.father_bot.token'));
