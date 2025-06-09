@@ -4,6 +4,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Module\ServerController;
 use App\Http\Controllers\Telegram\WebhookController;
+use App\Http\Controllers\Api\v1\BotModuleController;
+use App\Http\Controllers\Api\v1\KeyActivateController;
+use App\Http\Controllers\Api\v1\PackSalesmanController;
 
 /*
 |--------------------------------------------------------------------------
@@ -30,4 +33,22 @@ Route::prefix('servers')->group(function () {
 Route::prefix('telegram')->group(function () {
     Route::post('father-bot/{token}/init', [WebhookController::class, 'fatherBot']);
     Route::post('salesman-bot/{token}/init', [WebhookController::class, 'salesmanBot']);
+});
+
+// Bot Module API Routes
+Route::prefix('v1/bot-module')->group(function () {
+    Route::get('ping', [BotModuleController::class, 'ping']); //+
+    Route::post('create', [BotModuleController::class, 'create']); // ?
+    Route::get('get', [BotModuleController::class, 'get']); // ?
+    Route::get('settings', [BotModuleController::class, 'getSettings']); // ?
+    Route::post('update', [BotModuleController::class, 'update']); // ?
+    Route::post('delete', [BotModuleController::class, 'delete']); // ?
+});
+
+// Key Activate API Routes
+Route::prefix('v1/key-activate')->group(function () {
+    Route::post('buy-key', [KeyActivateController::class, 'buyKey']); // ?
+    Route::post('free-key', [KeyActivateController::class, 'getFreeKey']); // ?
+    Route::get('user-key', [KeyActivateController::class, 'getUserKey']); // +-
+    Route::get('user-keys', [KeyActivateController::class, 'getUserKeys']); // +-
 });
