@@ -51,4 +51,5 @@ Route::prefix('v1/key-activate')->group(function () {
     Route::post('free-key', [KeyActivateController::class, 'getFreeKey']); // ?
     Route::get('user-key', [KeyActivateController::class, 'getUserKey']); // +-
     Route::get('user-keys', [KeyActivateController::class, 'getUserKeys']); // +-
+    Route::get('vpn-instructions', [KeyActivateController::class, 'getVpnInstructions']); // +-
 });

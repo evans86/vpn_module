@@ -224,4 +224,60 @@ class KeyActivateController extends Controller
             return ApiHelpers::error('Ошибка при получении списка ключей');
         }
     }
+
+    /**
+     * Получение инструкций по работе с VPN
+     *
+     * @return array|string
+     */
+    public function getVpnInstructions()
+    {
+        try {
+            $instructions = [
+                'sections' => [
+                    [
+                        'title' => '🔹 Активация VPN',
+                        'steps' => [
+                            'Нажмите \'🔑 Активировать\'',
+                            'Введите полученный ключ',
+                            'Скопируйте конфигурацию и следуйте инструкциям для подключения'
+                        ]
+                    ],
+                    [
+                        'title' => '🔹 Проверка статуса',
+                        'steps' => [
+                            'Нажмите кнопку \'📊 Статус\'',
+                            'Просмотрите информацию о вашем доступе и конфигурации'
+                        ]
+                    ],
+                    [
+                        'title' => '📁 Инструкции по настройке VPN',
+                        'links' => [
+                            [
+                                'title' => 'Инструкция для Android 📱',
+                                'url' => 'https://docs.google.com/document/d/1ma6QZjKgwLHdS2457I8C6k22gC2Cq3Yic8bLiMeXmeY/edit'
+                            ],
+                            [
+                                'title' => 'Инструкция для iOS 🍏',
+                                'url' => 'https://docs.google.com/document/d/1f3iS-V0kFVQEA3i1hYOEaAoNMucgF60XiDZZdhRl59Q/edit'
+                            ],
+                            [
+                                'title' => 'Инструкция для Windows 🖥️',
+                                'url' => 'https://docs.google.com/document/d/1jXNpuNY9eET1LXyVmRjHSoX6YRX9RlWGJQFSEJE_2Jg/edit'
+                            ]
+                        ]
+                    ]
+                ],
+                'support_text' => '👨🏻‍💻 По всем вопросам обращайтесь к администратору бота.'
+            ];
+
+            return ApiHelpers::success([
+                'structured' => $instructions
+            ]);
+
+        } catch (Exception $e) {
+            Log::error('Ошибка при получении инструкций: ' . $e->getMessage());
+            return ApiHelpers::error('Не удалось загрузить инструкции');
+        }
+    }
 }
