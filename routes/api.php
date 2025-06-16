@@ -38,11 +38,11 @@ Route::prefix('telegram')->group(function () {
 // Bot Module API Routes
 Route::prefix('v1/bot-module')->group(function () {
     Route::get('ping', [BotModuleController::class, 'ping']); //+
-    Route::post('create', [BotModuleController::class, 'create']); // ?
+    Route::get('create', [BotModuleController::class, 'create']); // ?
     Route::get('get', [BotModuleController::class, 'get']); // ?
     Route::get('settings', [BotModuleController::class, 'getSettings']); // ?
     Route::post('update', [BotModuleController::class, 'update']); // ?
-    Route::post('delete', [BotModuleController::class, 'delete']); // ?
+    Route::get('delete', [BotModuleController::class, 'delete']); // ?
 });
 
 // Key Activate API Routes
