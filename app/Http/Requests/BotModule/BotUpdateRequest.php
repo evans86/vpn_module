@@ -38,6 +38,7 @@ class BotUpdateRequest extends FormRequest
         $dto->public_key = $this->public_key;
         $dto->private_key = $this->private_key;
         $dto->bot_id = intval($this->bot_id);
+        $dto->version = intval($this->version);
         $dto->category_id = intval($this->category_id);
         $dto->is_paid = intval($this->is_paid);
         $dto->secret_user_key = $this->secret_user_key;
