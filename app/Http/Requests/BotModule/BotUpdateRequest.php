@@ -22,7 +22,6 @@ class BotUpdateRequest extends FormRequest
             'private_key' => 'required|string',
             'version' => 'required|string|min:1|max:1',
             'category_id' => 'required|integer|min:1',
-            'is_paid' => 'required|integer',
             'secret_user_key' => 'required|string',
             'tariff_cost' => 'required|string',
             'bot_user_id' => 'required|integer',
