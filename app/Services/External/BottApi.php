@@ -66,7 +66,6 @@ class BottApi
      * @param BotModuleDto $botDto
      * @param int $category_id
      * @param int $count
-     * @param int $salesman_id
      * @return mixed
      * @throws GuzzleException
      */
@@ -74,7 +73,6 @@ class BottApi
     {
         $link = 'https://api.bot-t.com/v1/shopdigital/order-public/';
 
-        //@TODO бот продаж
         $bot_id = 254886;
 
         $requestParam = [
