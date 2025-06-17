@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $public_key
  * @property string $private_key
  * @property int $bot_id
- * @property int $version
+ * @property int|null $version
  * @property int $category_id
  * @property int $percent
  * @property int $is_paid

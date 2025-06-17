@@ -9,7 +9,7 @@ class BotModuleDto
     public string $private_key;
     public int $bot_id;
     public int $category_id;
-    public int $version;
+    public ?int $version;
     public int $is_paid;
     public string $secret_user_key;
     public ?string $tariff_cost;
