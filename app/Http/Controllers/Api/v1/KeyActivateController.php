@@ -95,7 +95,7 @@ class KeyActivateController extends Controller
      * @return array|string
      * @throws GuzzleException
      */
-    public function getFreeKey(PackSalesmanFreeKeyRequest $request): array
+    public function getFreeKey(PackSalesmanFreeKeyRequest $request)
     {
         try {
             $botModule = BotModule::where('public_key', $request->public_key)->first();
