@@ -33,7 +33,8 @@ class BotModuleDto
     public function getSettings(): array
     {
         return [
-            'is_paid' => $this->is_paid,
+            'tariff_cost' => $this->tariff_cost,
+            'is_paid' => $this->is_paid
         ];
     }
 }

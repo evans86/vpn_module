@@ -4,7 +4,6 @@ namespace App\Http\Requests\BotModule;
 
 use App\Dto\Bot\BotModuleDto;
 use App\Helpers\ApiHelpers;
-use App\Services\Bot\BotModuleService;
 use Illuminate\Foundation\Http\FormRequest;
 use \Illuminate\Contracts\Validation\Validator;
 use Illuminate\Validation\ValidationException;
