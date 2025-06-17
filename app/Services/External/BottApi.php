@@ -80,8 +80,7 @@ class BottApi
             'category_id' => $category_id, //какое содержимое товара
             'count' => $count, //количество
             'user_id' => $botDto->bot_user_id, //id продавца в боте Паши
-            'secret_user_key' => '91bfff96b52a311b91bf4379c75bdb4a8f2dff967f52db4a4b647f52842f842f', //секретный ключ продавца
-//            'secret_user_key' => $botDto->secret_user_key, //секретный ключ продавца
+            'secret_user_key' => $botDto->secret_user_key, //секретный ключ продавца
         ];
 
         $client = new Client(['base_uri' => $link]);

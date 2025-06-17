@@ -164,8 +164,13 @@ class KeyActivateService
 
             // Создание заказа
             $order = BottApi::createOrderSalesman($botModuleDto, $category_id, 1);
+            //Возврат баланса добавить
+            $keyID = $order['data']['product']['data'];
+            $this->logger->warning('ORDER', [
+                '$keyID' => $keyID,
+            ]);
 
-            return $this->keyActivateRepository->findById($order['data']['product']['data']);
+            return $this->keyActivateRepository->findById($keyID);
         } catch (Exception $e) {
             $this->logger->error('Ошибка при покупке ключа', [
                 'source' => 'key_activate',
