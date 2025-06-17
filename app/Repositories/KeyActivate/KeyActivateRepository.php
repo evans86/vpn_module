@@ -202,7 +202,7 @@ class KeyActivateRepository extends BaseRepository
             $pack = $key->packSalesman->pack;
             $finishAt = time() + ($pack->period * 24 * 60 * 60);
         }else{
-            $finishAt = time() + (30 * 24 * 60 * 60); // для бесплатного ключа
+            $finishAt = \Carbon\Carbon::now()->addMonth()->startOfMonth()->timestamp; // для бесплатного ключа
         }
 
         // Рассчитываем timestamp окончания: текущее время + период в днях (в секундах)

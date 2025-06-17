@@ -113,10 +113,6 @@ class KeyActivateController extends Controller
                 ->whereNull('pack_salesman_id')
                 ->exists();
 
-            Log::debug('Free Key', [
-                '$hasExistingKey' => $hasExistingKey,
-            ]);
-
             if ($hasExistingKey) {
                 return ApiHelpers::error('Вы уже получали бесплатный ключ в этом месяце. Повторная выдача возможна с '
                     . $nextMonth->format('d.m.Y'));
