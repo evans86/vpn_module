@@ -168,7 +168,6 @@ class KeyActivateService
             return $this->keyActivateRepository->findById($order['data']['product']['data']);
         } catch (Exception $e) {
             $this->logger->error('Ошибка при покупке ключа', [
-                'order' => $order,
                 'source' => 'key_activate',
                 'action' => 'buy_key',
                 'product_id' => $product_id,
