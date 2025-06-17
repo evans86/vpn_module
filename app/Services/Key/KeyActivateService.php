@@ -164,11 +164,14 @@ class KeyActivateService
 
             // Создание заказа
             $order = BottApi::createOrderSalesman($botModuleDto, $category_id, 1);
+
+            $this->logger->warning('ORDER', [
+                'ORDER' => $order,
+            ]);
+
             //Возврат баланса добавить
             $keyID = $order['data']['product']['data'];
-            $this->logger->warning('ORDER', [
-                '$keyID' => $keyID,
-            ]);
+
 
             return $this->keyActivateRepository->findById($keyID);
         } catch (Exception $e) {
