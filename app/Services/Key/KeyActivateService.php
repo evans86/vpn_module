@@ -168,7 +168,7 @@ class KeyActivateService
             $this->logger->warning('ORDER', [
                 'ORDER' => $order,
             ]);
-
+            //Добавить метод создания заказа в боте
             //Возврат баланса добавить
             $keyID = $order['data']['product']['data'];
 

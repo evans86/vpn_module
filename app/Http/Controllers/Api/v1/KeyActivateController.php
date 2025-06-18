@@ -192,7 +192,6 @@ class KeyActivateController extends Controller
         try {
             $keys = KeyActivate::where('user_tg_id', $request->user_tg_id)
                 ->where('status', '!=', KeyActivate::DELETED)
-                ->with('packSalesman.pack') // Подгружаем связанные данные
                 ->get()
                 ->map(function ($key) {
                     return [
