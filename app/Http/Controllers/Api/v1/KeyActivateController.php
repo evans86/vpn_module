@@ -110,12 +110,20 @@ class KeyActivateController extends Controller
             $hasExistingKey = KeyActivate::where('user_tg_id', $request->user_tg_id)
                 ->where('traffic_limit', 5 * 1024 * 1024 * 1024)
                 ->whereBetween('created_at', [$currentMonth, $nextMonth])
-                ->whereNull('pack_salesman_id')
-                ->exists();
+                ->whereNull('pack_salesman_id')->first();
 
             if ($hasExistingKey) {
-                return ApiHelpers::error('Вы уже получали бесплатный ключ в этом месяце. Повторная выдача возможна с '
-                    . $nextMonth->format('d.m.Y'));
+                return ApiHelpers::success([
+                    'key' => $hasExistingKey->id,
+                    'config_url' => "https://vpn-telegram.com/config/{$hasExistingKey->id}",
+                    'traffic_limit' => $hasExistingKey->traffic_limit,
+                    'traffic_limit_gb' => 5,
+                    'finish_at' => $hasExistingKey->finish_at,
+                    'activated_at' => $hasExistingKey->activated_at,
+                    'status' => $hasExistingKey->status,
+                    'status_text' => $hasExistingKey->getStatusText(),
+                    'is_free' => true,
+                ]);
             }
 
             // Создание и активация ключа
