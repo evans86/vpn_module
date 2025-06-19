@@ -227,12 +227,16 @@ class KeyActivateController extends Controller
             if ($keys->isEmpty()) {
                 return ApiHelpers::success([
                     'keys' => [],
+                    'total' => $total,
                     'message' => 'У пользователя нет активных ключей',
                 ]);
             }
 
             return ApiHelpers::success([
                 'keys' => $keys,
+                'total' => $total, // Возвращаем общее количество ключей
+                'limit' => $request->input('limit', null),
+                'offset' => $request->input('offset', 0),
             ]);
         } catch (RuntimeException $e) {
             return ApiHelpers::error($e->getMessage());
