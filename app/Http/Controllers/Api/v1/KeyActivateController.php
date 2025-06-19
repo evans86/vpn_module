@@ -203,12 +203,12 @@ class KeyActivateController extends Controller
 
             $total = $query->count();
 
-            if ($request->has('limit')) {
-                $limit = (int)$request->input('limit', 10);
-                $offset = (int)$request->input('offset', 0);
-
-                $query->limit($limit)->offset($offset);
-            }
+//            if ($request->has('limit')) {
+//                $limit = (int)$request->input('limit', 10);
+//                $offset = (int)$request->input('offset', 0);
+//
+//                $query->limit($limit)->offset($offset);
+//            }
 
             $keys = $query->get()
                 ->map(function ($key) {
@@ -235,8 +235,8 @@ class KeyActivateController extends Controller
             return ApiHelpers::success([
                 'keys' => $keys,
                 'total' => $total, // Возвращаем общее количество ключей
-                'limit' => $request->input('limit', null),
-                'offset' => $request->input('offset', 0),
+//                'limit' => $request->input('limit', null),
+//                'offset' => $request->input('offset', 0),
             ]);
         } catch (RuntimeException $e) {
             return ApiHelpers::error($e->getMessage());

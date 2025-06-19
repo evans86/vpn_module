@@ -25,8 +25,8 @@ class PackSalesmanUserKeysRequest extends FormRequest
     {
         return [
             'user_tg_id' => 'required',
-            'offset' => 'required',
-            'limit' => 'required'
+//            'offset' => 'required',
+//            'limit' => 'required'
         ];
     }
 }
