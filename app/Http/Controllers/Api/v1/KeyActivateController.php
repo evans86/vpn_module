@@ -198,9 +198,19 @@ class KeyActivateController extends Controller
     public function getUserKeys(PackSalesmanUserKeysRequest $request)
     {
         try {
-            $keys = KeyActivate::where('user_tg_id', $request->user_tg_id)
-                ->where('status', '!=', KeyActivate::DELETED)
-                ->get()
+            $query = KeyActivate::where('user_tg_id', $request->user_tg_id)
+                ->where('status', '!=', KeyActivate::DELETED);
+
+            $total = $query->count();
+
+            if ($request->has('limit')) {
+                $limit = (int)$request->input('limit', 10);
+                $offset = (int)$request->input('offset', 0);
+
+                $query->limit($limit)->offset($offset);
+            }
+
+            $keys = $query->get()
                 ->map(function ($key) {
                     return [
                         'key' => $key->id,
