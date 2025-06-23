@@ -68,7 +68,7 @@ class KeyActivateController extends Controller
 
             return ApiHelpers::success([
                 'key' => $activatedKey->id,
-                'config_url' => "https://vpn-telegram.com/config/{$activatedKey->id}",
+                'config_url' => "https://vpn-telegram.com/config/$activatedKey->id",
                 'traffic_limit' => $activatedKey->traffic_limit,
                 'traffic_limit_gb' => round($activatedKey->traffic_limit / 1024 / 1024 / 1024, 1),
                 'finish_at' => $activatedKey->finish_at,
@@ -257,39 +257,42 @@ class KeyActivateController extends Controller
             $instructions = [
                 'sections' => [
                     [
-                        'title' => '🔹 Активация VPN',
+                        'title' => '🔐 Инструкция по настройке VPN',
                         'steps' => [
-                            'Нажмите \'🔑 Активировать\'',
-                            'Введите полученный ключ',
-                            'Скопируйте конфигурацию и следуйте инструкциям для подключения'
+                            '1️⃣ Нажмите кнопку <strong>«Купить»</strong> и приобретите VPN-ключ',
+                            '2️⃣ Скопируйте конфигурацию полученного 🔑 ключа',
+                            '3️⃣ Вставьте конфигурацию в приложение <strong><a href="https://play.google.com/store/apps/details?id=app.hiddify.com&hl=ru">Hiddify</a></strong> или <strong><a href="https://apps.apple.com/ru/app/streisand/id6450534064">Streisand</a></strong>'
                         ]
                     ],
                     [
-                        'title' => '🔹 Проверка статуса',
-                        'steps' => [
-                            'Нажмите кнопку \'📊 Статус\'',
-                            'Просмотрите информацию о вашем доступе и конфигурации'
-                        ]
-                    ],
-                    [
-                        'title' => '📁 Инструкции по настройке VPN',
+                        'title' => '📁 Пошаговые инструкции по установке:',
                         'links' => [
                             [
                                 'title' => 'Инструкция для Android 📱',
-                                'url' => 'https://docs.google.com/document/d/1ma6QZjKgwLHdS2457I8C6k22gC2Cq3Yic8bLiMeXmeY/edit'
+                                'url' => 'https://teletype.in/@bott_manager/UPSEXs-nn66'
                             ],
                             [
                                 'title' => 'Инструкция для iOS 🍏',
-                                'url' => 'https://docs.google.com/document/d/1f3iS-V0kFVQEA3i1hYOEaAoNMucgF60XiDZZdhRl59Q/edit'
+                                'url' => 'https://teletype.in/@bott_manager/nau_zbkFsdo'
                             ],
                             [
                                 'title' => 'Инструкция для Windows 🖥️',
-                                'url' => 'https://docs.google.com/document/d/1jXNpuNY9eET1LXyVmRjHSoX6YRX9RlWGJQFSEJE_2Jg/edit'
+                                'url' => 'https://teletype.in/@bott_manager/HhKafGko3sO'
                             ]
                         ]
-                    ]
+                    ],
+                    [
+                        'title' => '❓ Что делать, если VPN не подключается?',
+                        'steps' => [
+                            '✅ Убедитесь, что используете <strong>актуальный конфиг</strong> (ключ не просрочен)',
+                            '🔁 Попробуйте <strong>другой протокол</strong>: VLESS / VMess / Shadowsocks / Trojan',
+                            '📲 Смените приложение на <strong>Hiddify</strong> или <strong>Streisand</strong> (другие не рекомендуются)',
+                            '🔄 Перезагрузите устройство',
+                            '💬 Обратитесь в поддержку бота'
+                        ]
+                    ],
                 ],
-                'support_text' => '👨🏻‍💻 По всем вопросам обращайтесь к администратору бота.'
+                'support_text' => '👨🏻‍💻 <strong>По всем вопросам</strong> — пишите администратору через бота.'
             ];
 
             return ApiHelpers::success([
