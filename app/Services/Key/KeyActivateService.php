@@ -173,7 +173,7 @@ class KeyActivateService
                     'Возврат баланса (ошибка при создании заказа) ' . $order['message']
                 );
 
-                throw new RuntimeException('Ошибка при списании баланса: ' . $paymentResult['message']);
+                throw new RuntimeException('Ошибка при списании баланса');
             } else {
                 $this->logger->warning('ORDER', [
                     'ORDER' => $order,
