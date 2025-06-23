@@ -292,7 +292,7 @@ class KeyActivateController extends Controller
                         ]
                     ],
                 ],
-                'support_text' => '👨🏻‍💻 <strong>По всем вопросам</strong> — пишите администратору через бота.'
+                'support_text' => '👨🏻‍💻 По всем вопросам — пишите администратору через бота.'
             ];
 
             return ApiHelpers::success([
