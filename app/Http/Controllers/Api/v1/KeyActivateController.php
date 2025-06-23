@@ -261,7 +261,7 @@ class KeyActivateController extends Controller
                         'steps' => [
                             '1️⃣ Нажмите кнопку <strong>«Купить»</strong> и приобретите VPN-ключ',
                             '2️⃣ Скопируйте конфигурацию полученного 🔑 ключа',
-                            '3️⃣ Вставьте конфигурацию в приложение <strong><a class="app-link" href="https://play.google.com/store/apps/details?id=app.hiddify.com&hl=ru">Hiddify</a></strong> или <strong><a class="app-link" href="https://apps.apple.com/ru/app/streisand/id6450534064">Streisand</a></strong>'
+                            '3️⃣ Вставьте конфигурацию в приложение <strong><a class="app-link q-hoverable bordered" href="https://play.google.com/store/apps/details?id=app.hiddify.com&hl=ru"><span class="q-focus-helper"></span>Hiddify</a></strong> или <strong><a class="app-link q-hoverable bordered" href="https://apps.apple.com/ru/app/streisand/id6450534064"><span class="q-focus-helper"></span>Streisand</a></strong>'
                         ]
                     ],
                     [
