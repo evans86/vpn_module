@@ -165,13 +165,25 @@ class KeyActivateService
             // Создание заказа
             $order = BottApi::createOrderSalesman($botModuleDto, $category_id, 1);
 
-            $this->logger->warning('ORDER', [
-                'ORDER' => $order,
-            ]);
-            //Добавить метод создания заказа в боте
-            //Возврат баланса добавить
-            $keyID = $order['data']['product']['data'];
+            if (!$order['result']) {
+                $paymentResult = BottApi::addBalance(
+                    $botModuleDto,
+                    $userData,
+                    $key_price_kopecks,
+                    'Возврат баланса (ошибка при создании заказа) ' . $order['message']
+                );
 
+                throw new RuntimeException('Ошибка при списании баланса: ' . $paymentResult['message']);
+            } else {
+                $this->logger->warning('ORDER', [
+                    'ORDER' => $order,
+                ]);
+
+                $keyID = $order['data']['product']['data'];
+
+                BottApi::createOrder($botModuleDto, $userData, $key_price_kopecks,
+                    'Покупка VPN доступа: ' . $keyID);
+            }
 
             return $this->keyActivateRepository->findById($keyID);
         } catch (Exception $e) {
