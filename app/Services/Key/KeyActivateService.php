@@ -3,6 +3,7 @@
 namespace App\Services\Key;
 
 use App\Dto\Bot\BotModuleDto;
+use App\Helpers\OrderHelper;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\Panel\Panel;
 use App\Models\Salesman\Salesman;
@@ -147,7 +148,7 @@ class KeyActivateService
             $key_price_kopecks = $key_price_rub * 100;
 
             if ($key_price_kopecks > $userData['money']) {
-                throw new RuntimeException('Пополните баланс в боте');
+                throw new RuntimeException('Недостаточно средств на балансе. Требуется: ' . $key_price_rub . ' руб.');
             }
 
             // Списание средств
@@ -166,14 +167,14 @@ class KeyActivateService
             $order = BottApi::createOrderSalesman($botModuleDto, $category_id, 1);
 
             if (!$order['result']) {
-                $paymentResult = BottApi::addBalance(
+                BottApi::addBalance(
                     $botModuleDto,
                     $userData,
                     $key_price_kopecks,
-                    'Возврат баланса (ошибка при создании заказа) ' . $order['message']
+                    'Возврат баланса (ошибка при создании заказа) ' . OrderHelper::formingError($order['message'])
                 );
 
-                throw new RuntimeException('Ошибка при списании баланса');
+                throw new RuntimeException('Ошибка при списании баланса, ' . OrderHelper::formingError($order['message']));
             } else {
                 $this->logger->warning('ORDER', [
                     'ORDER' => $order,
