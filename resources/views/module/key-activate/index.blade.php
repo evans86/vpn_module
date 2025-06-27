@@ -112,11 +112,14 @@
                                             @endif
                                         </td>
                                         <td>
+                                            @if($key->packSalesman)
                                             <span
                                                 class="badge badge-{{ $key->packSalesman->pack->module_key ? 'warning' : 'info' }}">
                                                 {{ $key->packSalesman->pack->module_key ? 'Модуль' : 'Бот' }}
                                             </span>
-
+                                            @else
+                                                Не задан (бесплатный)
+                                            @endif
                                         </td>
                                         <td>
                                             @if($key->packSalesman && $key->packSalesman->salesman)
