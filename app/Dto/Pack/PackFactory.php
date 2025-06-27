@@ -10,6 +10,7 @@ class PackFactory
     {
         $dto = new PackDto();
         $dto->title = $pack->title;
+        $dto->module_key = $pack->module_key;
         $dto->id = $pack->id;
         $dto->price = $pack->price;
         $dto->period = $pack->period;

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 /**
  * @property int $id
  * @property string|null $title
+ * @property int|null $module_key ключи для модуля
  * @property int|null $price
  * @property int|null $period сколько дней действует ключ
  * @property int|null $traffic_limit доступный объем трафика
@@ -34,6 +35,7 @@ class Pack extends Model
      */
     protected $fillable = [
         'title',
+        'module_key',
         'price',
         'period',
         'traffic_limit',
@@ -49,6 +51,7 @@ class Pack extends Model
      */
     protected $casts = [
         'title' => 'string',
+        'module_key' => 'integer',
         'price' => 'integer',
         'period' => 'integer',
         'traffic_limit' => 'integer',

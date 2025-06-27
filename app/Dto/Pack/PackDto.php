@@ -6,6 +6,7 @@ class PackDto
 {
     public int $id;
     public ?string $title;
+    public ?int $module_key;
     public int $price;
     public int $period; //30 дней
     public int $traffic_limit;
@@ -24,6 +25,7 @@ class PackDto
             'count' => $this->count,
             'activate_time' => $this->activate_time,
             'status' => $this->status,
+            'module_key' => $this->module_key,
         ];
     }
 }

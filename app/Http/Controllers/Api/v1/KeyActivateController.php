@@ -199,7 +199,10 @@ class KeyActivateController extends Controller
     {
         try {
             $query = KeyActivate::where('user_tg_id', $request->user_tg_id)
-                ->where('status', '!=', KeyActivate::DELETED);
+                ->where('status', '!=', KeyActivate::DELETED)
+                ->whereHas('packSalesman.pack', function($query) {
+                    $query->where('module_key', true); // Только пакеты для модуля
+                });
 
             $total = $query->count();
 
@@ -219,7 +222,8 @@ class KeyActivateController extends Controller
                         'traffic_limit_gb' => round($key->traffic_limit / 1024 / 1024 / 1024, 1),
                         'finish_at' => $key->finish_at,
                         'status' => $key->status,
-                        'status_text' => $key->getStatusText()
+                        'status_text' => $key->getStatusText(),
+//                        'pack_type' => $key->packSalesman->pack->module_key ? 'module' : 'bot'
                     ];
                 });
 
