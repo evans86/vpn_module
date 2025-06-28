@@ -23,7 +23,30 @@ class BotUpdateRequest extends FormRequest
             'version' => 'required|string|min:1|max:1',
             'category_id' => 'required|integer|min:1',
             'secret_user_key' => 'required|string',
-            'tariff_cost' => 'required|string',
+            'tariff_cost' => [
+                'required',
+                'string',
+                function ($attribute, $value, $fail) {
+                    if (!preg_match('/^(\d+-\d+)(,\d+-\d+)*$/', $value)) {
+                        $fail('The ' . $attribute . ' format is invalid. Correct format: 1-150,3-400,6-600,12-1100');
+                        return;
+                    }
+
+                    // Проверяем, что первые числа (периоды) не изменились
+                    $periods = explode(',', $value);
+                    $existingPeriods = [];
+                    foreach ($periods as $period) {
+                        [$num, $price] = explode('-', $period);
+                        $existingPeriods[] = $num;
+                    }
+
+                    $expectedPeriods = [1, 3, 6, 12]; // Ожидаемые периоды
+                    if (count($existingPeriods) !== count($expectedPeriods) ||
+                        array_diff($existingPeriods, $expectedPeriods)) {
+                        $fail('The periods (first numbers) in ' . $attribute . ' cannot be changed. Only prices can be updated.');
+                    }
+                },
+            ],
             'bot_user_id' => 'required|integer',
         ];
     }
