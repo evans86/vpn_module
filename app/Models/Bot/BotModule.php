@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $category_id
  * @property int $percent
  * @property int $is_paid
+ * @property int $free_show
  * @property int $secret_user_key
  * @property string|null $tariff_cost
  * @property int|null $bot_user_id

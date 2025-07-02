@@ -21,6 +21,7 @@ class BotUpdateRequest extends FormRequest
             'public_key' => 'required|string',
             'private_key' => 'required|string',
             'version' => 'required|string|min:1|max:1',
+            'free_show' => 'required|string|min:0|max:1',
             'category_id' => 'required|integer',
             'secret_user_key' => 'required|string',
             'tariff_cost' => [
@@ -64,6 +65,7 @@ class BotUpdateRequest extends FormRequest
         $dto->version = intval($this->version);
         $dto->category_id = intval($this->category_id);
         $dto->is_paid = intval($this->is_paid);
+        $dto->free_show = intval($this->free_show);
         $dto->secret_user_key = $this->secret_user_key;
         $dto->tariff_cost = $this->tariff_cost;
         $dto->bot_user_id = intval($this->bot_user_id);
