@@ -28,6 +28,7 @@ class BotModuleDto
             'secret_user_key' => $this->secret_user_key,
             'tariff_cost' => $this->tariff_cost,
             'bot_user_id' => $this->bot_user_id,
+            'free_show' => $this->free_show,
         ];
     }
 
