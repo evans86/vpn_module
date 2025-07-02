@@ -26,6 +26,7 @@ class BotModuleService
         $bot->category_id = 0;
         $bot->version = 1;
         $bot->is_paid = 0;
+        $bot->free_show = 1;
         $bot->secret_user_key = '';
         $bot->bot_user_id = 0;
         $bot->tariff_cost = '1-150,3-400,6-600,12-1100';
@@ -50,6 +51,7 @@ class BotModuleService
         $bot->category_id = $dto->category_id;
         $bot->secret_user_key = $dto->secret_user_key;
         $bot->tariff_cost = $dto->tariff_cost;
+        $bot->free_show = $dto->free_show;
         $bot->bot_user_id = $dto->bot_user_id;
 
         if (!$bot->save())
