@@ -596,8 +596,8 @@ class SalesmanBotController extends AbstractTelegramBot
                 ],
                 [
                     [
-                        'text' => '🍏 iOS - Hiddify',
-                        'url' => 'https://apps.apple.com/ru/app/hiddify-proxy-vpn/id6596777532'
+                        'text' => '🍏 iOS - Streisand',
+                        'url' => 'https://apps.apple.com/ru/app/streisand/id6450534064'
                     ]
                 ],
                 [
