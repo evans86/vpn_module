@@ -242,69 +242,60 @@ class FatherBotController extends AbstractTelegramBot
                 $this->sendMessage("👋 Вы были автоматически зарегистрированы как продавец");
             }
 
-            // Генерируем URL для callback (без кодирования)
-            $callbackUrl = config('app.url') . '/personal/auth/telegram/callback';
+            // Генерируем ссылку
+            $botDeepLink = $this->generateAuthUrl();
 
-            // Генерируем ссылку для бота
-            $botDeepLink = $this->generateAuthUrl('/personal/auth/telegram/callback');
-
-            // Сохраняем хэш в кэш
+            // Извлекаем хэш из ссылки
             $hash = explode('auth_', $botDeepLink)[1];
+
+            // Сохраняем данные в кэш
             Cache::put("telegram_auth:{$hash}", [
                 'user_id' => $this->chatId,
-                'callback_url' => $callbackUrl
+                'callback_url' => config('app.url') . '/personal/auth/telegram/callback'
             ], now()->addMinutes(5));
 
-            $message = "🔐 Для входа в личный кабинет:\n\n";
-            $message .= "1. Нажмите кнопку ниже\n";
-            $message .= "2. Подтвердите вход в боте\n";
-            $message .= "3. Вы будете автоматически авторизованы\n";
+            $message = "🔐 Для входа нажмите кнопку:\n";
+            $message .= "1. Откроется Telegram\n";
+            $message .= "2. Нажмите 'Start' в боте\n";
+            $message .= "3. Подтвердите вход\n";
 
-            // Правильное формирование кнопки с URL
             $this->sendMessage($message, [
                 'inline_keyboard' => [
                     [
                         [
-                            'text' => 'Войти в личный кабинет',
+                            'text' => '🔑 Войти в личный кабинет',
                             'url' => $botDeepLink
                         ]
                     ]
                 ]
             ]);
 
-            Log::channel('telegram')->info('Auth initiated', [
-                'user_id' => $this->chatId,
-                'bot_url' => $botDeepLink,
-                'callback_url' => $callbackUrl
-            ]);
+            Log::info('Auth link generated', ['url' => $botDeepLink, 'hash' => $hash]);
 
         } catch (\Exception $e) {
-            Log::channel('telegram')->error('Auth initiation failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            $this->sendErrorMessage();
+            Log::error('Auth initiation failed: ' . $e->getMessage());
+            $this->sendMessage("❌ Ошибка: не удалось сформировать ссылку для входа");
         }
     }
 
     /**
-     * @param string $callbackPath
      * @return string
      * @throws Exception
      */
-    public function generateAuthUrl(string $callbackPath): string
+    public function generateAuthUrl(): string
     {
-        // Убедимся, что путь начинается с /
-        $callbackPath = Str::start($callbackPath, '/');
+        $botUsername = env('TELEGRAM_BOT_USERNAME');
 
-        // Полный URL без кодирования (кодировать будем только в кнопке)
-        $callbackUrl = config('app.url') . $callbackPath;
+        // Удаляем @ если он есть
+        $botUsername = ltrim($botUsername, '@');
 
-        // Генерируем уникальный хэш
+        if (empty($botUsername)) {
+            throw new \Exception('Telegram bot username not configured');
+        }
+
         $randomHash = bin2hex(random_bytes(16));
 
-        // Формируем стартовую команду для бота
-        return "https://t.me/" . env('TELEGRAM_BOT_USERNAME') . "?start=auth_" . $randomHash;
+        return "https://t.me/{$botUsername}?start=auth_{$randomHash}";
     }
 
     /**
