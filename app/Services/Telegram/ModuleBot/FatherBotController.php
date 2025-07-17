@@ -222,8 +222,10 @@ class FatherBotController extends AbstractTelegramBot
             $salesman = Salesman::where('telegram_id', $this->chatId)->first();
 
             if (!$salesman) {
-                $this->sendMessage("❌ Вы не зарегистрированы как продавец");
-                return;
+                // Автоматически регистрируем нового продавца, как в методе start()
+                $salesman = $this->salesmanService->create($this->chatId, $this->username ?? $this->firstName);
+
+                $this->sendMessage("👋 Вы были автоматически зарегистрированы как продавец. Теперь вы можете войти в личный кабинет.");
             }
 
             $authUrl = $this->generateAuthUrl(
@@ -253,51 +255,65 @@ class FatherBotController extends AbstractTelegramBot
     }
 
     /**
-     * @param string $callbackUrl
-     * @param string|null $state
+     * @param string $callbackRoute
      * @return string
      * @throws Exception
      */
-    public function generateAuthUrl(string $callbackUrl, ?string $state = null): string
+    public function generateAuthUrl(string $callbackRoute): string
     {
-        $botUsername = env('TELEGRAM_BOT_NAME');
+        // Генерируем абсолютный URL
+        $callbackUrl = route($callbackRoute);
+
+        if (!Str::startsWith($callbackUrl, ['http://', 'https://'])) {
+            $callbackUrl = config('app.url') . $callbackUrl;
+        }
+
         $randomHash = bin2hex(random_bytes(16));
-        $state = $state ?? Str::random(40);
+        $botUsername = env('TELEGRAM_BOT_NAME');
 
-        // Убедитесь, что callbackUrl абсолютный
-        $absoluteCallbackUrl = Str::startsWith($callbackUrl, 'http')
-            ? $callbackUrl
-            : url($callbackUrl);
-
-        return "https://t.me/{$botUsername}?start=auth_{$randomHash}&callback=".urlencode($absoluteCallbackUrl);
+        return "https://t.me/{$botUsername}?start=auth_{$randomHash} " . urlencode($callbackUrl);
     }
 
+    /**
+     * Формирование URL для авторизации
+     *
+     * @param string $commandText
+     * @return void
+     */
     private function handleAuthRequest(string $commandText): void
     {
+        // Парсим команду вида "/start auth_XXXXX callback_url"
         $parts = explode(' ', $commandText);
-        if (count($parts) < 2) return;
 
-        $authHash = str_replace('auth_', '', $parts[1]);
-        $callbackUrl = $parts[2] ?? null;
-
-        if (!$callbackUrl) {
-            $this->sendMessage("Ошибка: не указан callback URL");
+        if (count($parts) < 3) {
+            $this->sendMessage("Ошибка авторизации: неверная команда");
             return;
         }
 
+        $authHash = str_replace('auth_', '', $parts[1]);
+        $callbackUrl = urldecode($parts[2]);
+
+        // Проверяем, что callbackUrl валидный
+        if (!filter_var($callbackUrl, FILTER_VALIDATE_URL)) {
+            $this->sendMessage("Ошибка: неверный URL авторизации");
+            return;
+        }
+
+        // Сохраняем хэш в кэш
         Cache::put("telegram_auth:{$authHash}", $this->chatId, now()->addMinutes(5));
 
-        $fullUrl = url($callbackUrl) . '?hash=' . $authHash . '&user=' . $this->chatId;
+        // Формируем полный URL с параметрами
+        $authUrl = $callbackUrl . '?hash=' . $authHash . '&user=' . $this->chatId;
 
-        $message = "Подтвердите вход в личный кабинет:\n\n";
-        $message .= "Если вы не запрашивали вход, проигнорируйте это сообщение.";
+        $message = "🔐 Подтвердите вход в личный кабинет:\n\n";
+        $message .= "Нажмите кнопку ниже для завершения авторизации.";
 
         $this->sendMessage($message, [
             'inline_keyboard' => [
                 [
                     [
                         'text' => '✅ Подтвердить вход',
-                        'url' => $fullUrl
+                        'url' => $authUrl
                     ]
                 ]
             ]

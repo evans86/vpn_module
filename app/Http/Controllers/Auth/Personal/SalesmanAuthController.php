@@ -15,6 +15,7 @@ class SalesmanAuthController extends Controller
 {
     /**
      * @throws TelegramSDKException
+     * @throws \Exception
      */
     public function redirect()
     {
@@ -42,10 +43,9 @@ class SalesmanAuthController extends Controller
         session(['telegram_auth_state' => $state]);
 
         $bot = new FatherBotController(env('TELEGRAM_FATHER_BOT_TOKEN'));
-        return redirect()->away($bot->generateAuthUrl(
-            route('personal.auth.telegram.callback'),
-            $state
-        ));
+        $authUrl = $bot->generateAuthUrl('personal.auth.telegram.callback');
+
+        return redirect()->away($authUrl);
     }
 
     /**
@@ -53,6 +53,10 @@ class SalesmanAuthController extends Controller
      */
     public function callback(Request $request)
     {
+        if (!Str::startsWith($request->fullUrl(), config('app.url'))) {
+            abort(403, 'Invalid request origin');
+        }
+
         // Проверка state параметра
         if ($request->input('state') !== session('telegram_auth_state')) {
             abort(403, 'Неверный state параметр');
