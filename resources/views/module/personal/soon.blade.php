@@ -1,4 +1,4 @@
-@extends('layouts.personal')
+@extends('module.personal.layouts.app')
 
 @section('content')
     <div class="soon-content">
