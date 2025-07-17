@@ -3,6 +3,9 @@
          xsi:noNamespaceSchemaLocation="./vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="vendor/autoload.php"
          colors="true"
+         cacheResult="false"
+         executionOrder="random"
+         beStrictAboutOutputDuringTests="true"
 >
     <testsuites>
         <testsuite name="Unit">
@@ -12,20 +15,31 @@
             <directory suffix="Test.php">./tests/Feature</directory>
         </testsuite>
     </testsuites>
+
     <coverage processUncoveredFiles="true">
         <include>
-            <directory suffix=".php">./app</directory>
+            <directory suffix=".php">./app/Services</directory>
+            <directory suffix=".php">./app/Models</directory>
         </include>
+        <exclude>
+            <directory suffix=".php">./app/Exceptions</directory>
+        </exclude>
     </coverage>
+
     <php>
         <env name="APP_ENV" value="testing"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_DRIVER" value="array"/>
-        <env name="DB_CONNECTION" value="mysql"/>
-        <env name="DB_DATABASE" value="vpn_testing"/>
+        <!-- Рекомендую использовать sqlite для тестов -->
+        <env name="DB_CONNECTION" value="sqlite"/>
+        <env name="DB_DATABASE" value=":memory:"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <!-- Добавьте если используете в проекте -->
+        <env name="VPN_API_KEY" value="test_key"/>
+        <env name="VPN_API_URL" value="http://test.url"/>
     </php>
+
 </phpunit>

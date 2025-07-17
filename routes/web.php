@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Module\PersonalController;
 use App\Http\Controllers\Module\ServerController;
 use App\Http\Controllers\Module\PanelController;
 use App\Http\Controllers\Module\SalesmanController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\LogController;
 use App\Http\Controllers\Module\ServerUserController;
 use App\Http\Controllers\Module\ServerUserTransferController;
 use App\Services\Telegram\ModuleBot\FatherBotController;
+use App\Http\Controllers\Auth\Personal\SalesmanAuthController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -24,6 +26,28 @@ use Illuminate\Support\Facades\Route;
 */
 
 Auth::routes(['register' => false]);
+
+// Личный кабинет продавца
+Route::prefix('personal')->name('personal.')->group(function () {
+    // Авторизация через Telegram
+    Route::get('/auth/telegram', [SalesmanAuthController::class, 'redirect'])
+        ->name('auth.telegram');
+
+    Route::get('/auth/telegram/callback', [SalesmanAuthController::class, 'callback'])
+        ->name('auth.telegram.callback');
+
+    // Защищенные маршруты
+    Route::middleware(['auth:salesman'])->group(function () {
+        Route::get('/dashboard', [PersonalController::class, 'dashboard'])->name('dashboard');
+        Route::get('/orders', [PersonalController::class, 'orders'])->name('orders');
+        Route::get('/stats', [PersonalController::class, 'stats'])->name('stats');
+    });
+
+    Route::post('/logout', function () {
+        Auth::guard('salesman')->logout();
+        return redirect('/');
+    })->name('logout');
+});
 
 // Telegram Bot Webhook
 Route::post('/telegram/webhook/{token}', [FatherBotController::class, 'handle'])->name('telegram.webhook');

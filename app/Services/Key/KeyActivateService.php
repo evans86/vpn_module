@@ -6,7 +6,6 @@ use App\Dto\Bot\BotModuleDto;
 use App\Helpers\OrderHelper;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\Panel\Panel;
-use App\Models\Salesman\Salesman;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Repositories\PackSalesman\PackSalesmanRepository;
 use App\Repositories\Panel\PanelRepository;

@@ -140,6 +140,32 @@ abstract class AbstractTelegramBot
         }
     }
 
+    protected function verifyTelegramHash(array $data): bool
+    {
+        // 1. Извлечение хэша из данных
+        $hash = $data['hash'];
+        unset($data['hash']);
+
+        // 2. Сортировка данных по алфавиту
+        ksort($data);
+
+        // 3. Формирование строки данных
+        $dataCheckArr = [];
+        foreach ($data as $key => $value) {
+            $dataCheckArr[] = $key . '=' . $value;
+        }
+        $dataCheckString = implode("\n", $dataCheckArr);
+
+        // 4. Генерация секретного ключа
+        $secretKey = hash('sha256', env('TELEGRAM_FATHER_BOT_TOKEN'), true);
+
+        // 5. Генерация хэша
+        $generatedHash = hash_hmac('sha256', $dataCheckString, $secretKey);
+
+        // 6. Сравнение хэшей
+        return hash_equals($generatedHash, $hash);
+    }
+
     /**
      * обработка update
      */

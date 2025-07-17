@@ -9,6 +9,8 @@ use App\Services\Panel\PanelStrategy;
 use DateInterval;
 use DateTime;
 use Exception;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Telegram\Bot\Api;
 use Illuminate\Support\Facades\Log;
 
@@ -52,6 +54,11 @@ class FatherBotController extends AbstractTelegramBot
                     return;
                 }
 
+                if (str_starts_with($text, '/start auth_')) {
+                    $this->handleAuthRequest($text);
+                    return;
+                }
+
                 if ($text === '/start') {
                     $this->start();
                     return;
@@ -86,6 +93,9 @@ class FatherBotController extends AbstractTelegramBot
                         break;
                     case '🪪 Личный кабинет':
                         $this->showProfile();
+                        break;
+                    case '🔑 Авторизация':
+                        $this->initiateAuth();
                         break;
                     case '🌎 Помощь':
                         $this->showHelp();
@@ -200,6 +210,140 @@ class FatherBotController extends AbstractTelegramBot
             ]);
             $this->sendErrorMessage();
         }
+    }
+
+    /**
+     *
+     * @return void
+     */
+    protected function initiateAuth(): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+
+            if (!$salesman) {
+                $this->sendMessage("❌ Вы не зарегистрированы как продавец");
+                return;
+            }
+
+            $authUrl = $this->generateAuthUrl(
+                route('personal.auth.telegram.callback')
+            );
+
+            $message = "🔐 Для входа в личный кабинет:\n\n";
+            $message .= "1. Нажмите кнопку ниже\n";
+            $message .= "2. Подтвердите вход в боте\n";
+            $message .= "3. Вы будете автоматически авторизованы\n";
+
+            $this->sendMessage($message, [
+                'inline_keyboard' => [
+                    [
+                        [
+                            'text' => 'Войти в личный кабинет',
+                            'url' => $authUrl
+                        ]
+                    ]
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Auth initiation error: '.$e->getMessage());
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * @param string $callbackUrl
+     * @param string|null $state
+     * @return string
+     * @throws Exception
+     */
+    public function generateAuthUrl(string $callbackUrl, ?string $state = null): string
+    {
+        $botUsername = env('TELEGRAM_BOT_NAME');
+        $randomHash = bin2hex(random_bytes(16));
+        $state = $state ?? Str::random(40);
+
+        $params = [
+            'start' => "auth_$randomHash",
+            'callback' => urlencode($callbackUrl),
+            'state' => $state
+        ];
+
+        return "https://t.me/{$botUsername}?".http_build_query($params);
+    }
+
+    /**
+     * Авторизация из бота
+     *
+     * @param string $commandText
+     * @return void
+     */
+    private function handleAuthRequest(string $commandText): void
+    {
+        $parts = explode(' ', $commandText);
+        if (count($parts) < 2) return;
+
+        $authHash = str_replace('auth_', '', $parts[1]);
+        $callbackUrl = $parts[2] ?? null;
+
+        // Сохраните в временное хранилище $authHash с привязкой к chat_id
+        Cache::put("telegram_auth:{$authHash}", $this->chatId, now()->addMinutes(5));
+
+        $message = "Подтвердите вход в личный кабинет:\n\n";
+        $message .= "Если вы не запрашивали вход, проигнорируйте это сообщение.";
+
+        $this->sendMessage($message, [
+            'inline_keyboard' => [
+                [
+                    [
+                        'text' => '✅ Подтвердить вход',
+                        'url' => $callbackUrl.'?hash='.$authHash.'&user='.$this->chatId
+                    ]
+                ]
+            ]
+        ]);
+    }
+
+    /**
+     * Валидация данных авторизации
+     *
+     * @param array $data
+     * @return array|null
+     */
+    public function validateAuth(array $data): ?array
+    {
+        // 1. Проверка обязательных полей
+        $requiredFields = ['id', 'auth_date', 'hash'];
+        foreach ($requiredFields as $field) {
+            if (empty($data[$field])) {
+                Log::warning('Missing required field in Telegram auth data', ['field' => $field]);
+                return null;
+            }
+        }
+
+        // 2. Проверка временной метки (не старше 1 дня)
+        $authDate = (int)$data['auth_date'];
+        if (time() - $authDate > 86400) { // 24 часа
+            Log::warning('Expired Telegram auth data', ['auth_date' => $authDate]);
+            return null;
+        }
+
+        // 3. Верификация хэша (если есть все необходимые данные)
+        if (!$this->verifyTelegramHash($data)) {
+            Log::warning('Invalid Telegram hash verification');
+            return null;
+        }
+
+        // 4. Подготовка и возврат данных пользователя
+        return [
+            'id' => (int)$data['id'],
+            'first_name' => $data['first_name'] ?? '',
+            'last_name' => $data['last_name'] ?? null,
+            'username' => $data['username'] ?? null,
+            'photo_url' => $data['photo_url'] ?? null,
+            'auth_date' => $authDate
+        ];
     }
 
     /**
@@ -1050,6 +1194,7 @@ class FatherBotController extends AbstractTelegramBot
                 ],
                 [
                     ['text' => '🪪 Личный кабинет'],
+                    ['text' => '🔑 Авторизация'],
                     ['text' => '🌎 Помощь']
                 ],
                 [
@@ -1244,8 +1389,19 @@ class FatherBotController extends AbstractTelegramBot
                 $message .= "📅 <b>Регистрация: <code>" . $salesman->created_at->format('d.m.Y H:i') . "</code></b>\n";
             }
 
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        [
+                            'text' => '🔑 Войти в личный кабинет',
+                            'url' => $this->generateAuthUrl(route('personal.auth.telegram.callback'))
+                        ]
+                    ]
+                ]
+            ];
+
             // Отправляем сообщение с профилем пользователя
-            $this->sendMessage($message);
+            $this->sendMessage($message, $keyboard);
         } catch (\Exception $e) {
             Log::error('Show profile error: ' . $e->getMessage());
             $this->sendErrorMessage();

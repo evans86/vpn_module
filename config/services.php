@@ -40,4 +40,9 @@ return [
         'zone_id' => env('CLOUDFLARE_ZONE_ID', 'ecd4115fa760df3dd0a5f9c0e2caee2d'),
     ],
 
+    'telegram' => [
+        'client_id' => env('TELEGRAM_BOT_TOKEN'),  // Это будет ваш bot token (например: '123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11')
+        'client_secret' => env('TELEGRAM_BOT_NAME'), // Это username вашего бота (например: 'MyBot')
+        'redirect' => env('TELEGRAM_REDIRECT_URI'), // URL callback (например: 'https://yourdomain.com/personal/auth/telegram/callback')
+    ],
 ];
