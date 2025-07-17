@@ -4,8 +4,8 @@ namespace App\Models\Salesman;
 
 use App\Models\Pack\Pack;
 use App\Models\Panel\Panel;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
@@ -22,12 +22,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property Panel|null $panel
  * @property string $updated_at
  */
-class Salesman extends Model
+class Salesman extends Authenticatable
 {
     use HasFactory;
 
     protected $guarded = false;
     protected $table = 'salesman';
+
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var array<int, string>
+     */
+    protected $hidden = [
+        'token',
+        'remember_token', // Добавьте это поле в миграцию если нужно
+    ];
 
     /**
      * Отношение к панели
@@ -37,23 +47,32 @@ class Salesman extends Model
         return $this->belongsTo(Panel::class, 'panel_id');
     }
 
-//    public function clients()
-//    {
-//        return $this->hasMany(Client::class);
-//    }
-//
-//    public function payments()
-//    {
-//        return $this->hasMany(Payment::class);
-//    }
-//
-//    public function activities()
-//    {
-//        return $this->hasMany(SalesmanActivity::class);
-//    }
-
     public function packs()
     {
         return $this->belongsToMany(Pack::class)->withTimestamps();
+    }
+
+    /**
+     * Получить пароль для аутентификации (если не используете стандартный)
+     */
+    public function getAuthPassword()
+    {
+        return $this->token; // Используем token как пароль
+    }
+
+    /**
+     * Получить имя уникального идентификатора (используем telegram_id)
+     */
+    public function getAuthIdentifierName()
+    {
+        return 'telegram_id';
+    }
+
+    /**
+     * Получить значение уникального идентификатора
+     */
+    public function getAuthIdentifier()
+    {
+        return $this->telegram_id;
     }
 }
