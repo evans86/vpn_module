@@ -58,31 +58,49 @@ class SalesmanAuthController extends Controller
             $hash = $request->input('hash');
             $userId = $request->input('user');
 
+            // Проверяем наличие данных в кэше
             if (!Cache::has("telegram_auth:{$hash}")) {
-                return redirect()->back()->with('error', 'Недействительная ссылка авторизации');
+                Log::error('Invalid auth hash', ['hash' => $hash]);
+                return redirect('/')->with('error', 'Ссылка авторизации устарела или недействительна');
             }
 
-            $cachedUserId = Cache::get("telegram_auth:{$hash}");
+            $authData = Cache::get("telegram_auth:{$hash}");
 
-            if ($cachedUserId != $userId) {
-                return redirect()->back()->with('error', 'Ошибка проверки пользователя');
+            // Сверяем user_id
+            if ($authData['user_id'] != $userId) {
+                Log::error('User ID mismatch', [
+                    'expected' => $authData['user_id'],
+                    'actual' => $userId
+                ]);
+                return redirect('/')->with('error', 'Ошибка проверки пользователя');
             }
 
-            // Находим продавца и авторизуем
+            // Ищем продавца
             $salesman = Salesman::where('telegram_id', $userId)->first();
 
             if (!$salesman) {
-                return redirect()->back()->with('error', 'Продавец не найден');
+                Log::error('Salesman not found', ['user_id' => $userId]);
+                return redirect('/')->with('error', 'Продавец не найден');
             }
 
+            // Выполняем вход
             Auth::guard('salesman')->login($salesman);
             Cache::forget("telegram_auth:{$hash}");
 
-            return redirect()->route('personal.dashboard');
+            Log::info('Auth session check', [
+                'authenticated' => Auth::guard('salesman')->check(),
+                'user_id' => Auth::guard('salesman')->id()
+            ]);
+
+            // Явный редирект в личный кабинет
+            return redirect()->route('personal.dashboard')
+                ->with('success', 'Вы успешно авторизованы');
 
         } catch (\Exception $e) {
-            Log::error('Auth callback error: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Произошла ошибка при авторизации');
+            Log::error('Auth callback error: '.$e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            return redirect('/')->with('error', 'Ошибка авторизации');
         }
     }
 }
