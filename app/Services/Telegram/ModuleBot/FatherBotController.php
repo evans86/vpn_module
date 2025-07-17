@@ -226,10 +226,9 @@ class FatherBotController extends AbstractTelegramBot
                 $this->sendMessage("👋 Вы были автоматически зарегистрированы как продавец.");
             }
 
-            // Убедитесь что маршрут 'personal.auth.telegram.callback' определён в routes/web.php
-            $authUrl = $this->generateAuthUrl(
-                route('personal.auth.telegram.callback') // Только имя маршрута, без URL
-            );
+            // Генерируем URL напрямую, без использования route()
+            $callbackPath = '/personal/auth/telegram/callback';
+            $authUrl = $this->generateAuthUrl($callbackPath);
 
             $message = "🔐 Для входа в личный кабинет:\n\n1. Нажмите кнопку ниже\n2. Подтвердите вход\n3. Авторизация произойдёт автоматически";
 
@@ -241,7 +240,7 @@ class FatherBotController extends AbstractTelegramBot
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Auth initiation error: '.$e->getMessage());
+            Log::error('Auth initiation error: ' . $e->getMessage());
             $this->sendErrorMessage();
         }
     }
@@ -251,14 +250,15 @@ class FatherBotController extends AbstractTelegramBot
      * @return string
      * @throws Exception
      */
-    public function generateAuthUrl(string $callbackRoute): string
+    public function generateAuthUrl(string $callbackPath): string
     {
-        // Генерируем абсолютный URL
-        $callbackUrl = route($callbackRoute);
-
-        if (!Str::startsWith($callbackUrl, ['http://', 'https://'])) {
-            $callbackUrl = config('app.url') . $callbackUrl;
+        // Убедимся, что путь начинается с /
+        if (!Str::startsWith($callbackPath, '/')) {
+            $callbackPath = '/' . $callbackPath;
         }
+
+        // Собираем полный URL
+        $callbackUrl = config('app.url') . $callbackPath;
 
         $randomHash = bin2hex(random_bytes(16));
         $botUsername = env('TELEGRAM_BOT_NAME');
@@ -370,7 +370,7 @@ class FatherBotController extends AbstractTelegramBot
              * @var KeyActivate|null $key
              */
             $key = KeyActivate::where('id', $keyId)
-                ->whereHas('packSalesman', function($query) use ($salesman) {
+                ->whereHas('packSalesman', function ($query) use ($salesman) {
                     $query->where('salesman_id', $salesman->id);
                 })
                 ->with(['packSalesman.pack', 'keyActivateUser.serverUser.panel'])
