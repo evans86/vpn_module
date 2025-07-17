@@ -252,18 +252,16 @@ class FatherBotController extends AbstractTelegramBot
      */
     public function generateAuthUrl(string $callbackPath): string
     {
-        // Убедимся, что путь начинается с /
         if (!Str::startsWith($callbackPath, '/')) {
             $callbackPath = '/' . $callbackPath;
         }
 
-        // Собираем полный URL
         $callbackUrl = config('app.url') . $callbackPath;
-
         $randomHash = bin2hex(random_bytes(16));
         $botUsername = env('TELEGRAM_BOT_NAME');
 
-        return "https://t.me/{$botUsername}?start=auth_{$randomHash} " . urlencode($callbackUrl);
+        // Убрал пробел между параметрами и URL
+        return "https://t.me/{$botUsername}?start=auth_{$randomHash}_" . urlencode($callbackUrl);
     }
 
     /**
@@ -274,42 +272,58 @@ class FatherBotController extends AbstractTelegramBot
      */
     private function handleAuthRequest(string $commandText): void
     {
-        // Парсим команду вида "/start auth_XXXXX callback_url"
-        $parts = explode(' ', $commandText);
+        try {
+            // Парсим команду вида "/start auth_XXXXX_callback_url"
+            $parts = explode('_', $commandText, 3);
 
-        if (count($parts) < 3) {
-            $this->sendMessage("Ошибка авторизации: неверная команда");
-            return;
-        }
+            if (count($parts) < 3) {
+                Log::error('Invalid auth command format', ['command' => $commandText]);
+                $this->sendMessage("❌ Ошибка авторизации: неверный формат команды");
+                return;
+            }
 
-        $authHash = str_replace('auth_', '', $parts[1]);
-        $callbackUrl = urldecode($parts[2]);
+            $authHash = $parts[1];
+            $callbackUrl = urldecode($parts[2]);
 
-        // Проверяем, что callbackUrl валидный
-        if (!filter_var($callbackUrl, FILTER_VALIDATE_URL)) {
-            $this->sendMessage("Ошибка: неверный URL авторизации");
-            return;
-        }
+            if (!filter_var($callbackUrl, FILTER_VALIDATE_URL)) {
+                Log::error('Invalid callback URL', ['url' => $callbackUrl]);
+                $this->sendMessage("❌ Ошибка: неверный URL авторизации");
+                return;
+            }
 
-        // Сохраняем хэш в кэш
-        Cache::put("telegram_auth:{$authHash}", $this->chatId, now()->addMinutes(5));
+            // Сохраняем хэш в кэш
+            Cache::put("telegram_auth:{$authHash}", $this->chatId, now()->addMinutes(5));
 
-        // Формируем полный URL с параметрами
-        $authUrl = $callbackUrl . '?hash=' . $authHash . '&user=' . $this->chatId;
+            // Формируем URL с параметрами
+            $authUrl = $callbackUrl . '?hash=' . $authHash . '&user=' . $this->chatId;
 
-        $message = "🔐 Подтвердите вход в личный кабинет:\n\n";
-        $message .= "Нажмите кнопку ниже для завершения авторизации.";
+            $message = "🔐 Подтвердите вход в личный кабинет:\n\n";
+            $message .= "Нажмите кнопку ниже для завершения авторизации.";
 
-        $this->sendMessage($message, [
-            'inline_keyboard' => [
-                [
+            $this->sendMessage($message, [
+                'inline_keyboard' => [
                     [
-                        'text' => '✅ Подтвердить вход',
-                        'url' => $authUrl
+                        [
+                            'text' => '✅ Подтвердить вход',
+                            'url' => $authUrl
+                        ]
                     ]
                 ]
-            ]
-        ]);
+            ]);
+
+            Log::info('Auth request processed', [
+                'hash' => $authHash,
+                'callback_url' => $callbackUrl,
+                'user_id' => $this->chatId
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Auth request handling error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'command' => $commandText
+            ]);
+            $this->sendMessage("❌ Произошла ошибка при обработке авторизации");
+        }
     }
 
     /**
