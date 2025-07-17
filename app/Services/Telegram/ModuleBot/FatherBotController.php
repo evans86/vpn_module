@@ -284,7 +284,7 @@ class FatherBotController extends AbstractTelegramBot
      */
     public function generateAuthUrl(): string
     {
-        $botUsername = env('TELEGRAM_BOT_USERNAME');
+        $botUsername = env('TELEGRAM_FATHER_BOT_NAME');
 
         // Удаляем @ если он есть
         $botUsername = ltrim($botUsername, '@');
