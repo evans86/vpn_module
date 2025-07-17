@@ -264,21 +264,14 @@ class FatherBotController extends AbstractTelegramBot
         $randomHash = bin2hex(random_bytes(16));
         $state = $state ?? Str::random(40);
 
-        $params = [
-            'start' => "auth_$randomHash",
-            'callback' => urlencode($callbackUrl),
-            'state' => $state
-        ];
+        // Убедитесь, что callbackUrl абсолютный
+        $absoluteCallbackUrl = Str::startsWith($callbackUrl, 'http')
+            ? $callbackUrl
+            : url($callbackUrl);
 
-        return "https://t.me/{$botUsername}?".http_build_query($params);
+        return "https://t.me/{$botUsername}?start=auth_{$randomHash}&callback=".urlencode($absoluteCallbackUrl);
     }
 
-    /**
-     * Авторизация из бота
-     *
-     * @param string $commandText
-     * @return void
-     */
     private function handleAuthRequest(string $commandText): void
     {
         $parts = explode(' ', $commandText);
@@ -287,8 +280,14 @@ class FatherBotController extends AbstractTelegramBot
         $authHash = str_replace('auth_', '', $parts[1]);
         $callbackUrl = $parts[2] ?? null;
 
-        // Сохраните в временное хранилище $authHash с привязкой к chat_id
+        if (!$callbackUrl) {
+            $this->sendMessage("Ошибка: не указан callback URL");
+            return;
+        }
+
         Cache::put("telegram_auth:{$authHash}", $this->chatId, now()->addMinutes(5));
+
+        $fullUrl = url($callbackUrl) . '?hash=' . $authHash . '&user=' . $this->chatId;
 
         $message = "Подтвердите вход в личный кабинет:\n\n";
         $message .= "Если вы не запрашивали вход, проигнорируйте это сообщение.";
@@ -298,7 +297,7 @@ class FatherBotController extends AbstractTelegramBot
                 [
                     [
                         'text' => '✅ Подтвердить вход',
-                        'url' => $callbackUrl.'?hash='.$authHash.'&user='.$this->chatId
+                        'url' => $fullUrl
                     ]
                 ]
             ]
