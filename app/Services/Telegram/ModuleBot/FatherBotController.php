@@ -35,6 +35,12 @@ class FatherBotController extends AbstractTelegramBot
             $message = $this->update->getMessage();
             $callbackQuery = $this->update->getCallbackQuery();
 
+            Log::channel('telegram')->info('Incoming update', [
+                'update_id' => $this->update->getUpdateId(),
+                'message_text' => $this->update->getMessage()->getText(),
+                'chat_id' => $this->chatId
+            ]);
+
             if ($callbackQuery) {
                 Log::info('Вызов callback query', [
                     'data' => $callbackQuery->getData(),
@@ -54,8 +60,18 @@ class FatherBotController extends AbstractTelegramBot
                     return;
                 }
 
-                if (str_starts_with($text, '/start auth_')) {
-                    $this->handleAuthRequest($text);
+                if (str_starts_with($text, '/start')) {
+                    Log::channel('telegram')->info('Start command received', [
+                        'full_text' => $text,
+                        'chat_id' => $this->chatId
+                    ]);
+
+                    if (str_contains($text, 'auth_')) {
+                        $this->handleAuthRequest($text);
+                        return;
+                    }
+
+                    $this->start();
                     return;
                 }
 
@@ -246,22 +262,22 @@ class FatherBotController extends AbstractTelegramBot
     }
 
     /**
-     * @param string $callbackRoute
+     * @param string $callbackPath
      * @return string
      * @throws Exception
      */
     public function generateAuthUrl(string $callbackPath): string
     {
-        if (!Str::startsWith($callbackPath, '/')) {
-            $callbackPath = '/' . $callbackPath;
-        }
-
         $callbackUrl = config('app.url') . $callbackPath;
         $randomHash = bin2hex(random_bytes(16));
-        $botUsername = env('TELEGRAM_BOT_NAME');
+        $botUsername = env('TELEGRAM_BOT_USERNAME'); // Убедитесь, что это именно username бота
 
-        // Убрал пробел между параметрами и URL
-        return "https://t.me/{$botUsername}?start=auth_{$randomHash}_" . urlencode($callbackUrl);
+        return sprintf(
+            "https://t.me/%s?start=auth_%s_%s",
+            $botUsername,
+            $randomHash,
+            urlencode($callbackUrl)
+        );
     }
 
     /**
@@ -273,56 +289,67 @@ class FatherBotController extends AbstractTelegramBot
     private function handleAuthRequest(string $commandText): void
     {
         try {
-            // Парсим команду вида "/start auth_XXXXX_callback_url"
-            $parts = explode('_', $commandText, 3);
+            Log::channel('telegram')->info('Auth request initiated', ['command' => $commandText]);
 
-            if (count($parts) < 3) {
-                Log::error('Invalid auth command format', ['command' => $commandText]);
-                $this->sendMessage("❌ Ошибка авторизации: неверный формат команды");
-                return;
+            // Новый парсинг команды
+            $commandParts = explode(' ', $commandText);
+            if (count($commandParts) < 2) {
+                throw new \Exception('Invalid command format');
             }
 
-            $authHash = $parts[1];
-            $callbackUrl = urldecode($parts[2]);
+            $authPart = $commandParts[1]; // auth_xxxx_urlencoded
+            $authComponents = explode('_', $authPart, 3);
 
+            if (count($authComponents) < 3) {
+                throw new \Exception('Invalid auth components');
+            }
+
+            $authHash = $authComponents[1];
+            $callbackUrl = urldecode($authComponents[2]);
+
+            Log::channel('telegram')->info('Auth components', [
+                'hash' => $authHash,
+                'callback_url' => $callbackUrl
+            ]);
+
+            // Валидация URL
             if (!filter_var($callbackUrl, FILTER_VALIDATE_URL)) {
-                Log::error('Invalid callback URL', ['url' => $callbackUrl]);
-                $this->sendMessage("❌ Ошибка: неверный URL авторизации");
-                return;
+                throw new \Exception('Invalid callback URL: ' . $callbackUrl);
             }
 
-            // Сохраняем хэш в кэш
+            // Сохраняем в кэш на 5 минут
             Cache::put("telegram_auth:{$authHash}", $this->chatId, now()->addMinutes(5));
 
-            // Формируем URL с параметрами
-            $authUrl = $callbackUrl . '?hash=' . $authHash . '&user=' . $this->chatId;
+            // Формируем URL для подтверждения
+            $confirmationUrl = $callbackUrl . (parse_url($callbackUrl, PHP_URL_QUERY) ? '&' : '?') . http_build_query([
+                    'hash' => $authHash,
+                    'user' => $this->chatId
+                ]);
 
-            $message = "🔐 Подтвердите вход в личный кабинет:\n\n";
-            $message .= "Нажмите кнопку ниже для завершения авторизации.";
+            Log::channel('telegram')->info('Generated confirmation URL', ['url' => $confirmationUrl]);
 
-            $this->sendMessage($message, [
-                'inline_keyboard' => [
-                    [
+            $this->sendMessage(
+                "🔐 Для завершения авторизации нажмите кнопку ниже:",
+                [
+                    'inline_keyboard' => [
                         [
-                            'text' => '✅ Подтвердить вход',
-                            'url' => $authUrl
+                            [
+                                'text' => '✅ Подтвердить вход',
+                                'url' => $confirmationUrl
+                            ]
                         ]
                     ]
                 ]
-            ]);
+            );
 
-            Log::info('Auth request processed', [
-                'hash' => $authHash,
-                'callback_url' => $callbackUrl,
-                'user_id' => $this->chatId
-            ]);
         } catch (\Exception $e) {
-            Log::error('Auth request handling error', [
+            Log::channel('telegram')->error('Auth error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'command' => $commandText
             ]);
-            $this->sendMessage("❌ Произошла ошибка при обработке авторизации");
+
+            $this->sendMessage("❌ Ошибка авторизации: " . $e->getMessage());
         }
     }
 
