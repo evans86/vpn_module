@@ -46,7 +46,7 @@ Route::prefix('personal')->name('personal.')->group(function () {
 
     Route::post('/logout', function () {
         Auth::guard('salesman')->logout();
-        return redirect()->route('personal.auth.telegram');
+        return redirect()->route('personal.auth'); // Изменено с personal.auth.telegram
     })->name('logout');
 });
 

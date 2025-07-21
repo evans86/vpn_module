@@ -110,9 +110,9 @@ class FatherBotController extends AbstractTelegramBot
                     case '🪪 Личный кабинет':
                         $this->showProfile();
                         break;
-                    case '🔑 Авторизация':
-                        $this->initiateAuth();
-                        break;
+//                    case '🔑 Авторизация':
+//                        $this->initiateAuth();
+//                        break;
                     case '🌎 Помощь':
                         $this->showHelp();
                         break;
@@ -1250,7 +1250,7 @@ class FatherBotController extends AbstractTelegramBot
                 ],
                 [
                     ['text' => '🪪 Личный кабинет'],
-                    ['text' => '🔑 Авторизация'],
+//                    ['text' => '🔑 Авторизация'],
                     ['text' => '🌎 Помощь']
                 ],
                 [

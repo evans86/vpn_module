@@ -49,6 +49,15 @@ class SalesmanAuthController extends Controller
         return redirect()->away($authUrl);
     }
 
+    public function logout(Request $request)
+    {
+        Auth::guard('salesman')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect()->route('personal.auth');
+    }
+
     public function showLoginForm()
     {
         if (Auth::guard('salesman')->check()) {
@@ -67,10 +76,21 @@ class SalesmanAuthController extends Controller
             $hash = $request->input('hash');
             $userId = $request->input('user');
 
+            // Проверяем наличие обязательных параметров
+            if (empty($hash) || empty($userId)) {
+                Log::error('Missing auth parameters', [
+                    'hash' => $hash,
+                    'user_id' => $userId
+                ]);
+                return redirect()->route('personal.auth')
+                    ->with('error', 'Недостаточно данных для авторизации');
+            }
+
             // Проверяем наличие данных в кэше
             if (!Cache::has("telegram_auth:{$hash}")) {
                 Log::error('Invalid auth hash', ['hash' => $hash]);
-                return redirect('/')->with('error', 'Ссылка авторизации устарела или недействительна');
+                return redirect()->route('personal.auth')
+                    ->with('error', 'Ссылка авторизации устарела или недействительна');
             }
 
             $authData = Cache::get("telegram_auth:{$hash}");
@@ -81,7 +101,8 @@ class SalesmanAuthController extends Controller
                     'expected' => $authData['user_id'],
                     'actual' => $userId
                 ]);
-                return redirect('/')->with('error', 'Ошибка проверки пользователя');
+                return redirect()->route('personal.auth')
+                    ->with('error', 'Ошибка проверки пользователя');
             }
 
             // Ищем продавца
@@ -89,27 +110,46 @@ class SalesmanAuthController extends Controller
 
             if (!$salesman) {
                 Log::error('Salesman not found', ['user_id' => $userId]);
-                return redirect('/')->with('error', 'Продавец не найден');
+                return redirect()->route('personal.auth')
+                    ->with('error', 'Продавец не найден');
             }
 
             // Выполняем вход
             Auth::guard('salesman')->login($salesman);
             Cache::forget("telegram_auth:{$hash}");
 
-            Log::info('Auth session check', [
-                'authenticated' => Auth::guard('salesman')->check(),
-                'user_id' => Auth::guard('salesman')->id()
+            Log::info('Successful salesman login', [
+                'salesman_id' => $salesman->id,
+                'telegram_id' => $userId
             ]);
 
-            // Явный редирект в личный кабинет
-            return redirect()->route('personal.dashboard')
+            // Проверяем, что авторизация прошла успешно
+            if (!Auth::guard('salesman')->check()) {
+                Log::error('Salesman authentication failed after login attempt', [
+                    'salesman_id' => $salesman->id
+                ]);
+                return redirect()->route('personal.auth')
+                    ->with('error', 'Ошибка входа в систему');
+            }
+
+            // Редирект с очисткой URL от параметров авторизации
+            $redirectUrl = $request->session()->pull('url.intended', route('personal.dashboard'));
+
+            // Дополнительная проверка, чтобы не перенаправлять на админ-маршруты
+            if (Str::startsWith($redirectUrl, url('/admin'))) {
+                $redirectUrl = route('personal.dashboard');
+            }
+
+            return redirect()->to($redirectUrl)
                 ->with('success', 'Вы успешно авторизованы');
 
         } catch (\Exception $e) {
             Log::error('Auth callback error: '.$e->getMessage(), [
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'request' => $request->all()
             ]);
-            return redirect('/')->with('error', 'Ошибка авторизации');
+            return redirect()->route('personal.auth')
+                ->with('error', 'Произошла ошибка при авторизации');
         }
     }
 }
