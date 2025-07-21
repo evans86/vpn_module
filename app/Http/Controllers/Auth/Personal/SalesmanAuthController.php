@@ -75,6 +75,7 @@ class SalesmanAuthController extends Controller
         try {
             $hash = $request->input('hash');
             $userId = $request->input('user');
+            $action = $request->input('action'); // Получаем параметр action
 
             // Проверяем наличие обязательных параметров
             if (empty($hash) || empty($userId)) {
@@ -132,15 +133,14 @@ class SalesmanAuthController extends Controller
                     ->with('error', 'Ошибка входа в систему');
             }
 
-            // Редирект с очисткой URL от параметров авторизации
-            $redirectUrl = $request->session()->pull('url.intended', route('personal.dashboard'));
-
-            // Дополнительная проверка, чтобы не перенаправлять на админ-маршруты
-            if (Str::startsWith($redirectUrl, url('/admin'))) {
-                $redirectUrl = route('personal.dashboard');
+            // Если action=profile, перенаправляем сразу в личный кабинет
+            if ($action === 'profile') {
+                return redirect()->route('personal.dashboard')
+                    ->with('success', 'Вы успешно авторизованы');
             }
 
-            return redirect()->to($redirectUrl)
+            // Редирект с очисткой URL от параметров авторизации
+            return redirect()->intended(route('personal.dashboard'))
                 ->with('success', 'Вы успешно авторизованы');
 
         } catch (\Exception $e) {

@@ -279,6 +279,7 @@ class FatherBotController extends AbstractTelegramBot
     }
 
     /**
+     * @param string|null $callbackRoute
      * @return string
      * @throws Exception
      */
@@ -330,7 +331,8 @@ class FatherBotController extends AbstractTelegramBot
             // Формируем URL подтверждения
             $confirmationUrl = $authData['callback_url'] . '?' . http_build_query([
                     'hash' => $hash,
-                    'user' => $authData['user_id']
+                    'user' => $authData['user_id'],
+                    'action' => 'profile' // Добавляем параметр action
                 ]);
 
             $this->sendMessage(
@@ -1426,8 +1428,6 @@ class FatherBotController extends AbstractTelegramBot
                 ->where('status', PackSalesman::PAID)
                 ->count();
 
-            // Получаем информацию о пользователе через Telegram API
-//            $telegramUser = $this->telegram->getChat(['chat_id' => $salesman->telegram_id]);
             $userUsername = $salesman->username ?? 'Не указано';
 
             // Формируем сообщение с информацией о пользователе
@@ -1438,7 +1438,6 @@ class FatherBotController extends AbstractTelegramBot
                 $message .= "📟 <b>Имя:</b> <code>{$userUsername}</code>\n";
             }
 
-            // Добавляем количество активных пакетов
             $message .= "📦 <b>Активных пакетов: <code>{$activePacks}</code></b>\n";
 
             if ($salesman->created_at) {
@@ -1450,13 +1449,12 @@ class FatherBotController extends AbstractTelegramBot
                     [
                         [
                             'text' => '🔑 Войти в личный кабинет',
-                            'url' => $this->generateAuthUrl()
+                            'url' => $this->generateAuthUrl() . '&action=profile'
                         ]
                     ]
                 ]
             ];
 
-            // Отправляем сообщение с профилем пользователя
             $this->sendMessage($message, $keyboard);
         } catch (\Exception $e) {
             Log::error('Show profile error: ' . $e->getMessage());
