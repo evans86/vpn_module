@@ -279,25 +279,20 @@ class FatherBotController extends AbstractTelegramBot
      * @return string
      * @throws Exception
      */
-    public function generateAuthUrl(string $callbackRoute = null): string
+    public function generateAuthUrl(): string
     {
-        $botUsername = env('TELEGRAM_FATHER_BOT_NAME');
-        $botUsername = ltrim($botUsername, '@');
-
+        $botUsername = ltrim(env('TELEGRAM_FATHER_BOT_NAME'), '@');
         if (empty($botUsername)) {
-            throw new \Exception('Telegram bot username not configured');
+            throw new \Exception('Bot username not configured');
         }
 
-        $randomHash = bin2hex(random_bytes(16));
-
-        // Сохраняем данные в кэш с меткой источника
-        Cache::put("telegram_auth:{$randomHash}", [
+        $hash = bin2hex(random_bytes(16));
+        Cache::put("telegram_auth:{$hash}", [
             'user_id' => $this->chatId,
-            'callback_url' => config('app.url') . '/personal/auth/telegram/callback',
-            'source' => 'bot' // Метка, что запрос из бота
+            'callback_url' => config('app.url') . '/personal/auth/telegram/callback'
         ], now()->addMinutes(5));
 
-        return "https://t.me/{$botUsername}?start=auth_{$randomHash}";
+        return "https://t.me/{$botUsername}?start=auth_{$hash}";
     }
 
     /**
@@ -309,27 +304,21 @@ class FatherBotController extends AbstractTelegramBot
     private function handleAuthRequest(string $commandText): void
     {
         try {
-            Log::channel('telegram')->info('Auth command received', ['command' => $commandText]);
-
-            // Извлекаем хэш из команды
             $hash = explode('auth_', $commandText)[1] ?? null;
-
             if (!$hash) {
                 throw new \Exception('Invalid auth command format');
             }
 
-            // Получаем данные из кэша
             $authData = Cache::get("telegram_auth:{$hash}");
-
             if (!$authData) {
                 throw new \Exception('Auth session expired or invalid');
             }
 
-            // Добавляем параметр redirect_to=profile в callback URL
-            $callbackUrl = $authData['callback_url'] . '?' . http_build_query([
+            // Всегда добавляем параметр redirect=profile
+            $confirmationUrl = $authData['callback_url'] . '?' . http_build_query([
                     'hash' => $hash,
                     'user' => $authData['user_id'],
-                    'redirect_to' => 'profile' // Новый параметр
+                    'redirect' => 'profile' // Жестко задаем редирект в профиль
                 ]);
 
             $this->sendMessage(
@@ -339,7 +328,7 @@ class FatherBotController extends AbstractTelegramBot
                         [
                             [
                                 'text' => 'Подтвердить вход',
-                                'url' => $callbackUrl
+                                'url' => $confirmationUrl
                             ]
                         ]
                     ]
@@ -347,10 +336,7 @@ class FatherBotController extends AbstractTelegramBot
             );
 
         } catch (\Exception $e) {
-            Log::channel('telegram')->error('Auth processing failed', [
-                'error' => $e->getMessage(),
-                'command' => $commandText
-            ]);
+            Log::error('Auth processing failed: ' . $e->getMessage());
             $this->sendMessage("❌ Ошибка авторизации: " . $e->getMessage());
         }
     }

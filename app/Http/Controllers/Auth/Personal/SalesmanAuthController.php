@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth\Personal;
 
 use App\Models\Salesman\Salesman;
 use App\Services\Telegram\ModuleBot\FatherBotController;
+use Exception;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Cache;
@@ -15,28 +16,24 @@ use Telegram\Bot\Exceptions\TelegramSDKException;
 class SalesmanAuthController extends Controller
 {
     /**
-     * @throws TelegramSDKException
-     * @throws \Exception
+     * @throws Exception
      */
     public function redirect()
     {
-        $state = Str::random(40);
-        session(['telegram_auth_state' => $state]);
-        session(['auth_source' => 'website']); // Добавляем метку источника
-
-        $bot = new FatherBotController(env('TELEGRAM_FATHER_BOT_TOKEN'));
-        $authUrl = $bot->generateAuthUrl('personal.auth.telegram.callback');
-
-        return redirect()->away($authUrl);
+        try {
+            $bot = new FatherBotController(env('TELEGRAM_FATHER_BOT_TOKEN'));
+            return redirect()->away($bot->generateAuthUrl());
+        } catch (Exception $e) {
+            Log::error('Redirect error: ' . $e->getMessage());
+            return back()->with('error', 'Ошибка при создании ссылки авторизации');
+        }
     }
 
-    public function logout(Request $request)
+    public function logout()
     {
         Auth::guard('salesman')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return redirect()->route('personal.auth');
+        return redirect()->route('personal.auth')
+            ->with('success', 'Вы успешно вышли из системы');
     }
 
     public function showLoginForm()
@@ -57,52 +54,31 @@ class SalesmanAuthController extends Controller
             $hash = $request->input('hash');
             $userId = $request->input('user');
 
-            // Проверяем наличие обязательных параметров
             if (empty($hash) || empty($userId)) {
-                Log::error('Missing auth parameters', ['hash' => $hash, 'user_id' => $userId]);
-                return redirect()->route('personal.auth')->with('error', 'Недостаточно данных для авторизации');
-            }
-
-            // Проверяем наличие данных в кэше
-            if (!Cache::has("telegram_auth:{$hash}")) {
-                Log::error('Invalid auth hash', ['hash' => $hash]);
-                return redirect()->route('personal.auth')->with('error', 'Ссылка авторизации устарела или недействительна');
+                throw new Exception('Missing required parameters');
             }
 
             $authData = Cache::get("telegram_auth:{$hash}");
-
-            // Сверяем user_id
-            if ($authData['user_id'] != $userId) {
-                Log::error('User ID mismatch', ['expected' => $authData['user_id'], 'actual' => $userId]);
-                return redirect()->route('personal.auth')->with('error', 'Ошибка проверки пользователя');
+            if (!$authData) {
+                throw new Exception('Invalid or expired auth session');
             }
 
-            // Ищем продавца
             $salesman = Salesman::where('telegram_id', $userId)->first();
-
             if (!$salesman) {
-                Log::error('Salesman not found', ['user_id' => $userId]);
-                return redirect()->route('personal.auth')->with('error', 'Продавец не найден');
+                throw new Exception('Salesman not found');
             }
 
-            // Выполняем вход
             Auth::guard('salesman')->login($salesman);
             Cache::forget("telegram_auth:{$hash}");
 
-            // Определяем источник авторизации
-            $source = $authData['source'] ?? session('auth_source');
+            // Всегда редиректим в личный кабинет, независимо от источника
+            return redirect()->route('personal.dashboard')
+                ->with('success', 'Вы успешно авторизованы');
 
-            // Если авторизация инициирована из бота или есть метка 'bot' - редиректим в личный кабинет
-            if ($source === 'bot') {
-                return redirect()->route('personal.dashboard')->with('success', 'Вы успешно авторизованы');
-            }
-
-            // Для авторизации с сайта - редирект на intended URL или в личный кабинет
-            return redirect()->intended(route('personal.dashboard'))->with('success', 'Вы успешно авторизованы');
-
-        } catch (\Exception $e) {
-            Log::error('Auth callback error: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
-            return redirect()->route('personal.auth')->with('error', 'Произошла ошибка при авторизации');
+        } catch (Exception $e) {
+            Log::error('Auth error: ' . $e->getMessage());
+            return redirect()->route('personal.auth')
+                ->with('error', 'Ошибка авторизации: ' . $e->getMessage());
         }
     }
 }
