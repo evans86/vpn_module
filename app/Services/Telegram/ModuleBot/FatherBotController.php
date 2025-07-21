@@ -282,11 +282,9 @@ class FatherBotController extends AbstractTelegramBot
      * @return string
      * @throws Exception
      */
-    public function generateAuthUrl(): string
+    public function generateAuthUrl(string $callbackRoute = null): string
     {
         $botUsername = env('TELEGRAM_FATHER_BOT_NAME');
-
-        // Удаляем @ если он есть
         $botUsername = ltrim($botUsername, '@');
 
         if (empty($botUsername)) {
@@ -294,6 +292,12 @@ class FatherBotController extends AbstractTelegramBot
         }
 
         $randomHash = bin2hex(random_bytes(16));
+
+        // Сохраняем данные в кэш
+        Cache::put("telegram_auth:{$randomHash}", [
+            'user_id' => $this->chatId,
+            'callback_url' => config('app.url') . '/personal/auth/telegram/callback'
+        ], now()->addMinutes(5));
 
         return "https://t.me/{$botUsername}?start=auth_{$randomHash}";
     }
@@ -1446,7 +1450,7 @@ class FatherBotController extends AbstractTelegramBot
                     [
                         [
                             'text' => '🔑 Войти в личный кабинет',
-                            'url' => $this->generateAuthUrl(route('personal.auth.telegram.callback'))
+                            'url' => $this->generateAuthUrl()
                         ]
                     ]
                 ]
