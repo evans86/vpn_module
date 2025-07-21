@@ -20,8 +20,13 @@ class SalesmanAuthController extends Controller
      */
     public function redirect()
     {
+        $state = Str::random(40);
+        session(['telegram_auth_state' => $state]);
+        session(['auth_source' => 'website']); // Добавляем метку источника
+
         $bot = new FatherBotController(env('TELEGRAM_FATHER_BOT_TOKEN'));
-        $authUrl = $bot->generateAuthUrl('personal.auth.telegram.callback', 'profile');
+        $authUrl = $bot->generateAuthUrl('personal.auth.telegram.callback');
+
         return redirect()->away($authUrl);
     }
 
@@ -51,35 +56,25 @@ class SalesmanAuthController extends Controller
         try {
             $hash = $request->input('hash');
             $userId = $request->input('user');
-            $redirectTo = $request->input('redirect_to'); // Получаем параметр redirect_to
 
             // Проверяем наличие обязательных параметров
             if (empty($hash) || empty($userId)) {
-                Log::error('Missing auth parameters', [
-                    'hash' => $hash,
-                    'user_id' => $userId
-                ]);
-                return redirect()->route('personal.auth')
-                    ->with('error', 'Недостаточно данных для авторизации');
+                Log::error('Missing auth parameters', ['hash' => $hash, 'user_id' => $userId]);
+                return redirect()->route('personal.auth')->with('error', 'Недостаточно данных для авторизации');
             }
 
             // Проверяем наличие данных в кэше
             if (!Cache::has("telegram_auth:{$hash}")) {
                 Log::error('Invalid auth hash', ['hash' => $hash]);
-                return redirect()->route('personal.auth')
-                    ->with('error', 'Ссылка авторизации устарела или недействительна');
+                return redirect()->route('personal.auth')->with('error', 'Ссылка авторизации устарела или недействительна');
             }
 
             $authData = Cache::get("telegram_auth:{$hash}");
 
             // Сверяем user_id
             if ($authData['user_id'] != $userId) {
-                Log::error('User ID mismatch', [
-                    'expected' => $authData['user_id'],
-                    'actual' => $userId
-                ]);
-                return redirect()->route('personal.auth')
-                    ->with('error', 'Ошибка проверки пользователя');
+                Log::error('User ID mismatch', ['expected' => $authData['user_id'], 'actual' => $userId]);
+                return redirect()->route('personal.auth')->with('error', 'Ошибка проверки пользователя');
             }
 
             // Ищем продавца
@@ -87,45 +82,27 @@ class SalesmanAuthController extends Controller
 
             if (!$salesman) {
                 Log::error('Salesman not found', ['user_id' => $userId]);
-                return redirect()->route('personal.auth')
-                    ->with('error', 'Продавец не найден');
+                return redirect()->route('personal.auth')->with('error', 'Продавец не найден');
             }
 
             // Выполняем вход
             Auth::guard('salesman')->login($salesman);
             Cache::forget("telegram_auth:{$hash}");
 
-            Log::info('Successful salesman login', [
-                'salesman_id' => $salesman->id,
-                'telegram_id' => $userId
-            ]);
+            // Определяем источник авторизации
+            $source = $authData['source'] ?? session('auth_source');
 
-            // Проверяем, что авторизация прошла успешно
-            if (!Auth::guard('salesman')->check()) {
-                Log::error('Salesman authentication failed after login attempt', [
-                    'salesman_id' => $salesman->id
-                ]);
-                return redirect()->route('personal.auth')
-                    ->with('error', 'Ошибка входа в систему');
+            // Если авторизация инициирована из бота или есть метка 'bot' - редиректим в личный кабинет
+            if ($source === 'bot') {
+                return redirect()->route('personal.dashboard')->with('success', 'Вы успешно авторизованы');
             }
 
-            // Если указан redirect_to=profile, перенаправляем в личный кабинет
-            if ($redirectTo === 'profile') {
-                return redirect()->route('personal.dashboard')
-                    ->with('success', 'Вы успешно авторизованы');
-            }
-
-            // Редирект с очисткой URL от параметров авторизации
-            return redirect()->intended(route('personal.dashboard'))
-                ->with('success', 'Вы успешно авторизованы');
+            // Для авторизации с сайта - редирект на intended URL или в личный кабинет
+            return redirect()->intended(route('personal.dashboard'))->with('success', 'Вы успешно авторизованы');
 
         } catch (\Exception $e) {
-            Log::error('Auth callback error: '.$e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
-                'request' => $request->all()
-            ]);
-            return redirect()->route('personal.auth')
-                ->with('error', 'Произошла ошибка при авторизации');
+            Log::error('Auth callback error: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return redirect()->route('personal.auth')->with('error', 'Произошла ошибка при авторизации');
         }
     }
 }

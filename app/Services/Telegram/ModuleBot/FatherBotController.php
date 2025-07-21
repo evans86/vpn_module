@@ -242,16 +242,14 @@ class FatherBotController extends AbstractTelegramBot
                 $this->sendMessage("👋 Вы были автоматически зарегистрированы как продавец");
             }
 
-            // Генерируем ссылку
             $botDeepLink = $this->generateAuthUrl();
-
-            // Извлекаем хэш из ссылки
             $hash = explode('auth_', $botDeepLink)[1];
 
-            // Сохраняем данные в кэш
+            // Сохраняем в кэше информацию о том, что запрос идет из бота
             Cache::put("telegram_auth:{$hash}", [
                 'user_id' => $this->chatId,
-                'callback_url' => config('app.url') . '/personal/auth/telegram/callback'
+                'callback_url' => config('app.url') . '/personal/auth/telegram/callback',
+                'source' => 'bot' // Добавляем метку источника
             ], now()->addMinutes(5));
 
             $message = "🔐 Для входа нажмите кнопку:\n";
@@ -270,8 +268,6 @@ class FatherBotController extends AbstractTelegramBot
                 ]
             ]);
 
-            Log::info('Auth link generated', ['url' => $botDeepLink, 'hash' => $hash]);
-
         } catch (\Exception $e) {
             Log::error('Auth initiation failed: ' . $e->getMessage());
             $this->sendMessage("❌ Ошибка: не удалось сформировать ссылку для входа");
@@ -283,7 +279,7 @@ class FatherBotController extends AbstractTelegramBot
      * @return string
      * @throws Exception
      */
-    public function generateAuthUrl(string $callbackRoute = null, string $redirectTo = null): string
+    public function generateAuthUrl(string $callbackRoute = null): string
     {
         $botUsername = env('TELEGRAM_FATHER_BOT_NAME');
         $botUsername = ltrim($botUsername, '@');
@@ -294,11 +290,11 @@ class FatherBotController extends AbstractTelegramBot
 
         $randomHash = bin2hex(random_bytes(16));
 
-        // Сохраняем данные в кэш
+        // Сохраняем данные в кэш с меткой источника
         Cache::put("telegram_auth:{$randomHash}", [
             'user_id' => $this->chatId,
             'callback_url' => config('app.url') . '/personal/auth/telegram/callback',
-            'redirect_to' => $redirectTo // Сохраняем параметр redirect_to
+            'source' => 'bot' // Метка, что запрос из бота
         ], now()->addMinutes(5));
 
         return "https://t.me/{$botUsername}?start=auth_{$randomHash}";
@@ -1445,7 +1441,7 @@ class FatherBotController extends AbstractTelegramBot
                     [
                         [
                             'text' => '🔑 Войти в личный кабинет',
-                            'url' => $this->generateAuthUrl(null, 'profile')
+                            'url' => $this->generateAuthUrl()
                         ]
                     ]
                 ]
