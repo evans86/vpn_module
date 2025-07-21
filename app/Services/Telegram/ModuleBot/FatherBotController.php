@@ -283,7 +283,7 @@ class FatherBotController extends AbstractTelegramBot
      * @return string
      * @throws Exception
      */
-    public function generateAuthUrl(string $callbackRoute = null): string
+    public function generateAuthUrl(string $callbackRoute = null, string $redirectTo = null): string
     {
         $botUsername = env('TELEGRAM_FATHER_BOT_NAME');
         $botUsername = ltrim($botUsername, '@');
@@ -297,7 +297,8 @@ class FatherBotController extends AbstractTelegramBot
         // Сохраняем данные в кэш
         Cache::put("telegram_auth:{$randomHash}", [
             'user_id' => $this->chatId,
-            'callback_url' => config('app.url') . '/personal/auth/telegram/callback'
+            'callback_url' => config('app.url') . '/personal/auth/telegram/callback',
+            'redirect_to' => $redirectTo // Сохраняем параметр redirect_to
         ], now()->addMinutes(5));
 
         return "https://t.me/{$botUsername}?start=auth_{$randomHash}";
@@ -328,11 +329,11 @@ class FatherBotController extends AbstractTelegramBot
                 throw new \Exception('Auth session expired or invalid');
             }
 
-            // Формируем URL подтверждения
-            $confirmationUrl = $authData['callback_url'] . '?' . http_build_query([
+            // Добавляем параметр redirect_to=profile в callback URL
+            $callbackUrl = $authData['callback_url'] . '?' . http_build_query([
                     'hash' => $hash,
                     'user' => $authData['user_id'],
-                    'action' => 'profile' // Добавляем параметр action
+                    'redirect_to' => 'profile' // Новый параметр
                 ]);
 
             $this->sendMessage(
@@ -342,17 +343,12 @@ class FatherBotController extends AbstractTelegramBot
                         [
                             [
                                 'text' => 'Подтвердить вход',
-                                'url' => $confirmationUrl
+                                'url' => $callbackUrl
                             ]
                         ]
                     ]
                 ]
             );
-
-            Log::channel('telegram')->info('Auth confirmation sent', [
-                'user_id' => $authData['user_id'],
-                'confirmation_url' => $confirmationUrl
-            ]);
 
         } catch (\Exception $e) {
             Log::channel('telegram')->error('Auth processing failed', [
@@ -1449,7 +1445,7 @@ class FatherBotController extends AbstractTelegramBot
                     [
                         [
                             'text' => '🔑 Войти в личный кабинет',
-                            'url' => $this->generateAuthUrl() . '&action=profile'
+                            'url' => $this->generateAuthUrl(null, 'profile')
                         ]
                     ]
                 ]

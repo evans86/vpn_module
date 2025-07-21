@@ -41,7 +41,7 @@
     <h2>Авторизация продавца</h2>
     <p>Для входа в личный кабинет необходимо авторизоваться через Telegram бота</p>
 
-    <a href="{{ route('personal.auth.telegram') }}" class="auth-button">
+    <a href="{{ route('personal.auth.telegram') }}" class="btn btn-telegram">
         Войти через Telegram
     </a>
 </div>

@@ -20,32 +20,8 @@ class SalesmanAuthController extends Controller
      */
     public function redirect()
     {
-        // Для локального тестирования - пропускаем Telegram бота
-//        if (app()->environment('local')) {
-//            $testUser = [
-//                'id' => 12345678, // Тестовый Telegram ID
-//                'first_name' => 'TestUser',
-//                'username' => 'test_user'
-//            ];
-//
-//            $salesman = Salesman::updateOrCreate(
-//                ['telegram_id' => $testUser['id']],
-//                [
-//                    'name' => $testUser['first_name'],
-//                    'username' => $testUser['username'],
-//                ]
-//            );
-//
-//            Auth::guard('salesman')->login($salesman);
-//            return redirect()->route('personal.dashboard');
-//        }
-
-        $state = Str::random(40);
-        session(['telegram_auth_state' => $state]);
-
         $bot = new FatherBotController(env('TELEGRAM_FATHER_BOT_TOKEN'));
-        $authUrl = $bot->generateAuthUrl('personal.auth.telegram.callback');
-
+        $authUrl = $bot->generateAuthUrl('personal.auth.telegram.callback', 'profile');
         return redirect()->away($authUrl);
     }
 
@@ -75,7 +51,7 @@ class SalesmanAuthController extends Controller
         try {
             $hash = $request->input('hash');
             $userId = $request->input('user');
-            $action = $request->input('action'); // Получаем параметр action
+            $redirectTo = $request->input('redirect_to'); // Получаем параметр redirect_to
 
             // Проверяем наличие обязательных параметров
             if (empty($hash) || empty($userId)) {
@@ -133,8 +109,8 @@ class SalesmanAuthController extends Controller
                     ->with('error', 'Ошибка входа в систему');
             }
 
-            // Если action=profile, перенаправляем сразу в личный кабинет
-            if ($action === 'profile') {
+            // Если указан redirect_to=profile, перенаправляем в личный кабинет
+            if ($redirectTo === 'profile') {
                 return redirect()->route('personal.dashboard')
                     ->with('success', 'Вы успешно авторизованы');
             }
