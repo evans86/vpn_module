@@ -49,6 +49,15 @@ class SalesmanAuthController extends Controller
         return redirect()->away($authUrl);
     }
 
+    public function showLoginForm()
+    {
+        if (Auth::guard('salesman')->check()) {
+            return redirect()->route('personal.dashboard');
+        }
+
+        return view('module.personal.auth.login'); // Создайте этот view
+    }
+
     /**
      * @throws TelegramSDKException
      */

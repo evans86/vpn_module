@@ -30,6 +30,7 @@ Auth::routes(['register' => false]);
 // Личный кабинет продавца
 Route::prefix('personal')->name('personal.')->group(function () {
     // Авторизация через Telegram
+    Route::get('/auth', [SalesmanAuthController::class, 'showLoginForm'])->name('auth');
     Route::get('/auth/telegram', [SalesmanAuthController::class, 'redirect'])
         ->name('auth.telegram');
 
@@ -45,7 +46,7 @@ Route::prefix('personal')->name('personal.')->group(function () {
 
     Route::post('/logout', function () {
         Auth::guard('salesman')->logout();
-        return redirect('/');
+        return redirect()->route('personal.auth.telegram');
     })->name('logout');
 });
 

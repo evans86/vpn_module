@@ -235,7 +235,7 @@
         <a href="{{ route('personal.stats') }}">Аналитика</a>
         <a href="#">Настройки</a>
     </div>
-    <form action="{{ route('logout') }}" method="POST">
+    <form action="{{ route('personal.logout') }}" method="POST">
         @csrf
         <button type="submit" class="logout-btn">
             Выйти
