@@ -71,7 +71,7 @@ class FatherBotController extends AbstractTelegramBot
                         return;
                     }
 
-                    if (str_contains($text, 'auth_')) {
+                    if (str_contains($text, 'auth_profile_')) {
                         $this->showProfile();
                         return;
                     }
