@@ -85,7 +85,7 @@
             background: var(--primary);
             color: white;
             border: none;
-            padding: 0.5rem 1.25rem;
+            padding: 0.5rem 1rem 0.5rem 1.25rem;
             border-radius: 6px;
             font-weight: 500;
             cursor: pointer;
@@ -98,6 +98,8 @@
         .logout-icon {
             width: 1.25rem;
             height: 1.25rem;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
 
         .logout-btn:hover {
@@ -235,7 +237,7 @@
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
-        <span>VPN Partner</span>
+        <span>VPN High BOT-T</span>
     </div>
     <div class="nav-links">
         <a href="{{ route('personal.dashboard') }}">Главная</a>
@@ -247,8 +249,9 @@
         @csrf
         <button type="submit" class="logout-btn">
             Выйти
-            <svg xmlns="http://www.w3.org/2000/svg" class="logout-icon" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l3-3a1 1 0 10-1.414-1.414L14 9.586l-2.293-2.293a1 1 0 00-1.414 1.414L12.586 11H5a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd" />
+            <svg xmlns="http://www.w3.org/2000/svg" class="logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+                <path d="M15 5h4a1 1 0 011 1v12a1 1 0 01-1 1h-4"/>
             </svg>
         </button>
     </form>
