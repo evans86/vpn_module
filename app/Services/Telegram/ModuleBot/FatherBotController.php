@@ -71,11 +71,6 @@ class FatherBotController extends AbstractTelegramBot
                         return;
                     }
 
-                    if (str_contains($text, 'auth_profile_')) {
-                        $this->showProfile();
-                        return;
-                    }
-
                     $this->start();
                     return;
                 }
@@ -296,7 +291,7 @@ class FatherBotController extends AbstractTelegramBot
             'callback_url' => config('app.url') . '/personal/auth/telegram/callback'
         ], now()->addMinutes(5));
 
-        return "https://t.me/{$botUsername}?start=auth_profile_{$hash}";
+        return "https://t.me/{$botUsername}?start=auth_{$hash}";
     }
 
     /**
