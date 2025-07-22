@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Личный кабинет | VPN Partner</title>
+    <title>Личный кабинет | VPN High BOT-T</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -90,6 +90,14 @@
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logout-icon {
+            width: 1.25rem;
+            height: 1.25rem;
         }
 
         .logout-btn:hover {
@@ -239,7 +247,7 @@
         @csrf
         <button type="submit" class="logout-btn">
             Выйти
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline ml-1" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="logout-icon" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l3-3a1 1 0 10-1.414-1.414L14 9.586l-2.293-2.293a1 1 0 00-1.414 1.414L12.586 11H5a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd" />
             </svg>
         </button>
