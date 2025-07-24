@@ -27,7 +27,8 @@ class PersonalController
 
     public function dashboard()
     {
-        return view('module.personal.soon');
+        $salesman = Auth::guard('salesman')->user();
+        return view('module.personal.soon', compact('salesman'));
     }
 
     public function orders()
