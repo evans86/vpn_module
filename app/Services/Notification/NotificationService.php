@@ -66,7 +66,18 @@ class NotificationService
             $message .= "После окончания срока работы ключ будет деактивирован.\n";
             $message .= "Купить новый ключ можно у создателя бота.";
 
-            $this->sendTelegramMessage($userTgId, $message, $token);
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        [
+                            'text' => 'Открыть конфигурацию',
+                            'url' => "https://vpn-telegram.com/config/{$keyId}"
+                        ]
+                    ]
+                ]
+            ];
+
+            $this->sendTelegramMessage($userTgId, $message, $token, $keyboard);
         } catch (\Exception $e) {
             Log::error('Error sending key expiration notification', [
                 'user_tg_id' => $userTgId,
@@ -81,7 +92,18 @@ class NotificationService
         try {
             $message = "✅ Ключ <code>{$keyId}</code> был успешно активирован\n";
 
-            $this->sendTelegramMessage($salesmanTgId, $message);
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        [
+                            'text' => 'Открыть конфигурацию',
+                            'url' => "https://vpn-telegram.com/config/{$keyId}"
+                        ]
+                    ]
+                ]
+            ];
+
+            $this->sendTelegramMessage($salesmanTgId, $message, null, $keyboard);
         } catch (\Exception $e) {
             Log::error('Error sending key activated notification', [
                 'salesman_tg_id' => $salesmanTgId,
