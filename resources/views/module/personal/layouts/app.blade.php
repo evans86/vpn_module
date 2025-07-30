@@ -19,20 +19,30 @@
 
         .sidebar {
             width: 250px;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
+            transform: translateX(0);
+            z-index: 50;
         }
 
         .sidebar-collapsed {
             width: 80px;
         }
 
+        .sidebar-hidden {
+            transform: translateX(-100%);
+        }
+
         .content {
             margin-left: 250px;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
         }
 
         .content-collapsed {
             margin-left: 80px;
+        }
+
+        .content-full {
+            margin-left: 0;
         }
 
         .nav-link {
@@ -56,72 +66,128 @@
             transform: translateY(-5px);
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
         }
+
+        .sidebar-toggle {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                height: 100vh;
+                transform: translateX(-100%);
+            }
+
+            .sidebar-visible {
+                transform: translateX(0);
+            }
+
+            .content {
+                margin-left: 0;
+            }
+
+            .content-collapsed {
+                margin-left: 0;
+            }
+
+            .sidebar-toggle {
+                display: block;
+            }
+
+            .sidebar-collapsed {
+                width: 250px;
+            }
+        }
+
+        .tooltip {
+            position: relative;
+        }
+
+        .tooltip .tooltip-text {
+            visibility: hidden;
+            width: 120px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            left: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            margin-left: 15px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
 <div class="flex h-screen">
     <!-- Боковое меню -->
-    <div class="sidebar bg-white shadow-md fixed h-full">
-        <div class="p-4 border-b border-gray-200 flex items-center justify-center h-16">
+    <div class="sidebar bg-white shadow-md fixed h-full" id="sidebar">
+        <div class="p-4 border-b border-gray-200 flex items-center justify-between h-16">
             <div class="flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-500" fill="none" viewBox="0 0 24 24"
                      stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                 </svg>
-                <span class="ml-2 text-xl font-bold text-indigo-600">High VPN</span>
+                <span class="ml-2 text-xl font-bold text-indigo-600" id="logo-text">High VPN</span>
             </div>
+            <button id="collapse-btn" class="p-1 rounded-md hover:bg-gray-100 hidden md:block">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                </svg>
+            </button>
         </div>
 
         <div class="p-4">
             <ul class="space-y-2">
                 <li>
                     <a href="{{ route('personal.dashboard') }}"
-                       class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.dashboard') ? 'active' : '' }}">
+                       class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.dashboard') ? 'active' : '' }} tooltip">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none"
                              viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
                         </svg>
-                        <span class="ml-3">Главная</span>
+                        <span class="ml-3" id="dashboard-text">Главная</span>
+                        <span class="tooltip-text">Главная</span>
                     </a>
                 </li>
                 <li>
                     <a href="{{ route('personal.keys') }}"
-                       class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.keys') ? 'active' : '' }}">
+                       class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.keys') ? 'active' : '' }} tooltip">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none"
                              viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
                         </svg>
-                        <span class="ml-3">Управление ключами</span>
+                        <span class="ml-3" id="keys-text">Управление ключами</span>
+                        <span class="tooltip-text">Управление ключами</span>
                     </a>
                 </li>
                 <li>
                     <a href="{{ route('personal.stats') }}"
-                       class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.stats') ? 'active' : '' }}">
+                       class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.stats') ? 'active' : '' }} tooltip">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none"
                              viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                         </svg>
-                        <span class="ml-3">Статистика продаж</span>
+                        <span class="ml-3" id="stats-text">Статистика продаж</span>
+                        <span class="tooltip-text">Статистика продаж</span>
                     </a>
                 </li>
-{{--                <li>--}}
-{{--                    <a href="{{ route('personal.packages') }}"--}}
-{{--                       class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.packages') ? 'active' : '' }}">--}}
-{{--                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none"--}}
-{{--                             viewBox="0 0 24 24" stroke="currentColor">--}}
-{{--                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"--}}
-{{--                                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>--}}
-{{--                        </svg>--}}
-{{--                        <span class="ml-3">Пакеты ключей</span>--}}
-{{--                    </a>--}}
-{{--                </li>--}}
                 <li>
                     <a href="{{ route('personal.faq') }}"
-                       class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.settings') ? 'active' : '' }}">
+                       class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.faq') ? 'active' : '' }} tooltip">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none"
                              viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -129,7 +195,8 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
-                        <span class="ml-3">База знаний FAQ</span>
+                        <span class="ml-3" id="faq-text">База знаний FAQ</span>
+                        <span class="tooltip-text">База знаний FAQ</span>
                     </a>
                 </li>
             </ul>
@@ -139,26 +206,34 @@
             <form action="{{ route('personal.logout') }}" method="POST">
                 @csrf
                 <button type="submit"
-                        class="w-full flex items-center justify-center p-2 rounded-lg text-gray-600 hover:bg-gray-100">
+                        class="w-full flex items-center justify-center p-2 rounded-lg text-gray-600 hover:bg-gray-100 tooltip">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
                          stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                     </svg>
-                    <span class="ml-3">Выйти</span>
+                    <span class="ml-3" id="logout-text">Выйти</span>
+                    <span class="tooltip-text">Выйти</span>
                 </button>
             </form>
         </div>
     </div>
 
     <!-- Основное содержимое -->
-    <div class="content flex-1 overflow-y-auto">
+    <div class="content flex-1 overflow-y-auto" id="main-content">
         <!-- Шапка -->
         <header class="bg-white shadow-sm">
             <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                <h1 class="text-lg font-semibold text-gray-900">
-                    @yield('title')
-                </h1>
+                <div class="flex items-center">
+                    <button id="mobile-menu-btn" class="sidebar-toggle mr-4 p-1 rounded-md hover:bg-gray-100 md:hidden">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                    <h1 class="text-lg font-semibold text-gray-900">
+                        @yield('title')
+                    </h1>
+                </div>
 
                 <div class="flex items-center space-x-4">
                     <div class="flex items-center">
@@ -182,5 +257,90 @@
     </div>
 </div>
 
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('main-content');
+        const collapseBtn = document.getElementById('collapse-btn');
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const logoText = document.getElementById('logo-text');
+        const navTexts = [
+            document.getElementById('dashboard-text'),
+            document.getElementById('keys-text'),
+            document.getElementById('stats-text'),
+            document.getElementById('faq-text'),
+            document.getElementById('logout-text')
+        ];
+
+        // Проверяем состояние в localStorage
+        const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+
+        // Применяем начальное состояние
+        if (isCollapsed) {
+            collapseSidebar();
+        }
+
+        // Обработчик для кнопки сворачивания (десктоп)
+        collapseBtn.addEventListener('click', function() {
+            if (sidebar.classList.contains('sidebar-collapsed')) {
+                expandSidebar();
+                localStorage.setItem('sidebarCollapsed', 'false');
+            } else {
+                collapseSidebar();
+                localStorage.setItem('sidebarCollapsed', 'true');
+            }
+        });
+
+        // Обработчик для кнопки меню (мобильные)
+        mobileMenuBtn.addEventListener('click', function() {
+            sidebar.classList.toggle('sidebar-visible');
+        });
+
+        function collapseSidebar() {
+            sidebar.classList.add('sidebar-collapsed');
+            mainContent.classList.add('content-collapsed');
+            mainContent.classList.remove('content-full');
+
+            // Скрываем текст в навигации
+            navTexts.forEach(text => {
+                if (text) text.style.display = 'none';
+            });
+            if (logoText) logoText.style.display = 'none';
+
+            // Меняем иконку кнопки
+            collapseBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+            `;
+        }
+
+        function expandSidebar() {
+            sidebar.classList.remove('sidebar-collapsed');
+            mainContent.classList.remove('content-collapsed');
+            mainContent.classList.remove('content-full');
+
+            // Показываем текст в навигации
+            navTexts.forEach(text => {
+                if (text) text.style.display = 'inline';
+            });
+            if (logoText) logoText.style.display = 'inline';
+
+            // Меняем иконку кнопки
+            collapseBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                </svg>
+            `;
+        }
+
+        // Закрываем меню при клике на контент (для мобильных)
+        mainContent.addEventListener('click', function() {
+            if (window.innerWidth <= 768 && sidebar.classList.contains('sidebar-visible')) {
+                sidebar.classList.remove('sidebar-visible');
+            }
+        });
+    });
+</script>
 </body>
 </html>
