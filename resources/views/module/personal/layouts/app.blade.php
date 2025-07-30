@@ -76,6 +76,7 @@
                 position: fixed;
                 height: 100vh;
                 transform: translateX(-100%);
+                transition: transform 0.3s ease;
             }
 
             .sidebar-visible {
@@ -84,6 +85,7 @@
 
             .content {
                 margin-left: 0;
+                width: 100%;
             }
 
             .content-collapsed {
@@ -96,6 +98,21 @@
 
             .sidebar-collapsed {
                 width: 250px;
+            }
+
+            .overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: rgba(0, 0, 0, 0.5);
+                z-index: 40;
+                display: none;
+            }
+
+            .overlay-visible {
+                display: block;
             }
         }
 
@@ -129,6 +146,9 @@
 </head>
 <body class="bg-gray-50">
 <div class="flex h-screen">
+    <!-- Overlay для мобильных -->
+    <div class="overlay" id="overlay"></div>
+
     <!-- Боковое меню -->
     <div class="sidebar bg-white shadow-md fixed h-full" id="sidebar">
         <div class="p-4 border-b border-gray-200 flex items-center justify-between h-16">
@@ -263,6 +283,7 @@
         const mainContent = document.getElementById('main-content');
         const collapseBtn = document.getElementById('collapse-btn');
         const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const overlay = document.getElementById('overlay');
         const logoText = document.getElementById('logo-text');
         const navTexts = [
             document.getElementById('dashboard-text'),
@@ -293,7 +314,14 @@
 
         // Обработчик для кнопки меню (мобильные)
         mobileMenuBtn.addEventListener('click', function() {
-            sidebar.classList.toggle('sidebar-visible');
+            sidebar.classList.add('sidebar-visible');
+            overlay.classList.add('overlay-visible');
+        });
+
+        // Закрываем меню при клике на overlay
+        overlay.addEventListener('click', function() {
+            sidebar.classList.remove('sidebar-visible');
+            overlay.classList.remove('overlay-visible');
         });
 
         function collapseSidebar() {
@@ -333,13 +361,6 @@
                 </svg>
             `;
         }
-
-        // Закрываем меню при клике на контент (для мобильных)
-        mainContent.addEventListener('click', function() {
-            if (window.innerWidth <= 768 && sidebar.classList.contains('sidebar-visible')) {
-                sidebar.classList.remove('sidebar-visible');
-            }
-        });
     });
 </script>
 </body>
