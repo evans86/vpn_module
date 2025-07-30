@@ -40,8 +40,10 @@ Route::prefix('personal')->name('personal.')->group(function () {
     // Защищенные маршруты
     Route::middleware(['auth:salesman'])->group(function () {
         Route::get('/dashboard', [PersonalController::class, 'dashboard'])->name('dashboard');
-        Route::get('/orders', [PersonalController::class, 'orders'])->name('orders');
+        Route::get('/keys', [PersonalController::class, 'keys'])->name('keys');
         Route::get('/stats', [PersonalController::class, 'stats'])->name('stats');
+        Route::get('/packages', [PersonalController::class, 'packages'])->name('packages');
+        Route::get('/faq', [PersonalController::class, 'faq'])->name('faq');
     });
 
     Route::post('/logout', function () {

@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use phpseclib\Math\BigInteger;
 
 /**
  * @property string $id
@@ -16,7 +15,7 @@ use phpseclib\Math\BigInteger;
  * @property int|null $pack_salesman_id кто продавец
  * @property int|null $finish_at дата окончания
  * @property int|null $activated_at дата активации
- * @property BigInteger|null $user_tg_id кто активировал ключ
+ * @property int|null $user_tg_id кто активировал ключ
  * @property int|null $deleted_at срок, до которого нужно активировать
  * @property int|null $status статус
  * @property PackSalesman|null $packSalesman
@@ -104,6 +103,22 @@ class KeyActivate extends Model
                 return 'badge-info';
             case self::DELETED:
                 return 'badge-secondary';
+            default:
+                return 'badge-warning';
+        }
+    }
+
+    public function getStatusBadgeClassSalesman(): string
+    {
+        switch ($this->status) {
+            case self::EXPIRED:
+                return 'bg-red-100 text-red-800';
+            case self::ACTIVE:
+                return 'bg-green-100 text-green-800';
+            case self::PAID:
+                return 'bg-yellow-100 text-yellow-800';
+            case self::DELETED:
+                return 'bg-gray-100 text-gray-800';
             default:
                 return 'badge-warning';
         }

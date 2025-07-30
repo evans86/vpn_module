@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Ваши кастомные стили */
+:root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --dark: #1e293b;
+    --light: #f8fafc;
+    --gray: #94a3b8;
+}
+
+.sidebar {
+    width: 250px;
+    transition: all 0.3s;
+}

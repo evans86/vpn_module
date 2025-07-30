@@ -2,8 +2,11 @@
 
 namespace App\Models\Salesman;
 
+use App\Models\KeyActivate\KeyActivate;
 use App\Models\Pack\Pack;
+use App\Models\PackSalesman\PackSalesman;
 use App\Models\Panel\Panel;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -74,5 +77,26 @@ class Salesman extends Authenticatable
     public function getAuthIdentifier()
     {
         return $this->telegram_id;
+    }
+
+// Получить все ключи, связанные с продавцом через packSales
+    public function keyActivates()
+    {
+        return $this->hasManyThrough(
+            KeyActivate::class,
+            PackSalesman::class,
+            'salesman_id', // Внешний ключ в таблице pack_salesman
+            'pack_salesman_id', // Внешний ключ в таблице key_activate
+            'id', // Локальный ключ в таблице salesman
+            'id' // Локальный ключ в таблице pack_salesman
+        );
+    }
+
+    /**
+     * Отношение к продажам пакетов
+     */
+    public function packSales(): HasMany
+    {
+        return $this->hasMany(PackSalesman::class, 'salesman_id');
     }
 }
