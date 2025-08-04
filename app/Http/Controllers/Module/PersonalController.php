@@ -7,6 +7,7 @@ use App\Models\KeyActivate\KeyActivate;
 use App\Models\Pack\Pack;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
+use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
@@ -171,5 +172,33 @@ class PersonalController extends Controller
 //        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
         return view('module.personal.faq', compact('salesman'));
+    }
+
+    public function updateFaq(Request $request)
+    {
+        $request->validate([
+            'help_text' => 'required|string|max:4000'
+        ]);
+
+        $salesman = Auth::guard('salesman')->user();
+//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+
+        $salesman->update([
+            'custom_help_text' => $request->help_text
+        ]);
+
+        return redirect()->route('personal.faq')->with('success', 'Текст FAQ успешно обновлен!');
+    }
+
+    public function resetFaq()
+    {
+        $salesman = Auth::guard('salesman')->user();
+//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+
+        $salesman->update([
+            'custom_help_text' => null
+        ]);
+
+        return redirect()->route('personal.faq')->with('success', 'Текст FAQ сброшен к стандартному!');
     }
 }

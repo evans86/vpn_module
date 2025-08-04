@@ -44,6 +44,8 @@ Route::prefix('personal')->name('personal.')->group(function () {
         Route::get('/stats', [PersonalController::class, 'stats'])->name('stats');
         Route::get('/packages', [PersonalController::class, 'packages'])->name('packages');
         Route::get('/faq', [PersonalController::class, 'faq'])->name('faq');
+        Route::post('/faq/update', [PersonalController::class, 'updateFaq'])->name('faq.update');
+        Route::post('/faq/reset', [PersonalController::class, 'resetFaq'])->name('faq.reset');
     });
 
     Route::post('/logout', function () {
