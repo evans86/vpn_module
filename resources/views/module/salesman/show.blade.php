@@ -149,6 +149,15 @@
                             </div>
                         </div>
 
+                        <div class="mb-5">
+                            <div class="d-flex justify-content-between align-items-center mb-4">
+                                <h5 class="mb-0">Модуль VPN</h5>
+                                <div class="form-group">
+                                    <label>ID</label>
+                                    <input type="text" class="form-control" value="{{ $salesman->module_bot_id ?? 'Не указан' }}" readonly>
+                                </div>
+                            </div>
+
                         <!-- Статистика и активность -->
 {{--                        <div class="mb-5">--}}
 {{--                            <h5 class="mb-4">Статистика и активность</h5>--}}

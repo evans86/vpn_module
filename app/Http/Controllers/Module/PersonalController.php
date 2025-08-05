@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Log;
 
 class PersonalController extends Controller
 {
-    protected $botModuleService;
+    protected BotModuleService $botModuleService;
 
     public function __construct(BotModuleService $botModuleService)
     {
