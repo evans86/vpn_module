@@ -24,8 +24,8 @@ class PersonalController extends Controller
 
     public function dashboard()
     {
-//        $salesman = Auth::guard('salesman')->user();
-        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+        $salesman = Auth::guard('salesman')->user();
+//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
         // Получаем все pack_salesman_id для данного продавца
         $packSalesmanIds = $salesman->packSales()->pluck('id');
@@ -95,8 +95,8 @@ class PersonalController extends Controller
 
     public function keys()
     {
-//        $salesman = Auth::guard('salesman')->user();
-        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+        $salesman = Auth::guard('salesman')->user();
+//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
         $keys = $salesman->keyActivates()
             ->with(['packSalesman.pack', 'keyActivateUser.serverUser.panel'])
@@ -119,8 +119,8 @@ class PersonalController extends Controller
 
     public function stats()
     {
-//        $salesman = Auth::guard('salesman')->user();
-        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+        $salesman = Auth::guard('salesman')->user();
+//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
         // Статистика продаж по месяцам
 //        $salesStats = $salesman->packSales()
@@ -160,8 +160,8 @@ class PersonalController extends Controller
 
     public function packages()
     {
-//        $salesman = Auth::guard('salesman')->user();
-        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+        $salesman = Auth::guard('salesman')->user();
+//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
         // История покупок пакетов
         $purchasedPacks = $salesman->packSales()
@@ -177,8 +177,8 @@ class PersonalController extends Controller
 
     public function faq()
     {
-//        $salesman = Auth::guard('salesman')->user();
-        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+        $salesman = Auth::guard('salesman')->user();
+//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
         $module = $salesman->botModule;
 
         return view('module.personal.faq', [
@@ -194,8 +194,8 @@ class PersonalController extends Controller
     {
         $request->validate(['instructions' => 'required|string']);
 
-//        $salesman = Auth::guard('salesman')->user();
-        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+        $salesman = Auth::guard('salesman')->user();
+//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
         $salesman->botModule->update(['vpn_instructions' => $request->instructions]);
 
         return redirect()->back()->with('success', 'Инструкции успешно обновлены!');
@@ -218,8 +218,8 @@ class PersonalController extends Controller
             'help_text' => 'required|string|max:4000'
         ]);
 
-//        $salesman = Auth::guard('salesman')->user();
-        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+        $salesman = Auth::guard('salesman')->user();
+//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
         $salesman->update([
             'custom_help_text' => $request->help_text
@@ -230,8 +230,8 @@ class PersonalController extends Controller
 
     public function resetFaq()
     {
-//        $salesman = Auth::guard('salesman')->user();
-        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+        $salesman = Auth::guard('salesman')->user();
+//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
         $salesman->update([
             'custom_help_text' => null
