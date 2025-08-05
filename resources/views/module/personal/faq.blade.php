@@ -24,7 +24,8 @@
     @endif
 
     <div class="px-4 py-6 sm:px-0">
-        <div class="bg-white shadow rounded-lg overflow-hidden">
+        <!-- Редактор FAQ для бота -->
+        <div class="bg-white shadow rounded-lg mb-8">
             <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
                 <h3 class="text-lg leading-6 font-medium text-gray-900">
                     Редактирование раздела "Помощь"
@@ -88,37 +89,100 @@
                 <div class="mt-8 border-t border-gray-200 pt-6">
                     <h4 class="text-md font-medium text-gray-900 mb-2">Предпросмотр</h4>
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                        <div class="prose max-w-none">
+                        <div class="vpn-instructions-preview">
                             {!! nl2br(e($salesman->custom_help_text ?? '🤖 Как создать бота?
 
-    1️⃣ Открываем в телеграмме @BotFather и нажимаем start/начать
+                1️⃣ Открываем в телеграмме @BotFather и нажимаем start/начать
 
-    2️⃣ Выбираем команду /newbot
+                2️⃣ Выбираем команду /newbot
 
-    3️⃣ Вводим любое название для бота. Потом вводим никнейм бота на английском слитно, которое обязательно заканчивается на слово _bot
-    4️⃣ Придёт сообщение, где после API будет находится наш токен.
+                3️⃣ Вводим любое название для бота. Потом вводим никнейм бота на английском слитно, которое обязательно заканчивается на слово _bot
+                4️⃣ Придёт сообщение, где после API будет находится наш токен.
 
+                🪙 Как начать продавать VPN?
 
-    🪙 Как начать продавать VPN?
+                1️⃣ Нажмите на кнопку 🤖 Мой бот
 
-    1️⃣ Нажмите на кнопку 🤖 Мой бот
+                2️⃣ Если у вас нет бота, укажите ранее выпущенный токен и оплатите пакеты
+                Если бот уже добавлен, Вам останется только приобрести пакеты и начать продажи
 
-    2️⃣ Если у вас нет бота, укажите ранее выпущенный токен и оплатите пакеты
-    Если бот уже добавлен, Вам останется только приобрести пакеты и начать продажи
-
-
-    👨🏻‍💻 По всем вопросам обращайтесь к администратору')) !!}
+                👨🏻‍💻 По всем вопросам обращайтесь к администратору')) !!}
                         </div>
                     </div>
                 </div>
+
             </div>
         </div>
+
+        @if($hasModule)
+            <!-- Редактор инструкций для модуля VPN -->
+            <div class="bg-white shadow rounded-lg overflow-hidden">
+                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">
+                        Редактирование инструкций для модуля VPN
+                    </h3>
+                    <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                        Настройте текст инструкций по настройке VPN для ваших клиентов
+                    </p>
+                </div>
+
+                <div class="px-4 py-5 sm:p-6">
+                    <form id="vpnInstructionsForm" action="{{ route('personal.faq.vpn-instructions.update') }}" method="POST">
+                        @csrf
+
+                        <div class="mb-6">
+                            <label for="vpn_instructions" class="block text-sm font-medium text-gray-700 mb-2">
+                                Текст инструкций VPN
+                            </label>
+                            <textarea id="vpn_instructions" name="instructions" rows="12"
+                                      class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                                      placeholder="Введите текст инструкций для VPN...">{{ $currentInstructions }}</textarea>
+                            <p class="mt-2 text-sm text-gray-500">
+                                Можно использовать HTML-разметку. Максимальная длина: 4000 символов.
+                            </p>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <button type="submit"
+                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                Сохранить изменения
+                            </button>
+
+                            <button type="button" onclick="confirmVpnReset()"
+                                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                Сбросить к стандартному
+                            </button>
+                        </div>
+                    </form>
+
+                    <form id="resetVpnForm" action="{{ route('personal.faq.vpn-instructions.reset') }}" method="POST" class="hidden">
+                        @csrf
+                    </form>
+
+                    <div class="mt-8 border-t border-gray-200 pt-6">
+                        <h4 class="text-md font-medium text-gray-900 mb-2">Предпросмотр</h4>
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div class="vpn-instructions-preview">
+                                {!! $currentInstructions !!}
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        @endif
     </div>
 
     <script>
         function confirmReset() {
             if (confirm('Вы уверены, что хотите сбросить текст помощи к стандартному?')) {
                 document.getElementById('resetForm').submit();
+            }
+        }
+
+        function confirmVpnReset() {
+            if (confirm('Вы уверены, что хотите сбросить инструкции VPN к стандартным?')) {
+                document.getElementById('resetVpnForm').submit();
             }
         }
     </script>

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Личный кабинет | High VPN Bot-t</title>
     <link rel="icon"
           href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
@@ -22,6 +23,20 @@
             transition: all 0.3s ease;
             transform: translateX(0);
             z-index: 50;
+        }
+
+        .prose blockquote {
+            border-left: 3px solid #e5e7eb;
+            padding-left: 1rem;
+            margin: 1rem 0;
+            color: #1f2937;
+        }
+        .prose a {
+            color: #4f46e5;
+            text-decoration: underline;
+        }
+        .prose strong {
+            font-weight: 600;
         }
 
         .sidebar-collapsed {
@@ -142,6 +157,33 @@
             visibility: visible;
             opacity: 1;
         }
+
+        .vpn-instructions-preview {
+            white-space: pre-line;
+            line-height: 1.6;
+        }
+        .vpn-instructions-preview blockquote {
+            border-left: 3px solid #e5e7eb;
+            padding-left: 1rem;
+            margin: 1rem 0;
+            color: #1f2937;
+            font-weight: 500;
+        }
+        .vpn-instructions-preview a {
+            color: #4f46e5;
+            text-decoration: underline;
+        }
+        .vpn-instructions-preview strong {
+            font-weight: 600;
+        }
+        .vpn-instructions-preview ul {
+            list-style-type: disc;
+            padding-left: 1.5rem;
+            margin: 0.5rem 0;
+        }
+        .vpn-instructions-preview li {
+            margin-bottom: 0.25rem;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -161,8 +203,9 @@
                 <span class="ml-2 text-xl font-bold text-indigo-600" id="logo-text">High VPN</span>
             </div>
             <button id="collapse-btn" class="p-1 rounded-md hover:bg-gray-100 hidden md:block">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                 </svg>
             </button>
         </div>
@@ -246,8 +289,10 @@
             <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
                 <div class="flex items-center">
                     <button id="mobile-menu-btn" class="sidebar-toggle mr-4 p-1 rounded-md hover:bg-gray-100 md:hidden">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-500" fill="none"
+                             viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M4 6h16M4 12h16M4 18h16"/>
                         </svg>
                     </button>
                     <h1 class="text-lg font-semibold text-gray-900">
@@ -278,7 +323,7 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         const sidebar = document.getElementById('sidebar');
         const mainContent = document.getElementById('main-content');
         const collapseBtn = document.getElementById('collapse-btn');
@@ -302,7 +347,7 @@
         }
 
         // Обработчик для кнопки сворачивания (десктоп)
-        collapseBtn.addEventListener('click', function() {
+        collapseBtn.addEventListener('click', function () {
             if (sidebar.classList.contains('sidebar-collapsed')) {
                 expandSidebar();
                 localStorage.setItem('sidebarCollapsed', 'false');
@@ -313,13 +358,13 @@
         });
 
         // Обработчик для кнопки меню (мобильные)
-        mobileMenuBtn.addEventListener('click', function() {
+        mobileMenuBtn.addEventListener('click', function () {
             sidebar.classList.add('sidebar-visible');
             overlay.classList.add('overlay-visible');
         });
 
         // Закрываем меню при клике на overlay
-        overlay.addEventListener('click', function() {
+        overlay.addEventListener('click', function () {
             sidebar.classList.remove('sidebar-visible');
             overlay.classList.remove('overlay-visible');
         });

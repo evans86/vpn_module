@@ -14,6 +14,7 @@ class BotModuleDto
     public int $free_show;
     public string $secret_user_key;
     public ?string $tariff_cost;
+    public ?string $vpn_instructions;
     public ?int $bot_user_id;
 
     public function getArray(): array
@@ -27,6 +28,7 @@ class BotModuleDto
             'version' => $this->version,
             'secret_user_key' => $this->secret_user_key,
             'tariff_cost' => $this->tariff_cost,
+            'vpn_instructions' => $this->vpn_instructions,
             'bot_user_id' => $this->bot_user_id,
             'free_show' => $this->free_show,
         ];

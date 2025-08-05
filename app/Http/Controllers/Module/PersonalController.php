@@ -8,15 +8,24 @@ use App\Models\Pack\Pack;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
 use Illuminate\Http\Request;
+use App\Services\Bot\BotModuleService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class PersonalController extends Controller
 {
+    protected $botModuleService;
+
+    public function __construct(BotModuleService $botModuleService)
+    {
+        $this->botModuleService = $botModuleService;
+    }
+
     public function dashboard()
     {
-        $salesman = Auth::guard('salesman')->user();
-//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+//        $salesman = Auth::guard('salesman')->user();
+        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
         // Получаем все pack_salesman_id для данного продавца
         $packSalesmanIds = $salesman->packSales()->pluck('id');
@@ -27,7 +36,7 @@ class PersonalController extends Controller
         //Активные ключи
         $activeKeys = KeyActivate::whereIn('pack_salesman_id', $packSalesmanIds)
             ->where('status', KeyActivate::ACTIVE)
-            ->where(function($query) {
+            ->where(function ($query) {
                 $query->whereNull('finish_at')
                     ->orWhere('finish_at', '>', Carbon::now()->timestamp);
             })
@@ -59,13 +68,13 @@ class PersonalController extends Controller
             ->where('status', PackSalesman::PAID)
             ->with('pack')
             ->get()
-            ->sum(function($packSales) {
+            ->sum(function ($packSales) {
                 return $packSales->pack->price ?? 0;
             });
 
         $recentSales = KeyActivate::whereIn('pack_salesman_id', $packSalesmanIds)
             ->where('status', KeyActivate::PAID)
-            ->where(function($query) {
+            ->where(function ($query) {
                 $query->whereNull('finish_at')
                     ->orWhere('finish_at', '>', Carbon::now()->timestamp);
             })
@@ -86,8 +95,8 @@ class PersonalController extends Controller
 
     public function keys()
     {
-        $salesman = Auth::guard('salesman')->user();
-//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+//        $salesman = Auth::guard('salesman')->user();
+        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
         $keys = $salesman->keyActivates()
             ->with(['packSalesman.pack', 'keyActivateUser.serverUser.panel'])
@@ -110,8 +119,8 @@ class PersonalController extends Controller
 
     public function stats()
     {
-        $salesman = Auth::guard('salesman')->user();
-//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+//        $salesman = Auth::guard('salesman')->user();
+        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
         // Статистика продаж по месяцам
 //        $salesStats = $salesman->packSales()
@@ -151,8 +160,8 @@ class PersonalController extends Controller
 
     public function packages()
     {
-        $salesman = Auth::guard('salesman')->user();
-//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+//        $salesman = Auth::guard('salesman')->user();
+        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
         // История покупок пакетов
         $purchasedPacks = $salesman->packSales()
@@ -168,10 +177,39 @@ class PersonalController extends Controller
 
     public function faq()
     {
-        $salesman = Auth::guard('salesman')->user();
-//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+//        $salesman = Auth::guard('salesman')->user();
+        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+        $module = $salesman->botModule;
 
-        return view('module.personal.faq', compact('salesman'));
+        return view('module.personal.faq', [
+            'salesman' => $salesman,
+            'module' => $module,
+            'currentInstructions' => $module->vpn_instructions ?? $this->botModuleService->getDefaultVpnInstructions(),
+            'defaultInstructions' => $this->botModuleService->getDefaultVpnInstructions(),
+            'hasModule' => $module !== null
+        ]);
+    }
+
+    public function updateVpnInstructions(Request $request)
+    {
+        $request->validate(['instructions' => 'required|string']);
+
+//        $salesman = Auth::guard('salesman')->user();
+        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+        $salesman->botModule->update(['vpn_instructions' => $request->instructions]);
+
+        return redirect()->back()->with('success', 'Инструкции успешно обновлены!');
+    }
+
+    public function resetVpnInstructions()
+    {
+//        $salesman = Auth::guard('salesman')->user();
+        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+        $salesman->botModule->update([
+            'vpn_instructions' => $this->botModuleService->getDefaultVpnInstructions()
+        ]);
+
+        return redirect()->back()->with('success', 'Инструкции сброшены к стандартным!');
     }
 
     public function updateFaq(Request $request)
@@ -180,8 +218,8 @@ class PersonalController extends Controller
             'help_text' => 'required|string|max:4000'
         ]);
 
-        $salesman = Auth::guard('salesman')->user();
-//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+//        $salesman = Auth::guard('salesman')->user();
+        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
         $salesman->update([
             'custom_help_text' => $request->help_text
@@ -192,8 +230,8 @@ class PersonalController extends Controller
 
     public function resetFaq()
     {
-        $salesman = Auth::guard('salesman')->user();
-//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+//        $salesman = Auth::guard('salesman')->user();
+        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
         $salesman->update([
             'custom_help_text' => null

@@ -38,15 +38,23 @@ Route::prefix('personal')->name('personal.')->group(function () {
         ->name('auth.telegram.callback');
 
     // Защищенные маршруты
-    Route::middleware(['auth:salesman'])->group(function () {
+//    Route::middleware(['auth:salesman'])->group(function () {
         Route::get('/dashboard', [PersonalController::class, 'dashboard'])->name('dashboard');
         Route::get('/keys', [PersonalController::class, 'keys'])->name('keys');
         Route::get('/stats', [PersonalController::class, 'stats'])->name('stats');
         Route::get('/packages', [PersonalController::class, 'packages'])->name('packages');
-        Route::get('/faq', [PersonalController::class, 'faq'])->name('faq');
-        Route::post('/faq/update', [PersonalController::class, 'updateFaq'])->name('faq.update');
-        Route::post('/faq/reset', [PersonalController::class, 'resetFaq'])->name('faq.reset');
+
+        // FAQ и инструкции
+    Route::prefix('faq')->group(function () {
+        Route::get('/', [PersonalController::class, 'faq'])->name('faq');
+        Route::post('/update', [PersonalController::class, 'updateFaq'])->name('faq.update');
+        Route::post('/reset', [PersonalController::class, 'resetFaq'])->name('faq.reset');
+        Route::post('/vpn-instructions/update', [PersonalController::class, 'updateVpnInstructions'])
+            ->name('faq.vpn-instructions.update');
+        Route::post('/vpn-instructions/reset', [PersonalController::class, 'resetVpnInstructions'])
+            ->name('faq.vpn-instructions.reset');
     });
+//    });
 
     Route::post('/logout', function () {
         Auth::guard('salesman')->logout();

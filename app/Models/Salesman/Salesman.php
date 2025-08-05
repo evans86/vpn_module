@@ -2,6 +2,7 @@
 
 namespace App\Models\Salesman;
 
+use App\Models\Bot\BotModule;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\Pack\Pack;
 use App\Models\PackSalesman\PackSalesman;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $username
  * @property string $telegram_id
  * @property int|null $panel_id
+ * @property int|null $module_bot_id
  * @property string $token
  * @property string $bot_link
  * @property string $custom_help_text
@@ -23,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $created_at
  * @property string $bot_active
  * @property Panel|null $panel
+ * @property BotModule|null $botModule
  * @property string $updated_at
  */
 class Salesman extends Authenticatable
@@ -41,6 +44,11 @@ class Salesman extends Authenticatable
         'token',
         'remember_token', // Добавьте это поле в миграцию если нужно
     ];
+
+    public function botModule(): BelongsTo
+    {
+        return $this->belongsTo(BotModule::class, 'module_bot_id');
+    }
 
     /**
      * Отношение к панели

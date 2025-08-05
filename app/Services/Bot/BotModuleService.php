@@ -5,6 +5,8 @@ namespace App\Services\Bot;
 use App\Dto\Bot\BotModuleDto;
 use App\Helpers\ApiHelpers;
 use App\Models\Bot\BotModule;
+use Exception;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class BotModuleService
@@ -30,6 +32,7 @@ class BotModuleService
         $bot->secret_user_key = '';
         $bot->bot_user_id = 0;
         $bot->tariff_cost = '1-150,3-400,6-600,12-1100';
+        $bot->vpn_instructions = self::getDefaultVpnInstructions();
         if (!$bot->save())
             throw new RuntimeException('bot dont save');
         return $bot;
@@ -73,5 +76,27 @@ class BotModuleService
             throw new RuntimeException('Not found module.');
         if (!$bot->delete())
             throw new RuntimeException('Bot dont delete');
+    }
+
+    public function getDefaultVpnInstructions(): string
+    {
+        return <<<TEXT
+<blockquote><b>🔐 Инструкция по настройке VPN</b></blockquote>
+1️⃣ Нажмите кнопку <strong>«Купить»</strong> и приобретите VPN-ключ
+2️⃣ Скопируйте конфигурацию полученного 🔑 ключа
+3️⃣ Вставьте конфигурацию в приложение <a href="https://play.google.com/store/apps/details?id=app.hiddify.com&hl=ru">Hiddify</a> или <a href="https://apps.apple.com/ru/app/streisand/id6450534064">Streisand</a>
+
+<blockquote><b>📁 Пошаговые инструкции:</b></blockquote>
+- <a href="https://teletype.in/@bott_manager/UPSEXs-nn66">Android</a> 📱
+- <a href="https://teletype.in/@bott_manager/nau_zbkFsdo">iOS</a> 🍏
+- <a href="https://teletype.in/@bott_manager/HhKafGko3sO">Windows</a> 🖥️
+
+<blockquote><b>❓ Если VPN не подключается:</b></blockquote>
+✅ Убедитесь, что используете <strong>актуальный конфиг</strong>
+🔁 Попробуйте <strong>другой протокол</strong>
+📲 Смените приложение на <strong>Hiddify</strong> или <strong>Streisand</strong>
+🔄 Перезагрузите устройство
+💬 Обратитесь в поддержку
+TEXT;
     }
 }

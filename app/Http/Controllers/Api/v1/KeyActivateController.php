@@ -11,6 +11,7 @@ use App\Http\Requests\PackSalesman\PackSalesmanFreeKeyRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanUserKeysRequest;
 use App\Models\Bot\BotModule;
 use App\Models\KeyActivate\KeyActivate;
+use App\Services\Bot\BotModuleService;
 use App\Services\External\BottApi;
 use App\Services\Key\KeyActivateService;
 use Carbon\Carbon;
@@ -22,11 +23,13 @@ use RuntimeException;
 class KeyActivateController extends Controller
 {
     private KeyActivateService $keyActivateService;
+    private BotModuleService $botModuleService;
 
-    public function __construct(KeyActivateService $keyActivateService)
+    public function __construct(KeyActivateService $keyActivateService, BotModuleService $botModuleService)
     {
         $this->middleware('api');
         $this->keyActivateService = $keyActivateService;
+        $this->botModuleService = $botModuleService;
     }
 
     /**
@@ -200,7 +203,7 @@ class KeyActivateController extends Controller
         try {
             $query = KeyActivate::where('user_tg_id', $request->user_tg_id)
                 ->where('status', '!=', KeyActivate::DELETED)
-                ->whereHas('packSalesman.pack', function($query) {
+                ->whereHas('packSalesman.pack', function ($query) {
                     $query->where('module_key', true); // Только пакеты для модуля
                 });
 
@@ -258,48 +261,50 @@ class KeyActivateController extends Controller
     public function getVpnInstructions()
     {
         try {
-            $instructions = [
-                'sections' => [
-                    [
-                        'title' => '🔐 Инструкция по настройке VPN',
-                        'steps' => [
-                            '1️⃣ Нажмите кнопку <strong>«Купить»</strong> и приобретите VPN-ключ',
-                            '2️⃣ Скопируйте конфигурацию полученного 🔑 ключа',
-                            '3️⃣ Вставьте конфигурацию в приложение <strong><a class="app-link q-hoverable bordered" href="https://play.google.com/store/apps/details?id=app.hiddify.com&hl=ru"><span class="q-focus-helper"></span>Hiddify</a></strong> или <strong><a class="app-link q-hoverable bordered" href="https://apps.apple.com/ru/app/streisand/id6450534064"><span class="q-focus-helper"></span>Streisand</a></strong>'
-                        ]
-                    ],
-                    [
-                        'title' => '📁 Пошаговые инструкции по установке:',
-                        'links' => [
-                            [
-                                'title' => 'Инструкция для Android 📱',
-                                'url' => 'https://teletype.in/@bott_manager/UPSEXs-nn66'
-                            ],
-                            [
-                                'title' => 'Инструкция для iOS 🍏',
-                                'url' => 'https://teletype.in/@bott_manager/nau_zbkFsdo'
-                            ],
-                            [
-                                'title' => 'Инструкция для Windows 🖥️',
-                                'url' => 'https://teletype.in/@bott_manager/HhKafGko3sO'
-                            ]
-                        ]
-                    ],
-                    [
-                        'title' => '❓ Что делать, если VPN не подключается?',
-                        'steps' => [
-                            '✅ Убедитесь, что используете <strong>актуальный конфиг</strong> (ключ не просрочен)',
-                            '🔁 Попробуйте <strong>другой протокол</strong>: VLESS / VMess / Shadowsocks / Trojan',
-                            '📲 Смените приложение на <strong>Hiddify</strong> или <strong>Streisand</strong> (другие не рекомендуются)',
-                            '🔄 Перезагрузите устройство',
-                            '💬 Обратитесь в поддержку бота'
-                        ]
-                    ],
-                ],
-            ];
+//            $instructions = [
+//                'sections' => [
+//                    [
+//                        'title' => '🔐 Инструкция по настройке VPN',
+//                        'steps' => [
+//                            '1️⃣ Нажмите кнопку <strong>«Купить»</strong> и приобретите VPN-ключ',
+//                            '2️⃣ Скопируйте конфигурацию полученного 🔑 ключа',
+//                            '3️⃣ Вставьте конфигурацию в приложение <strong><a class="app-link q-hoverable bordered" href="https://play.google.com/store/apps/details?id=app.hiddify.com&hl=ru"><span class="q-focus-helper"></span>Hiddify</a></strong> или <strong><a class="app-link q-hoverable bordered" href="https://apps.apple.com/ru/app/streisand/id6450534064"><span class="q-focus-helper"></span>Streisand</a></strong>'
+//                        ]
+//                    ],
+//                    [
+//                        'title' => '📁 Пошаговые инструкции по установке:',
+//                        'links' => [
+//                            [
+//                                'title' => 'Инструкция для Android 📱',
+//                                'url' => 'https://teletype.in/@bott_manager/UPSEXs-nn66'
+//                            ],
+//                            [
+//                                'title' => 'Инструкция для iOS 🍏',
+//                                'url' => 'https://teletype.in/@bott_manager/nau_zbkFsdo'
+//                            ],
+//                            [
+//                                'title' => 'Инструкция для Windows 🖥️',
+//                                'url' => 'https://teletype.in/@bott_manager/HhKafGko3sO'
+//                            ]
+//                        ]
+//                    ],
+//                    [
+//                        'title' => '❓ Что делать, если VPN не подключается?',
+//                        'steps' => [
+//                            '✅ Убедитесь, что используете <strong>актуальный конфиг</strong> (ключ не просрочен)',
+//                            '🔁 Попробуйте <strong>другой протокол</strong>: VLESS / VMess / Shadowsocks / Trojan',
+//                            '📲 Смените приложение на <strong>Hiddify</strong> или <strong>Streisand</strong> (другие не рекомендуются)',
+//                            '🔄 Перезагрузите устройство',
+//                            '💬 Обратитесь в поддержку бота'
+//                        ]
+//                    ],
+//                ],
+//            ];
+
+            $instructions = $this->botModuleService->getDefaultVpnInstructions();
 
             return ApiHelpers::success([
-                'structured' => $instructions
+                $instructions
             ]);
 
         } catch (Exception $e) {
