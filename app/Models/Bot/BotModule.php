@@ -28,9 +28,9 @@ class BotModule extends Model
 
     protected $guarded = false;
     protected $table = 'bot_module';
-    protected $casts = [
-        'vpn_instructions' => 'array'
-    ];
+//    protected $casts = [
+//        'vpn_instructions' => 'array'
+//    ];
 
     public function salesman()
     {
