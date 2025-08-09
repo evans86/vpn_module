@@ -28,7 +28,7 @@ class BotModuleDto
             'version' => $this->version,
             'secret_user_key' => $this->secret_user_key,
             'tariff_cost' => $this->tariff_cost,
-            'vpn_instructions' => $this->vpn_instructions,
+//            'vpn_instructions' => $this->vpn_instructions,
             'bot_user_id' => $this->bot_user_id,
             'free_show' => $this->free_show,
         ];
