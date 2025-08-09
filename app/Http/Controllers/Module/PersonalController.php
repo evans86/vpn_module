@@ -7,6 +7,9 @@ use App\Models\KeyActivate\KeyActivate;
 use App\Models\Pack\Pack;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\View\Factory;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use App\Services\Bot\BotModuleService;
 use Carbon\Carbon;
@@ -22,6 +25,9 @@ class PersonalController extends Controller
         $this->botModuleService = $botModuleService;
     }
 
+    /**
+     * @return Application|Factory|View
+     */
     public function dashboard()
     {
         $salesman = Auth::guard('salesman')->user();
@@ -93,6 +99,9 @@ class PersonalController extends Controller
         ));
     }
 
+    /**
+     * @return Application|Factory|View
+     */
     public function keys()
     {
         $salesman = Auth::guard('salesman')->user();
@@ -117,6 +126,9 @@ class PersonalController extends Controller
         ));
     }
 
+    /**
+     * @return Application|Factory|View
+     */
     public function stats()
     {
         $salesman = Auth::guard('salesman')->user();
@@ -158,6 +170,9 @@ class PersonalController extends Controller
         ));
     }
 
+    /**
+     * @return Application|Factory|View
+     */
     public function packages()
     {
         $salesman = Auth::guard('salesman')->user();
@@ -180,13 +195,15 @@ class PersonalController extends Controller
         $salesman = Auth::guard('salesman')->user();
 //        $salesman = Salesman::where('telegram_id', 6715142449)->first();
         $module = $salesman->botModule;
+        $bot = $salesman->bot_link;
 
         return view('module.personal.faq', [
             'salesman' => $salesman,
             'module' => $module,
             'currentInstructions' => $module->vpn_instructions ?? $this->botModuleService->getDefaultVpnInstructions(),
             'defaultInstructions' => $this->botModuleService->getDefaultVpnInstructions(),
-            'hasModule' => $module !== null
+            'hasModule' => $module !== null,
+            'hasBot' => $bot !== null
         ]);
     }
 

@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $panel_id
  * @property int|null $module_bot_id
  * @property string $token
- * @property string $bot_link
+ * @property string|null $bot_link
  * @property string $custom_help_text
  * @property string $status
  * @property string $created_at

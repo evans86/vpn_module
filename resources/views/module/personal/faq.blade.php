@@ -23,29 +23,31 @@
         </div>
     @endif
 
+
     <div class="px-4 py-6 sm:px-0">
-        <!-- Редактор FAQ для бота -->
-        <div class="bg-white shadow rounded-lg mb-8">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <h3 class="text-lg leading-6 font-medium text-gray-900">
-                    Редактирование раздела "Помощь"
-                </h3>
-                <p class="mt-1 max-w-2xl text-sm text-gray-500">
-                    Настройте текст, который видят ваши клиенты в разделе "Помощь" вашего бота
-                </p>
-            </div>
+        @if($hasBot)
+            <!-- Редактор FAQ для бота -->
+            <div class="bg-white shadow rounded-lg mb-8">
+                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">
+                        Редактирование раздела "Помощь"
+                    </h3>
+                    <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                        Настройте текст, который видят ваши клиенты в разделе "Помощь" вашего бота
+                    </p>
+                </div>
 
-            <div class="px-4 py-5 sm:p-6">
-                <form action="{{ route('personal.faq.update') }}" method="POST">
-                    @csrf
+                <div class="px-4 py-5 sm:p-6">
+                    <form action="{{ route('personal.faq.update') }}" method="POST">
+                        @csrf
 
-                    <div class="mb-6">
-                        <label for="help_text" class="block text-sm font-medium text-gray-700 mb-2">
-                            Текст раздела "Помощь"
-                        </label>
-                        <textarea id="help_text" name="help_text" rows="12"
-                                  class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                                  placeholder="Введите текст помощи для ваших клиентов...">{{ $salesman->custom_help_text ?? '🤖 Как создать бота?
+                        <div class="mb-6">
+                            <label for="help_text" class="block text-sm font-medium text-gray-700 mb-2">
+                                Текст раздела "Помощь"
+                            </label>
+                            <textarea id="help_text" name="help_text" rows="12"
+                                      class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                                      placeholder="Введите текст помощи для ваших клиентов...">{{ $salesman->custom_help_text ?? '🤖 Как создать бота?
 
 1️⃣ Открываем в телеграмме @BotFather и нажимаем start/начать
 
@@ -64,55 +66,84 @@
 
 
 👨🏻‍💻 По всем вопросам обращайтесь к администратору' }}</textarea>
-                        <p class="mt-2 text-sm text-gray-500">
-                            Можно использовать HTML-разметку. Максимальная длина: 4000 символов.
-                        </p>
+                            <p class="mt-2 text-sm text-gray-500">
+                                Можно использовать HTML-разметку. Максимальная длина: 4000 символов.
+                            </p>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <button type="submit"
+                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                Сохранить изменения
+                            </button>
+
+                            <button type="button" onclick="confirmReset()"
+                                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                Сбросить к стандартному
+                            </button>
+                        </div>
+                    </form>
+
+                    <form id="resetForm" action="{{ route('personal.faq.reset') }}" method="POST" class="hidden">
+                        @csrf
+                    </form>
+
+                    <div class="mt-8 border-t border-gray-200 pt-6">
+                        <h4 class="text-md font-medium text-gray-900 mb-2">Предпросмотр</h4>
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div class="vpn-instructions-preview">
+                                {!! nl2br(e($salesman->custom_help_text ?? '🤖 Как создать бота?
+
+                    1️⃣ Открываем в телеграмме @BotFather и нажимаем start/начать
+
+                    2️⃣ Выбираем команду /newbot
+
+                    3️⃣ Вводим любое название для бота. Потом вводим никнейм бота на английском слитно, которое обязательно заканчивается на слово _bot
+                    4️⃣ Придёт сообщение, где после API будет находится наш токен.
+
+                    🪙 Как начать продавать VPN?
+
+                    1️⃣ Нажмите на кнопку 🤖 Мой бот
+
+                    2️⃣ Если у вас нет бота, укажите ранее выпущенный токен и оплатите пакеты
+                    Если бот уже добавлен, Вам останется только приобрести пакеты и начать продажи
+
+                    👨🏻‍💻 По всем вопросам обращайтесь к администратору')) !!}
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="flex items-center justify-between">
-                        <button type="submit"
-                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                            Сохранить изменения
-                        </button>
-
-                        <button type="button" onclick="confirmReset()"
-                                class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                            Сбросить к стандартному
-                        </button>
-                    </div>
-                </form>
-
-                <form id="resetForm" action="{{ route('personal.faq.reset') }}" method="POST" class="hidden">
-                    @csrf
-                </form>
-
-                <div class="mt-8 border-t border-gray-200 pt-6">
-                    <h4 class="text-md font-medium text-gray-900 mb-2">Предпросмотр</h4>
-                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                        <div class="vpn-instructions-preview">
-                            {!! nl2br(e($salesman->custom_help_text ?? '🤖 Как создать бота?
-
-                1️⃣ Открываем в телеграмме @BotFather и нажимаем start/начать
-
-                2️⃣ Выбираем команду /newbot
-
-                3️⃣ Вводим любое название для бота. Потом вводим никнейм бота на английском слитно, которое обязательно заканчивается на слово _bot
-                4️⃣ Придёт сообщение, где после API будет находится наш токен.
-
-                🪙 Как начать продавать VPN?
-
-                1️⃣ Нажмите на кнопку 🤖 Мой бот
-
-                2️⃣ Если у вас нет бота, укажите ранее выпущенный токен и оплатите пакеты
-                Если бот уже добавлен, Вам останется только приобрести пакеты и начать продажи
-
-                👨🏻‍💻 По всем вопросам обращайтесь к администратору')) !!}
+                </div>
+            </div>
+        @else
+            <!-- Блок, если нет привязанного бота -->
+            <div class="bg-white shadow rounded-lg mb-8 overflow-hidden">
+                <div class="px-4 py-5 sm:px-6 bg-indigo-600 text-white">
+                    <h3 class="text-lg leading-6 font-medium">
+                        <i class="fas fa-robot mr-2"></i> У вас нет привязанного бота
+                    </h3>
+                </div>
+                <div class="px-4 py-5 sm:p-6">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 text-indigo-500">
+                            <i class="fas fa-info-circle text-2xl"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-gray-700">
+                                Для редактирования FAQ вам нужно привязать бота к вашему аккаунту.
+                            </p>
+                            <div class="mt-4">
+                                <a href="https://t.me/father_vpn_bot_t_bot"
+                                   target="_blank"
+                                   class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+                                    <i class="fab fa-telegram mr-2"></i> Перейти к Father VPN Bot-t
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
-
             </div>
-        </div>
+        @endif
 
         @if($hasModule)
             <!-- Редактор инструкций для модуля VPN -->
@@ -127,7 +158,8 @@
                 </div>
 
                 <div class="px-4 py-5 sm:p-6">
-                    <form id="vpnInstructionsForm" action="{{ route('personal.faq.vpn-instructions.update') }}" method="POST">
+                    <form id="vpnInstructionsForm" action="{{ route('personal.faq.vpn-instructions.update') }}"
+                          method="POST">
                         @csrf
 
                         <div class="mb-6">
@@ -155,7 +187,8 @@
                         </div>
                     </form>
 
-                    <form id="resetVpnForm" action="{{ route('personal.faq.vpn-instructions.reset') }}" method="POST" class="hidden">
+                    <form id="resetVpnForm" action="{{ route('personal.faq.vpn-instructions.reset') }}" method="POST"
+                          class="hidden">
                         @csrf
                     </form>
 
@@ -167,6 +200,34 @@
                             </div>
                         </div>
 
+                    </div>
+                </div>
+            </div>
+        @else
+            <!-- Блок, если нет модуля -->
+            <div class="bg-white shadow rounded-lg mb-8 overflow-hidden">
+                <div class="px-4 py-5 sm:px-6 bg-blue-600 text-white">
+                    <h3 class="text-lg leading-6 font-medium">
+                        <i class="fas fa-puzzle-piece mr-2"></i> Модуль VPN не подключен
+                    </h3>
+                </div>
+                <div class="px-4 py-5 sm:p-6">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 text-blue-500">
+                            <i class="fas fa-cube text-2xl"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-gray-700">
+                                Для редактирования инструкций VPN вам нужно подключить модуль к вашему боту.
+                            </p>
+                            <div class="mt-4">
+                                <a href="https://bot-t.com"
+                                   target="_blank"
+                                   class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
+                                    <i class="fas fa-external-link-alt mr-2"></i> Перейти на Bot-T.com
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
