@@ -17,11 +17,9 @@ class BotModuleService
 {
     private SalesmanService $salesmanService;
 
-    public function __construct(
-        SalesmanService $salesmanService
-    )
+    public function __construct()
     {
-        $this->salesmanService = $salesmanService;
+        $this->salesmanService = app(SalesmanService::class);
     }
 
     /**
@@ -74,7 +72,7 @@ class BotModuleService
         $creator = BottApi::getCreator($dto->public_key, $dto->private_key);
         $salesman = Salesman::query()->where('telegram_id', $creator['data']['user']['telegram_id'])->first();
 
-        if (!isset($salesman)){
+        if (!isset($salesman)) {
             $this->salesmanService->create($creator['data']['user']['telegram_id'], $creator['data']['user']['username']);
         }
 
