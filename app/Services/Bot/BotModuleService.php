@@ -5,12 +5,25 @@ namespace App\Services\Bot;
 use App\Dto\Bot\BotModuleDto;
 use App\Helpers\ApiHelpers;
 use App\Models\Bot\BotModule;
+use App\Models\Salesman\Salesman;
+use App\Services\External\BottApi;
+use App\Services\Salesman\SalesmanService;
 use Exception;
+use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class BotModuleService
 {
+    private SalesmanService $salesmanService;
+
+    public function __construct(
+        SalesmanService $salesmanService
+    )
+    {
+        $this->salesmanService = $salesmanService;
+    }
+
     /**
      * Создание модуля
      *
@@ -43,6 +56,7 @@ class BotModuleService
      *
      * @param BotModuleDto $dto
      * @return BotModule|string
+     * @throws GuzzleException
      */
     public function update(BotModuleDto $dto): BotModule
     {
@@ -56,6 +70,19 @@ class BotModuleService
         $bot->tariff_cost = $dto->tariff_cost;
         $bot->free_show = $dto->free_show;
         $bot->bot_user_id = $dto->bot_user_id;
+
+        $creator = BottApi::getCreator($dto->public_key, $dto->private_key);
+        $salesman = Salesman::query()->where('telegram_id', $creator['data']['user']['telegram_id'])->first();
+
+        if (!isset($salesman)){
+            $this->salesmanService->create($creator['data']['user']['telegram_id'], $creator['data']['user']['username']);
+        }
+
+        $salesman = Salesman::query()->where('telegram_id', $creator['data']['user']['telegram_id'])->first();
+        $salesman->module_bot_id = $dto->id;
+
+        if (!$salesman->save())
+            throw new RuntimeException('salesman dont save');
 
         if (!$bot->save())
             throw new RuntimeException('bot dont save');

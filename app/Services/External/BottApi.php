@@ -37,6 +37,28 @@ class BottApi
     }
 
     /**
+     * Получение пользователя создателя
+     *
+     * @param string $public_key
+     * @param string $private_key
+     * @return array
+     * @throws GuzzleException
+     */
+    public static function getCreator(string $public_key, string $private_key): array
+    {
+        $requestParam = [
+            'public_key' => $public_key,
+            'private_key' => $private_key
+        ];
+
+        $client = new Client(['base_uri' => self::HOST]);
+        $response = $client->get('v1/module/user/get-creator?' . http_build_query($requestParam));
+
+        $result = $response->getBody()->getContents();
+        return json_decode($result, true);
+    }
+
+    /**
      * Получение $secret_key
      *
      * @param int $telegram_id
