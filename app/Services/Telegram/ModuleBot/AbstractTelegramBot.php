@@ -88,7 +88,7 @@ abstract class AbstractTelegramBot
 
             $this->processUpdate();
         } catch (Exception $e) {
-            Log::error('Error initializing bot', [
+            Log::info('!Error initializing bot!', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
