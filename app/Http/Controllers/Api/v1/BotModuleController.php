@@ -76,7 +76,7 @@ class BotModuleController extends Controller
             return ApiHelpers::error($r->getMessage());
         } catch (Exception $e) {
             Log::error($e->getMessage());
-            return ApiHelpers::error('Module creation error');
+            return ApiHelpers::error('Module get error');
         }
     }
 
@@ -101,7 +101,7 @@ class BotModuleController extends Controller
             return ApiHelpers::error($r->getMessage());
         } catch (Exception $e) {
             Log::error($e->getMessage());
-            return ApiHelpers::error('Module creation error');
+            return ApiHelpers::error('Module get settings error');
         }
     }
 
@@ -121,7 +121,7 @@ class BotModuleController extends Controller
             return ApiHelpers::error($r->getMessage());
         } catch (Exception $e) {
             Log::error($e->getMessage());
-            return ApiHelpers::error('Module creation error');
+            return ApiHelpers::error('Module update error');
         }
     }
 
@@ -140,7 +140,7 @@ class BotModuleController extends Controller
             return ApiHelpers::error($r->getMessage());
         } catch (Exception $e) {
             Log::error($e->getMessage());
-            return ApiHelpers::error('Module creation error');
+            return ApiHelpers::error('Module delete error');
         }
     }
 }
