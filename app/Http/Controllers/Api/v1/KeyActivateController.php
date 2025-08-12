@@ -6,6 +6,7 @@ use App\Dto\Bot\BotModuleFactory;
 use App\Helpers\ApiHelpers;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\BotModule\BotGetRequest;
+use App\Http\Requests\BotModule\BotModuleInstructionsRequest;
 use App\Http\Requests\KeyActivate\KeyActivateRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanBuyKeyRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanFreeKeyRequest;
@@ -260,18 +261,18 @@ class KeyActivateController extends Controller
      * @return array|string
      */
     public function getVpnInstructions(
-//        BotGetRequest $request
+        BotModuleInstructionsRequest $request
     )
     {
         try {
 
-//            $botModule = BotModule::where('public_key', $request->public_key)->first();
-//            if (!$botModule) {
-//                throw new RuntimeException('Модуль бота не найден');
-//            }
+            $botModule = BotModule::where('public_key', $request->public_key)->first();
+            if (!$botModule) {
+                throw new RuntimeException('Модуль бота не найден');
+            }
 
-//            $instructions = $botModule->vpn_instructions;
-            $instructions = $this->botModuleService->getDefaultVpnInstructions();
+            $instructions = $botModule->vpn_instructions;
+//            $instructions = $this->botModuleService->getDefaultVpnInstructions();
 
             return ApiHelpers::success([
                 $instructions

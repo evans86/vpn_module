@@ -3,11 +3,11 @@
 namespace App\Http\Requests\BotModule;
 
 use App\Helpers\ApiHelpers;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
-use \Illuminate\Contracts\Validation\Validator;
 use Illuminate\Validation\ValidationException;
 
-class BotGetRequest c
+class BotModuleInstructionsRequest extends FormRequest
 {
     /**
      * @return string[]
@@ -15,8 +15,7 @@ class BotGetRequest c
     public function rules()
     {
         return [
-            'public_key' => 'required|string',
-            'private_key' => 'required|string',
+            'public_key' => 'required|string'
         ];
     }
 
