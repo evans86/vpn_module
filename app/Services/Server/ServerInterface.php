@@ -7,6 +7,12 @@ use App\Models\Server\Server;
 interface ServerInterface
 {
     /**
+     * @param Server $server
+     * @return bool
+     */
+    public function ping(Server $server): bool;
+
+    /**
      * @param int $location_id
      * @param string $provider
      * @param bool $isFree

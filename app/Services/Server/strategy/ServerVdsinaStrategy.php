@@ -18,6 +18,11 @@ class ServerVdsinaStrategy extends ServerMainStrategy
         $this->service = new VdsinaService();
     }
 
+    public function ping(Server $server): bool
+    {
+        return $this->service->ping($server);
+    }
+
     /**
      * Первоначальное создание сервера
      *

@@ -23,6 +23,59 @@ class VdsinaService
     }
 
     /**
+     * Проверка доступности сервера
+     *
+     * @param Server $server
+     * @return bool
+     */
+    public function ping(Server $server): bool
+    {
+        try {
+            if (empty($server->ip)) {
+                Log::warning('Server has no IP address', ['server_id' => $server->id]);
+                return false;
+            }
+
+            // Проверяем доступность сервера через ping (ICMP)
+            $output = [];
+            $result = null;
+
+            // Для Windows используем другой синтаксис команды
+            if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                exec(sprintf('ping -n 1 -w 1 %s', escapeshellarg($server->ip)), $output, $result);
+            } else {
+                exec(sprintf('ping -c 1 -W 1 %s', escapeshellarg($server->ip)), $output, $result);
+            }
+
+            // Если результат 0 - сервер доступен
+            if ($result === 0) {
+                Log::info('Server ping successful', ['server_id' => $server->id, 'ip' => $server->ip]);
+                return true;
+            }
+
+            // Если ping не сработал, попробуем проверить через TCP-порт (например, SSH 22)
+            $connection = @fsockopen($server->ip, 22, $errno, $errstr, 1);
+
+            if ($connection) {
+                fclose($connection);
+                Log::info('Server TCP port check successful', ['server_id' => $server->id, 'ip' => $server->ip]);
+                return true;
+            }
+
+            Log::warning('Server is not responding to ping or TCP connection', ['server_id' => $server->id, 'ip' => $server->ip]);
+            return false;
+
+        } catch (Exception $e) {
+            Log::error('Error while pinging server', [
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return false;
+        }
+    }
+
+    /**
      * Первоначальная настройка сервера
      *
      * @param int $location_id

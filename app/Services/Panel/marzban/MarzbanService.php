@@ -16,8 +16,8 @@ use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use phpseclib\Net\SSH2;
 use Exception;
+use phpseclib3\Net\SSH2;
 use RuntimeException;
 use Telegram\Bot\Api;
 

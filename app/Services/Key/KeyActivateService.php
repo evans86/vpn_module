@@ -13,10 +13,12 @@ use App\Logging\DatabaseLogger;
 use App\Services\External\BottApi;
 use App\Services\Panel\PanelStrategy;
 use App\Services\Notification\NotificationService;
+use App\Services\Server\ServerStrategy;
 use Carbon\Carbon;
 use DomainException;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Exception;
@@ -232,6 +234,22 @@ class KeyActivateService
 
             if (!$panel) {
                 throw new RuntimeException('Активная панель Marzban не найдена');
+            }
+
+            $serverStrategy = new ServerStrategy($panel->server->provider);
+            if (!$serverStrategy->ping($panel->server)) {
+                $this->logger->error('Ошибка активации ключа', [
+                    'key_id' => $key->id,
+                    'user_id' => $userTgId,
+                    'server_id' => $panel->server->id
+                ]);
+                throw new RuntimeException('Сервер не доступен');
+            }else{
+                $this->logger->warning('CЕРВЕР ПРОВЕРЕН И ДОСТУПЕН', [
+                    'key_id' => $key->id,
+                    'user_id' => $userTgId,
+                    'server_id' => $panel->server->id,
+                ]);
             }
 
             $finishAt = time() + ($key->packSalesman->pack->period * 24 * 60 * 60);

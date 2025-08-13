@@ -23,6 +23,15 @@ class ServerStrategy
     }
 
     /**
+     * @param Server $server
+     * @return bool
+     */
+    public function ping(Server $server): bool
+    {
+        $this->strategy->ping($server);
+    }
+
+    /**
      * Создание сервера в первоначальном виде
      *
      * @param int $location_id
