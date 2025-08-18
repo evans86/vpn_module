@@ -17,10 +17,25 @@ use RuntimeException;
 
 class SalesmanController extends Controller
 {
+    /**
+     * @var SalesmanService
+     */
     private SalesmanService $salesmanService;
+    /**
+     * @var SalesmanRepository
+     */
     private SalesmanRepository $salesmanRepository;
+    /**
+     * @var PackSalesmanService
+     */
     private PackSalesmanService $packSalesmanService;
+    /**
+     * @var PackRepository
+     */
     private PackRepository $packRepository;
+    /**
+     * @var PanelRepository
+     */
     private PanelRepository $panelRepository;
 
     public function __construct(
@@ -114,40 +129,6 @@ class SalesmanController extends Controller
         }
     }
 
-//    /**
-//     * Remove pack from salesman
-//     *
-//     * @param Request $request
-//     * @param int $id
-//     * @return JsonResponse
-//     */
-//    public function removePack(Request $request, int $id): JsonResponse
-//    {
-//        try {
-//            $packId = $request->input('pack_id');
-//            $this->packSalesmanService->delete($packId, $id);
-//
-//            return response()->json([
-//                'success' => true,
-//                'message' => 'Пакет успешно удален у продавца',
-//            ]);
-//        } catch (Exception $e) {
-//            Log::error('Error removing pack from salesman', [
-//                'source' => 'salesman',
-//                'error' => $e->getMessage(),
-//                'trace' => $e->getTraceAsString(),
-//                'salesman_id' => $id,
-//                'pack_id' => $request->input('pack_id'),
-//                'user_id' => auth()->id()
-//            ]);
-//
-//            return response()->json([
-//                'success' => false,
-//                'message' => $e->getMessage()
-//            ], 500);
-//        }
-//    }
-
     /**
      * Toggle salesman status
      *
@@ -187,6 +168,11 @@ class SalesmanController extends Controller
         }
     }
 
+    /**
+     * @param Request $request
+     * @param int $id
+     * @return JsonResponse
+     */
     public function assignPanel(Request $request, int $id): JsonResponse
     {
         try {

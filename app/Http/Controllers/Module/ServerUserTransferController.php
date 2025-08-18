@@ -15,6 +15,9 @@ use RuntimeException;
 
 class ServerUserTransferController extends Controller
 {
+    /**
+     * @var MarzbanService
+     */
     private MarzbanService $marzbanService;
 
     public function __construct(MarzbanService $marzbanService)

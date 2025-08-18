@@ -6,6 +6,10 @@ use App\Models\Salesman\Salesman;
 
 class SalesmanFactory
 {
+    /**
+     * @param Salesman $salesman
+     * @return SalesmanDto
+     */
     public static function fromEntity(Salesman $salesman): SalesmanDto
     {
         $dto = new SalesmanDto();

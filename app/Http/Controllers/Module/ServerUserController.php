@@ -12,6 +12,9 @@ class ServerUserController extends Controller
 {
     /**
      * Display a listing of the server users.
+     *
+     * @param Request $request
+     * @return View
      */
     public function index(Request $request): View
     {
@@ -66,6 +69,9 @@ class ServerUserController extends Controller
 
     /**
      * Show the specified server user.
+     *
+     * @param ServerUser $serverUser
+     * @return View
      */
     public function show(ServerUser $serverUser): View
     {

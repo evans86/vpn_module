@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
 use App\Models\TelegramUser\TelegramUser;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\View\Factory;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -11,6 +14,9 @@ class TelegramUserController extends Controller
 {
     /**
      * Отображает список пользователей.
+     *
+     * @param Request $request
+     * @return Application|Factory|View
      */
     public function index(Request $request)
     {
@@ -36,6 +42,9 @@ class TelegramUserController extends Controller
 
     /**
      * Переключает статус пользователя.
+     *
+     * @param $id
+     * @return JsonResponse
      */
     public function toggleStatus($id): JsonResponse
     {

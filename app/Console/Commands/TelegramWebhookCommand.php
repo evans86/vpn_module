@@ -6,11 +6,35 @@ use Exception;
 use Illuminate\Console\Command;
 use Telegram\Bot\Api;
 
+/**
+ * Консольная команда для управления Telegram webhook.
+ *
+ * Команда позволяет:
+ * 1. Устанавливать webhook для указанного бота (father или salesman)
+ * 2. Удалять webhook для указанного бота
+ * 3. Работать с разными типами ботов и их токенами
+ * 4. Обрабатывать ошибки при взаимодействии с Telegram API
+ */
 class TelegramWebhookCommand extends Command
 {
+    /**
+     * Сигнатура команды для вызова из консоли.
+     *
+     * @var string
+     */
     protected $signature = 'telegram:webhook {action=set} {--bot=father} {--token=}';
+    /**
+     * Описание команды, отображаемое при выводе списка команд.
+     *
+     * @var string
+     */
     protected $description = 'Set or remove Telegram webhook. Use --bot=father|salesman to specify bot type';
 
+    /**
+     * Основной метод выполнения команды.
+     *
+     * @return void
+     */
     public function handle()
     {
         $action = $this->argument('action');
@@ -29,6 +53,13 @@ class TelegramWebhookCommand extends Command
         }
     }
 
+    /**
+     * Устанавливает webhook для указанного бота.
+     *
+     * @param string $botType Тип бота (father|salesman)
+     * @param string|null $token Токен бота (опционально)
+     * @return void
+     */
     private function setWebhook(string $botType, ?string $token = null)
     {
         // Для основного бота берем токен из конфига, если не указан
@@ -64,6 +95,13 @@ class TelegramWebhookCommand extends Command
         }
     }
 
+    /**
+     * Удаляет webhook для указанного бота.
+     *
+     * @param string $botType Тип бота (father|salesman)
+     * @param string|null $token Токен бота (опционально)
+     * @return void
+     */
     public function removeWebhook(string $botType, ?string $token = null)
     {
         if ($botType === 'father') {

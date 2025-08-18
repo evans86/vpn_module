@@ -15,7 +15,13 @@ use Carbon\Carbon;
 
 class PackSalesmanController extends Controller
 {
+    /**
+     * @var DatabaseLogger
+     */
     private DatabaseLogger $logger;
+    /**
+     * @var PackSalesmanService
+     */
     private PackSalesmanService $packSalesmanService;
 
     public function __construct(

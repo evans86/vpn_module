@@ -10,6 +10,7 @@ use App\Models\Salesman\Salesman;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use App\Services\Bot\BotModuleService;
 use Carbon\Carbon;
@@ -18,6 +19,9 @@ use Illuminate\Support\Facades\Log;
 
 class PersonalController extends Controller
 {
+    /**
+     * @var BotModuleService
+     */
     protected BotModuleService $botModuleService;
 
     public function __construct(BotModuleService $botModuleService)
@@ -190,6 +194,9 @@ class PersonalController extends Controller
         ));
     }
 
+    /**
+     * @return Application|Factory|View
+     */
     public function faq()
     {
         $salesman = Auth::guard('salesman')->user();
@@ -207,6 +214,10 @@ class PersonalController extends Controller
         ]);
     }
 
+    /**
+     * @param Request $request
+     * @return RedirectResponse
+     */
     public function updateVpnInstructions(Request $request)
     {
         $request->validate(['instructions' => 'required|string']);
@@ -218,6 +229,9 @@ class PersonalController extends Controller
         return redirect()->back()->with('success', 'Инструкции успешно обновлены!');
     }
 
+    /**
+     * @return RedirectResponse
+     */
     public function resetVpnInstructions()
     {
 //        $salesman = Auth::guard('salesman')->user();
@@ -229,6 +243,10 @@ class PersonalController extends Controller
         return redirect()->back()->with('success', 'Инструкции сброшены к стандартным!');
     }
 
+    /**
+     * @param Request $request
+     * @return RedirectResponse
+     */
     public function updateFaq(Request $request)
     {
         $request->validate([
@@ -245,6 +263,9 @@ class PersonalController extends Controller
         return redirect()->route('personal.faq')->with('success', 'Текст FAQ успешно обновлен!');
     }
 
+    /**
+     * @return RedirectResponse
+     */
     public function resetFaq()
     {
         $salesman = Auth::guard('salesman')->user();

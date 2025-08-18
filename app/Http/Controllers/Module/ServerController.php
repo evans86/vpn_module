@@ -19,7 +19,13 @@ use RuntimeException;
 
 class ServerController extends Controller
 {
+    /**
+     * @var ServerRepository
+     */
     private ServerRepository $serverRepository;
+    /**
+     * @var DatabaseLogger
+     */
     private DatabaseLogger $logger;
 
     public function __construct(
@@ -172,7 +178,9 @@ class ServerController extends Controller
     }
 
     /**
-     * Update the specified resource in storage.
+     * @param Request $request
+     * @param Server $server
+     * @return RedirectResponse
      */
     public function update(Request $request, Server $server): RedirectResponse
     {
@@ -255,7 +263,8 @@ class ServerController extends Controller
     }
 
     /**
-     * Get server status
+     * @param Server $server
+     * @return JsonResponse
      */
     public function getStatus(Server $server): JsonResponse
     {

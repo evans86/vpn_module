@@ -6,6 +6,10 @@ use App\Models\PackSalesman\PackSalesman;
 
 class PackSalesmanFactory
 {
+    /**
+     * @param PackSalesman $pack_salesman
+     * @return PackSalesmanDto
+     */
     public static function fromEntity(PackSalesman $pack_salesman): PackSalesmanDto
     {
         $dto = new PackSalesmanDto();

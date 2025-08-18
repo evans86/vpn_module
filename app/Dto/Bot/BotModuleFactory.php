@@ -6,6 +6,10 @@ use App\Models\Bot\BotModule;
 
 class BotModuleFactory
 {
+    /**
+     * @param BotModule $bot_module
+     * @return BotModuleDto
+     */
     public static function fromEntity(BotModule $bot_module): BotModuleDto
     {
         $dto = new BotModuleDto();

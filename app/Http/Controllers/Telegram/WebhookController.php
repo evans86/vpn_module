@@ -15,6 +15,10 @@ class WebhookController extends Controller
 {
     /**
      * Обработка webhook-а для главного бота
+     *
+     * @param Request $request
+     * @param string $token
+     * @return JsonResponse
      */
     public function fatherBot(Request $request, string $token): JsonResponse
     {
@@ -51,6 +55,10 @@ class WebhookController extends Controller
 
     /**
      * Обработка webhook-а для бота продавца
+     *
+     * @param Request $request
+     * @param string $token
+     * @return JsonResponse
      */
     public function salesmanBot(Request $request, string $token): JsonResponse
     {

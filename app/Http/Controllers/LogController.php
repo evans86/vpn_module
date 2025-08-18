@@ -11,6 +11,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 class LogController extends Controller
 {
+    /**
+     * @var LogRepository
+     */
     private LogRepository $logRepository;
 
     public function __construct(LogRepository $logRepository)

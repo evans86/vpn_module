@@ -11,12 +11,16 @@ use App\Http\Requests\BotModule\BotGetRequest;
 use App\Models\Bot\BotModule;
 use App\Services\Bot\BotModuleService;
 use Exception;
+use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class BotModuleController extends Controller
 {
+    /**
+     * @var BotModuleService
+     */
     private BotModuleService $botModuleService;
 
     public function __construct()
@@ -68,6 +72,9 @@ class BotModuleController extends Controller
     public function get(BotGetRequest $request)
     {
         try {
+            /**
+             * @var BotModule $botModule
+             */
             $botModule = BotModule::query()->where('public_key', $request->public_key)->where('private_key', $request->private_key)->first();
             if (empty($botModule))
                 return ApiHelpers::error('Not found module.');
@@ -91,6 +98,9 @@ class BotModuleController extends Controller
         try {
             if (is_null($request->public_key))
                 return ApiHelpers::error('Not found params: public_key');
+            /**
+             * @var BotModule $botModule
+             */
             $botModule = BotModule::query()->where('public_key', $request->public_key)->first();
             if (empty($botModule))
                 throw new RuntimeException('Not found module.');
@@ -110,11 +120,15 @@ class BotModuleController extends Controller
      *
      * @param BotUpdateRequest $request
      * @return array|string
+     * @throws GuzzleException
      */
     public function update(BotUpdateRequest $request)
     {
         try {
             $botModule = $this->botModuleService->update($request->getDto());
+            /**
+             * @var BotModule $botModule
+             */
             $botModule = BotModule::query()->where('public_key', $botModule->public_key)->where('private_key', $botModule->private_key)->first();
             return ApiHelpers::success(BotModuleFactory::fromEntity($botModule)->getArray());
         } catch (RuntimeException $r) {

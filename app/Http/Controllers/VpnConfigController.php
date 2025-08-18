@@ -13,7 +13,13 @@ use Symfony\Component\HttpFoundation\Response;
 
 class VpnConfigController extends Controller
 {
+    /**
+     * @var KeyActivateUserRepository
+     */
     private KeyActivateUserRepository $keyActivateUserRepository;
+    /**
+     * @var ServerUserRepository
+     */
     private ServerUserRepository $serverUserRepository;
 
     public function __construct(

@@ -16,6 +16,10 @@ class BotController extends Controller
         return view('module.bot.index');
     }
 
+    /**
+     * @param Request $request
+     * @return RedirectResponse
+     */
     public function updateToken(Request $request): RedirectResponse
     {
         try {

@@ -17,7 +17,13 @@ use RuntimeException;
 
 class PackController extends Controller
 {
+    /**
+     * @var PackService
+     */
     private PackService $packService;
+    /**
+     * @var DatabaseLogger
+     */
     private DatabaseLogger $logger;
 
     public function __construct(PackService $packService, DatabaseLogger $logger)
@@ -28,6 +34,7 @@ class PackController extends Controller
 
     /**
      * Display a listing of the packs.
+     *
      * @param Request $request
      * @return Application|Factory|View
      * @throws Exception
@@ -63,6 +70,7 @@ class PackController extends Controller
 
     /**
      * Store a newly created pack.
+     *
      * @param StorePackRequest $request
      * @return RedirectResponse
      * @throws Exception
@@ -98,6 +106,7 @@ class PackController extends Controller
 
     /**
      * Update the specified pack.
+     *
      * @param UpdatePackRequest $request
      * @param int $id
      * @return RedirectResponse
@@ -136,6 +145,7 @@ class PackController extends Controller
 
     /**
      * Remove the specified pack.
+     *
      * @param int $id
      * @return RedirectResponse
      */

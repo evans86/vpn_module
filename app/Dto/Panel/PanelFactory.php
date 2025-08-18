@@ -6,6 +6,10 @@ use App\Models\Panel\Panel;
 
 class PanelFactory
 {
+    /**
+     * @param Panel $server
+     * @return PanelDto
+     */
     public static function fromEntity(Panel $server): PanelDto
     {
         $dto = new PanelDto();

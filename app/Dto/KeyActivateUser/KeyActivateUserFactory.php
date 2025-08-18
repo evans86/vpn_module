@@ -6,6 +6,10 @@ use App\Models\KeyActivateUser\KeyActivateUser;
 
 class KeyActivateUserFactory
 {
+    /**
+     * @param KeyActivateUser $key_activate_user
+     * @return KeyActivateUserDto
+     */
     public static function fromEntity(KeyActivateUser $key_activate_user): KeyActivateUserDto
     {
         $dto = new KeyActivateUserDto();

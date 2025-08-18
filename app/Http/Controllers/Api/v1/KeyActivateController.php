@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api\v1;
 use App\Dto\Bot\BotModuleFactory;
 use App\Helpers\ApiHelpers;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\BotModule\BotGetRequest;
 use App\Http\Requests\BotModule\BotModuleInstructionsRequest;
 use App\Http\Requests\KeyActivate\KeyActivateRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanBuyKeyRequest;
@@ -13,7 +12,6 @@ use App\Http\Requests\PackSalesman\PackSalesmanFreeKeyRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanUserKeysRequest;
 use App\Models\Bot\BotModule;
 use App\Models\KeyActivate\KeyActivate;
-use App\Services\Bot\BotModuleService;
 use App\Services\External\BottApi;
 use App\Services\Key\KeyActivateService;
 use Carbon\Carbon;
@@ -24,14 +22,15 @@ use RuntimeException;
 
 class KeyActivateController extends Controller
 {
+    /**
+     * @var KeyActivateService
+     */
     private KeyActivateService $keyActivateService;
-    private BotModuleService $botModuleService;
 
-    public function __construct(KeyActivateService $keyActivateService, BotModuleService $botModuleService)
+    public function __construct(KeyActivateService $keyActivateService)
     {
         $this->middleware('api');
         $this->keyActivateService = $keyActivateService;
-        $this->botModuleService = $botModuleService;
     }
 
     /**
@@ -260,19 +259,15 @@ class KeyActivateController extends Controller
      *
      * @return array|string
      */
-    public function getVpnInstructions(
-        BotModuleInstructionsRequest $request
-    )
+    public function getVpnInstructions(BotModuleInstructionsRequest $request)
     {
         try {
-
             $botModule = BotModule::where('public_key', $request->public_key)->first();
             if (!$botModule) {
                 throw new RuntimeException('Модуль бота не найден');
             }
 
             $instructions = $botModule->vpn_instructions;
-//            $instructions = $this->botModuleService->getDefaultVpnInstructions();
 
             return ApiHelpers::success([
                 $instructions

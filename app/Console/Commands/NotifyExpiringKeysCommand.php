@@ -7,8 +7,6 @@ use App\Services\Key\KeyActivateService;
 use App\Services\Notification\NotificationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
-use Symfony\Component\Routing\Annotation\Route;
 
 class NotifyExpiringKeysCommand extends Command
 {

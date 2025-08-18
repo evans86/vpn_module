@@ -20,8 +20,17 @@ use RuntimeException;
 
 class KeyActivateController extends Controller
 {
+    /**
+     * @var DatabaseLogger
+     */
     private DatabaseLogger $logger;
+    /**
+     * @var KeyActivateService
+     */
     private KeyActivateService $keyActivateService;
+    /**
+     * @var KeyActivateRepository
+     */
     private KeyActivateRepository $keyActivateRepository;
 
     public function __construct(
@@ -37,6 +46,7 @@ class KeyActivateController extends Controller
 
     /**
      * Display a listing of key activates
+     *
      * @param Request $request
      * @return Application|Factory|View
      * @throws Exception
@@ -92,6 +102,7 @@ class KeyActivateController extends Controller
 
     /**
      * Display the specified key activate
+     *
      * @param KeyActivate $key
      * @return Application|Factory|View
      */
@@ -257,6 +268,7 @@ class KeyActivateController extends Controller
 
     /**
      * Update date for the specified key activate
+     *
      * @param Request $request
      * @return JsonResponse
      */

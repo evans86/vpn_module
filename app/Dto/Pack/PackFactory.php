@@ -6,6 +6,10 @@ use App\Models\Pack\Pack;
 
 class PackFactory
 {
+    /**
+     * @param Pack $pack
+     * @return PackDto
+     */
     public static function fromEntity(Pack $pack): PackDto
     {
         $dto = new PackDto();

@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Auth\Personal;
 use App\Models\Salesman\Salesman;
 use App\Services\Telegram\ModuleBot\FatherBotController;
 use Exception;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\View\Factory;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Telegram\Bot\Exceptions\TelegramSDKException;
 
 class SalesmanAuthController extends Controller
@@ -29,6 +32,9 @@ class SalesmanAuthController extends Controller
         }
     }
 
+    /**
+     * @return RedirectResponse
+     */
     public function logout()
     {
         Auth::guard('salesman')->logout();
@@ -36,13 +42,16 @@ class SalesmanAuthController extends Controller
             ->with('success', 'Вы успешно вышли из системы');
     }
 
+    /**
+     * @return Application|Factory|View|RedirectResponse
+     */
     public function showLoginForm()
     {
         if (Auth::guard('salesman')->check()) {
             return redirect()->route('personal.dashboard');
         }
 
-        return view('module.personal.auth.login'); // Создайте этот view
+        return view('module.personal.auth.login');
     }
 
     /**
