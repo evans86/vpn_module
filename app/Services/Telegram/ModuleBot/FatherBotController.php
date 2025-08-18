@@ -696,36 +696,31 @@ class FatherBotController extends AbstractTelegramBot
                 $this->sendMessage("❌ Ошибка: продавец не найден");
                 return;
             }
+
             $packSalesman = PackSalesman::with(['pack', 'keyActivates'])
                 ->where('id', $packSalesmanId)
                 ->where('salesman_id', $salesman->id)
                 ->firstOrFail();
+
             $pack = $packSalesman->pack;
             $keys = $packSalesman->keyActivates;
 
+            // Основное сообщение
+            $message = "<b>📦 Информация о пакете:</b>\n\n";
+
             if ($pack) {
-//                $date = new DateTime($packSalesman->created_at);
-//                $date->add(new DateInterval("PT{$pack->activate_time}S"));
-//                $formattedDate = $date->format('d.m.Y');
-                // Основная информация о пакете
-                $message = "<b>📦 Информация о пакете:</b>\n\n";
                 $message .= "💾 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
-                $message .= "⏱ Период: {$pack->period} дней\n";
-//                $message .= "🏁 Активировать до: {$formattedDate}\n\n";
+                $message .= "⏱ Период: {$pack->period} дней\n\n";
             } else {
-                // Если пакет удален, выводим сообщение об этом
-                $message = "<b>📦 Информация о пакете:</b>|❌ Основной тариф удален";
+                $message .= "❌ Основной тариф удален\n\n";
             }
 
             // Добавляем ключи активации
             $message .= "<b>🔑 Ключи активации:</b>\n";
             foreach ($keys as $index => $key) {
                 $status = $key->user_tg_id ? "✅ Активирован" : "⚪️ Не активирован";
-                if ($key->user_tg_id) {
-                    $message .= ($index + 1) . ". <code>{$key->id}</code> - {$status} (ID: {$key->user_tg_id})\n";
-                } else {
-                    $message .= ($index + 1) . ". <code>{$key->id}</code> - {$status}\n";
-                }
+                $message .= ($index + 1) . ". <code>{$key->id}</code> - {$status}" .
+                    ($key->user_tg_id ? " (ID: {$key->user_tg_id})" : "") . "\n";
             }
 
             // Кнопки для выгрузки ключей в .txt файл
@@ -763,22 +758,6 @@ class FatherBotController extends AbstractTelegramBot
                             ])
                         ]
                     ],
-//                    [
-//                        [
-//                            'text' => '📥 Выгрузить с остатком трафика',
-//                            'callback_data' => json_encode([
-//                                'action' => 'export_keys_with_traffic',
-//                                'pack_id' => $packSalesmanId
-//                            ])
-//                        ],
-//                        [
-//                            'text' => '(Без текста)',
-//                            'callback_data' => json_encode([
-//                                'action' => 'export_keys_with_traffic_only',
-//                                'pack_id' => $packSalesmanId
-//                            ])
-//                        ]
-//                    ],
                     [
                         [
                             'text' => '📥 Выгрузить использованные',
@@ -800,28 +779,28 @@ class FatherBotController extends AbstractTelegramBot
 
             // Проверяем длину сообщения
             if (strlen($message) <= 4096) {
-                // Если сообщение не превышает лимит, отправляем всё одним сообщением
                 $this->sendMessage($message, $keyboard);
             } else {
-                // Если сообщение слишком длинное, разбиваем на части
-                $this->sendMessage("<b>📦 Информация о пакете:</b>\n\n💾 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n⏱ Период: {$pack->period} дней\n\n");
+                // Если сообщение слишком длинное, сначала отправляем информацию о пакете
+                $packInfo = "<b>📦 Информация о пакете:</b>\n\n";
+                if ($pack) {
+                    $packInfo .= "💾 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
+                    $packInfo .= "⏱ Период: {$pack->period} дней\n\n";
+                } else {
+                    $packInfo .= "❌ Основной тариф удален\n\n";
+                }
+                $this->sendMessage($packInfo);
 
-                // Отправляем ключи частями
-                $chunkSize = 50; // Количество ключей в одном сообщении
+                // Затем отправляем ключи частями
+                $chunkSize = 50;
                 $keyChunks = $keys->chunk($chunkSize);
-                $globalIndex = 1; // Глобальный счетчик для сквозной нумерации
                 foreach ($keyChunks as $index => $chunk) {
                     $keyMessage = "<b>🔑 Ключи активации (часть " . ($index + 1) . "):</b>\n";
-                    foreach ($chunk as $key) {
+                    foreach ($chunk as $keyIndex => $key) {
                         $status = $key->user_tg_id ? "✅ Активирован" : "⚪️ Не активирован";
-                        if ($key->user_tg_id) {
-                            $keyMessage .= $globalIndex . ". <code>{$key->id}</code> - {$status} (ID: {$key->user_tg_id})\n";
-                        } else {
-                            $keyMessage .= $globalIndex . ". <code>{$key->id}</code> - {$status}\n";
-                        }
-                        $globalIndex++; // Увеличиваем глобальный счетчик
+                        $keyMessage .= ($index * $chunkSize + $keyIndex + 1) . ". <code>{$key->id}</code> - {$status}" .
+                            ($key->user_tg_id ? " (ID: {$key->user_tg_id})" : "") . "\n";
                     }
-                    // Отправляем часть ключей
                     $this->sendMessage($keyMessage);
                 }
                 // Отправляем кнопку после всех ключей
