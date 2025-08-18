@@ -26,6 +26,20 @@
                                 </div>
                                 <div class="col-md-2">
                                     <div class="form-group">
+                                        <label for="time_from">Время от</label>
+                                        <input type="time" class="form-control" id="time_from" name="time_from"
+                                               value="{{ request('time_from') }}">
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="form-group">
+                                        <label for="time_to">Время до</label>
+                                        <input type="time" class="form-control" id="time_to" name="time_to"
+                                               value="{{ request('time_to') }}">
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="form-group">
                                         <label for="date_from">Дата от</label>
                                         <input type="date" class="form-control" id="date_from" name="date_from"
                                                value="{{ request('date_from') }}">
@@ -53,7 +67,7 @@
                                             <button type="submit" class="btn btn-primary">
                                                 <i class="fas fa-search"></i> Поиск
                                             </button>
-                                            <a href="{{ route('admin.logs.index') }}" 
+                                            <a href="{{ route('admin.logs.index') }}"
                                                class="btn btn-secondary">
                                                 <i class="fas fa-times"></i> Сбросить
                                             </a>
@@ -86,7 +100,8 @@
                                             </span>
                                         </td>
                                         <td>{{ $log->source }}</td>
-                                        <td>{{ Str::limit($log->message, 100) }}</td>
+                                        <td>{{ $log->message_short }}</td>
+{{--                                        <td>{{ Str::limit($log->message, 100) }}</td>--}}
                                         <td>
                                             <a href="{{ route('admin.logs.show', $log) }}" class="btn btn-sm btn-info">
                                                 <i class="fas fa-eye"></i> Подробнее
@@ -124,12 +139,12 @@
             // Обработка пагинации
             document.addEventListener('click', function(e) {
                 const target = e.target;
-                
+
                 // Проверяем, является ли клик по ссылке пагинации
                 if (target.tagName === 'A' && target.closest('.pagination')) {
                     e.preventDefault();
                     const url = target.href;
-                    
+
                     // Загружаем страницу обычным способом
                     window.location.href = url;
                 }
