@@ -136,7 +136,7 @@
                                 <a href="https://t.me/father_vpn_bot_t_bot"
                                    target="_blank"
                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
-                                    <i class="fab fa-telegram mr-2"></i> Перейти к Father VPN Bot-t
+                                    <i class="fab fa-telegram mr-2"></i> Перейти к Father VPN BOT-T
                                 </a>
                             </div>
                         </div>
@@ -224,7 +224,7 @@
                                 <a href="https://bot-t.com"
                                    target="_blank"
                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
-                                    <i class="fas fa-external-link-alt mr-2"></i> Перейти на Bot-T.com
+                                    <i class="fas fa-external-link-alt mr-2"></i> Перейти на BOT-T
                                 </a>
                             </div>
                         </div>
