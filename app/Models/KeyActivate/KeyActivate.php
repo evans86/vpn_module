@@ -2,7 +2,6 @@
 
 namespace App\Models\KeyActivate;
 
-use App\Http\Controllers\Module\TelegramUserController;
 use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\TelegramUser\TelegramUser;
@@ -141,14 +140,14 @@ class KeyActivate extends Model
         return $this->user_tg_id ? 'Пользователь #' . $this->user_tg_id : 'Не активирован';
     }
 
-    public function getPackInfoAttribute()
+    public function getTrafficInfo()
     {
         if ($this->packSalesman && $this->packSalesman->pack) {
             $pack = $this->packSalesman->pack;
-            return $pack->name . ' (' . number_format($pack->traffic_limit / (1024*1024*1024), 1) . ' GB)';
+            return $pack->name  . number_format($pack->traffic_limit / (1024*1024*1024), 1) . ' GB';
         }
 
-        return 'Неизвестный пакет';
+        return 'Основной пакет удален';
     }
 
     public function getExpiryDateFormattedAttribute()
@@ -165,6 +164,16 @@ class KeyActivate extends Model
         }
 
         return 'До ' . $expiryDate->format('d.m.Y H:i');
+    }
+
+    public function getPeriodInfo()
+    {
+        if ($this->packSalesman && $this->packSalesman->pack) {
+            $pack = $this->packSalesman->pack;
+            return $pack->period . ' дн.';
+        }
+
+        return 'Основной пакет удален';
     }
 
     public function getConfigUrlAttribute()
