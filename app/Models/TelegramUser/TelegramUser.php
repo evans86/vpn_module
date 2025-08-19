@@ -8,11 +8,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
-use phpseclib\Math\BigInteger;
 
 /**
  * @property int $id
- * @property BigInteger|null $salesman_id
+ * @property int|null $salesman_id
  * @property int|null $telegram_id
  * @property string|null $username
  * @property string|null $first_name

@@ -2,8 +2,11 @@
 
 namespace App\Models\KeyActivate;
 
+use App\Http\Controllers\Module\TelegramUserController;
 use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Models\PackSalesman\PackSalesman;
+use App\Models\TelegramUser\TelegramUser;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -122,5 +125,55 @@ class KeyActivate extends Model
             default:
                 return 'badge-warning';
         }
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(TelegramUser::class, 'user_tg_id', 'telegram_id');
+    }
+
+    public function getUserNicknameAttribute()
+    {
+        if ($this->user_tg_id && $this->user) {
+            return $this->user->username ?? $this->user->first_name ?? 'Пользователь';
+        }
+
+        return $this->user_tg_id ? 'Пользователь #' . $this->user_tg_id : 'Не активирован';
+    }
+
+    public function getPackInfoAttribute()
+    {
+        if ($this->packSalesman && $this->packSalesman->pack) {
+            $pack = $this->packSalesman->pack;
+            return $pack->name . ' (' . number_format($pack->traffic_limit / (1024*1024*1024), 1) . ' GB)';
+        }
+
+        return 'Неизвестный пакет';
+    }
+
+    public function getExpiryDateFormattedAttribute()
+    {
+        if (!$this->finish_at) {
+            return 'Не активирован';
+        }
+
+        $expiryDate = Carbon::createFromTimestamp($this->finish_at);
+        $now = Carbon::now();
+
+        if ($expiryDate->isPast()) {
+            return 'Истек ' . $expiryDate->format('d.m.Y H:i');
+        }
+
+        return 'До ' . $expiryDate->format('d.m.Y H:i');
+    }
+
+    public function getConfigUrlAttribute()
+    {
+        return "https://vpn-telegram.com/config/{$this->id}";
+    }
+
+    public function hasConfig()
+    {
+        return true;
     }
 }

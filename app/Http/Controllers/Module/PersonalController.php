@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
 use App\Models\KeyActivate\KeyActivate;
-use App\Models\Pack\Pack;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
 use Illuminate\Contracts\Foundation\Application;
@@ -106,20 +105,49 @@ class PersonalController extends Controller
     /**
      * @return Application|Factory|View
      */
-    public function keys()
+    public function keys(Request $request)
     {
         $salesman = Auth::guard('salesman')->user();
 //        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
-        $keys = $salesman->keyActivates()
-            ->with(['packSalesman.pack', 'keyActivateUser.serverUser.panel'])
-            ->orderBy('created_at', 'desc')
-            ->paginate(15);
+        $query = $salesman->keyActivates()
+            ->with([
+                'packSalesman.pack',
+                'keyActivateUser.serverUser.panel',
+                'user'
+            ]);
+
+        // Применяем фильтры с указанием таблицы для status
+        if ($request->has('key_search') && !empty($request->key_search)) {
+            $query->where('key_activate.id', 'like', '%' . $request->key_search . '%');
+        }
+
+        if ($request->has('telegram_search') && !empty($request->telegram_search)) {
+            $query->where('key_activate.user_tg_id', 'like', '%' . $request->telegram_search . '%');
+        }
+
+        if ($request->has('status_filter') && !empty($request->status_filter)) {
+            $query->where('key_activate.status', $request->status_filter);
+        }
+
+        if ($request->has('expiry_filter') && !empty($request->expiry_filter)) {
+            if ($request->expiry_filter === 'active') {
+                $query->where(function($q) {
+                    $q->whereNull('key_activate.finish_at')
+                        ->orWhere('key_activate.finish_at', '>', Carbon::now()->timestamp);
+                });
+            } elseif ($request->expiry_filter === 'expired') {
+                $query->where('key_activate.finish_at', '<=', Carbon::now()->timestamp);
+            }
+        }
+
+        $keys = $query->orderBy('key_activate.created_at', 'desc')->paginate(15);
 
         $statuses = [
-            KeyActivate::EXPIRED => 'Просрочен',
-            KeyActivate::ACTIVE => 'Активирован',
+            '' => 'Все статусы',
             KeyActivate::PAID => 'Оплачен',
+            KeyActivate::ACTIVE => 'Активирован',
+            KeyActivate::EXPIRED => 'Просрочен',
             KeyActivate::DELETED => 'Удален'
         ];
 
@@ -224,6 +252,7 @@ class PersonalController extends Controller
 
         $salesman = Auth::guard('salesman')->user();
 //        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+
         $salesman->botModule->update(['vpn_instructions' => $request->instructions]);
 
         return redirect()->back()->with('success', 'Инструкции успешно обновлены!');
@@ -234,8 +263,9 @@ class PersonalController extends Controller
      */
     public function resetVpnInstructions()
     {
-//        $salesman = Auth::guard('salesman')->user();
-        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+        $salesman = Auth::guard('salesman')->user();
+//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+
         $salesman->botModule->update([
             'vpn_instructions' => $this->botModuleService->getDefaultVpnInstructions()
         ]);
