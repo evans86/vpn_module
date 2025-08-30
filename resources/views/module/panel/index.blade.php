@@ -143,7 +143,7 @@
 
                             {{-- Модальное окно редактирования --}}
                             <x-modal id="editPanelModal{{ $panel->id }}" title="Редактировать панель">
-                                <form action="{{ route('admin.module.panel.update-credentials', $panel) }}" method="POST">
+                                <form action="{{ route('admin.module.panel.update', $panel) }}" method="POST">
                                     @csrf
                                     <div class="row">
                                         <div class="col-md-12">
