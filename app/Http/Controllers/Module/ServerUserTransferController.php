@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
 use App\Models\KeyActivate\KeyActivate;
+use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Models\Panel\Panel;
+use App\Models\ServerUser\ServerUser;
 use App\Services\Panel\marzban\MarzbanService;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
@@ -56,7 +58,16 @@ class ServerUserTransferController extends Controller
 //                'panel_id' => $key->keyActivateUser->serverUser->panel_id
             ]);
 
-            $currentPanelId = $key->keyActivateUser->serverUser->panel_id;
+            /**
+             * @var KeyActivateUser $keyActivateUser
+             */
+            $keyActivateUser = KeyActivateUser::query()->where('key_activate_id', $key->id)->first();
+            /**
+             * @var ServerUser $serverUser
+             */
+            $serverUser = ServerUser::query()->where('id', $keyActivateUser->server_user_id)->first();
+
+            $currentPanelId = $serverUser->panel_id;
 
             // Получаем все активные панели, кроме текущей
             $panels = Panel::with('server')
