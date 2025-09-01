@@ -53,7 +53,7 @@ class ServerUserTransferController extends Controller
                 'key_id' => $key->id,
                 'key_activate_user' => $key->keyActivateUser,
                 'server_user' => $key->keyActivateUser->serverUser,
-                'panel_id' => $key->keyActivateUser->serverUser->panel_id
+//                'panel_id' => $key->keyActivateUser->serverUser->panel_id
             ]);
 
             $currentPanelId = $key->keyActivateUser->serverUser->panel_id;
