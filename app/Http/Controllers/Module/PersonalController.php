@@ -33,17 +33,32 @@ class PersonalController extends Controller
      */
     public function dashboard()
     {
-        $salesman = Auth::guard('salesman')->user();
+                $salesman = Auth::guard('salesman')->user();
 //        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
-        // Получаем все pack_salesman_id для данного продавца
+        // Получаем все pack_salesman_id для данного продавца (где он продавец)
         $packSalesmanIds = $salesman->packSales()->pluck('id');
 
-        //Общее количество ключей
-        $totalKeys = KeyActivate::whereIn('pack_salesman_id', $packSalesmanIds)->count();
+        // Ключи проданные в боте (где продавец является продавцом)
+        $botKeysQuery = KeyActivate::whereIn('pack_salesman_id', $packSalesmanIds);
 
-        //Активные ключи
-        $activeKeys = KeyActivate::whereIn('pack_salesman_id', $packSalesmanIds)
+        // Ключи проданные в модуле (где продавец является покупателем и pack имеет module_key = 1)
+        $moduleKeysQuery = KeyActivate::where('user_tg_id', $salesman->telegram_id)
+            ->whereHas('packSalesman.pack', function($q) {
+                $q->where('pack.module_key', 1);
+            });
+
+        // Общее количество ключей (оба типа)
+        $totalKeys = KeyActivate::where(function($q) use ($packSalesmanIds, $salesman, $moduleKeysQuery) {
+            $q->whereIn('pack_salesman_id', $packSalesmanIds)
+                ->orWhereIn('id', $moduleKeysQuery->select('id'));
+        })->count();
+
+        // Активные ключи (оба типа)
+        $activeKeys = KeyActivate::where(function($q) use ($packSalesmanIds, $salesman, $moduleKeysQuery) {
+            $q->whereIn('pack_salesman_id', $packSalesmanIds)
+                ->orWhereIn('id', $moduleKeysQuery->select('id'));
+        })
             ->where('status', KeyActivate::ACTIVE)
             ->where(function ($query) {
                 $query->whereNull('finish_at')
@@ -51,13 +66,14 @@ class PersonalController extends Controller
             })
             ->count();
 
-        //Проданные ключи
-        $soldKeys = KeyActivate::whereIn('pack_salesman_id', $packSalesmanIds)
-            ->whereNotNull('user_tg_id')
-            ->count();
+        // Ключи проданные в боте
+        $botSoldKeys = $botKeysQuery->whereNotNull('user_tg_id')->count();
 
-        // График продаж за 7 дней
-        $salesData = KeyActivate::whereIn('pack_salesman_id', $packSalesmanIds)
+        // Ключи проданные в модуле
+        $moduleSoldKeys = $moduleKeysQuery->count();
+
+        // График продаж в боте за 7 дней
+        $botSalesData = KeyActivate::whereIn('pack_salesman_id', $packSalesmanIds)
             ->whereNotNull('user_tg_id')
             ->where('updated_at', '>=', Carbon::now()->subDays(7))
             ->selectRaw('DATE(updated_at) as date, COUNT(*) as count')
@@ -66,11 +82,25 @@ class PersonalController extends Controller
             ->get()
             ->pluck('count', 'date');
 
-        // Заполняем пропущенные дни нулями
-        $chartData = [];
+        // График покупок в модуле за 7 дней
+        $moduleSalesData = KeyActivate::where('user_tg_id', $salesman->telegram_id)
+            ->whereHas('packSalesman.pack', function($q) {
+                $q->where('pack.module_key', 1);
+            })
+            ->where('updated_at', '>=', Carbon::now()->subDays(7))
+            ->selectRaw('DATE(updated_at) as date, COUNT(*) as count')
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get()
+            ->pluck('count', 'date');
+
+        // Заполняем пропущенные дни нулями для обоих графиков
+        $botChartData = [];
+        $moduleChartData = [];
         for ($i = 6; $i >= 0; $i--) {
             $date = Carbon::now()->subDays($i)->format('Y-m-d');
-            $chartData[$date] = $salesData[$date] ?? 0;
+            $botChartData[$date] = $botSalesData[$date] ?? 0;
+            $moduleChartData[$date] = $moduleSalesData[$date] ?? 0;
         }
 
         $totalEarnings = $salesman->packSales()
@@ -81,24 +111,56 @@ class PersonalController extends Controller
                 return $packSales->pack->price ?? 0;
             });
 
-        $recentSales = KeyActivate::whereIn('pack_salesman_id', $packSalesmanIds)
+// Ключи проданные в боте (где продавец является продавцом)
+        $botSales = KeyActivate::whereIn('pack_salesman_id', $packSalesmanIds)
+            ->with(['packSalesman.pack'])
             ->where('status', KeyActivate::PAID)
             ->where(function ($query) {
                 $query->whereNull('finish_at')
                     ->orWhere('finish_at', '>', Carbon::now()->timestamp);
             })
             ->orderBy('updated_at', 'desc')
-            ->take(5)
-            ->get();
+            ->take(7)
+            ->get()
+            ->map(function ($sale) {
+                $sale->operation_type = 'bot_sale';
+                return $sale;
+            });
+
+// Ключи проданные в модуле (где продавец является покупателем)
+        $modulePurchases = KeyActivate::where('user_tg_id', $salesman->telegram_id)
+            ->whereHas('packSalesman.pack', function($q) {
+                $q->where('pack.module_key', 1);
+            })
+            ->with(['packSalesman.pack'])
+            ->where('status', KeyActivate::PAID)
+            ->where(function ($query) {
+                $query->whereNull('finish_at')
+                    ->orWhere('finish_at', '>', Carbon::now()->timestamp);
+            })
+            ->orderBy('updated_at', 'desc')
+            ->take(7)
+            ->get()
+            ->map(function ($sale) {
+                $sale->operation_type = 'module_purchase';
+                return $sale;
+            });
+
+// Объединяем и сортируем по дате, берем 7 последних
+        $recentSales = $botSales->merge($modulePurchases)
+            ->sortByDesc('updated_at')
+            ->take(7);
 
         return view('module.personal.dashboard', compact(
             'salesman',
             'totalKeys',
             'activeKeys',
-            'soldKeys',
+            'botSoldKeys',
+            'moduleSoldKeys',
             'totalEarnings',
             'recentSales',
-            'chartData'
+            'botChartData',
+            'moduleChartData'
         ));
     }
 
