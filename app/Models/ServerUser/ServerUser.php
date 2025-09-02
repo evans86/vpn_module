@@ -14,7 +14,7 @@ use phpseclib\Math\BigInteger;
 
 /**
  * @property string $id
- * @property BigInteger|null $panel_id
+ * @property int|null $panel_id
  * @property string|null $keys
  * @property bool|null $is_free
  * @property string|null $status

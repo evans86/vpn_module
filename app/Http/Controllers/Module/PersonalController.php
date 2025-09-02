@@ -110,12 +110,34 @@ class PersonalController extends Controller
         $salesman = Auth::guard('salesman')->user();
 //        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
-        $query = $salesman->keyActivates()
+        // Получаем ключи, где текущий продавец является продавцом
+        $salesmanKeysQuery = $salesman->keyActivates();
+
+        // Получаем ключи где текущий продавец является покупателем и pack имеет module_key = 1
+        $buyerKeysQuery = KeyActivate::where('key_activate.user_tg_id', $salesman->telegram_id)
+            ->whereHas('packSalesman.pack', function($q) {
+                $q->where('pack.module_key', 1);
+            });
+
+        // Объединяем два запроса
+        $query = KeyActivate::query()
             ->with([
                 'packSalesman.pack',
+                'packSalesman.salesman', // продавец этого ключа
                 'keyActivateUser.serverUser.panel',
                 'user'
-            ]);
+            ])
+            ->where(function($q) use ($salesmanKeysQuery, $buyerKeysQuery) {
+                $q->whereIn('key_activate.id', $salesmanKeysQuery->select('key_activate.id'))
+                    ->orWhereIn('key_activate.id', $buyerKeysQuery->select('key_activate.id'));
+            });
+
+//        $query = $salesman->keyActivates()
+//            ->with([
+//                'packSalesman.pack',
+//                'keyActivateUser.serverUser.panel',
+//                'user'
+//            ]);
 
         // Применяем фильтры с указанием таблицы для status
         if ($request->has('key_search') && !empty($request->key_search)) {
@@ -227,8 +249,8 @@ class PersonalController extends Controller
      */
     public function faq()
     {
-        $salesman = Auth::guard('salesman')->user();
-//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+//        $salesman = Auth::guard('salesman')->user();
+        $salesman = Salesman::where('telegram_id', 6715142449)->first();
         $module = $salesman->botModule;
         $bot = $salesman->bot_link;
 
