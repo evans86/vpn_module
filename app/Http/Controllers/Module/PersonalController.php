@@ -111,10 +111,10 @@ class PersonalController extends Controller
                 return $packSales->pack->price ?? 0;
             });
 
-// Ключи проданные в боте (где продавец является продавцом)
+        // Ключи проданные в боте (где продавец является продавцом)
         $botSales = KeyActivate::whereIn('pack_salesman_id', $packSalesmanIds)
             ->with(['packSalesman.pack'])
-            ->where('status', KeyActivate::ACTIVE)
+            ->where('status', KeyActivate::ACTIVE, KeyActivate::PAID)
             ->where(function ($query) {
                 $query->whereNull('finish_at')
                     ->orWhere('finish_at', '>', Carbon::now()->timestamp);
@@ -127,13 +127,13 @@ class PersonalController extends Controller
                 return $sale;
             });
 
-// Ключи проданные в модуле (где продавец является покупателем)
+        // Ключи проданные в модуле (где продавец является покупателем)
         $modulePurchases = KeyActivate::where('user_tg_id', $salesman->telegram_id)
             ->whereHas('packSalesman.pack', function($q) {
                 $q->where('pack.module_key', 1);
             })
             ->with(['packSalesman.pack'])
-            ->where('status', KeyActivate::ACTIVE)
+            ->where('status', KeyActivate::ACTIVE, KeyActivate::PAID)
             ->where(function ($query) {
                 $query->whereNull('finish_at')
                     ->orWhere('finish_at', '>', Carbon::now()->timestamp);
