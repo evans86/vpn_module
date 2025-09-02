@@ -114,7 +114,7 @@ class PersonalController extends Controller
 // Ключи проданные в боте (где продавец является продавцом)
         $botSales = KeyActivate::whereIn('pack_salesman_id', $packSalesmanIds)
             ->with(['packSalesman.pack'])
-            ->where('status', KeyActivate::PAID)
+            ->where('status', KeyActivate::ACTIVE)
             ->where(function ($query) {
                 $query->whereNull('finish_at')
                     ->orWhere('finish_at', '>', Carbon::now()->timestamp);
@@ -133,7 +133,7 @@ class PersonalController extends Controller
                 $q->where('pack.module_key', 1);
             })
             ->with(['packSalesman.pack'])
-            ->where('status', KeyActivate::PAID)
+            ->where('status', KeyActivate::ACTIVE)
             ->where(function ($query) {
                 $query->whereNull('finish_at')
                     ->orWhere('finish_at', '>', Carbon::now()->timestamp);

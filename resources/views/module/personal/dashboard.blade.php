@@ -86,7 +86,7 @@
         <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
             <!-- График продаж в боте -->
             <div class="bg-white shadow rounded-lg p-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Продажи в боте за 7 дней</h3>
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Продажи в боте за неделю</h3>
                 <div class="h-64">
                     <canvas id="botSalesChart"></canvas>
                 </div>
@@ -94,7 +94,7 @@
 
             <!-- График покупок в модуле -->
             <div class="bg-white shadow rounded-lg p-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Покупки в модуле за 7 дней</h3>
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Продажи в модуле за неделю</h3>
                 <div class="h-64">
                     <canvas id="moduleSalesChart"></canvas>
                 </div>
