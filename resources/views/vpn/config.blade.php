@@ -2,17 +2,11 @@
 
 @section('content')
     <div class="container mx-auto px-4 py-8">
-        <div class="bg-white rounded-lg shadow-lg p-6">
+        <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">
             <!-- Bot Link and Copy URL Section -->
-            <div class="mb-8 flex justify-between items-center">
-{{--                <div>--}}
-{{--                    <span class="text-gray-600">Бот активации:</span>--}}
-{{--                    <a href="{{ $botLink }}" target="_blank" class="ml-2 text-blue-600 hover:text-blue-800">--}}
-{{--                        Перейти к боту--}}
-{{--                    </a>--}}
-{{--                </div>--}}
+            <div class="mb-6 md:mb-8 flex justify-between items-center">
                 <button onclick="copyCurrentUrl()"
-                        class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                        class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors w-full md:w-auto justify-center">
                     <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
@@ -22,8 +16,8 @@
             </div>
 
             <!-- User Information Section -->
-            <div class="mb-8">
-                <h2 class="text-2xl font-bold mb-6">Информация о подключении</h2>
+            <div class="mb-6 md:mb-8">
+                <h2 class="text-xl md:text-2xl font-bold mb-4 md:mb-6">Информация о подключении</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="bg-gray-50 p-4 rounded-lg">
                         <div class="mb-4">
@@ -79,23 +73,23 @@
             <!-- Connection Keys Section -->
             @if($userInfo['status'] === 'active')
                 <div>
-                    <h2 class="text-2xl font-bold mb-6">Доступные протоколы</h2>
+                    <h2 class="text-xl md:text-2xl font-bold mb-4 md:mb-6">Доступные протоколы</h2>
                     <div class="space-y-4">
                         @foreach($formattedKeys as $key)
                             <div class="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                                <div class="flex items-center justify-between">
+                                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                     <div class="flex items-center flex-grow">
-                                        <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-800 font-semibold mr-3">
+                                        <span class="inline-flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-100 text-blue-800 font-semibold mr-3 flex-shrink-0">
                                             {{ $key['icon'] }}
                                         </span>
-                                        <div class="flex-grow">
-                                            <div class="font-medium">{{ $key['protocol'] }}</div>
-                                            <div class="text-xs text-blue-600 mt-1">{{ $key['connection_type'] }}</div>
+                                        <div class="flex-grow min-w-0">
+                                            <div class="font-medium text-sm md:text-base truncate">{{ $key['protocol'] }}</div>
+                                            <div class="text-xs text-blue-600 mt-1 truncate">{{ $key['connection_type'] }}</div>
                                         </div>
                                     </div>
-                                    <div class="flex space-x-2 ml-4">
+                                    <div class="flex flex-col xs:flex-row gap-2 md:ml-4 w-full md:w-auto">
                                         <button onclick="copyToClipboard('{{ $key['link'] }}', '{{ $key['protocol'] }}')"
-                                                class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                                                class="inline-flex items-center justify-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors w-full md:w-auto"
                                                 title="Нажмите, чтобы скопировать конфигурацию {{ $key['protocol'] }}">
                                             <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -104,7 +98,7 @@
                                             Копировать
                                         </button>
                                         <button onclick="showQR('{{ $key['link'] }}')"
-                                                class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                                                class="inline-flex items-center justify-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors w-full md:w-auto">
                                             <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                       d="M12 4v1m6 11h-6m-6 0h6m6-3v-3m-6 0v-3"/>
@@ -126,8 +120,8 @@
     </div>
 
     <!-- QR Code Modal -->
-    <div id="qrModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-lg max-w-lg w-full mx-4">
+    <div id="qrModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white p-4 md:p-6 rounded-lg max-w-lg w-full mx-auto">
             <div class="text-center mb-4">
                 <h3 class="text-lg font-medium mb-2">QR-код для подключения</h3>
                 <p class="text-sm text-gray-500">Отсканируйте этот код в вашем VPN-клиенте</p>
@@ -154,15 +148,13 @@
 
             function showCopyNotification(message) {
                 const notification = document.getElementById('copy-notification');
-                notification.textContent = message; // Устанавливаем текст уведомления
-                notification.classList.remove('hidden'); // Показываем уведомление
+                notification.textContent = message;
+                notification.classList.remove('hidden');
 
-                // Очищаем предыдущий таймаут, если он существует
                 if (copyNotificationTimeout) {
                     clearTimeout(copyNotificationTimeout);
                 }
 
-                // Скрываем уведомление через 2 секунды
                 copyNotificationTimeout = setTimeout(() => {
                     notification.classList.add('hidden');
                 }, 2000);
@@ -191,43 +183,38 @@
                     return;
                 }
 
-                // Очищаем предыдущий QR-код, если он существует
                 const qrcodeElement = document.getElementById('qrcode');
-                qrcodeElement.innerHTML = ''; // Удаляем содержимое контейнера
+                qrcodeElement.innerHTML = '';
 
-                // Создаём новый экземпляр QRCodeStyling
                 const qrCode = new QRCodeStyling({
-                    width: 320, // Ширина QR-кода
-                    height: 320, // Высота QR-кода
-                    type: "svg", // Тип рендера (можно использовать "canvas")
-                    data: link, // Данные для QR-кода
+                    width: 250,
+                    height: 250,
+                    type: "svg",
+                    data: link,
                     dotsOptions: {
-                        color: "#635bd4", // Цвет точек QR-кода
-                        type: "rounded" // Тип точек (rounded, square, circle и т.д.)
+                        color: "#635bd4",
+                        type: "rounded"
                     },
                     backgroundOptions: {
-                        color: "#ffffff", // Цвет фона
+                        color: "#ffffff",
                     },
-                    image: "", // Можно добавить логотип в центр QR-кода (URL изображения)
+                    image: "",
                     imageOptions: {
-                        crossOrigin: "anonymous", // Настройки кросс-оригина для изображения
-                        margin: 10 // Отступ вокруг изображения
+                        crossOrigin: "anonymous",
+                        margin: 10
                     }
                 });
 
-                // Добавляем QR-код в DOM
                 qrCode.append(qrcodeElement);
 
-                // Показываем модальное окно с QR-кодом
                 const qrModal = document.getElementById('qrModal');
-                qrModal.classList.remove('hidden'); // Убираем класс hidden для показа модального окна
+                qrModal.classList.remove('hidden');
             }
 
             function closeQR() {
                 const qrModal = document.getElementById('qrModal');
                 qrModal.classList.add('hidden');
             }
-
         </script>
     @endpush
     <style>
@@ -236,7 +223,7 @@
             bottom: 20px;
             right: 20px;
             padding: 10px 20px;
-            background-color: #4caf50; /* Зеленый цвет */
+            background-color: #4caf50;
             color: white;
             border-radius: 5px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -255,6 +242,12 @@
         .notification:not(.hidden) {
             opacity: 1;
             transform: translateY(0);
+        }
+
+        @media (max-width: 475px) {
+            .xs\:flex-row {
+                flex-direction: row;
+            }
         }
     </style>
 @endsection
