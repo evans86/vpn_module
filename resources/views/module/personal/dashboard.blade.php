@@ -210,7 +210,7 @@
                 data: {
                     labels: Object.keys(moduleChartData),
                     datasets: [{
-                        label: 'Покупки в модуле',
+                        label: 'Продажи в модуле',
                         data: Object.values(moduleChartData),
                         backgroundColor: 'rgba(147, 51, 234, 0.7)',
                         borderColor: 'rgba(147, 51, 234, 1)',
