@@ -4,7 +4,7 @@
     <div class="container mx-auto px-4 py-8">
         <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">
             <!-- Bot Link and Copy URL Section -->
-            <div class="mb-6 md:mb-8 flex justify-between items-center">
+            <div class="mb-6 md:mb-8 flex flex-col md:flex-row gap-3 justify-between items-center">
                 <button onclick="copyCurrentUrl()"
                         class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors w-full md:w-auto justify-center">
                     <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -13,8 +13,18 @@
                     </svg>
                     Скопировать ссылку
                 </button>
+
+                <!-- Новая кнопка для QR общей ссылки -->
+                <button onclick="showUrlQR('{{ url()->current() }}')"
+                        class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors w-full md:w-auto justify-center">
+                    <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9h14a2 2 0 012 2v2m0 0H3a2 2 0 01-2-2V9a2 2 0 012-2h14a2 2 0 012 2v2zm0 0h2a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2h2z"/>
+                    </svg>
+                    QR общей ссылки
+                </button>
             </div>
 
+            <!-- Остальной код остается без изменений -->
             <!-- User Information Section -->
             <div class="mb-6 md:mb-8">
                 <h2 class="text-xl md:text-2xl font-bold mb-4 md:mb-6">Информация о подключении</h2>
@@ -36,12 +46,6 @@
                         <div class="mb-4">
                             <span class="text-gray-600">Использовано:</span>
                             <span class="ml-2 font-semibold">{{ number_format($userInfo['data_used'] / (1024*1024*1024), 2) }} GB</span>
-{{--                            <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">--}}
-{{--                                @php--}}
-{{--                                    $percentage = min(($userInfo['data_used'] / $userInfo['data_limit']) * 100, 100);--}}
-{{--                                @endphp--}}
-{{--                                <div class="bg-blue-600 h-2.5 rounded-full" style="width: {{ $percentage }}%"></div>--}}
-{{--                            </div>--}}
                         </div>
 
                         <div>
@@ -97,7 +101,7 @@
                                             </svg>
                                             Копировать
                                         </button>
-                                        <button onclick="showQR('{{ $key['link'] }}')"
+                                        <button onclick="showQR('{{ $key['link'] }}', '{{ $key['protocol'] }}')"
                                                 class="inline-flex items-center justify-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors w-full md:w-auto">
                                             <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9h14a2 2 0 012 2v2m0 0H3a2 2 0 01-2-2V9a2 2 0 012-2h14a2 2 0 012 2v2zm0 0h2a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2h2z"/>
@@ -122,8 +126,8 @@
     <div id="qrModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
         <div class="bg-white p-4 md:p-6 rounded-lg max-w-lg w-full mx-auto">
             <div class="text-center mb-4">
-                <h3 class="text-lg font-medium mb-2">QR-код для подключения</h3>
-                <p class="text-sm text-gray-500">Отсканируйте этот код в вашем VPN-клиенте</p>
+                <h3 id="qrTitle" class="text-lg font-medium mb-2">QR-код для подключения</h3>
+                <p id="qrDescription" class="text-sm text-gray-500">Отсканируйте этот код в вашем VPN-клиенте</p>
             </div>
             <div id="qrcode" class="flex flex-col items-center justify-center mb-4">
                 <!-- QR код будет добавлен сюда -->
@@ -144,6 +148,7 @@
         <script src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
         <script>
             let copyNotificationTimeout;
+            let currentQR = null;
 
             function showCopyNotification(message) {
                 const notification = document.getElementById('copy-notification');
@@ -176,14 +181,22 @@
                 });
             }
 
-            function showQR(link) {
+            function showQR(link, protocol = '') {
                 if (!link) {
                     alert('Ссылка для QR-кода отсутствует или некорректна.');
                     return;
                 }
 
                 const qrcodeElement = document.getElementById('qrcode');
+                const qrTitle = document.getElementById('qrTitle');
+                const qrDescription = document.getElementById('qrDescription');
+
                 qrcodeElement.innerHTML = '';
+
+                qrTitle.textContent = protocol ? `QR-код для ${protocol}` : 'QR-код';
+                qrDescription.textContent = protocol
+                    ? 'Отсканируйте этот код в вашем VPN-клиенте'
+                    : 'Отсканируйте этот код для быстрого доступа';
 
                 const qrCode = new QRCodeStyling({
                     width: 250,
@@ -205,14 +218,25 @@
                 });
 
                 qrCode.append(qrcodeElement);
+                currentQR = qrCode;
 
                 const qrModal = document.getElementById('qrModal');
                 qrModal.classList.remove('hidden');
             }
 
+            function showUrlQR(url) {
+                showQR(url, 'общей ссылки');
+            }
+
             function closeQR() {
                 const qrModal = document.getElementById('qrModal');
                 qrModal.classList.add('hidden');
+
+                if (currentQR) {
+                    const qrcodeElement = document.getElementById('qrcode');
+                    qrcodeElement.innerHTML = '';
+                    currentQR = null;
+                }
             }
         </script>
     @endpush
