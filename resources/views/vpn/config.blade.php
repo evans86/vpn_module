@@ -225,7 +225,7 @@
             }
 
             function showUrlQR(url) {
-                showQR(url, 'общей ссылки');
+                showQR(url, 'конфигурации');
             }
 
             function closeQR() {
