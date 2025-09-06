@@ -74,7 +74,7 @@
                             </svg>
                         </div>
                         <div class="ml-4">
-                            <dt class="text-sm font-medium text-gray-500 truncate">Куплено в модуле</dt>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Продано в модуле</dt>
                             <dd class="mt-1 text-2xl font-semibold text-gray-900">{{ $moduleSoldKeys }}</dd>
                         </div>
                     </div>
