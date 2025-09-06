@@ -36,12 +36,12 @@
                         <div class="mb-4">
                             <span class="text-gray-600">Использовано:</span>
                             <span class="ml-2 font-semibold">{{ number_format($userInfo['data_used'] / (1024*1024*1024), 2) }} GB</span>
-                            <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
-                                @php
-                                    $percentage = min(($userInfo['data_used'] / $userInfo['data_limit']) * 100, 100);
-                                @endphp
-                                <div class="bg-blue-600 h-2.5 rounded-full" style="width: {{ $percentage }}%"></div>
-                            </div>
+{{--                            <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">--}}
+{{--                                @php--}}
+{{--                                    $percentage = min(($userInfo['data_used'] / $userInfo['data_limit']) * 100, 100);--}}
+{{--                                @endphp--}}
+{{--                                <div class="bg-blue-600 h-2.5 rounded-full" style="width: {{ $percentage }}%"></div>--}}
+{{--                            </div>--}}
                         </div>
 
                         <div>
