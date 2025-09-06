@@ -188,10 +188,29 @@ class KeyActivateService
                 BottApi::createOrder($botModuleDto, $userData, $key_price_kopecks,
                     'Покупка VPN доступа: ' . $keyID);
             }
+
             $salesman = Salesman::query()->where('module_bot_id', $botModuleDto->id)->first();
+
+            if (!$salesman) {
+                // Логируем ошибку, но не прерываем процесс
+                $this->logger->error('Продавец не найден для модуля', [
+                    'module_bot_id' => $botModuleDto->id,
+                    'key_id' => $keyID
+                ]);
+            }
+
             $keyActivate = $this->keyActivateRepository->findById($keyID);
-            $keyActivate->module_salesman_id = $salesman->id;
-            $keyActivate->save();
+
+            if ($salesman) {
+                $keyActivate->module_salesman_id = $salesman->id;
+                $keyActivate->save();
+            } else {
+                // Логируем, что ключ создан, но без привязки к продавцу
+                $this->logger->warning('Ключ создан без привязки к продавцу', [
+                    'key_id' => $keyID,
+                    'module_bot_id' => $botModuleDto->id
+                ]);
+            }
 
             return $this->keyActivateRepository->findById($keyID);
         } catch (Exception $e) {
