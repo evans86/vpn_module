@@ -565,12 +565,12 @@ class SalesmanBotController extends AbstractTelegramBot
         $finishDate = date('d.m.Y', $key->finish_at);
 
         $text = "✅ <b>VPN успешно активирован!</b>\n\n";
-        $text .= "📅 Срок действия: до {$finishDate}\n";
+        $text .= "📅 Срок действия: до {$finishDate}\n\n";
 
-        if ($key->traffic_limit) {
-            $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
-            $text .= "📊 Лимит трафика: {$trafficGB} GB\n\n";
-        }
+//        if ($key->traffic_limit) {
+//            $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
+//            $text .= "📊 Лимит трафика: {$trafficGB} GB\n\n";
+//        }
 
         $text .= "🔗 <b>Ваша VPN-конфигурация:</b>\n\n";
         $text .= "[Открыть конфигурацию]\n";
