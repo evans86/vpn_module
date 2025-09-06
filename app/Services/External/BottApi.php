@@ -286,4 +286,36 @@ class BottApi
         $result = $response->getBody()->getContents();
         return json_decode($result, true);
     }
+
+    /**
+     * @param BotModuleDto $botDto
+     * @param int $user_tg_id
+     * @param string $text
+     * @return array
+     * @throws GuzzleException
+     */
+    public static function senModuleMessage(BotModuleDto $botDto, int $user_tg_id, string $text): array
+    {
+        $link = 'https://api.bot-t.com/v1/module/user/';
+
+        $requestParam = [
+            'public_key' => $botDto->public_key,
+            'private_key' => $botDto->private_key,
+            'user_tg_id' => $user_tg_id,
+            'method' => 'sendMessage',
+            'params' => [
+                'text' => $text
+            ]
+        ];
+
+        $client = new Client(['base_uri' => $link]);
+        $response = $client->request('POST', 'send-request', [
+            'form_params' => $requestParam,
+            'headers' => [
+            ]
+        ]);
+
+        $result = $response->getBody()->getContents();
+        return json_decode($result, true);
+    }
 }

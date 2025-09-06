@@ -4,6 +4,7 @@ namespace App\Models\KeyActivate;
 
 use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Models\PackSalesman\PackSalesman;
+use App\Models\Salesman\Salesman;
 use App\Models\TelegramUser\TelegramUser;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,13 +15,15 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 /**
  * @property string $id
  * @property int|null $traffic_limit лимит трафика на пользователя (сколько осталось)
- * @property int|null $pack_salesman_id кто продавец
+ * @property int|null $pack_salesman_id кто продавец ключа из бота
+ * @property int|null $module_salesman_id кто продавец ключа из модуля
  * @property int|null $finish_at дата окончания
  * @property int|null $activated_at дата активации
  * @property int|null $user_tg_id кто активировал ключ
  * @property int|null $deleted_at срок, до которого нужно активировать
  * @property int|null $status статус
  * @property PackSalesman|null $packSalesman
+ * @property Salesman|null $moduleSalesman
  * @property KeyActivateUser|null $keyActivateUser
  */
 class KeyActivate extends Model
@@ -42,6 +45,14 @@ class KeyActivate extends Model
     public function packSalesman(): BelongsTo
     {
         return $this->belongsTo(PackSalesman::class, 'pack_salesman_id');
+    }
+
+    /**
+     * Get the salesman relation
+     */
+    public function moduleSalesman(): BelongsTo
+    {
+        return $this->belongsTo(Salesman::class, 'module_salesman_id');
     }
 
     /**

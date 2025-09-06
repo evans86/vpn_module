@@ -4,8 +4,10 @@ namespace App\Services\Key;
 
 use App\Dto\Bot\BotModuleDto;
 use App\Helpers\OrderHelper;
+use App\Models\Bot\BotModule;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\Panel\Panel;
+use App\Models\Salesman\Salesman;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Repositories\PackSalesman\PackSalesmanRepository;
 use App\Repositories\Panel\PanelRepository;
@@ -186,6 +188,10 @@ class KeyActivateService
                 BottApi::createOrder($botModuleDto, $userData, $key_price_kopecks,
                     'Покупка VPN доступа: ' . $keyID);
             }
+            $salesman = Salesman::query()->where('module_bot_id', $botModuleDto->id)->first();
+            $keyActivate = $this->keyActivateRepository->findById($keyID);
+            $keyActivate->module_salesman_id = $salesman->id;
+            $keyActivate->save();
 
             return $this->keyActivateRepository->findById($keyID);
         } catch (Exception $e) {
