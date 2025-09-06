@@ -184,8 +184,8 @@ class PersonalController extends Controller
      */
     public function keys(Request $request)
     {
-//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
-         $salesman = Auth::guard('salesman')->user();
+        $salesman = Auth::guard('salesman')->user();
+//                $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
         // Ключи из модуля (прямая связь)
         $moduleKeysQuery = $salesman->moduleKeyActivates();
@@ -197,8 +197,8 @@ class PersonalController extends Controller
         $query = KeyActivate::query()
             ->with([
                 'packSalesman.pack',
-                'packSalesman.salesman', // продавец для ключей из бота
-                'moduleSalesman', // продавец для ключей из модуля
+                'packSalesman.salesman',
+                'moduleSalesman',
                 'keyActivateUser.serverUser.panel',
                 'user'
             ])
@@ -231,6 +231,14 @@ class PersonalController extends Controller
             }
         }
 
+        if ($request->has('source_filter') && !empty($request->source_filter)) {
+            if ($request->source_filter === 'module') {
+                $query->whereNotNull('module_salesman_id');
+            } elseif ($request->source_filter === 'bot') {
+                $query->whereNotNull('pack_salesman_id');
+            }
+        }
+
         $keys = $query->orderBy('key_activate.created_at', 'desc')->paginate(15);
 
         $statuses = [
@@ -241,10 +249,17 @@ class PersonalController extends Controller
             KeyActivate::DELETED => 'Удален'
         ];
 
+        $sources = [
+            '' => 'Все источники',
+            'module' => 'Модуль VPN',
+            'bot' => 'Telegram бот'
+        ];
+
         return view('module.personal.keys', compact(
             'salesman',
             'keys',
-            'statuses'
+            'statuses',
+            'sources'
         ));
     }
 

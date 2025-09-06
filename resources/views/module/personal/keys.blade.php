@@ -40,8 +40,22 @@
                             <select name="status_filter" id="status_filter"
                                     class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                                 @foreach($statuses as $value => $label)
-                                    <option
-                                        value="{{ $value }}" {{ request('status_filter') === (string) $value ? 'selected' : '' }}>
+                                    <option value="{{ $value }}" {{ request('status_filter') === (string) $value ? 'selected' : '' }}>
+                                        {{ $label }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <!-- Фильтр по источнику - ДОБАВЛЯЕМ ЭТОТ БЛОК -->
+                        <div class="flex-1 min-w-[200px]">
+                            <label for="source_filter" class="block text-sm font-medium text-gray-700 mb-1">
+                                Источник ключа
+                            </label>
+                            <select name="source_filter" id="source_filter"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                @foreach($sources as $value => $label)
+                                    <option value="{{ $value }}" {{ request('source_filter') === $value ? 'selected' : '' }}>
                                         {{ $label }}
                                     </option>
                                 @endforeach
@@ -206,7 +220,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">
+                            <td colspan="8" class="px-6 py-4 text-center text-sm text-gray-500">
                                 Нет доступных ключей
                             </td>
                         </tr>
