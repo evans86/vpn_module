@@ -573,7 +573,8 @@ class SalesmanBotController extends AbstractTelegramBot
         }
 
         $text .= "🔗 <b>Ваша VPN-конфигурация:</b>\n\n";
-        $text .= "[Открыть конфигурацию](https://vpn-telegram.com/config/{$key->id})\n\n";
+        $text .= "[Открыть конфигурацию]\n";
+        $text .= "https://vpn-telegram.com/config/{$key->id}\n\n";
 
         $text .= "📝 <b>Инструкция по настройке:</b>\n\n";
         $text .= "1️⃣ Установите VPN-клиент на Ваше устройство\n";
