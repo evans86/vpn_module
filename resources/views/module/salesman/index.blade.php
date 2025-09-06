@@ -62,7 +62,7 @@
                                 <tr>
                                     <th style="width:80px;"><strong>#</strong></th>
                                     <th><strong>Телеграм ID</strong></th>
-                                    <th><strong>Имя пользователя</strong></th>
+                                    <th><strong>Username</strong></th>
                                     <th><strong>Токен</strong></th>
                                     <th><strong>Ссылка на бота</strong></th>
                                     <th><strong>Статус</strong></th>
