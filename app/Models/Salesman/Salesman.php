@@ -8,6 +8,7 @@ use App\Models\Pack\Pack;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Panel\Panel;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -87,8 +88,14 @@ class Salesman extends Authenticatable
         return $this->telegram_id;
     }
 
-// Получить все ключи, связанные с продавцом через packSales
-    public function keyActivates()
+    // Отношение для ключей из модуля (прямая связь)
+    public function moduleKeyActivates(): HasMany
+    {
+        return $this->hasMany(KeyActivate::class, 'module_salesman_id');
+    }
+
+// Отношение для ключей из бота (через pack_salesman)
+    public function botKeyActivates(): HasManyThrough
     {
         return $this->hasManyThrough(
             KeyActivate::class,

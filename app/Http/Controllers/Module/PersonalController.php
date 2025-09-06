@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use App\Services\Bot\BotModuleService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class PersonalController extends Controller
 {
@@ -24,18 +25,12 @@ class PersonalController extends Controller
      * @var BotModuleService
      */
     protected BotModuleService $botModuleService;
-    /**
-     * @var KeyActivateService
-     */
-    private KeyActivateService $keyActivateService;
 
     public function __construct(
-        BotModuleService   $botModuleService,
-        KeyActivateService $keyActivateService
+        BotModuleService $botModuleService
     )
     {
         $this->botModuleService = $botModuleService;
-        $this->keyActivateService = $keyActivateService;
     }
 
     /**
@@ -62,57 +57,51 @@ class PersonalController extends Controller
             $botModuleLink = null;
         }
 
-        // Получаем все pack_salesman_id для данного продавца (где он продавец)
-        $packSalesmanIds = $salesman->packSales()->pluck('id');
+        // Ключи из модуля (прямая связь)
+        $moduleKeysQuery = $salesman->moduleKeyActivates();
 
-        // Ключи проданные в боте (где продавец является продавцом)
-        $botKeysQuery = KeyActivate::whereIn('pack_salesman_id', $packSalesmanIds);
-
-        // Ключи проданные в модуле (где продавец является покупателем и pack имеет module_key = 1)
-        $moduleKeysQuery = KeyActivate::where('user_tg_id', $salesman->telegram_id)
-            ->whereHas('packSalesman.pack', function ($q) {
-                $q->where('pack.module_key', 1);
-            });
+        // Ключи из бота (через pack_salesman)
+        $botKeysQuery = $salesman->botKeyActivates();
 
         // Общее количество ключей (оба типа)
-        $totalKeys = KeyActivate::where(function ($q) use ($packSalesmanIds, $salesman, $moduleKeysQuery) {
-            $q->whereIn('pack_salesman_id', $packSalesmanIds)
-                ->orWhereIn('id', $moduleKeysQuery->select('id'));
-        })->count();
+        $totalKeys = $botKeysQuery->count() + $moduleKeysQuery->count();
 
         // Активные ключи (оба типа)
-        $activeKeys = KeyActivate::where(function ($q) use ($packSalesmanIds, $salesman, $moduleKeysQuery) {
-            $q->whereIn('pack_salesman_id', $packSalesmanIds)
-                ->orWhereIn('id', $moduleKeysQuery->select('id'));
-        })
-            ->where('status', KeyActivate::ACTIVE)
+        $activeBotKeys = $botKeysQuery->where('key_activate.status', KeyActivate::ACTIVE)
+            ->where(function ($query) {
+                $query->whereNull('key_activate.finish_at')
+                    ->orWhere('key_activate.finish_at', '>', Carbon::now()->timestamp);
+            })->count();
+
+        $activeModuleKeys = $moduleKeysQuery->where('status', KeyActivate::ACTIVE)
             ->where(function ($query) {
                 $query->whereNull('finish_at')
                     ->orWhere('finish_at', '>', Carbon::now()->timestamp);
-            })
-            ->count();
+            })->count();
 
-        // Ключи проданные в боте
-        $botSoldKeys = $botKeysQuery->whereNotNull('user_tg_id')->count();
+        $activeKeys = $activeBotKeys + $activeModuleKeys;
 
-        // Ключи проданные в модуле
+        // Ключи проданные в боте (активированные)
+        $botSoldKeys = $botKeysQuery->whereNotNull('key_activate.user_tg_id')->count();
+
+        // Ключи в модуле (все, так как они уже проданы продавцу)
         $moduleSoldKeys = $moduleKeysQuery->count();
 
-        // График продаж в боте за 7 дней
-        $botSalesData = KeyActivate::whereIn('pack_salesman_id', $packSalesmanIds)
-            ->whereNotNull('user_tg_id')
-            ->where('updated_at', '>=', Carbon::now()->subDays(7))
-            ->selectRaw('DATE(updated_at) as date, COUNT(*) as count')
+        // График продаж в боте за 7 дней - ИСПРАВЛЕННЫЙ ЗАПРОС
+        $botSalesData = DB::table('key_activate')
+            ->join('pack_salesman', 'pack_salesman.id', '=', 'key_activate.pack_salesman_id')
+            ->where('pack_salesman.salesman_id', $salesman->id)
+            ->whereNotNull('key_activate.user_tg_id')
+            ->where('key_activate.updated_at', '>=', Carbon::now()->subDays(7))
+            ->selectRaw('DATE(key_activate.updated_at) as date, COUNT(*) as count')
             ->groupBy('date')
             ->orderBy('date')
             ->get()
             ->pluck('count', 'date');
 
-        // График покупок в модуле за 7 дней
-        $moduleSalesData = KeyActivate::where('user_tg_id', $salesman->telegram_id)
-            ->whereHas('packSalesman.pack', function ($q) {
-                $q->where('pack.module_key', 1);
-            })
+        // График покупок в модуле за 7 дней - ИСПРАВЛЕННЫЙ ЗАПРОС
+        $moduleSalesData = DB::table('key_activate')
+            ->where('module_salesman_id', $salesman->id)
             ->where('updated_at', '>=', Carbon::now()->subDays(7))
             ->selectRaw('DATE(updated_at) as date, COUNT(*) as count')
             ->groupBy('date')
@@ -137,15 +126,15 @@ class PersonalController extends Controller
                 return $packSales->pack->price ?? 0;
             });
 
-        // Ключи проданные в боте (где продавец является продавцом)
-        $botSales = KeyActivate::whereIn('pack_salesman_id', $packSalesmanIds)
+        // Ключи из бота
+        $botSales = $botKeysQuery
             ->with(['packSalesman.pack'])
-            ->where('status', [KeyActivate::ACTIVE, KeyActivate::PAID])
+            ->whereIn('key_activate.status', [KeyActivate::ACTIVE, KeyActivate::PAID])
             ->where(function ($query) {
-                $query->whereNull('finish_at')
-                    ->orWhere('finish_at', '>', Carbon::now()->timestamp);
+                $query->whereNull('key_activate.finish_at')
+                    ->orWhere('key_activate.finish_at', '>', Carbon::now()->timestamp);
             })
-            ->orderBy('updated_at', 'desc')
+            ->orderBy('key_activate.updated_at', 'desc')
             ->take(7)
             ->get()
             ->map(function ($sale) {
@@ -153,13 +142,10 @@ class PersonalController extends Controller
                 return $sale;
             });
 
-        // Ключи проданные в модуле (где продавец является покупателем)
-        $modulePurchases = KeyActivate::where('user_tg_id', $salesman->telegram_id)
-            ->whereHas('packSalesman.pack', function ($q) {
-                $q->where('pack.module_key', 1);
-            })
+        // Ключи из модуля
+        $modulePurchases = $moduleKeysQuery
             ->with(['packSalesman.pack'])
-            ->where('status', [KeyActivate::ACTIVE, KeyActivate::PAID])
+            ->whereIn('status', [KeyActivate::ACTIVE, KeyActivate::PAID])
             ->where(function ($query) {
                 $query->whereNull('finish_at')
                     ->orWhere('finish_at', '>', Carbon::now()->timestamp);
@@ -198,39 +184,30 @@ class PersonalController extends Controller
      */
     public function keys(Request $request)
     {
-        $salesman = Auth::guard('salesman')->user();
 //        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+         $salesman = Auth::guard('salesman')->user();
 
-        // Получаем ключи, где текущий продавец является продавцом
-        $salesmanKeysQuery = $salesman->keyActivates();
+        // Ключи из модуля (прямая связь)
+        $moduleKeysQuery = $salesman->moduleKeyActivates();
 
-        // Получаем ключи где текущий продавец является покупателем и pack имеет module_key = 1
-        $buyerKeysQuery = KeyActivate::where('key_activate.user_tg_id', $salesman->telegram_id)
-            ->whereHas('packSalesman.pack', function ($q) {
-                $q->where('pack.module_key', 1);
-            });
+        // Ключи из бота (через pack_salesman)
+        $botKeysQuery = $salesman->botKeyActivates();
 
         // Объединяем два запроса
         $query = KeyActivate::query()
             ->with([
                 'packSalesman.pack',
-                'packSalesman.salesman', // продавец этого ключа
+                'packSalesman.salesman', // продавец для ключей из бота
+                'moduleSalesman', // продавец для ключей из модуля
                 'keyActivateUser.serverUser.panel',
                 'user'
             ])
-            ->where(function ($q) use ($salesmanKeysQuery, $buyerKeysQuery) {
-                $q->whereIn('key_activate.id', $salesmanKeysQuery->select('key_activate.id'))
-                    ->orWhereIn('key_activate.id', $buyerKeysQuery->select('key_activate.id'));
+            ->where(function ($q) use ($moduleKeysQuery, $botKeysQuery) {
+                $q->whereIn('key_activate.id', $moduleKeysQuery->select('key_activate.id'))
+                    ->orWhereIn('key_activate.id', $botKeysQuery->select('key_activate.id'));
             });
 
-//        $query = $salesman->keyActivates()
-//            ->with([
-//                'packSalesman.pack',
-//                'keyActivateUser.serverUser.panel',
-//                'user'
-//            ]);
-
-        // Применяем фильтры с указанием таблицы для status
+        // Применяем фильтры
         if ($request->has('key_search') && !empty($request->key_search)) {
             $query->where('key_activate.id', 'like', '%' . $request->key_search . '%');
         }

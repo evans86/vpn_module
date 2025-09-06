@@ -40,7 +40,8 @@
                             <select name="status_filter" id="status_filter"
                                     class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                                 @foreach($statuses as $value => $label)
-                                    <option value="{{ $value }}" {{ request('status_filter') === (string) $value ? 'selected' : '' }}>
+                                    <option
+                                        value="{{ $value }}" {{ request('status_filter') === (string) $value ? 'selected' : '' }}>
                                         {{ $label }}
                                     </option>
                                 @endforeach
@@ -55,8 +56,12 @@
                             <select name="expiry_filter" id="expiry_filter"
                                     class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                                 <option value="">Все ключи</option>
-                                <option value="active" {{ request('expiry_filter') == 'active' ? 'selected' : '' }}>Активные</option>
-                                <option value="expired" {{ request('expiry_filter') == 'expired' ? 'selected' : '' }}>Просроченные</option>
+                                <option value="active" {{ request('expiry_filter') == 'active' ? 'selected' : '' }}>
+                                    Активные
+                                </option>
+                                <option value="expired" {{ request('expiry_filter') == 'expired' ? 'selected' : '' }}>
+                                    Просроченные
+                                </option>
                             </select>
                         </div>
 
@@ -90,24 +95,50 @@
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                     <tr>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ключ</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Период</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Пользователь</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Срок действия</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ключ
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Период
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Статус
+                        </th>
+                        <!-- ДОБАВЬТЕ ЗДЕСЬ НОВУЮ КОЛОНКУ "Источник" -->
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Источник
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Пользователь
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Срок
+                            действия
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Действия
+                        </th>
                     </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                     @forelse($keys as $key)
                         <tr>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="flex items-center group cursor-pointer" onclick="copyKey('{{ $key->id }}')" title="Кликните чтобы скопировать">
+                                <div class="flex items-center group cursor-pointer" onclick="copyKey('{{ $key->id }}')"
+                                     title="Кликните чтобы скопировать">
                                     <div class="text-sm text-gray-500 font-mono">
                                         {{ $key->id }}
                                     </div>
-                                    <svg class="w-4 h-4 ml-2 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                    <svg
+                                        class="w-4 h-4 ml-2 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                                     </svg>
                                 </div>
                             </td>
@@ -115,10 +146,26 @@
                                 {{ $key->getPeriodInfo() }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $key->getStatusBadgeClassSalesman() }}">
+                                <span
+                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $key->getStatusBadgeClassSalesman() }}">
                                     {{ $key->getStatusText() }}
                                 </span>
                             </td>
+
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                @if($key->module_salesman_id)
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                    Модуль VPN
+                                    </span>
+                                @elseif($key->pack_salesman_id)
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                     Telegram бот
+                                    </span>
+                                @endif
+                            </td>
+
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm text-gray-900">
                                     {{ $key->user_nickname }}
@@ -144,20 +191,22 @@
                                        class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                                        title="Открыть конфигурацию">
                                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                                         </svg>
                                         Конфигурация
                                     </a>
                                 @else
-                                    <span class="text-xs text-gray-500" title="Конфигурация доступна только для активированных ключей">
-                                        Недоступно
-                                    </span>
+                                    <span class="text-xs text-gray-500"
+                                          title="Конфигурация доступна только для активированных ключей">
+                    Недоступно
+                </span>
                                 @endif
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">
+                            <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">
                                 Нет доступных ключей
                             </td>
                         </tr>
@@ -244,6 +293,7 @@
         .group:hover {
             background-color: #f9fafb;
         }
+
         .cursor-pointer {
             cursor: pointer;
         }
