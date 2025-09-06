@@ -236,18 +236,18 @@
                         <span class="tooltip-text">Управление ключами</span>
                     </a>
                 </li>
-                <li>
-                    <a href="{{ route('personal.stats') }}"
-                       class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.stats') ? 'active' : '' }} tooltip">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none"
-                             viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                        </svg>
-                        <span class="ml-3" id="stats-text">Статистика продаж</span>
-                        <span class="tooltip-text">Статистика продаж</span>
-                    </a>
-                </li>
+{{--                <li>--}}
+{{--                    <a href="{{ route('personal.stats') }}"--}}
+{{--                       class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.stats') ? 'active' : '' }} tooltip">--}}
+{{--                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none"--}}
+{{--                             viewBox="0 0 24 24" stroke="currentColor">--}}
+{{--                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"--}}
+{{--                                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>--}}
+{{--                        </svg>--}}
+{{--                        <span class="ml-3" id="stats-text">Статистика продаж</span>--}}
+{{--                        <span class="tooltip-text">Статистика продаж</span>--}}
+{{--                    </a>--}}
+{{--                </li>--}}
                 <li>
                     <a href="{{ route('personal.faq') }}"
                        class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.faq') ? 'active' : '' }} tooltip">
@@ -258,8 +258,8 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
-                        <span class="ml-3" id="faq-text">База знаний FAQ</span>
-                        <span class="tooltip-text">База знаний FAQ</span>
+                        <span class="ml-3" id="faq-text">Редактор FAQ</span>
+                        <span class="tooltip-text">Редактор FAQ</span>
                     </a>
                 </li>
             </ul>

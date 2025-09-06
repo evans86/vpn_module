@@ -41,7 +41,7 @@ Route::prefix('personal')->name('personal.')->group(function () {
     Route::middleware(['auth:salesman'])->group(function () {
         Route::get('/dashboard', [PersonalController::class, 'dashboard'])->name('dashboard');
         Route::get('/keys', [PersonalController::class, 'keys'])->name('keys');
-        Route::get('/stats', [PersonalController::class, 'stats'])->name('stats');
+//        Route::get('/stats', [PersonalController::class, 'stats'])->name('stats');
         Route::get('/packages', [PersonalController::class, 'packages'])->name('packages');
 
         // FAQ и инструкции

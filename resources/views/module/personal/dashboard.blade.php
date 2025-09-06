@@ -87,17 +87,76 @@
             <!-- График продаж в боте -->
             <div class="bg-white shadow rounded-lg p-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">Продажи в боте за неделю</h3>
-                <div class="h-64">
+                <div class="h-64 mb-4">
                     <canvas id="botSalesChart"></canvas>
                 </div>
+
+                @if($hasBot)
+                    <!-- Кнопка перехода к боту -->
+                    <a href="{{ $salesman->bot_link ?? '#' }}"
+                       target="_blank"
+                       class="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        Перейти к боту
+                    </a>
+                @else
+                    <!-- Блок, если нет привязанного бота -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <div class="ml-3">
+                                <p class="text-sm text-blue-700">
+                                    У вас нет привязанного бота
+                                </p>
+                                <div class="mt-2">
+                                    <a href="https://t.me/father_vpn_bot_t_bot"
+                                       target="_blank"
+                                       class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
+                                        Подключить бота
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </div>
 
             <!-- График покупок в модуле -->
             <div class="bg-white shadow rounded-lg p-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">Продажи в модуле за неделю</h3>
-                <div class="h-64">
+                <div class="h-64 mb-4">
                     <canvas id="moduleSalesChart"></canvas>
                 </div>
+
+                @if($hasModule)
+                    <!-- Кнопка перехода к модулю -->
+                    <a href="{{ $botModuleLink ?? '#' }}"
+                       class="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                        </svg>
+                        Перейти к модулю
+                    </a>
+                @else
+                    <!-- Блок, если нет модуля -->
+                    <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <div class="ml-3">
+                                <p class="text-sm text-purple-700">
+                                    Модуль VPN не подключен
+                                </p>
+                                <div class="mt-2">
+                                    <a href="https://bot-t.com"
+                                       target="_blank"
+                                       class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700">
+                                        Подключить модуль
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </div>
 
             <!-- Таблица последних продаж -->

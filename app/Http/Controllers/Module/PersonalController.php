@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
+use App\Services\External\BottApi;
+use App\Services\Key\KeyActivateService;
+use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
@@ -14,7 +17,6 @@ use Illuminate\Http\Request;
 use App\Services\Bot\BotModuleService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 
 class PersonalController extends Controller
 {
@@ -22,19 +24,43 @@ class PersonalController extends Controller
      * @var BotModuleService
      */
     protected BotModuleService $botModuleService;
+    /**
+     * @var KeyActivateService
+     */
+    private KeyActivateService $keyActivateService;
 
-    public function __construct(BotModuleService $botModuleService)
+    public function __construct(
+        BotModuleService   $botModuleService,
+        KeyActivateService $keyActivateService
+    )
     {
         $this->botModuleService = $botModuleService;
+        $this->keyActivateService = $keyActivateService;
     }
 
     /**
      * @return Application|Factory|View
+     * @throws GuzzleException
      */
     public function dashboard()
     {
-                $salesman = Auth::guard('salesman')->user();
 //        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+         $salesman = Auth::guard('salesman')->user();
+
+        // Проверяем наличие бота и модуля
+        $hasBot = $salesman->bot_link !== null;
+        $hasModule = $salesman->botModule !== null;
+
+        if ($hasModule) {
+            $botModule = BottApi::getBot($salesman->botModule->public_key);
+            if ($botModule['result']) {
+                $botModuleLink = 'https://t.me/' . $botModule['data']['title'];
+            } else {
+                $botModuleLink = null;
+            }
+        } else {
+            $botModuleLink = null;
+        }
 
         // Получаем все pack_salesman_id для данного продавца (где он продавец)
         $packSalesmanIds = $salesman->packSales()->pluck('id');
@@ -44,18 +70,18 @@ class PersonalController extends Controller
 
         // Ключи проданные в модуле (где продавец является покупателем и pack имеет module_key = 1)
         $moduleKeysQuery = KeyActivate::where('user_tg_id', $salesman->telegram_id)
-            ->whereHas('packSalesman.pack', function($q) {
+            ->whereHas('packSalesman.pack', function ($q) {
                 $q->where('pack.module_key', 1);
             });
 
         // Общее количество ключей (оба типа)
-        $totalKeys = KeyActivate::where(function($q) use ($packSalesmanIds, $salesman, $moduleKeysQuery) {
+        $totalKeys = KeyActivate::where(function ($q) use ($packSalesmanIds, $salesman, $moduleKeysQuery) {
             $q->whereIn('pack_salesman_id', $packSalesmanIds)
                 ->orWhereIn('id', $moduleKeysQuery->select('id'));
         })->count();
 
         // Активные ключи (оба типа)
-        $activeKeys = KeyActivate::where(function($q) use ($packSalesmanIds, $salesman, $moduleKeysQuery) {
+        $activeKeys = KeyActivate::where(function ($q) use ($packSalesmanIds, $salesman, $moduleKeysQuery) {
             $q->whereIn('pack_salesman_id', $packSalesmanIds)
                 ->orWhereIn('id', $moduleKeysQuery->select('id'));
         })
@@ -84,7 +110,7 @@ class PersonalController extends Controller
 
         // График покупок в модуле за 7 дней
         $moduleSalesData = KeyActivate::where('user_tg_id', $salesman->telegram_id)
-            ->whereHas('packSalesman.pack', function($q) {
+            ->whereHas('packSalesman.pack', function ($q) {
                 $q->where('pack.module_key', 1);
             })
             ->where('updated_at', '>=', Carbon::now()->subDays(7))
@@ -129,7 +155,7 @@ class PersonalController extends Controller
 
         // Ключи проданные в модуле (где продавец является покупателем)
         $modulePurchases = KeyActivate::where('user_tg_id', $salesman->telegram_id)
-            ->whereHas('packSalesman.pack', function($q) {
+            ->whereHas('packSalesman.pack', function ($q) {
                 $q->where('pack.module_key', 1);
             })
             ->with(['packSalesman.pack'])
@@ -146,7 +172,7 @@ class PersonalController extends Controller
                 return $sale;
             });
 
-// Объединяем и сортируем по дате, берем 7 последних
+        // Объединяем и сортируем по дате, берем 7 последних
         $recentSales = $botSales->merge($modulePurchases)
             ->sortByDesc('updated_at')
             ->take(7);
@@ -160,7 +186,10 @@ class PersonalController extends Controller
             'totalEarnings',
             'recentSales',
             'botChartData',
-            'moduleChartData'
+            'moduleChartData',
+            'hasBot',
+            'hasModule',
+            'botModuleLink'
         ));
     }
 
@@ -177,7 +206,7 @@ class PersonalController extends Controller
 
         // Получаем ключи где текущий продавец является покупателем и pack имеет module_key = 1
         $buyerKeysQuery = KeyActivate::where('key_activate.user_tg_id', $salesman->telegram_id)
-            ->whereHas('packSalesman.pack', function($q) {
+            ->whereHas('packSalesman.pack', function ($q) {
                 $q->where('pack.module_key', 1);
             });
 
@@ -189,7 +218,7 @@ class PersonalController extends Controller
                 'keyActivateUser.serverUser.panel',
                 'user'
             ])
-            ->where(function($q) use ($salesmanKeysQuery, $buyerKeysQuery) {
+            ->where(function ($q) use ($salesmanKeysQuery, $buyerKeysQuery) {
                 $q->whereIn('key_activate.id', $salesmanKeysQuery->select('key_activate.id'))
                     ->orWhereIn('key_activate.id', $buyerKeysQuery->select('key_activate.id'));
             });
@@ -216,7 +245,7 @@ class PersonalController extends Controller
 
         if ($request->has('expiry_filter') && !empty($request->expiry_filter)) {
             if ($request->expiry_filter === 'active') {
-                $query->where(function($q) {
+                $query->where(function ($q) {
                     $q->whereNull('key_activate.finish_at')
                         ->orWhere('key_activate.finish_at', '>', Carbon::now()->timestamp);
                 });
@@ -242,49 +271,49 @@ class PersonalController extends Controller
         ));
     }
 
-    /**
-     * @return Application|Factory|View
-     */
-    public function stats()
-    {
-        $salesman = Auth::guard('salesman')->user();
+//    /**
+//     * @return Application|Factory|View
+//     */
+//    public function stats()
+//    {
+////        $salesman = Auth::guard('salesman')->user();
 //        $salesman = Salesman::where('telegram_id', 6715142449)->first();
-
-        // Статистика продаж по месяцам
-//        $salesStats = $salesman->packSales()
-//            ->where('status', PackSalesman::PAID)
-//            ->selectRaw('YEAR(created_at) as year, MONTH(created_at) as month, SUM(amount) as total, COUNT(*) as count')
-//            ->groupBy('year', 'month')
-//            ->orderBy('year', 'desc')
-//            ->orderBy('month', 'desc')
-//            ->get();
-
-        // Популярные пакеты
-//        $popularPacks = $salesman->packSales()
-//            ->where('status', PackSalesman::PAID)
-//            ->with('pack')
-//            ->selectRaw('pack_id, COUNT(*) as count, SUM(amount) as total')
-//            ->groupBy('pack_id')
-//            ->orderBy('count', 'desc')
-//            ->limit(5)
-//            ->get();
-
-        // Общая статистика
-//        $totalSales = $salesman->packSales()
-//            ->where('status', PackSalesman::PAID)
-//            ->count();
-//        $totalAmount = $salesman->packSales()
-//            ->where('status', PackSalesman::PAID)
-//            ->sum('amount');
-
-        return view('module.personal.stats', compact(
-            'salesman',
-//            'salesStats',
-//            'popularPacks',
-//            'totalSales',
-//            'totalAmount'
-        ));
-    }
+//
+//        // Статистика продаж по месяцам
+////        $salesStats = $salesman->packSales()
+////            ->where('status', PackSalesman::PAID)
+////            ->selectRaw('YEAR(created_at) as year, MONTH(created_at) as month, SUM(amount) as total, COUNT(*) as count')
+////            ->groupBy('year', 'month')
+////            ->orderBy('year', 'desc')
+////            ->orderBy('month', 'desc')
+////            ->get();
+//
+//        // Популярные пакеты
+////        $popularPacks = $salesman->packSales()
+////            ->where('status', PackSalesman::PAID)
+////            ->with('pack')
+////            ->selectRaw('pack_id, COUNT(*) as count, SUM(amount) as total')
+////            ->groupBy('pack_id')
+////            ->orderBy('count', 'desc')
+////            ->limit(5)
+////            ->get();
+//
+//        // Общая статистика
+////        $totalSales = $salesman->packSales()
+////            ->where('status', PackSalesman::PAID)
+////            ->count();
+////        $totalAmount = $salesman->packSales()
+////            ->where('status', PackSalesman::PAID)
+////            ->sum('amount');
+//
+//        return view('module.personal.stats', compact(
+//            'salesman',
+////            'salesStats',
+////            'popularPacks',
+////            'totalSales',
+////            'totalAmount'
+//        ));
+//    }
 
     /**
      * @return Application|Factory|View
@@ -311,8 +340,8 @@ class PersonalController extends Controller
      */
     public function faq()
     {
-//        $salesman = Auth::guard('salesman')->user();
-        $salesman = Salesman::where('telegram_id', 6715142449)->first();
+        $salesman = Auth::guard('salesman')->user();
+//        $salesman = Salesman::where('telegram_id', 6715142449)->first();
         $module = $salesman->botModule;
         $bot = $salesman->bot_link;
 

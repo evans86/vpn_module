@@ -259,4 +259,31 @@ class BottApi
         $result = $response->getBody()->getContents();
         return json_decode($result, true);
     }
+
+    /**
+     * Получение Bot
+     *
+     * @param string $public_key
+     * @return array
+     * @throws GuzzleException
+     */
+    public static function getBot(string $public_key): array
+    {
+        $link = 'https://api.bot-t.com/v1/module/bot/';
+
+        $requestParam = [
+            'public_key' => $public_key,
+            'type_id' => 11
+        ];
+
+        $client = new Client(['base_uri' => $link]);
+        $response = $client->request('POST', 'get-by-public-key', [
+            'form_params' => $requestParam,
+            'headers' => [
+            ]
+        ]);
+
+        $result = $response->getBody()->getContents();
+        return json_decode($result, true);
+    }
 }

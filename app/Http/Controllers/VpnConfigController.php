@@ -24,7 +24,7 @@ class VpnConfigController extends Controller
 
     public function __construct(
         KeyActivateUserRepository $keyActivateUserRepository,
-        ServerUserRepository $serverUserRepository
+        ServerUserRepository      $serverUserRepository
     )
     {
         $this->keyActivateUserRepository = $keyActivateUserRepository;
@@ -107,6 +107,30 @@ class VpnConfigController extends Controller
                 str_contains($userAgent, 'ipsec') || // IPSec clients
                 str_contains($userAgent, 'l2tp') || // L2TP clients
                 str_contains($userAgent, 'pptp'); // PPTP clients
+                //new client
+                str_contains($userAgent, 'happproxy') || // Happy Proxy (Android)
+                str_contains($userAgent, 'hexasoftware') || // V2Box (Android)
+                str_contains($userAgent, 'v2box') || // V2Box (Android)
+                str_contains($userAgent, 'v2rayg') || // V2RayG (клиенты)
+                str_contains($userAgent, 'anxray') || // AnXray (Android)
+                str_contains($userAgent, 'kitsunebi') || // Kitsunebi (iOS)
+                str_contains($userAgent, 'potatso') || // Potatso (iOS)
+                str_contains($userAgent, 'rocket') || // Общий для Rocket клиентов
+                str_contains($userAgent, 'pharos') || // Pharos (iOS)
+                str_contains($userAgent, 'stash') || // Stash (iOS)
+                str_contains($userAgent, 'mellow') || // Mellow (клиенты)
+                str_contains($userAgent, 'leaf') || // Leaf (клиенты)
+                str_contains($userAgent, 'hysteria') || // Hysteria (клиенты)
+                str_contains($userAgent, 'tuic') || // TUIC (клиенты)
+                str_contains($userAgent, 'naive') || // NaiveProxy (клиенты)
+                str_contains($userAgent, 'brook') || // Brook (клиенты)
+                str_contains($userAgent, 'vnet') || // VNet (клиенты)
+                str_contains($userAgent, 'http injector') || // HTTP Injector (Android)
+                str_contains($userAgent, 'anonym') || // Анонимайзеры
+                str_contains($userAgent, 'proxy') || // Прокси клиенты
+                str_contains($userAgent, 'vpn') || // Общий для VPN клиентов
+                str_contains($userAgent, 'sub') || // Для подписочных клиентов
+                str_contains($userAgent, 'subscribe'); // Для подписочных клиентов
 
             if ($isVpnClient || request()->wantsJson()) {
                 // Для VPN клиентов возвращаем строку с конфигурациями
