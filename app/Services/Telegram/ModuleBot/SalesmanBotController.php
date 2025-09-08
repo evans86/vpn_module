@@ -504,8 +504,8 @@ class SalesmanBotController extends AbstractTelegramBot
         $text .= "📁 <b>Инструкции по настройке VPN:</b>\n\n";
         $text .= "- <a href=\"https://teletype.in/@bott_manager/C0WFg-Bsren\">Инструкция для Android</a> 🤖\n";
         $text .= "- <a href=\"https://teletype.in/@bott_manager/8jEexiKqjlEWQ\">Инструкция для IOS</a> 🍏\n";
-        $text .= "- <a href=\"https://teletype.in/@bott_manager/kJaChoXUqmZ\">Инструкция для Windows</a> 🪟\n\n";
-        $text .= "- <a href=\"https://teletype.in/@bott_manager/Q8vOQ-_lnQ_\">Инструкция для MacOS</a> 💻\n\n";
+        $text .= "- <a href=\"https://teletype.in/@bott_manager/kJaChoXUqmZ\">Инструкция для Windows</a> 🪟\n";
+        $text .= "- <a href=\"https://teletype.in/@bott_manager/Q8vOQ-_lnQ_\">Инструкция для MacOS</a> 💻\n";
         $text .= "- <a href=\"https://teletype.in/@bott_manager/OIc2Dwer6jV\">Инструкция для AndroidTV</a> 📺\n\n";
         $text .= "👨🏻‍💻 По всем вопросам обращайтесь к <a href=\"ссылка на акк поддержки\">администратору</a> бота.\n\n";
 
