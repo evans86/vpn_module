@@ -502,9 +502,11 @@ class SalesmanBotController extends AbstractTelegramBot
         $text .= "1️⃣ Нажмите кнопку '📊 Статус'\n";
         $text .= "2️⃣ Просмотрите информацию о вашем доступе и конфигурации\n\n";
         $text .= "📁 <b>Инструкции по настройке VPN:</b>\n\n";
-        $text .= "- <a href=\"https://docs.google.com/document/d/1ma6QZjKgwLHdS2457I8C6k22gC2Cq3Yic8bLiMeXmeY/edit?usp=sharing\">Инструкция для Android</a> 📱\n";
-        $text .= "- <a href=\"https://docs.google.com/document/d/1f3iS-V0kFVQEA3i1hYOEaAoNMucgF60XiDZZdhRl59Q/edit?usp=sharing\">Инструкция для IOS</a> 🍏\n";
-        $text .= "- <a href=\"https://docs.google.com/document/d/1jXNpuNY9eET1LXyVmRjHSoX6YRX9RlWGJQFSEJE_2Jg/edit?usp=sharing\">Инструкция для Windows</a> 🖥️\n\n";
+        $text .= "- <a href=\"https://teletype.in/@bott_manager/C0WFg-Bsren\">Инструкция для Android</a> 🤖\n";
+        $text .= "- <a href=\"https://teletype.in/@bott_manager/8jEexiKqjlEWQ\">Инструкция для IOS</a> 🍏\n";
+        $text .= "- <a href=\"https://teletype.in/@bott_manager/kJaChoXUqmZ\">Инструкция для Windows</a> 🪟\n\n";
+        $text .= "- <a href=\"https://teletype.in/@bott_manager/Q8vOQ-_lnQ_\">Инструкция для MacOS</a> 💻\n\n";
+        $text .= "- <a href=\"https://teletype.in/@bott_manager/OIc2Dwer6jV\">Инструкция для AndroidTV</a> 📺\n\n";
         $text .= "👨🏻‍💻 По всем вопросам обращайтесь к <a href=\"ссылка на акк поддержки\">администратору</a> бота.\n\n";
 
         $this->sendMessage($text);

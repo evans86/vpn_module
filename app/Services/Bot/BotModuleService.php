@@ -109,12 +109,14 @@ class BotModuleService
 <blockquote><b>🔐 Инструкция по настройке VPN</b></blockquote>
 1️⃣ Нажмите кнопку <strong>«Купить»</strong> и приобретите VPN-ключ
 2️⃣ Скопируйте конфигурацию полученного 🔑 ключа
-3️⃣ Вставьте конфигурацию в приложение <a href="https://play.google.com/store/apps/details?id=app.hiddify.com&hl=ru">Hiddify</a> или <a href="https://apps.apple.com/ru/app/streisand/id6450534064">Streisand</a>
+3️⃣ Следуйте инструкциям для подключения на различных устройствах
 
 <blockquote><b>📁 Пошаговые инструкции:</b></blockquote>
-- <a href="https://teletype.in/@bott_manager/UPSEXs-nn66">Android</a> 📱
-- <a href="https://teletype.in/@bott_manager/nau_zbkFsdo">iOS</a> 🍏
-- <a href="https://teletype.in/@bott_manager/HhKafGko3sO">Windows</a> 🖥️
+- <a href="https://teletype.in/@bott_manager/C0WFg-Bsren">Android</a> 🤖
+- <a href="https://teletype.in/@bott_manager/8jEexiKqjlEWQ">iOS</a> 🍏
+- <a href="https://teletype.in/@bott_manager/kJaChoXUqmZ">Windows</a> 🪟
+- <a href="https://teletype.in/@bott_manager/Q8vOQ-_lnQ_">MacOS</a> 💻
+- <a href="https://teletype.in/@bott_manager/OIc2Dwer6jV">AndroidTV</a> 📺
 
 <blockquote><b>❓ Если VPN не подключается:</b></blockquote>
 ✅ Убедитесь, что используете <strong>актуальный конфиг</strong>
