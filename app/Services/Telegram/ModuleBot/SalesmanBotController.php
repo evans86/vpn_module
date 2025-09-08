@@ -569,11 +569,6 @@ class SalesmanBotController extends AbstractTelegramBot
         $text = "✅ <b>VPN успешно активирован!</b>\n\n";
         $text .= "📅 Срок действия: до {$finishDate}\n\n";
 
-//        if ($key->traffic_limit) {
-//            $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
-//            $text .= "📊 Лимит трафика: {$trafficGB} GB\n\n";
-//        }
-
         $text .= "🔗 <b>Ваша VPN-конфигурация:</b>\n\n";
         $text .= "[Открыть конфигурацию]\n";
         $text .= "https://vpn-telegram.com/config/{$key->id}\n\n";
@@ -581,32 +576,42 @@ class SalesmanBotController extends AbstractTelegramBot
         $text .= "📝 <b>Инструкция по настройке:</b>\n\n";
         $text .= "1️⃣ Установите VPN-клиент на Ваше устройство\n";
         $text .= "2️⃣ Скопируйте ссылку конфигурации выше\n";
-        $text .= "3️⃣ Откройте приложение\n";
-        $text .= "4️⃣ Нажмите '+' для добавления новой конфигурации\n";
-        $text .= "5️⃣ Вставьте скопированную конфигурацию'\n\n";
+        $text .= "3️⃣ Следуйте инструкциям для подключения на различных устройствах\n\n";
 
 
         $text .= "❓ Если возникли вопросы, обратитесь к администратору бота";
-        $text .= "📱 Рекомендуемый VPN-клиент:\n";
+        $text .= "📱 Инструкции для настройки подключения:\n";
 
         $keyboard = [
             'inline_keyboard' => [
                 [
                     [
-                        'text' => '📲 Android - Hiddify',
-                        'url' => 'https://play.google.com/store/apps/details?id=app.hiddify.com'
+                        'text' => '🤖 Android',
+                        'url' => 'https://teletype.in/@bott_manager/C0WFg-Bsren'
                     ]
                 ],
                 [
                     [
-                        'text' => '🍏 iOS - Streisand',
-                        'url' => 'https://apps.apple.com/ru/app/streisand/id6450534064'
+                        'text' => '🍏 iOS',
+                        'url' => 'https://teletype.in/@bott_manager/8jEexiKqjlEWQ'
                     ]
                 ],
                 [
                     [
-                        'text' => '🖥️ Windows - Hiddify',
-                        'url' => 'https://apps.microsoft.com/detail/9pdfnl3qv2s5?hl=en-US&gl=US'
+                        'text' => '🪟️ Windows',
+                        'url' => 'https://teletype.in/@bott_manager/kJaChoXUqmZ'
+                    ]
+                ],
+                [
+                    [
+                        'text' => '💻 MacOS',
+                        'url' => 'https://teletype.in/@bott_manager/Q8vOQ-_lnQ_'
+                    ]
+                ],
+                [
+                    [
+                        'text' => '📺 AndroidTV',
+                        'url' => 'https://teletype.in/@bott_manager/OIc2Dwer6jV'
                     ]
                 ]
             ]
