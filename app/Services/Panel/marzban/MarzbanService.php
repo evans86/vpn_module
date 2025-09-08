@@ -851,19 +851,19 @@ class MarzbanService
                 $message .= "https://vpn-telegram.com/config/{$key_activate->id})";
 
                 try {
-                    if (!is_null($key_activate->module_salesman_id)) {
+//                    if (!is_null($key_activate->module_salesman_id)) {
                         $salesman = $key_activate->moduleSalesman;
 
                         BottApi::senModuleMessage(BotModuleFactory::fromEntity($salesman->botModule), $key_activate->user_tg_id, $message);
-                    }else {
-                        $salesman = $key_activate->packSalesman->salesman;
-                        $telegram = new Api($salesman->token);
-                        $telegram->sendMessage([
-                            'chat_id' => $key_activate->user_tg_id,
-                            'text' => $message,
-                            'parse_mode' => 'HTML'
-                        ]);
-                    }
+//                    }else {
+//                        $salesman = $key_activate->packSalesman->salesman;
+//                        $telegram = new Api($salesman->token);
+//                        $telegram->sendMessage([
+//                            'chat_id' => $key_activate->user_tg_id,
+//                            'text' => $message,
+//                            'parse_mode' => 'HTML'
+//                        ]);
+//                    }
                 } catch (Exception $e) {
                     Log::error('Ошибка при отправке сообщения через FatherBot', [
                         'error' => $e->getMessage(),
