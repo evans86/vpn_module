@@ -304,7 +304,8 @@ class BottApi
             'user_tg_id' => $user_tg_id,
             'method' => 'sendMessage',
             'params' => [
-                'text' => $text
+                'text' => $text,
+                'parse_mode' => 'HTML'
             ]
         ];
 
