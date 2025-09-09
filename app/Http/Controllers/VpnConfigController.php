@@ -106,11 +106,10 @@ class VpnConfigController extends Controller
                 str_contains($userAgent, 'ikev2') || // IKEv2 clients
                 str_contains($userAgent, 'ipsec') || // IPSec clients
                 str_contains($userAgent, 'l2tp') || // L2TP clients
-                str_contains($userAgent, 'pptp'); // PPTP clients
-                str_contains($userAgent, 'v2raytun'); // PPTP clients
-                str_contains($userAgent, 'Happ'); // PPTP clients
-                str_contains($userAgent, 'V2Box'); // PPTP clients
-                //new client
+                str_contains($userAgent, 'pptp') || // PPTP clients
+                str_contains($userAgent, 'v2raytun') || // PPTP clients
+                str_contains($userAgent, 'Happ') || // PPTP clients
+                str_contains($userAgent, 'V2Box') || // PPTP clients
                 str_contains($userAgent, 'happproxy') || // Happy Proxy (Android)
                 str_contains($userAgent, 'hexasoftware') || // V2Box (Android)
                 str_contains($userAgent, 'v2box') || // V2Box (Android)
