@@ -135,6 +135,8 @@ class VpnConfigController extends Controller
                 str_contains($userAgent, 'subscribe'); // Для подписочных клиентов
 
             if ($isVpnClient || request()->wantsJson()) {
+                Log::warning('ВОТ ЭТО ВЕРНУЛИ:', ['ВОТ ЭТО ВЕРНУЛИ' => response(implode("\n", $connectionKeys))
+                    ->header('Content-Type', 'text/plain')]);
                 // Для VPN клиентов возвращаем строку с конфигурациями
                 return response(implode("\n", $connectionKeys))
                     ->header('Content-Type', 'text/plain');
