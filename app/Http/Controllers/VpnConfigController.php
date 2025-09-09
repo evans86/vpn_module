@@ -109,6 +109,7 @@ class VpnConfigController extends Controller
                 str_contains($userAgent, 'pptp') || // PPTP clients
                 str_contains($userAgent, 'v2raytun') || // PPTP clients
                 str_contains($userAgent, 'Happ') || // PPTP clients
+                str_contains($userAgent, 'happ') || // PPTP clients
                 str_contains($userAgent, 'V2Box') || // PPTP clients
                 str_contains($userAgent, 'happproxy') || // Happy Proxy (Android)
                 str_contains($userAgent, 'hexasoftware') || // V2Box (Android)
