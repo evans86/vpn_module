@@ -243,9 +243,9 @@ class KeyActivateService
             }
 
             // Проверяем, не истек ли срок для активации
-            if ($this->keyActivateRepository->isActivationPeriodExpired($key)) {
-                throw new RuntimeException('Срок активации ключа истек');
-            }
+//            if ($this->keyActivateRepository->isActivationPeriodExpired($key)) {
+//                throw new RuntimeException('Срок активации ключа истек');
+//            }
 
             // Проверяем, не занят ли уже ключ другим пользователем
             if ($this->keyActivateRepository->isUsedByAnotherUser($key, $userTgId)) {
@@ -343,9 +343,9 @@ class KeyActivateService
             }
 
             // Проверяем, не истек ли срок для активации
-            if ($this->keyActivateRepository->isActivationPeriodExpired($key)) {
-                throw new RuntimeException('Срок активации ключа истек');
-            }
+//            if ($this->keyActivateRepository->isActivationPeriodExpired($key)) {
+//                throw new RuntimeException('Срок активации ключа истек');
+//            }
 
             // Проверяем, не занят ли уже ключ другим пользователем
             if ($this->keyActivateRepository->isUsedByAnotherUser($key, $userTgId)) {
