@@ -30,7 +30,7 @@ class LogController extends Controller
     {
         try {
             // Clean old logs (older than 30 days)
-            $deletedCount = $this->logRepository->cleanOldLogs(30);
+            $deletedCount = $this->logRepository->cleanOldLogs(10);
             if ($deletedCount > 0) {
                 Log::info('Cleaned old logs', [
                     'source' => 'system',
