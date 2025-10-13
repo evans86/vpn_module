@@ -218,24 +218,24 @@ class FatherBotController extends AbstractTelegramBot
 //                case 'export_all_keys_menu':
 //                    $this->exportAllKeysMenu();
 //                    break;
-                case 'export_all_keys':
-                    $this->exportAllKeys();
-                    break;
-                case 'export_all_keys_only':
-                    $this->exportAllKeys(false);
-                    break;
-                case 'export_all_active_keys':
-                    $this->exportAllActiveKeys();
-                    break;
-                case 'export_all_active_keys_only':
-                    $this->exportAllActiveKeys(false);
-                    break;
-                case 'export_all_used_keys':
-                    $this->exportAllUsedKeys();
-                    break;
-                case 'export_all_used_keys_only':
-                    $this->exportAllUsedKeys(false);
-                    break;
+//                case 'export_all_keys':
+//                    $this->exportAllKeys();
+//                    break;
+//                case 'export_all_keys_only':
+//                    $this->exportAllKeys(false);
+//                    break;
+//                case 'export_all_active_keys':
+//                    $this->exportAllActiveKeys();
+//                    break;
+//                case 'export_all_active_keys_only':
+//                    $this->exportAllActiveKeys(false);
+//                    break;
+//                case 'export_all_used_keys':
+//                    $this->exportAllUsedKeys();
+//                    break;
+//                case 'export_all_used_keys_only':
+//                    $this->exportAllUsedKeys(false);
+//                    break;
 
                 default:
                     Log::warning('Unknown callback action', [
