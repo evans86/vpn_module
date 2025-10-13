@@ -1136,117 +1136,117 @@ class FatherBotController extends AbstractTelegramBot
         }
     }
 
-    /**
-     * Меню выгрузки всех ключей
-     */
-    private function exportAllKeysMenu(): void
-    {
-        try {
-            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-            if (!$salesman) {
-                $this->sendMessage("❌ Ошибка: продавец не найден");
-                return;
-            }
+//    /**
+//     * Меню выгрузки всех ключей
+//     */
+//    private function exportAllKeysMenu(): void
+//    {
+//        try {
+//            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+//            if (!$salesman) {
+//                $this->sendMessage("❌ Ошибка: продавец не найден");
+//                return;
+//            }
+//
+//            $message = "📥 <b>Выгрузка всех ключей</b>\n\n";
+//            $message .= "Выберите тип выгрузки:\n\n";
+//            $message .= "• <b>Все ключи</b> - полный список всех ключей\n";
+//            $message .= "• <b>Активные</b> - только неиспользованные ключи\n";
+//            $message .= "• <b>Использованные</b> - только активированные ключи\n";
+//
+//            $keyboard = [
+//                'inline_keyboard' => [
+//                    [
+//                        [
+//                            'text' => '📥 Все ключи',
+//                            'callback_data' => json_encode(['action' => 'export_all_keys'])
+//                        ],
+//                        [
+//                            'text' => '📋 (Только ключи)',
+//                            'callback_data' => json_encode(['action' => 'export_all_keys_only'])
+//                        ]
+//                    ],
+//                    [
+//                        [
+//                            'text' => '🟢 Активные ключи',
+//                            'callback_data' => json_encode(['action' => 'export_all_active_keys'])
+//                        ],
+//                        [
+//                            'text' => '📋 (Только ключи)',
+//                            'callback_data' => json_encode(['action' => 'export_all_active_keys_only'])
+//                        ]
+//                    ],
+//                    [
+//                        [
+//                            'text' => '🔴 Использованные',
+//                            'callback_data' => json_encode(['action' => 'export_all_used_keys'])
+//                        ],
+//                        [
+//                            'text' => '📋 (Только ключи)',
+//                            'callback_data' => json_encode(['action' => 'export_all_used_keys_only'])
+//                        ]
+//                    ],
+//                    [
+//                        [
+//                            'text' => '⬅️ Назад',
+//                            'callback_data' => json_encode(['action' => 'show_packs', 'page' => 1])
+//                        ]
+//                    ]
+//                ]
+//            ];
+//
+//            $this->sendMessage($message, $keyboard);
+//
+//        } catch (\Exception $e) {
+//            Log::error('Error in exportAllKeysMenu: ' . $e->getMessage());
+//            $this->sendErrorMessage();
+//        }
+//    }
 
-            $message = "📥 <b>Выгрузка всех ключей</b>\n\n";
-            $message .= "Выберите тип выгрузки:\n\n";
-            $message .= "• <b>Все ключи</b> - полный список всех ключей\n";
-            $message .= "• <b>Активные</b> - только неиспользованные ключи\n";
-            $message .= "• <b>Использованные</b> - только активированные ключи\n";
-
-            $keyboard = [
-                'inline_keyboard' => [
-                    [
-                        [
-                            'text' => '📥 Все ключи',
-                            'callback_data' => json_encode(['action' => 'export_all_keys'])
-                        ],
-                        [
-                            'text' => '📋 (Только ключи)',
-                            'callback_data' => json_encode(['action' => 'export_all_keys_only'])
-                        ]
-                    ],
-                    [
-                        [
-                            'text' => '🟢 Активные ключи',
-                            'callback_data' => json_encode(['action' => 'export_all_active_keys'])
-                        ],
-                        [
-                            'text' => '📋 (Только ключи)',
-                            'callback_data' => json_encode(['action' => 'export_all_active_keys_only'])
-                        ]
-                    ],
-                    [
-                        [
-                            'text' => '🔴 Использованные',
-                            'callback_data' => json_encode(['action' => 'export_all_used_keys'])
-                        ],
-                        [
-                            'text' => '📋 (Только ключи)',
-                            'callback_data' => json_encode(['action' => 'export_all_used_keys_only'])
-                        ]
-                    ],
-                    [
-                        [
-                            'text' => '⬅️ Назад',
-                            'callback_data' => json_encode(['action' => 'show_packs', 'page' => 1])
-                        ]
-                    ]
-                ]
-            ];
-
-            $this->sendMessage($message, $keyboard);
-
-        } catch (\Exception $e) {
-            Log::error('Error in exportAllKeysMenu: ' . $e->getMessage());
-            $this->sendErrorMessage();
-        }
-    }
-
-    /**
-     * Выгрузка всех ключей продавца
-     */
-    private function exportAllKeys(bool $withText = true): void
-    {
-        try {
-            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-            if (!$salesman) {
-                $this->sendMessage("❌ Ошибка: продавец не найден");
-                return;
-            }
-
-            $allPacks = PackSalesman::where('salesman_id', $salesman->id)
-                ->where('status', PackSalesman::PAID)
-                ->with('keyActivates')
-                ->get();
-
-            $content = "";
-            if ($withText) {
-                $content .= "Все ключи продавца\n";
-                $content .= "Telegram ID: {$salesman->telegram_id}\n";
-                $content .= "Бот: {$salesman->bot_link}\n";
-                $content .= "Дата выгрузки: " . date('d.m.Y H:i') . "\n\n";
-            }
-
-            $totalKeys = 0;
-            foreach ($allPacks as $pack) {
-                foreach ($pack->keyActivates as $key) {
-                    $content .= "{$key->id}\n";
-                    $totalKeys++;
-                }
-            }
-
-            if ($withText) {
-                $content .= "\nВсего ключей: {$totalKeys}";
-            }
-
-            $this->sendKeysFile($content, "all_keys_{$salesman->telegram_id}.txt", "Все ключи ({$totalKeys})");
-
-        } catch (\Exception $e) {
-            Log::error('Error in exportAllKeys: ' . $e->getMessage());
-            $this->sendErrorMessage();
-        }
-    }
+//    /**
+//     * Выгрузка всех ключей продавца
+//     */
+//    private function exportAllKeys(bool $withText = true): void
+//    {
+//        try {
+//            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+//            if (!$salesman) {
+//                $this->sendMessage("❌ Ошибка: продавец не найден");
+//                return;
+//            }
+//
+//            $allPacks = PackSalesman::where('salesman_id', $salesman->id)
+//                ->where('status', PackSalesman::PAID)
+//                ->with('keyActivates')
+//                ->get();
+//
+//            $content = "";
+//            if ($withText) {
+//                $content .= "Все ключи продавца\n";
+//                $content .= "Telegram ID: {$salesman->telegram_id}\n";
+//                $content .= "Бот: {$salesman->bot_link}\n";
+//                $content .= "Дата выгрузки: " . date('d.m.Y H:i') . "\n\n";
+//            }
+//
+//            $totalKeys = 0;
+//            foreach ($allPacks as $pack) {
+//                foreach ($pack->keyActivates as $key) {
+//                    $content .= "{$key->id}\n";
+//                    $totalKeys++;
+//                }
+//            }
+//
+//            if ($withText) {
+//                $content .= "\nВсего ключей: {$totalKeys}";
+//            }
+//
+//            $this->sendKeysFile($content, "all_keys_{$salesman->telegram_id}.txt", "Все ключи ({$totalKeys})");
+//
+//        } catch (\Exception $e) {
+//            Log::error('Error in exportAllKeys: ' . $e->getMessage());
+//            $this->sendErrorMessage();
+//        }
+//    }
 
 
     /**
@@ -1321,7 +1321,7 @@ class FatherBotController extends AbstractTelegramBot
             $content = "";
             if ($withText) {
                 $content .= "Пакет: ID {$packSalesman->id}\n";
-                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
+//                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
                 $content .= "Период: {$pack->period} дней\n";
                 $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
                 $content .= "Ключи активации:\n";
@@ -1386,7 +1386,7 @@ class FatherBotController extends AbstractTelegramBot
             $content = "";
             if ($withText) {
                 $content .= "Пакет: ID {$packSalesman->id}\n";
-                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
+//                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
                 $content .= "Период: {$pack->period} дней\n";
                 $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
                 $content .= "Не активированные ключи активации:\n";
@@ -1454,7 +1454,7 @@ class FatherBotController extends AbstractTelegramBot
             $content = "";
             if ($withText) {
                 $content .= "Пакет: ID {$packSalesman->id}\n";
-                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
+//                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
                 $content .= "Период: {$pack->period} дней\n";
                 $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
                 $content .= "Ключи с остатком трафика:\n";
@@ -1519,7 +1519,7 @@ class FatherBotController extends AbstractTelegramBot
             $content = "";
             if ($withText) {
                 $content .= "Пакет: ID {$packSalesman->id}\n";
-                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
+//                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
                 $content .= "Период: {$pack->period} дней\n";
                 $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
                 $content .= "Использованные ключи:\n";
