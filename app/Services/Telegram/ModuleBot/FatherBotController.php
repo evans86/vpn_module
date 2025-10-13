@@ -215,6 +215,11 @@ class FatherBotController extends AbstractTelegramBot
                     $this->reloadBot();
                     break;
 
+                case 'current_page':
+                    // Просто отвечаем на callback query без изменений
+                    $this->answerCallbackQuery('Вы уже на этой странице');
+                    break;
+
 //                case 'export_all_keys_menu':
 //                    $this->exportAllKeysMenu();
 //                    break;
@@ -243,11 +248,31 @@ class FatherBotController extends AbstractTelegramBot
                         'data' => $data
                     ]);
             }
+            // Всегда отвечаем на callback query чтобы убрать "loading"
+            $this->answerCallbackQuery();
+
         } catch (Exception $e) {
             Log::error('Process callback error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()
             ]);
             $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Ответ на callback query (для избежания "loading" состояния)
+     */
+    private function answerCallbackQuery(string $text = '', bool $showAlert = false): void
+    {
+        try {
+            $callbackQueryId = $this->update->getCallbackQuery()->getId();
+            $this->telegram->answerCallbackQuery([
+                'callback_query_id' => $callbackQueryId,
+                'text' => $text,
+                'show_alert' => $showAlert
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error answering callback query: ' . $e->getMessage());
         }
     }
 
@@ -708,9 +733,6 @@ class FatherBotController extends AbstractTelegramBot
 //        }
 //    }
 
-    /**
-     * Показать список пакетов продавца с пагинацией и красивым оформлением
-     */
     private function showPacksList(int $page = 1, ?int $messageId = null): void
     {
         try {
@@ -723,14 +745,24 @@ class FatherBotController extends AbstractTelegramBot
             // Количество пакетов на страницу
             $perPage = 8;
 
-//            // Получаем пакеты с пагинацией
-//            $packs = PackSalesman::where('salesman_id', $salesman->id)
-//                ->where('status', PackSalesman::PAID)
-//                ->with(['pack', 'keyActivates'])
-//                ->orderBy('created_at', 'desc')
-//                ->paginate($perPage, ['*'], 'page', $page);
+            // Получаем ВСЕ пакеты для общей статистики
+            $allPacks = PackSalesman::where('salesman_id', $salesman->id)
+                ->where('status', PackSalesman::PAID)
+                ->with('keyActivates')
+                ->get();
 
-            // Получаем пакеты с пагинацией
+            // Общая статистика по ВСЕМ пакетам
+            $totalKeys = 0;
+            $activeKeys = 0;
+            $usedKeys = 0;
+
+            foreach ($allPacks as $packSalesman) {
+                $totalKeys += $packSalesman->keyActivates->count();
+                $usedKeys += $packSalesman->keyActivates->whereNotNull('user_tg_id')->count();
+            }
+            $activeKeys = $totalKeys - $usedKeys;
+
+            // Получаем пакеты для текущей страницы (только для отображения)
             $packs = PackSalesman::where('salesman_id', $salesman->id)
                 ->where('status', PackSalesman::PAID)
                 ->with('pack')
@@ -749,23 +781,18 @@ class FatherBotController extends AbstractTelegramBot
                 return;
             }
 
-            // Заголовок с общей статистикой
-            $totalKeys = 0;
-            $activeKeys = 0;
-            $usedKeys = 0;
-
-            foreach ($packs as $packSalesman) {
-                $totalKeys += $packSalesman->keyActivates->count();
-                $usedKeys += $packSalesman->keyActivates->whereNotNull('user_tg_id')->count();
-            }
-            $activeKeys = $totalKeys - $usedKeys;
-
             $message = "📊 <b>Ваши пакеты VPN-ключей</b>\n\n";
             $message .= "📈 <i>Общая статистика:</i>\n";
             $message .= "   • Всего ключей: <b>{$totalKeys}</b>\n";
             $message .= "   • Активных: <b>{$activeKeys}</b>\n";
             $message .= "   • Использовано: <b>{$usedKeys}</b>\n\n";
-            $message .= "🔍 <i>Выберите пакет для просмотра деталей:</i>\n\n";
+
+            // Добавляем информацию о текущей странице
+            $currentPage = $packs->currentPage();
+            $lastPage = $packs->lastPage();
+            $totalPacks = $packs->total();
+
+            $message .= "📦 <i>Пакеты на странице {$currentPage}/{$lastPage} (всего: {$totalPacks}):</i>\n\n";
 
             $keyboard = ['inline_keyboard' => []];
 
@@ -786,14 +813,15 @@ class FatherBotController extends AbstractTelegramBot
                 $usagePercent = $totalPackKeys > 0 ? round(($usedPackKeys / $totalPackKeys) * 100) : 0;
 
                 // Форматируем трафик
+                $trafficGB = number_format($pack->traffic_limit / (1024 * 1024 * 1024));
                 $period = $pack->period;
 
                 // Создаем прогресс-бар
                 $progressBar = $this->createProgressBar($usagePercent);
 
-                // Текст кнопки
+                // Текст кнопки (исправлено - убрано дублирование)
                 $buttonText = "📦 {$period}д\n";
-                $buttonText = "{$progressBar} {$usagePercent}%\n";
+                $buttonText .= "{$progressBar} {$usagePercent}%\n";
                 $buttonText .= "🔑 {$activePackKeys}/{$totalPackKeys}";
 
                 $keyboard['inline_keyboard'][] = [
@@ -807,16 +835,6 @@ class FatherBotController extends AbstractTelegramBot
                 ];
             }
 
-//            // Добавляем разделитель
-//            $keyboard['inline_keyboard'][] = [
-//                [
-//                    'text' => '📥 Выгрузить все ключи',
-//                    'callback_data' => json_encode([
-//                        'action' => 'export_all_keys_menu'
-//                    ])
-//                ]
-//            ];
-
             // Добавляем кнопки пагинации с эмодзи
             if ($packs->hasPages()) {
                 $paginationButtons = [];
@@ -828,6 +846,18 @@ class FatherBotController extends AbstractTelegramBot
                 // Информация о странице
                 $pageInfo = "📄 {$currentPage}/{$lastPage}";
 
+                // Кнопка "В начало" если не на первой странице
+                if ($currentPage > 1) {
+                    $paginationButtons[] = [
+                        'text' => '⏮',
+                        'callback_data' => json_encode([
+                            'action' => 'packs_page',
+                            'page' => 1
+                        ])
+                    ];
+                }
+
+                // Кнопка "Назад"
                 if ($currentPage > 1) {
                     $paginationButtons[] = [
                         'text' => '⬅️',
@@ -838,11 +868,13 @@ class FatherBotController extends AbstractTelegramBot
                     ];
                 }
 
+                // Информация о странице
                 $paginationButtons[] = [
                     'text' => $pageInfo,
                     'callback_data' => json_encode(['action' => 'current_page'])
                 ];
 
+                // Кнопка "Вперед"
                 if ($packs->hasMorePages()) {
                     $paginationButtons[] = [
                         'text' => '➡️',
@@ -853,8 +885,31 @@ class FatherBotController extends AbstractTelegramBot
                     ];
                 }
 
+                // Кнопка "В конец" если не на последней странице
+                if ($currentPage < $lastPage) {
+                    $paginationButtons[] = [
+                        'text' => '⏭',
+                        'callback_data' => json_encode([
+                            'action' => 'packs_page',
+                            'page' => $lastPage
+                        ])
+                    ];
+                }
+
                 $keyboard['inline_keyboard'][] = $paginationButtons;
             }
+
+            // Добавляем кнопку обновления с временной меткой
+//            $keyboard['inline_keyboard'][] = [
+//                [
+//                    'text' => '🔄 Обновить',
+//                    'callback_data' => json_encode([
+//                        'action' => 'show_packs',
+//                        'page' => $page,
+//                        'ts' => time() // Добавляем временную метку
+//                    ])
+//                ]
+//            ];
 
             if ($messageId) {
                 $this->editMessage($message, $keyboard, $messageId);
@@ -866,6 +921,165 @@ class FatherBotController extends AbstractTelegramBot
             $this->sendErrorMessage();
         }
     }
+
+//    /**
+//     * Показать список пакетов продавца с пагинацией и красивым оформлением
+//     */
+//    private function showPacksList(int $page = 1, ?int $messageId = null): void
+//    {
+//        try {
+//            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+//            if (!$salesman) {
+//                $this->sendMessage("❌ Ошибка: продавец не найден");
+//                return;
+//            }
+//
+//            // Количество пакетов на страницу
+//            $perPage = 8;
+//
+////            // Получаем пакеты с пагинацией
+////            $packs = PackSalesman::where('salesman_id', $salesman->id)
+////                ->where('status', PackSalesman::PAID)
+////                ->with(['pack', 'keyActivates'])
+////                ->orderBy('created_at', 'desc')
+////                ->paginate($perPage, ['*'], 'page', $page);
+//
+//            // Получаем пакеты с пагинацией
+//            $packs = PackSalesman::where('salesman_id', $salesman->id)
+//                ->where('status', PackSalesman::PAID)
+//                ->with('pack')
+//                ->orderBy('created_at', 'desc')
+//                ->paginate($perPage, ['*'], 'page', $page);
+//
+//            if ($packs->isEmpty()) {
+//                $message = "📦 <b>У вас пока нет активных пакетов</b>\n\n";
+//                $message .= "Чтобы начать продавать VPN:\n\n";
+//                $message .= "1️⃣ Пополните баланс в системе\n";
+//                $message .= "2️⃣ Приобретите пакеты VPN-ключей\n";
+//                $message .= "3️⃣ Начните продавать доступы клиентам\n\n";
+//                $message .= "⚡️ Первые продажи уже через 5 минут!";
+//
+//                $this->sendMessage($message);
+//                return;
+//            }
+//
+//            // Заголовок с общей статистикой
+//            $totalKeys = 0;
+//            $activeKeys = 0;
+//            $usedKeys = 0;
+//
+//            foreach ($packs as $packSalesman) {
+//                $totalKeys += $packSalesman->keyActivates->count();
+//                $usedKeys += $packSalesman->keyActivates->whereNotNull('user_tg_id')->count();
+//            }
+//            $activeKeys = $totalKeys - $usedKeys;
+//
+//            $message = "📊 <b>Ваши пакеты VPN-ключей</b>\n\n";
+//            $message .= "📈 <i>Общая статистика:</i>\n";
+//            $message .= "   • Всего ключей: <b>{$totalKeys}</b>\n";
+//            $message .= "   • Активных: <b>{$activeKeys}</b>\n";
+//            $message .= "   • Использовано: <b>{$usedKeys}</b>\n\n";
+//            $message .= "🔍 <i>Выберите пакет для просмотра деталей:</i>\n\n";
+//
+//            $keyboard = ['inline_keyboard' => []];
+//
+//            // Добавляем пакеты с красивым оформлением
+//            foreach ($packs as $packSalesman) {
+//                $pack = $packSalesman->pack;
+//
+//                if (!$pack) {
+//                    continue; // Пропускаем если пакет удален
+//                }
+//
+//                // Статистика по ключам в этом пакете
+//                $totalPackKeys = $packSalesman->keyActivates->count();
+//                $usedPackKeys = $packSalesman->keyActivates->whereNotNull('user_tg_id')->count();
+//                $activePackKeys = $totalPackKeys - $usedPackKeys;
+//
+//                // Процент использования
+//                $usagePercent = $totalPackKeys > 0 ? round(($usedPackKeys / $totalPackKeys) * 100) : 0;
+//
+//                // Форматируем трафик
+//                $period = $pack->period;
+//
+//                // Создаем прогресс-бар
+//                $progressBar = $this->createProgressBar($usagePercent);
+//
+//                // Текст кнопки
+//                $buttonText = "📦 {$period}д\n";
+//                $buttonText = "{$progressBar} {$usagePercent}%\n";
+//                $buttonText .= "🔑 {$activePackKeys}/{$totalPackKeys}";
+//
+//                $keyboard['inline_keyboard'][] = [
+//                    [
+//                        'text' => $buttonText,
+//                        'callback_data' => json_encode([
+//                            'action' => 'show_pack',
+//                            'pack_id' => $packSalesman->id
+//                        ])
+//                    ]
+//                ];
+//            }
+//
+////            // Добавляем разделитель
+////            $keyboard['inline_keyboard'][] = [
+////                [
+////                    'text' => '📥 Выгрузить все ключи',
+////                    'callback_data' => json_encode([
+////                        'action' => 'export_all_keys_menu'
+////                    ])
+////                ]
+////            ];
+//
+//            // Добавляем кнопки пагинации с эмодзи
+//            if ($packs->hasPages()) {
+//                $paginationButtons = [];
+//
+//                // Текущая страница и общее количество
+//                $currentPage = $packs->currentPage();
+//                $lastPage = $packs->lastPage();
+//
+//                // Информация о странице
+//                $pageInfo = "📄 {$currentPage}/{$lastPage}";
+//
+//                if ($currentPage > 1) {
+//                    $paginationButtons[] = [
+//                        'text' => '⬅️',
+//                        'callback_data' => json_encode([
+//                            'action' => 'packs_page',
+//                            'page' => $currentPage - 1
+//                        ])
+//                    ];
+//                }
+//
+//                $paginationButtons[] = [
+//                    'text' => $pageInfo,
+//                    'callback_data' => json_encode(['action' => 'current_page'])
+//                ];
+//
+//                if ($packs->hasMorePages()) {
+//                    $paginationButtons[] = [
+//                        'text' => '➡️',
+//                        'callback_data' => json_encode([
+//                            'action' => 'packs_page',
+//                            'page' => $currentPage + 1
+//                        ])
+//                    ];
+//                }
+//
+//                $keyboard['inline_keyboard'][] = $paginationButtons;
+//            }
+//
+//            if ($messageId) {
+//                $this->editMessage($message, $keyboard, $messageId);
+//            } else {
+//                $this->sendMessage($message, $keyboard);
+//            }
+//        } catch (\Exception $e) {
+//            Log::error('Error in showPacksList: ' . $e->getMessage());
+//            $this->sendErrorMessage();
+//        }
+//    }
 
     /**
      * Создает текстовый прогресс-бар
