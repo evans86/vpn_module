@@ -215,9 +215,9 @@ class FatherBotController extends AbstractTelegramBot
                     $this->reloadBot();
                     break;
 
-                case 'export_all_keys_menu':
-                    $this->exportAllKeysMenu();
-                    break;
+//                case 'export_all_keys_menu':
+//                    $this->exportAllKeysMenu();
+//                    break;
                 case 'export_all_keys':
                     $this->exportAllKeys();
                     break;
@@ -807,15 +807,15 @@ class FatherBotController extends AbstractTelegramBot
                 ];
             }
 
-            // Добавляем разделитель
-            $keyboard['inline_keyboard'][] = [
-                [
-                    'text' => '📥 Выгрузить все ключи',
-                    'callback_data' => json_encode([
-                        'action' => 'export_all_keys_menu'
-                    ])
-                ]
-            ];
+//            // Добавляем разделитель
+//            $keyboard['inline_keyboard'][] = [
+//                [
+//                    'text' => '📥 Выгрузить все ключи',
+//                    'callback_data' => json_encode([
+//                        'action' => 'export_all_keys_menu'
+//                    ])
+//                ]
+//            ];
 
             // Добавляем кнопки пагинации с эмодзи
             if ($packs->hasPages()) {
