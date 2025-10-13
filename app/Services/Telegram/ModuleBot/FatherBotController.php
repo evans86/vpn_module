@@ -6,11 +6,8 @@ use App\Models\KeyActivate\KeyActivate;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
 use App\Services\Panel\PanelStrategy;
-use DateInterval;
-use DateTime;
 use Exception;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
 use Telegram\Bot\Api;
 use Illuminate\Support\Facades\Log;
 
@@ -110,9 +107,6 @@ class FatherBotController extends AbstractTelegramBot
                     case '🪪 Личный кабинет':
                         $this->showProfile();
                         break;
-//                    case '🔑 Авторизация':
-//                        $this->initiateAuth();
-//                        break;
                     case '🌎 Помощь':
                         $this->showHelp();
                         break;
@@ -219,28 +213,6 @@ class FatherBotController extends AbstractTelegramBot
                     // Просто отвечаем на callback query без изменений
                     $this->answerCallbackQuery('Вы уже на этой странице');
                     break;
-
-//                case 'export_all_keys_menu':
-//                    $this->exportAllKeysMenu();
-//                    break;
-//                case 'export_all_keys':
-//                    $this->exportAllKeys();
-//                    break;
-//                case 'export_all_keys_only':
-//                    $this->exportAllKeys(false);
-//                    break;
-//                case 'export_all_active_keys':
-//                    $this->exportAllActiveKeys();
-//                    break;
-//                case 'export_all_active_keys_only':
-//                    $this->exportAllActiveKeys(false);
-//                    break;
-//                case 'export_all_used_keys':
-//                    $this->exportAllUsedKeys();
-//                    break;
-//                case 'export_all_used_keys_only':
-//                    $this->exportAllUsedKeys(false);
-//                    break;
 
                 default:
                     Log::warning('Unknown callback action', [
@@ -491,10 +463,6 @@ class FatherBotController extends AbstractTelegramBot
                 $message .= "📅 <b>Создан:</b> " . $key->created_at->format('d.m.Y H:i') . "\n";
             }
 
-//            if ($key->deleted_at && !is_null($key->deleted_at)) {
-//                $message .= "✅ <b>Активировать до:</b> " . date('d.m.Y', $key->deleted_at) . "\n";
-//            }
-
             if ($key->finish_at && !is_null($key->finish_at)) {
                 $message .= "⏳ <b>Действует до:</b> " . date('d.m.Y', $key->finish_at) . "\n";
                 $message .= "⏳ <b>Осталось дней:</b> " . ceil(($key->finish_at - time()) / (60 * 60 * 24)) . "\n";
@@ -502,7 +470,6 @@ class FatherBotController extends AbstractTelegramBot
 
             // Трафик
             if ($key->traffic_limit) {
-                $trafficGB = number_format($key->traffic_limit / (1024 * 1024 * 1024), 2);
                 $trafficUsedGB = round($info['used_traffic'] / (1024 * 1024 * 1024), 2);
 
                 $message .= "📶 <b>Трафик:</b>\n";
@@ -630,110 +597,8 @@ class FatherBotController extends AbstractTelegramBot
         }
     }
 
-//    /**
-//     * Показать список пакетов продавца с пагинацией
-//     */
-//    private function showPacksList(int $page = 1, ?int $messageId = null): void
-//    {
-//        try {
-//            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-//            if (!$salesman) {
-//                $this->sendMessage("❌ Ошибка: продавец не найден");
-//                return;
-//            }
-//
-//            // Количество пакетов на страницу
-//            $perPage = 10;
-//
-//            // Получаем пакеты с пагинацией
-//            $packs = PackSalesman::where('salesman_id', $salesman->id)
-//                ->where('status', PackSalesman::PAID)
-//                ->with('pack')
-//                ->orderBy('created_at', 'desc')
-//                ->paginate($perPage, ['*'], 'page', $page);
-//
-//            if ($packs->isEmpty()) {
-//                $this->sendMessage("❌ Кажется, что у вас <b>нет</b> активных <b>пакетов</b>, успейте приобрести пакет ключей и начать свой бизнес!");
-//                return;
-//            }
-//
-//            $message = "<blockquote><b>📦 Пакеты ключей:</b></blockquote>\n\n";
-//            $message .= "<b>✅ Для проверки конфигурации отправьте ключ боту.</b>\n\n";
-//            $keyboard = ['inline_keyboard' => []];
-//
-//            // Добавляем пакеты на текущую страницу
-//            foreach ($packs as $packSalesman) {
-//                $pack = $packSalesman->pack;
-//
-//                // Проверяем, существует ли основной пакет
-//                if ($pack) {
-////                    $date = new DateTime($packSalesman->created_at);
-////                    $date->add(new DateInterval("PT{$pack->activate_time}S"));
-////                    $formattedDate = $date->format('d.m.Y');
-//                    $traffic = number_format($pack->traffic_limit / (1024 * 1024 * 1024));
-//
-//                    $text = "📦{$traffic}GB| Период: {$pack->period}д";
-//
-////                    $text = "📦 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB|";
-////                    $text .= "Период: {$pack->period} дней|";
-////                    $text .= "Активировать до: {$formattedDate}";
-//                } else {
-//                    $text = "❌ Основной тариф удален";
-//                }
-//
-//                $keyboard['inline_keyboard'][] = [
-//                    [
-//                        'text' => $text,
-//                        'callback_data' => json_encode([
-//                            'action' => 'show_pack',
-//                            'pack_id' => $packSalesman->id
-//                        ])
-//                    ]
-//                ];
-//            }
-//
-//            // Добавляем кнопки пагинации
-//            if ($packs->hasPages()) {
-//                $paginationButtons = [];
-//
-//                // Кнопка "Назад"
-//                if ($packs->currentPage() > 1) {
-//                    $paginationButtons[] = [
-//                        'text' => '⬅️ Назад',
-//                        'callback_data' => json_encode([
-//                            'action' => 'packs_page',
-//                            'page' => $packs->currentPage() - 1
-//                        ])
-//                    ];
-//                }
-//
-//                // Кнопка "Вперед"
-//                if ($packs->hasMorePages()) {
-//                    $paginationButtons[] = [
-//                        'text' => 'Вперед ➡️',
-//                        'callback_data' => json_encode([
-//                            'action' => 'packs_page',
-//                            'page' => $packs->currentPage() + 1
-//                        ])
-//                    ];
-//                }
-//
-//                $keyboard['inline_keyboard'][] = $paginationButtons;
-//            }
-//
-//            if ($messageId) {
-//                $this->editMessage($message, $keyboard, $messageId);
-//            } else {
-//                $this->sendMessage($message, $keyboard);
-//            }
-//        } catch (\Exception $e) {
-//            Log::error('Error in showPacksList: ' . $e->getMessage());
-//            $this->sendErrorMessage();
-//        }
-//    }
-
     /**
-     * Показать список пакетов продавца с пагинацией и красивым оформлением
+     * Показать список пакетов продавца
      */
     private function showPacksList(int $page = 1, ?int $messageId = null): void
     {
@@ -815,7 +680,6 @@ class FatherBotController extends AbstractTelegramBot
 
                 if ($pack) {
                     // Если основной пакет существует - показываем нормальную информацию
-//                    $trafficGB = number_format($pack->traffic_limit / (1024 * 1024 * 1024));
                     $period = $pack->period;
 
                     $buttonText = "📦 {$period}д |\n";
@@ -903,18 +767,6 @@ class FatherBotController extends AbstractTelegramBot
                 $keyboard['inline_keyboard'][] = $paginationButtons;
             }
 
-            // Добавляем кнопку обновления с временной меткой
-//            $keyboard['inline_keyboard'][] = [
-//                [
-//                    'text' => '🔄 Обновить',
-//                    'callback_data' => json_encode([
-//                        'action' => 'show_packs',
-//                        'page' => $page,
-//                        'ts' => time()
-//                    ])
-//                ]
-//            ];
-
             if ($messageId) {
                 $this->editMessage($message, $keyboard, $messageId);
             } else {
@@ -925,165 +777,6 @@ class FatherBotController extends AbstractTelegramBot
             $this->sendErrorMessage();
         }
     }
-
-//    /**
-//     * Показать список пакетов продавца с пагинацией и красивым оформлением
-//     */
-//    private function showPacksList(int $page = 1, ?int $messageId = null): void
-//    {
-//        try {
-//            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-//            if (!$salesman) {
-//                $this->sendMessage("❌ Ошибка: продавец не найден");
-//                return;
-//            }
-//
-//            // Количество пакетов на страницу
-//            $perPage = 8;
-//
-////            // Получаем пакеты с пагинацией
-////            $packs = PackSalesman::where('salesman_id', $salesman->id)
-////                ->where('status', PackSalesman::PAID)
-////                ->with(['pack', 'keyActivates'])
-////                ->orderBy('created_at', 'desc')
-////                ->paginate($perPage, ['*'], 'page', $page);
-//
-//            // Получаем пакеты с пагинацией
-//            $packs = PackSalesman::where('salesman_id', $salesman->id)
-//                ->where('status', PackSalesman::PAID)
-//                ->with('pack')
-//                ->orderBy('created_at', 'desc')
-//                ->paginate($perPage, ['*'], 'page', $page);
-//
-//            if ($packs->isEmpty()) {
-//                $message = "📦 <b>У вас пока нет активных пакетов</b>\n\n";
-//                $message .= "Чтобы начать продавать VPN:\n\n";
-//                $message .= "1️⃣ Пополните баланс в системе\n";
-//                $message .= "2️⃣ Приобретите пакеты VPN-ключей\n";
-//                $message .= "3️⃣ Начните продавать доступы клиентам\n\n";
-//                $message .= "⚡️ Первые продажи уже через 5 минут!";
-//
-//                $this->sendMessage($message);
-//                return;
-//            }
-//
-//            // Заголовок с общей статистикой
-//            $totalKeys = 0;
-//            $activeKeys = 0;
-//            $usedKeys = 0;
-//
-//            foreach ($packs as $packSalesman) {
-//                $totalKeys += $packSalesman->keyActivates->count();
-//                $usedKeys += $packSalesman->keyActivates->whereNotNull('user_tg_id')->count();
-//            }
-//            $activeKeys = $totalKeys - $usedKeys;
-//
-//            $message = "📊 <b>Ваши пакеты VPN-ключей</b>\n\n";
-//            $message .= "📈 <i>Общая статистика:</i>\n";
-//            $message .= "   • Всего ключей: <b>{$totalKeys}</b>\n";
-//            $message .= "   • Активных: <b>{$activeKeys}</b>\n";
-//            $message .= "   • Использовано: <b>{$usedKeys}</b>\n\n";
-//            $message .= "🔍 <i>Выберите пакет для просмотра деталей:</i>\n\n";
-//
-//            $keyboard = ['inline_keyboard' => []];
-//
-//            // Добавляем пакеты с красивым оформлением
-//            foreach ($packs as $packSalesman) {
-//                $pack = $packSalesman->pack;
-//
-//                if (!$pack) {
-//                    continue; // Пропускаем если пакет удален
-//                }
-//
-//                // Статистика по ключам в этом пакете
-//                $totalPackKeys = $packSalesman->keyActivates->count();
-//                $usedPackKeys = $packSalesman->keyActivates->whereNotNull('user_tg_id')->count();
-//                $activePackKeys = $totalPackKeys - $usedPackKeys;
-//
-//                // Процент использования
-//                $usagePercent = $totalPackKeys > 0 ? round(($usedPackKeys / $totalPackKeys) * 100) : 0;
-//
-//                // Форматируем трафик
-//                $period = $pack->period;
-//
-//                // Создаем прогресс-бар
-//                $progressBar = $this->createProgressBar($usagePercent);
-//
-//                // Текст кнопки
-//                $buttonText = "📦 {$period}д\n";
-//                $buttonText = "{$progressBar} {$usagePercent}%\n";
-//                $buttonText .= "🔑 {$activePackKeys}/{$totalPackKeys}";
-//
-//                $keyboard['inline_keyboard'][] = [
-//                    [
-//                        'text' => $buttonText,
-//                        'callback_data' => json_encode([
-//                            'action' => 'show_pack',
-//                            'pack_id' => $packSalesman->id
-//                        ])
-//                    ]
-//                ];
-//            }
-//
-////            // Добавляем разделитель
-////            $keyboard['inline_keyboard'][] = [
-////                [
-////                    'text' => '📥 Выгрузить все ключи',
-////                    'callback_data' => json_encode([
-////                        'action' => 'export_all_keys_menu'
-////                    ])
-////                ]
-////            ];
-//
-//            // Добавляем кнопки пагинации с эмодзи
-//            if ($packs->hasPages()) {
-//                $paginationButtons = [];
-//
-//                // Текущая страница и общее количество
-//                $currentPage = $packs->currentPage();
-//                $lastPage = $packs->lastPage();
-//
-//                // Информация о странице
-//                $pageInfo = "📄 {$currentPage}/{$lastPage}";
-//
-//                if ($currentPage > 1) {
-//                    $paginationButtons[] = [
-//                        'text' => '⬅️',
-//                        'callback_data' => json_encode([
-//                            'action' => 'packs_page',
-//                            'page' => $currentPage - 1
-//                        ])
-//                    ];
-//                }
-//
-//                $paginationButtons[] = [
-//                    'text' => $pageInfo,
-//                    'callback_data' => json_encode(['action' => 'current_page'])
-//                ];
-//
-//                if ($packs->hasMorePages()) {
-//                    $paginationButtons[] = [
-//                        'text' => '➡️',
-//                        'callback_data' => json_encode([
-//                            'action' => 'packs_page',
-//                            'page' => $currentPage + 1
-//                        ])
-//                    ];
-//                }
-//
-//                $keyboard['inline_keyboard'][] = $paginationButtons;
-//            }
-//
-//            if ($messageId) {
-//                $this->editMessage($message, $keyboard, $messageId);
-//            } else {
-//                $this->sendMessage($message, $keyboard);
-//            }
-//        } catch (\Exception $e) {
-//            Log::error('Error in showPacksList: ' . $e->getMessage());
-//            $this->sendErrorMessage();
-//        }
-//    }
 
     /**
      * Создает текстовый прогресс-бар
@@ -1103,133 +796,6 @@ class FatherBotController extends AbstractTelegramBot
 
         return $bar;
     }
-
-//    /**
-//     * Показать детали пакета и его ключи
-//     */
-//    private function showPackDetails(int $packSalesmanId): void
-//    {
-//        try {
-//            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-//            if (!$salesman) {
-//                $this->sendMessage("❌ Ошибка: продавец не найден");
-//                return;
-//            }
-//
-//            $packSalesman = PackSalesman::with(['pack', 'keyActivates'])
-//                ->where('id', $packSalesmanId)
-//                ->where('salesman_id', $salesman->id)
-//                ->firstOrFail();
-//
-//            $pack = $packSalesman->pack;
-//            $keys = $packSalesman->keyActivates;
-//
-//            // Основное сообщение
-//            $message = "<b>📦 Информация о пакете:</b>\n\n";
-//
-//            if ($pack) {
-//                $message .= "💾 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
-//                $message .= "⏱ Период: {$pack->period} дней\n\n";
-//            } else {
-//                $message .= "❌ Основной тариф удален\n\n";
-//            }
-//
-//            // Добавляем ключи активации
-//            $message .= "<b>🔑 Ключи активации:</b>\n";
-//            foreach ($keys as $index => $key) {
-//                $status = $key->user_tg_id ? "✅ Активирован" : "⚪️ Не активирован";
-//                $message .= ($index + 1) . ". <code>{$key->id}</code> - {$status}" .
-//                    ($key->user_tg_id ? " (ID: {$key->user_tg_id})" : "") . "\n";
-//            }
-//
-//            // Кнопки для выгрузки ключей в .txt файл
-//            $keyboard = [
-//                'inline_keyboard' => [
-//                    [
-//                        [
-//                            'text' => '📥 Выгрузить все ключи',
-//                            'callback_data' => json_encode([
-//                                'action' => 'export_keys',
-//                                'pack_id' => $packSalesmanId
-//                            ])
-//                        ],
-//                        [
-//                            'text' => '(Без текста)',
-//                            'callback_data' => json_encode([
-//                                'action' => 'export_keys_only',
-//                                'pack_id' => $packSalesmanId
-//                            ])
-//                        ]
-//                    ],
-//                    [
-//                        [
-//                            'text' => '📥 Выгрузить не активированные',
-//                            'callback_data' => json_encode([
-//                                'action' => 'export_unactivated_keys',
-//                                'pack_id' => $packSalesmanId
-//                            ])
-//                        ],
-//                        [
-//                            'text' => '(Без текста)',
-//                            'callback_data' => json_encode([
-//                                'action' => 'export_unactivated_keys_only',
-//                                'pack_id' => $packSalesmanId
-//                            ])
-//                        ]
-//                    ],
-//                    [
-//                        [
-//                            'text' => '📥 Выгрузить использованные',
-//                            'callback_data' => json_encode([
-//                                'action' => 'export_used_keys',
-//                                'pack_id' => $packSalesmanId
-//                            ])
-//                        ],
-//                        [
-//                            'text' => '(Без текста)',
-//                            'callback_data' => json_encode([
-//                                'action' => 'export_used_keys_only',
-//                                'pack_id' => $packSalesmanId
-//                            ])
-//                        ]
-//                    ]
-//                ]
-//            ];
-//
-//            // Проверяем длину сообщения
-//            if (strlen($message) <= 4096) {
-//                $this->sendMessage($message, $keyboard);
-//            } else {
-//                // Если сообщение слишком длинное, сначала отправляем информацию о пакете
-//                $packInfo = "<b>📦 Информация о пакете:</b>\n\n";
-//                if ($pack) {
-//                    $packInfo .= "💾 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
-//                    $packInfo .= "⏱ Период: {$pack->period} дней\n\n";
-//                } else {
-//                    $packInfo .= "❌ Основной тариф удален\n\n";
-//                }
-//                $this->sendMessage($packInfo);
-//
-//                // Затем отправляем ключи частями
-//                $chunkSize = 50;
-//                $keyChunks = $keys->chunk($chunkSize);
-//                foreach ($keyChunks as $index => $chunk) {
-//                    $keyMessage = "<b>🔑 Ключи активации (часть " . ($index + 1) . "):</b>\n";
-//                    foreach ($chunk as $keyIndex => $key) {
-//                        $status = $key->user_tg_id ? "✅ Активирован" : "⚪️ Не активирован";
-//                        $keyMessage .= ($index * $chunkSize + $keyIndex + 1) . ". <code>{$key->id}</code> - {$status}" .
-//                            ($key->user_tg_id ? " (ID: {$key->user_tg_id})" : "") . "\n";
-//                    }
-//                    $this->sendMessage($keyMessage);
-//                }
-//                // Отправляем кнопку после всех ключей
-//                $this->sendMessage("Вы можете выгрузить все ключи в .txt файл:", $keyboard);
-//            }
-//        } catch (\Exception $e) {
-//            Log::error('Error in showPackDetails: ' . $e->getMessage());
-//            $this->sendErrorMessage();
-//        }
-//    }
 
     /**
      * Показать детали пакета с улучшенным оформлением
@@ -1262,8 +828,6 @@ class FatherBotController extends AbstractTelegramBot
 
             if ($pack) {
                 // Если основной пакет существует
-//                $trafficGB = number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1);
-//                $message .= "💾 <b>Трафик:</b> {$trafficGB} GB\n";
                 $message .= "⏱ <b>Период:</b> {$pack->period} дней\n";
             } else {
                 // Если основной пакет удален
@@ -1360,119 +924,6 @@ class FatherBotController extends AbstractTelegramBot
         }
     }
 
-//    /**
-//     * Меню выгрузки всех ключей
-//     */
-//    private function exportAllKeysMenu(): void
-//    {
-//        try {
-//            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-//            if (!$salesman) {
-//                $this->sendMessage("❌ Ошибка: продавец не найден");
-//                return;
-//            }
-//
-//            $message = "📥 <b>Выгрузка всех ключей</b>\n\n";
-//            $message .= "Выберите тип выгрузки:\n\n";
-//            $message .= "• <b>Все ключи</b> - полный список всех ключей\n";
-//            $message .= "• <b>Активные</b> - только неиспользованные ключи\n";
-//            $message .= "• <b>Использованные</b> - только активированные ключи\n";
-//
-//            $keyboard = [
-//                'inline_keyboard' => [
-//                    [
-//                        [
-//                            'text' => '📥 Все ключи',
-//                            'callback_data' => json_encode(['action' => 'export_all_keys'])
-//                        ],
-//                        [
-//                            'text' => '📋 (Только ключи)',
-//                            'callback_data' => json_encode(['action' => 'export_all_keys_only'])
-//                        ]
-//                    ],
-//                    [
-//                        [
-//                            'text' => '🟢 Активные ключи',
-//                            'callback_data' => json_encode(['action' => 'export_all_active_keys'])
-//                        ],
-//                        [
-//                            'text' => '📋 (Только ключи)',
-//                            'callback_data' => json_encode(['action' => 'export_all_active_keys_only'])
-//                        ]
-//                    ],
-//                    [
-//                        [
-//                            'text' => '🔴 Использованные',
-//                            'callback_data' => json_encode(['action' => 'export_all_used_keys'])
-//                        ],
-//                        [
-//                            'text' => '📋 (Только ключи)',
-//                            'callback_data' => json_encode(['action' => 'export_all_used_keys_only'])
-//                        ]
-//                    ],
-//                    [
-//                        [
-//                            'text' => '⬅️ Назад',
-//                            'callback_data' => json_encode(['action' => 'show_packs', 'page' => 1])
-//                        ]
-//                    ]
-//                ]
-//            ];
-//
-//            $this->sendMessage($message, $keyboard);
-//
-//        } catch (\Exception $e) {
-//            Log::error('Error in exportAllKeysMenu: ' . $e->getMessage());
-//            $this->sendErrorMessage();
-//        }
-//    }
-
-//    /**
-//     * Выгрузка всех ключей продавца
-//     */
-//    private function exportAllKeys(bool $withText = true): void
-//    {
-//        try {
-//            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-//            if (!$salesman) {
-//                $this->sendMessage("❌ Ошибка: продавец не найден");
-//                return;
-//            }
-//
-//            $allPacks = PackSalesman::where('salesman_id', $salesman->id)
-//                ->where('status', PackSalesman::PAID)
-//                ->with('keyActivates')
-//                ->get();
-//
-//            $content = "";
-//            if ($withText) {
-//                $content .= "Все ключи продавца\n";
-//                $content .= "Telegram ID: {$salesman->telegram_id}\n";
-//                $content .= "Бот: {$salesman->bot_link}\n";
-//                $content .= "Дата выгрузки: " . date('d.m.Y H:i') . "\n\n";
-//            }
-//
-//            $totalKeys = 0;
-//            foreach ($allPacks as $pack) {
-//                foreach ($pack->keyActivates as $key) {
-//                    $content .= "{$key->id}\n";
-//                    $totalKeys++;
-//                }
-//            }
-//
-//            if ($withText) {
-//                $content .= "\nВсего ключей: {$totalKeys}";
-//            }
-//
-//            $this->sendKeysFile($content, "all_keys_{$salesman->telegram_id}.txt", "Все ключи ({$totalKeys})");
-//
-//        } catch (\Exception $e) {
-//            Log::error('Error in exportAllKeys: ' . $e->getMessage());
-//            $this->sendErrorMessage();
-//        }
-//    }
-
-
     /**
      * Выгрузить все ключи | (Без текста)
      *
@@ -1545,7 +996,6 @@ class FatherBotController extends AbstractTelegramBot
             $content = "";
             if ($withText) {
                 $content .= "Пакет: ID {$packSalesman->id}\n";
-//                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
                 if ($pack) {
                     $content .= "Период: {$pack->period} дней\n";
                 } else {
@@ -1614,7 +1064,6 @@ class FatherBotController extends AbstractTelegramBot
             $content = "";
             if ($withText) {
                 $content .= "Пакет: ID {$packSalesman->id}\n";
-//                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
                 if ($pack) {
                     $content .= "Период: {$pack->period} дней\n";
                 } else {
@@ -1623,9 +1072,6 @@ class FatherBotController extends AbstractTelegramBot
                 $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
                 $content .= "Не активированные ключи активации:\n";
             }
-
-//            if (!empty($keys))
-//                $content .= "Нет не активированных ключей";
 
             foreach ($keys as $index => $key) {
                 $content .= "{$key->id}\n";
@@ -1686,7 +1132,6 @@ class FatherBotController extends AbstractTelegramBot
             $content = "";
             if ($withText) {
                 $content .= "Пакет: ID {$packSalesman->id}\n";
-//                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
                 if ($pack) {
                     $content .= "Период: {$pack->period} дней\n";
                 } else {
@@ -1755,7 +1200,6 @@ class FatherBotController extends AbstractTelegramBot
             $content = "";
             if ($withText) {
                 $content .= "Пакет: ID {$packSalesman->id}\n";
-//                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
                 if ($pack) {
                     $content .= "Период: {$pack->period} дней\n";
                 } else {
@@ -1822,7 +1266,6 @@ class FatherBotController extends AbstractTelegramBot
 
                 $message = "✅ Бот успешно добавлен!\n\nТеперь вы можете купить пакет VPN-доступов.";
                 $this->generateMenu($message);
-//                $this->sendMessage("✅ Бот успешно добавлен!\n\nТеперь вы можете купить пакет VPN-доступов.");
             }
         } catch (\Exception $e) {
             Log::error('Bot token validation error: ' . $e->getMessage());
@@ -1849,21 +1292,6 @@ class FatherBotController extends AbstractTelegramBot
             if (!$existingSalesman) {
                 $this->salesmanService->create($this->chatId, $this->username == null ? null : $this->firstName);
             }
-
-//            $message = "👋 <i>Добро пожаловать в систему управления VPN-доступами!</i>\n\n\n";
-//            $message .= "🌍 <b>Хотите зарабатывать на продаже VPN?</b> С нами это просто и удобно!\n\n\n";
-//            $message .= "🚀 <i><b>Что вы получите:</b></i>\n\n";
-//            $message .= "🔹 <i>Готовую систему</i> - покупайте пакеты ключей и создавайте своего бота за считанные минуты\n\n";
-//            $message .= "🔹 <i>Автоматизацию</i> - Ваш бот сам выдает доступы клиентам 24/7\n\n";
-//            $message .= "🔹 <i>Гибкость</i> - выбирайте тарифы, управляйте ценами и следите за балансом\n\n";
-//            $message .= "🔹 <i>Высокий спрос</i> - VPN нужен многим, а значит, клиентов будет достаточно!\n\n";
-//            $message .= "🔹 <i>Простоту подключения</i> - без сложных настроек, просто привяжите своего бота\n\n\n";
-//            $message .= "💼  <i><b>Как начать?</b></i>\n\n";
-//            $message .= "1️⃣ Купите пакет VPN-ключей\n\n";
-//            $message .= "2️⃣ Привяжите своего бота к системе\n\n";
-//            $message .= "3️⃣ Начните продавать доступы и зарабатывать\n\n\n";
-//            $message .= "📲 Подключайтесь и создавайте свой бизнес на продаже VPN уже сегодня!\n";
-//            $message .= "<b>Приятного пользования!</b>\n";
 
             $message = "👋 <b>Добро пожаловать в систему управления VPN-доступами!</b>\n\n";
             $message .= "<i>Это ваш личный кабинет для запуска и управления бизнесом по продаже VPN.</i>\n\n";
@@ -1907,7 +1335,6 @@ class FatherBotController extends AbstractTelegramBot
                 ],
                 [
                     ['text' => '🪪 Личный кабинет'],
-//                    ['text' => '🔑 Авторизация'],
                     ['text' => '🌎 Помощь']
                 ],
                 [
@@ -2062,8 +1489,6 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->showBotInfo($messageId);
 
-            $status = $salesman->bot_active ? "включен 🟢" : "отключен 🔴";
-//            $this->sendMessage("✅ Бот успешно " . $status);
         } catch (Exception $e) {
             Log::error('Toggle bot error: ' . $e->getMessage());
             $this->sendErrorMessage();
