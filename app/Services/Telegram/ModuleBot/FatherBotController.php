@@ -462,7 +462,7 @@ class FatherBotController extends AbstractTelegramBot
             // Основная информация
             $message .= "📦 <b>Пакет:</b> ";
             if ($key->packSalesman && $key->packSalesman->pack) {
-                $message .= "# {$key->packSalesman->id}\n";
+                $message .= "# {$key->packSalesman->id} | ";
                 $message .= "Период: {$key->packSalesman->pack->period} дней\n";
             } else {
                 $message .= "неизвестен (возможно, пакет удален)\n";
