@@ -1579,7 +1579,7 @@ class FatherBotController extends AbstractTelegramBot
             $this->telegram->sendDocument([
                 'chat_id' => $this->chatId,
                 'document' => fopen($tempPath, 'r'),
-                'caption' => "📥 Выгрузка ключей для пакета {$pack->id}"
+                'caption' => "📥 Выгрузка ключей"
             ]);
 
             // Удаляем временный файл
@@ -1651,7 +1651,7 @@ class FatherBotController extends AbstractTelegramBot
             $this->telegram->sendDocument([
                 'chat_id' => $this->chatId,
                 'document' => fopen($tempPath, 'r'),
-                'caption' => "📥 Выгрузка не активированных ключей для пакета {$pack->id}"
+                'caption' => "📥 Выгрузка не активированных ключей"
             ]);
 
             // Удаляем временный файл
@@ -1720,7 +1720,7 @@ class FatherBotController extends AbstractTelegramBot
             $this->telegram->sendDocument([
                 'chat_id' => $this->chatId,
                 'document' => fopen($tempPath, 'r'),
-                'caption' => "📥 Выгрузка ключей с остатком трафика для пакета {$pack->id}"
+                'caption' => "📥 Выгрузка ключей с остатком трафика"
             ]);
 
             // Удаляем временный файл
@@ -1789,7 +1789,7 @@ class FatherBotController extends AbstractTelegramBot
             $this->telegram->sendDocument([
                 'chat_id' => $this->chatId,
                 'document' => fopen($tempPath, 'r'),
-                'caption' => "📥 Выгрузка использованных ключей для пакета {$pack->id}"
+                'caption' => "📥 Выгрузка использованных ключей"
             ]);
 
             // Удаляем временный файл
