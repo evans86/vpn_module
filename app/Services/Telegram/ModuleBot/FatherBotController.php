@@ -819,8 +819,8 @@ class FatherBotController extends AbstractTelegramBot
 //                    $trafficGB = number_format($pack->traffic_limit / (1024 * 1024 * 1024));
                     $period = $pack->period;
 
-                    $buttonText = "📦 {$period}д\n";
-                    $buttonText .= "{$progressBar} {$usagePercent}%\n";
+                    $buttonText = "📦 {$period}д|\n";
+                    $buttonText .= "{$progressBar} {$usagePercent}%|\n";
                     $buttonText .= "🔑 {$activePackKeys}/{$totalPackKeys}";
                 } else {
                     // Если основной пакет удален - показываем альтернативную информацию
