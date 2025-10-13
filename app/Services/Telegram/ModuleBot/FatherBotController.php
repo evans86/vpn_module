@@ -733,6 +733,9 @@ class FatherBotController extends AbstractTelegramBot
 //        }
 //    }
 
+    /**
+     * Показать список пакетов продавца с пагинацией и красивым оформлением
+     */
     private function showPacksList(int $page = 1, ?int $messageId = null): void
     {
         try {
@@ -765,7 +768,7 @@ class FatherBotController extends AbstractTelegramBot
             // Получаем пакеты для текущей страницы (только для отображения)
             $packs = PackSalesman::where('salesman_id', $salesman->id)
                 ->where('status', PackSalesman::PAID)
-                ->with('pack')
+                ->with(['pack', 'keyActivates'])
                 ->orderBy('created_at', 'desc')
                 ->paginate($perPage, ['*'], 'page', $page);
 
@@ -800,10 +803,6 @@ class FatherBotController extends AbstractTelegramBot
             foreach ($packs as $packSalesman) {
                 $pack = $packSalesman->pack;
 
-                if (!$pack) {
-                    continue; // Пропускаем если пакет удален
-                }
-
                 // Статистика по ключам в этом пакете
                 $totalPackKeys = $packSalesman->keyActivates->count();
                 $usedPackKeys = $packSalesman->keyActivates->whereNotNull('user_tg_id')->count();
@@ -812,17 +811,26 @@ class FatherBotController extends AbstractTelegramBot
                 // Процент использования
                 $usagePercent = $totalPackKeys > 0 ? round(($usedPackKeys / $totalPackKeys) * 100) : 0;
 
-                // Форматируем трафик
-                $trafficGB = number_format($pack->traffic_limit / (1024 * 1024 * 1024));
-                $period = $pack->period;
-
                 // Создаем прогресс-бар
                 $progressBar = $this->createProgressBar($usagePercent);
 
-                // Текст кнопки (исправлено - убрано дублирование)
-                $buttonText = "📦 {$period}д\n";
-                $buttonText .= "{$progressBar} {$usagePercent}%\n";
-                $buttonText .= "🔑 {$activePackKeys}/{$totalPackKeys}";
+                if ($pack) {
+                    // Если основной пакет существует - показываем нормальную информацию
+//                    $trafficGB = number_format($pack->traffic_limit / (1024 * 1024 * 1024));
+                    $period = $pack->period;
+
+                    $buttonText = "📦 {$period}д\n";
+                    $buttonText .= "{$progressBar} {$usagePercent}%\n";
+                    $buttonText .= "🔑 {$activePackKeys}/{$totalPackKeys}";
+                } else {
+                    // Если основной пакет удален - показываем альтернативную информацию
+                    $createdDate = $packSalesman->created_at->format('d.m.Y');
+
+                    $buttonText = "📦 Пакет #{$packSalesman->id}\n";
+                    $buttonText .= "{$progressBar} {$usagePercent}%\n";
+                    $buttonText .= "🔑 {$activePackKeys}/{$totalPackKeys}\n";
+                    $buttonText .= "📅 {$createdDate}";
+                }
 
                 $keyboard['inline_keyboard'][] = [
                     [
@@ -906,7 +914,7 @@ class FatherBotController extends AbstractTelegramBot
 //                    'callback_data' => json_encode([
 //                        'action' => 'show_packs',
 //                        'page' => $page,
-//                        'ts' => time() // Добавляем временную метку
+//                        'ts' => time()
 //                    ])
 //                ]
 //            ];
@@ -1247,11 +1255,6 @@ class FatherBotController extends AbstractTelegramBot
             $pack = $packSalesman->pack;
             $keys = $packSalesman->keyActivates;
 
-            if (!$pack) {
-                $this->sendMessage("❌ Основной тариф пакета был удален");
-                return;
-            }
-
             // Статистика по ключам
             $totalKeys = $keys->count();
             $usedKeys = $keys->whereNotNull('user_tg_id')->count();
@@ -1261,9 +1264,16 @@ class FatherBotController extends AbstractTelegramBot
             // Основное сообщение
             $message = "📦 <b>Детали пакета</b>\n\n";
 
-            // Информация о пакете
-            $trafficGB = number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1);
-            $message .= "⏱ <b>Период:</b> {$pack->period} дней\n";
+            if ($pack) {
+                // Если основной пакет существует
+//                $trafficGB = number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1);
+//                $message .= "💾 <b>Трафик:</b> {$trafficGB} GB\n";
+                $message .= "⏱ <b>Период:</b> {$pack->period} дней\n";
+            } else {
+                // Если основной пакет удален
+                $message .= "ℹ️ <b>Тип пакета:</b> Архивный\n";
+            }
+
             $message .= "📅 <b>Создан:</b> " . $packSalesman->created_at->format('d.m.Y H:i') . "\n\n";
 
             // Статистика использования
@@ -1273,6 +1283,10 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "✅ <b>Активных:</b> {$activeKeys} ключей\n";
             $message .= "🔒 <b>Использовано:</b> {$usedKeys} ключей\n";
             $message .= "📋 <b>Всего:</b> {$totalKeys} ключей\n\n";
+
+            if (!$pack) {
+                $message .= "💡 <i>Это архивный пакет. Основной тариф был обновлен, но ваши ключи остаются активными.</i>\n\n";
+            }
 
             $message .= "🔍 <b>Для проверки ключа отправьте его боту</b>";
 
