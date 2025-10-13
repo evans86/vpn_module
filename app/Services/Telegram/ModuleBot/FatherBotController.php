@@ -1550,7 +1550,11 @@ class FatherBotController extends AbstractTelegramBot
             if ($withText) {
                 $content .= "Пакет: ID {$packSalesman->id}\n";
 //                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
-                $content .= "Период: {$pack->period} дней\n";
+                if ($pack) {
+                    $content .= "Период: {$pack->period} дней\n";
+                } else {
+                    $content .= "Тип: Архивный пакет\n";
+                }
                 $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
                 $content .= "Ключи активации:\n";
             }
@@ -1615,7 +1619,11 @@ class FatherBotController extends AbstractTelegramBot
             if ($withText) {
                 $content .= "Пакет: ID {$packSalesman->id}\n";
 //                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
-                $content .= "Период: {$pack->period} дней\n";
+                if ($pack) {
+                    $content .= "Период: {$pack->period} дней\n";
+                } else {
+                    $content .= "Тип: Архивный пакет\n";
+                }
                 $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
                 $content .= "Не активированные ключи активации:\n";
             }
@@ -1683,7 +1691,11 @@ class FatherBotController extends AbstractTelegramBot
             if ($withText) {
                 $content .= "Пакет: ID {$packSalesman->id}\n";
 //                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
-                $content .= "Период: {$pack->period} дней\n";
+                if ($pack) {
+                    $content .= "Период: {$pack->period} дней\n";
+                } else {
+                    $content .= "Тип: Архивный пакет\n";
+                }
                 $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
                 $content .= "Ключи с остатком трафика:\n";
             }
@@ -1748,7 +1760,11 @@ class FatherBotController extends AbstractTelegramBot
             if ($withText) {
                 $content .= "Пакет: ID {$packSalesman->id}\n";
 //                $content .= "Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n";
-                $content .= "Период: {$pack->period} дней\n";
+                if ($pack) {
+                    $content .= "Период: {$pack->period} дней\n";
+                } else {
+                    $content .= "Тип: Архивный пакет\n";
+                }
                 $content .= "Ключи можно активировать в боте: $salesman->bot_link\n\n";
                 $content .= "Использованные ключи:\n";
             }
