@@ -506,7 +506,6 @@ class FatherBotController extends AbstractTelegramBot
                 $trafficUsedGB = round($info['used_traffic'] / (1024 * 1024 * 1024), 2);
 
                 $message .= "📶 <b>Трафик:</b>\n";
-                $message .= "   • Лимит: {$trafficGB} GB\n";
                 $message .= "   • Использовано: {$trafficUsedGB} GB\n";
             }
 
