@@ -26,9 +26,9 @@ class PanelSelectionDebugCommand extends Command
         $this->line("🟢 Новая система выбрала: Панель ID {$comparison['new_system_selected']}");
 
         $this->line("\n📋 Детальная информация по панелям:");
-        $this->line(str_repeat('-', 120));
+        $this->line(str_repeat('-', 150));
 
-        $headers = ['ID', 'Адрес', 'Активные', 'Всего', 'Последняя активность', 'CPU %', 'Память %', 'Score', 'Выбор'];
+        $headers = ['ID', 'Адрес', 'Активные', 'Всего', 'Последняя акт.', 'CPU%', 'Память%', 'Общ.Score', 'User', 'Load', 'Time', 'Rand', 'Выбор'];
 
         $rows = [];
         foreach ($comparison['panels'] as $panel) {
@@ -46,24 +46,29 @@ class PanelSelectionDebugCommand extends Command
                 $selection = '🟢 НОВАЯ';
             }
 
-            $lastActivity = $panel['last_activity'] ? $panel['last_activity']->format('m-d H:i') : 'никогда';
+            $lastActivity = $panel['last_activity'] ? $panel['last_activity']->format('H:i') : 'никогда';
 
             $rows[] = [
                 $panel['id'],
-                substr($panel['address'], 0, 20) . '...',
+                substr($panel['address'], 0, 15) . '...',
                 $panel['active_users'],
                 $panel['total_users'],
                 $lastActivity,
                 $cpuUsage,
                 $memoryUsage,
                 number_format($panel['optimized_score'], 1),
+                number_format($panel['score_details']['user_score'], 1),
+                number_format($panel['score_details']['load_score'], 1),
+                number_format($panel['score_details']['time_score'], 1),
+                number_format($panel['score_details']['random_score'], 1),
                 $selection
             ];
         }
 
         $this->table($headers, $rows);
 
-        $this->line("\n💡 Для тестирования новой системы используйте:");
+        $this->line("\n💡 Веса алгоритма: Пользователи (40%), Нагрузка (40%), Время (15%), Случайность (5%)");
+        $this->line("💡 Для тестирования новой системы используйте:");
         $this->line("   \$panel = \$panelRepository->getOptimizedMarzbanPanel();");
     }
 }
