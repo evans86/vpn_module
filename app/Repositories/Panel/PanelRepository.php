@@ -206,17 +206,18 @@ class PanelRepository extends BaseRepository
         $newSelection = $this->getOptimizedMarzbanPanel();
 
         $panelsWithInfo = $panels->map(function ($panel) use ($oldSelection, $newSelection) {
-            $scoreDetails = $this->calculatePanelScoreDetailed($panel);
+            $totalUsers = $this->getTotalUsersCount($panel->id);
+            $activeUsersFromStats = $this->getActiveUsersFromStats($panel->id);
 
             return [
                 'id' => $panel->id,
                 'address' => $panel->panel_adress,
-                'active_users' => $this->getActiveUsersCount($panel->id),
-                'total_users' => $this->getTotalUsersCount($panel->id),
+                'active_users_db' => $this->getActiveUsersCount($panel->id), // Старый метод (для отладки)
+                'active_users_stats' => $activeUsersFromStats, // Новый метод из статистики
+                'total_users' => $totalUsers,
                 'last_activity' => $this->getLastUserCreationTime($panel->id),
                 'server_stats' => $this->getLatestPanelStats($panel->id),
-                'optimized_score' => $scoreDetails['total'],
-                'score_details' => $scoreDetails,
+                'optimized_score' => $this->calculatePanelScore($panel, $activeUsersFromStats),
                 'is_old_selected' => $oldSelection && $oldSelection->id === $panel->id,
                 'is_new_selected' => $newSelection && $newSelection->id === $panel->id,
             ];
@@ -238,10 +239,10 @@ class PanelRepository extends BaseRepository
     private function selectOptimalPanelIntelligent(Collection $panels): Panel
     {
         $scoredPanels = $panels->map(function ($panel) {
-            $scoreDetails = $this->calculatePanelScoreDetailed($panel);
+            $activeUsers = $this->getActiveUsersFromStats($panel->id);
             return [
                 'panel' => $panel,
-                'score' => $scoreDetails['total']
+                'score' => $this->calculatePanelScore($panel, $activeUsers)
             ];
         });
 
@@ -249,66 +250,48 @@ class PanelRepository extends BaseRepository
     }
 
     /**
-     * Расчет комплексного score для панели с детализацией
+     * Расчет комплексного score для панели
      */
-    private function calculatePanelScoreDetailed(Panel $panel): array
+    private function calculatePanelScore(Panel $panel, int $activeUsers): float
     {
-        $activeUsers = $this->getActiveUsersCount($panel->id);
-        $latestStats = $this->getLatestPanelStats($panel->id);
-        $lastActivity = $this->getLastUserCreationTime($panel->id);
+        $score = 100.0;
 
-        // 1. Score на основе количества активных пользователей (40% веса)
+        // 1. Score на основе количества активных пользователей (50% веса)
         $userScore = $this->calculateUserBasedScore($activeUsers);
-        $userContribution = $userScore * 40;
+        $score += $userScore * 50;
 
         // 2. Score на основе нагрузки сервера (40% веса)
-        $loadScore = $this->calculateLoadBasedScore($latestStats);
-        $loadContribution = $loadScore * 40;
+        $loadScore = $this->calculateLoadBasedScore($panel);
+        $score += $loadScore * 40;
 
-        // 3. Score на основе времени последней активности (15% веса)
-        $timeScore = $this->calculateTimeBasedScore($lastActivity);
-        $timeContribution = $timeScore * 15;
+        // 3. Score на основе времени последней активности (10% веса)
+        $timeScore = $this->calculateTimeBasedScore($panel);
+        $score += $timeScore * 10;
 
-        // 4. Случайность для распределения (5% веса)
-        $randomScore = $this->calculateRandomScore($panel);
-        $randomContribution = $randomScore * 5;
-
-        $totalScore = $userContribution + $loadContribution + $timeContribution + $randomContribution;
-
-        return [
-            'total' => $totalScore,
-            'user_score' => $userScore,
-            'user_contribution' => $userContribution,
-            'load_score' => $loadScore,
-            'load_contribution' => $loadContribution,
-            'time_score' => $timeScore,
-            'time_contribution' => $timeContribution,
-            'random_score' => $randomScore,
-            'random_contribution' => $randomContribution,
-        ];
+        return max($score, 0);
     }
 
     /**
-     * Score на основе количества пользователей (адаптировано под большие числа)
+     * Score на основе количества пользователей (используем реальные данные из статистики)
      */
     private function calculateUserBasedScore(int $activeUsersCount): float
     {
-        // Адаптивная шкала для больших объемов пользователей
-        // Чем меньше пользователей относительно других панелей, тем выше score
-
-        if ($activeUsersCount < 100) return 1.0;      // Очень мало
-        if ($activeUsersCount < 500) return 0.8;      // Мало
-        if ($activeUsersCount < 2000) return 0.6;     // Средне
-        if ($activeUsersCount < 3000) return 0.4;     // Много
-        if ($activeUsersCount < 4000) return 0.2;     // Очень много
+        // Используем реальные цифры из вашей статистики: 465-520 активных пользователей
+        if ($activeUsersCount < 400) return 1.0;      // Очень мало
+        if ($activeUsersCount < 450) return 0.8;      // Мало
+        if ($activeUsersCount < 480) return 0.6;      // Средне
+        if ($activeUsersCount < 500) return 0.4;      // Много
+        if ($activeUsersCount < 530) return 0.2;      // Очень много
         return 0.0;                                   // Перегружена
     }
 
     /**
      * Score на основе нагрузки сервера
      */
-    private function calculateLoadBasedScore(?array $latestStats): float
+    private function calculateLoadBasedScore(Panel $panel): float
     {
+        $latestStats = $this->getLatestPanelStats($panel->id);
+
         if (!$latestStats) {
             return 0.5;
         }
@@ -332,15 +315,16 @@ class PanelRepository extends BaseRepository
     /**
      * Score на основе времени последней активности
      */
-    private function calculateTimeBasedScore(?Carbon $lastUserTime): float
+    private function calculateTimeBasedScore(Panel $panel): float
     {
+        $lastUserTime = $this->getLastUserCreationTime($panel->id);
+
         if (!$lastUserTime) {
             return 1.0; // Панель никогда не использовалась
         }
 
         $minutesSinceLast = Carbon::now()->diffInMinutes($lastUserTime);
 
-        // Для больших систем время между созданиями пользователей маленькое
         if ($minutesSinceLast < 5) return 0.0;     // Только что использовалась
         if ($minutesSinceLast < 15) return 0.3;    // Недавно
         if ($minutesSinceLast < 30) return 0.6;    // Некоторое время назад
@@ -349,16 +333,18 @@ class PanelRepository extends BaseRepository
     }
 
     /**
-     * Случайный компонент для равномерного распределения
+     * Получение количества активных пользователей из статистики Marzban
      */
-    private function calculateRandomScore(Panel $panel): float
+    private function getActiveUsersFromStats(int $panelId): int
     {
-        $hash = crc32($panel->id . date('Y-m-d-H'));
-        return (($hash % 100) / 100) - 0.5; // От -0.5 до +0.5
+        $latestStats = $this->getLatestPanelStats($panelId);
+
+        // Берем реальные данные из статистики Marzban
+        return $latestStats['users_active'] ?? 0;
     }
 
     /**
-     * Получение количества активных пользователей панели
+     * Старый метод подсчета активных пользователей (для отладки)
      */
     private function getActiveUsersCount(int $panelId): int
     {

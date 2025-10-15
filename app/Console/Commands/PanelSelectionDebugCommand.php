@@ -26,9 +26,9 @@ class PanelSelectionDebugCommand extends Command
         $this->line("🟢 Новая система выбрала: Панель ID {$comparison['new_system_selected']}");
 
         $this->line("\n📋 Детальная информация по панелям:");
-        $this->line(str_repeat('-', 150));
+        $this->line(str_repeat('-', 130));
 
-        $headers = ['ID', 'Адрес', 'Активные', 'Всего', 'Последняя акт.', 'CPU%', 'Память%', 'Общ.Score', 'User', 'Load', 'Time', 'Rand', 'Выбор'];
+        $headers = ['ID', 'Адрес', 'Актив.(DB)', 'Актив.(Stats)', 'Всего', 'CPU%', 'Память%', 'Score', 'Выбор'];
 
         $rows = [];
         foreach ($comparison['panels'] as $panel) {
@@ -46,29 +46,27 @@ class PanelSelectionDebugCommand extends Command
                 $selection = '🟢 НОВАЯ';
             }
 
-            $lastActivity = $panel['last_activity'] ? $panel['last_activity']->format('H:i') : 'никогда';
-
             $rows[] = [
                 $panel['id'],
                 substr($panel['address'], 0, 15) . '...',
-                $panel['active_users'],
+                $panel['active_users_db'],
+                $panel['active_users_stats'],
                 $panel['total_users'],
-                $lastActivity,
                 $cpuUsage,
                 $memoryUsage,
                 number_format($panel['optimized_score'], 1),
-                number_format($panel['score_details']['user_score'], 1),
-                number_format($panel['score_details']['load_score'], 1),
-                number_format($panel['score_details']['time_score'], 1),
-                number_format($panel['score_details']['random_score'], 1),
                 $selection
             ];
         }
 
         $this->table($headers, $rows);
 
-        $this->line("\n💡 Веса алгоритма: Пользователи (40%), Нагрузка (40%), Время (15%), Случайность (5%)");
-        $this->line("💡 Для тестирования новой системы используйте:");
+        $this->line("\n💡 Объяснение расхождений:");
+        $this->line("   - Актив.(DB) - пользователи с активными ключами в нашей БД");
+        $this->line("   - Актив.(Stats) - реально активные пользователи из статистики Marzban");
+        $this->line("   - Новая система использует Актив.(Stats) для распределения");
+
+        $this->line("\n💡 Для тестирования новой системы используйте:");
         $this->line("   \$panel = \$panelRepository->getOptimizedMarzbanPanel();");
     }
 }
