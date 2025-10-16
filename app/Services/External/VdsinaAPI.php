@@ -5,43 +5,56 @@ namespace App\Services\External;
 use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
-use GuzzleHttp\RequestOptions;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use InvalidArgumentException;
 
 class VdsinaAPI
 {
-    const HOST_RU = 'https://userapi.vdsina.ru/v1/';
     const HOST_COM = 'https://userapi.vdsina.com/v1/';
     private string $apiKey;
 
     public function __construct($apiKey)
     {
+        if (empty($apiKey)) {
+            throw new InvalidArgumentException('VDSina API key is required');
+        }
         $this->apiKey = $apiKey;
     }
 
-    //интересуют id = 2 Standard servers
-
     /**
-     * @throws GuzzleException
+     * Базовый метод для выполнения запросов
      */
-    public function getServerGroup(): array
+    private function makeRequest(string $action, string $method = 'GET', array $data = []): array
     {
         try {
-            $action = 'server-group';
-
-            $headers = [
+            $options = [
                 'headers' => [
-                    'Authorization' => $this->apiKey,
-                ]
+                    'Authorization' => 'Bearer ' . $this->apiKey,
+                    'Accept' => 'application/json',
+                ],
+                'timeout' => 30,
+                'connect_timeout' => 10,
             ];
 
-            Log::info('Getting server group from VDSina', [
-                'action' => $action
+            // Для разных методов используем разные форматы данных
+            if (!empty($data)) {
+                if ($method === 'GET') {
+                    $options['query'] = $data;
+                } else {
+                    $options['form_params'] = $data;
+                }
+            }
+
+            Log::info('VDSina API Request', [
+                'action' => $action,
+                'method' => $method,
+                'data_keys' => array_keys($data)
             ]);
 
             $client = new Client(['base_uri' => self::HOST_COM]);
-            $response = $client->get($action, $headers);
+            $response = $client->request($method, $action, $options);
+
             $result = $response->getBody()->getContents();
             $data = json_decode($result, true);
 
@@ -53,616 +66,252 @@ class VdsinaAPI
             }
 
             if (!isset($data['status']) || $data['status'] !== 'ok') {
-                Log::error('Error response from VDSina', [
-                    'response' => $data
+                Log::error('API error response from VDSina', [
+                    'response' => $data,
+                    'status_code' => $data['status_code'] ?? 'unknown'
                 ]);
-                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
+
+                // Специальная обработка для ошибок аутентификации
+                if (isset($data['status_code']) && $data['status_code'] === 401) {
+                    throw new RuntimeException('VDSina API authentication failed: ' . ($data['status_msg'] ?? 'Invalid token'));
+                }
+
+                throw new RuntimeException('VDSina API error: ' . ($data['status_msg'] ?? 'Unknown error'));
             }
 
-            Log::info('Successfully got server group from VDSina');
+            Log::info('VDSina API Response Success', [
+                'action' => $action,
+                'data_count' => isset($data['data']) ? (is_array($data['data']) ? count($data['data']) : 'single') : 'none'
+            ]);
 
             return $data;
 
         } catch (GuzzleException $e) {
-            Log::error('HTTP error while getting server group from VDSina', [
-                'error' => $e->getMessage(),
-                'code' => $e->getCode()
+            $statusCode = $e->getCode();
+            $message = $e->getMessage();
+
+            Log::error('VDSina API HTTP error', [
+                'action' => $action,
+                'method' => $method,
+                'error' => $message,
+                'code' => $statusCode
             ]);
+
+            if ($statusCode === 401) {
+                throw new RuntimeException('VDSina API authentication failed. Please check your API token.');
+            }
+
             throw $e;
         } catch (Exception $e) {
-            Log::error('Error while getting server group from VDSina', [
+            Log::error('VDSina API general error', [
+                'action' => $action,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            throw new RuntimeException('Error getting server group from VDSina: ' . $e->getMessage());
+            throw new RuntimeException('VDSina API request failed: ' . $e->getMessage());
         }
     }
 
-    //Возвращается список дата-центров
-    //id = 1 - Amsterdam
     /**
-     * @throws GuzzleException
+     * Получить информацию об аккаунте
+     */
+    public function getAccount(): array
+    {
+        return $this->makeRequest('account');
+    }
+
+    /**
+     * Получить список дата-центров
      */
     public function getDatacenter(): array
     {
-        try {
-            $action = 'datacenter';
-
-            $headers = [
-                'headers' => [
-                    'Authorization' => $this->apiKey,
-                ]
-            ];
-
-            Log::info('Getting datacenter from VDSina', [
-                'action' => $action
-            ]);
-
-            $client = new Client(['base_uri' => self::HOST_COM]);
-            $response = $client->get($action, $headers);
-            $result = $response->getBody()->getContents();
-            $data = json_decode($result, true);
-
-            if (!is_array($data)) {
-                Log::error('Invalid JSON response from VDSina', [
-                    'response' => $result
-                ]);
-                throw new RuntimeException('Invalid JSON response from VDSina');
-            }
-
-            if (!isset($data['status']) || $data['status'] !== 'ok') {
-                Log::error('Error response from VDSina', [
-                    'response' => $data
-                ]);
-                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
-            }
-
-            Log::info('Successfully got datacenter from VDSina');
-
-            return $data;
-
-        } catch (GuzzleException $e) {
-            Log::error('HTTP error while getting datacenter from VDSina', [
-                'error' => $e->getMessage(),
-                'code' => $e->getCode()
-            ]);
-            throw $e;
-        } catch (Exception $e) {
-            Log::error('Error while getting datacenter from VDSina', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            throw new RuntimeException('Error getting datacenter from VDSina: ' . $e->getMessage());
-        }
+        return $this->makeRequest('datacenter');
     }
 
-    //Список шаблонов операционных систем, доступных для установки или переустановки сервера
-    //Интересует id = 23, Ubuntu 24.04
     /**
-     * @throws GuzzleException
+     * Получить группы серверов
+     */
+    public function getServerGroup(): array
+    {
+        return $this->makeRequest('server-group');
+    }
+
+    /**
+     * Получить шаблоны ОС
      */
     public function getTemplate(): array
     {
-        try {
-            $action = 'template';
-
-            $headers = [
-                'headers' => [
-                    'Authorization' => $this->apiKey,
-                ]
-            ];
-
-            Log::info('Getting template from VDSina', [
-                'action' => $action
-            ]);
-
-            $client = new Client(['base_uri' => self::HOST_COM]);
-            $response = $client->get($action, $headers);
-            $result = $response->getBody()->getContents();
-            $data = json_decode($result, true);
-
-            if (!is_array($data)) {
-                Log::error('Invalid JSON response from VDSina', [
-                    'response' => $result
-                ]);
-                throw new RuntimeException('Invalid JSON response from VDSina');
-            }
-
-            if (!isset($data['status']) || $data['status'] !== 'ok') {
-                Log::error('Error response from VDSina', [
-                    'response' => $data
-                ]);
-                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
-            }
-
-            Log::info('Successfully got template from VDSina');
-
-            return $data;
-
-        } catch (GuzzleException $e) {
-            Log::error('HTTP error while getting template from VDSina', [
-                'error' => $e->getMessage(),
-                'code' => $e->getCode()
-            ]);
-            throw $e;
-        } catch (Exception $e) {
-            Log::error('Error while getting template from VDSina', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            throw new RuntimeException('Error getting template from VDSina: ' . $e->getMessage());
-        }
+        return $this->makeRequest('template');
     }
 
-    //Список тарифных планов, доступен по ID группы сервера
-    //Интересует Standard Server id = 2
-    //Из полученного списка тарифных планов выбираем по индексу 0 с id = 1
     /**
-     * @throws GuzzleException
+     * Получить тарифные планы для группы серверов
      */
-    public function getServerPlan(): array
+    public function getServerPlan(int $serverGroupId): array
     {
-        try {
-            $action = 'server-plan/2';
-
-            $headers = [
-                'headers' => [
-                    'Authorization' => $this->apiKey,
-                ]
-            ];
-
-            Log::info('Getting server plan from VDSina', [
-                'action' => $action
-            ]);
-
-            $client = new Client(['base_uri' => self::HOST_COM]);
-            $response = $client->get($action, $headers);
-            $result = $response->getBody()->getContents();
-            $data = json_decode($result, true);
-
-            if (!is_array($data)) {
-                Log::error('Invalid JSON response from VDSina', [
-                    'response' => $result
-                ]);
-                throw new RuntimeException('Invalid JSON response from VDSina');
-            }
-
-            if (!isset($data['status']) || $data['status'] !== 'ok') {
-                Log::error('Error response from VDSina', [
-                    'response' => $data
-                ]);
-                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
-            }
-
-            Log::info('Successfully got server plan from VDSina');
-
-            return $data;
-
-        } catch (GuzzleException $e) {
-            Log::error('HTTP error while getting server plan from VDSina', [
-                'error' => $e->getMessage(),
-                'code' => $e->getCode()
-            ]);
-            throw $e;
-        } catch (Exception $e) {
-            Log::error('Error while getting server plan from VDSina', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            throw new RuntimeException('Error getting server plan from VDSina: ' . $e->getMessage());
-        }
+        return $this->makeRequest("server-plan/{$serverGroupId}");
     }
 
-    //получить список серверов
-
     /**
-     * @throws GuzzleException
+     * Получить список серверов
      */
     public function getServers(): array
     {
-        try {
-            $action = 'server';
-
-            $headers = [
-                'headers' => [
-                    'Authorization' => $this->apiKey,
-                ]
-            ];
-
-            Log::info('Getting servers from VDSina', [
-                'action' => $action
-            ]);
-
-            $client = new Client(['base_uri' => self::HOST_COM]);
-            $response = $client->get($action, $headers);
-            $result = $response->getBody()->getContents();
-            $data = json_decode($result, true);
-
-            if (!is_array($data)) {
-                Log::error('Invalid JSON response from VDSina', [
-                    'response' => $result
-                ]);
-                throw new RuntimeException('Invalid JSON response from VDSina');
-            }
-
-            if (!isset($data['status']) || $data['status'] !== 'ok') {
-                Log::error('Error response from VDSina', [
-                    'response' => $data
-                ]);
-                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
-            }
-
-            Log::info('Successfully got servers from VDSina');
-
-            return $data;
-
-        } catch (GuzzleException $e) {
-            Log::error('HTTP error while getting servers from VDSina', [
-                'error' => $e->getMessage(),
-                'code' => $e->getCode()
-            ]);
-            throw $e;
-        } catch (Exception $e) {
-            Log::error('Error while getting servers from VDSina', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            throw new RuntimeException('Error getting servers from VDSina: ' . $e->getMessage());
-        }
+        return $this->makeRequest('server');
     }
 
     /**
-     * @param string $server_name //имя сервера
-     * @param int $server_plan //id = 1 - базовый тарифный план
-     * @param int $autoprolong //0 - без авто продления, 1 - авто продление
-     * @param int $datacenter //id = 1 - Amsterdam
-     * @param int $template //id = 23 - Ubuntu 24.04
-     * @return array
-     * @throws GuzzleException
+     * Получить информацию о сервере
+     */
+    public function getServerById(int $serverId): array
+    {
+        return $this->makeRequest("server/{$serverId}");
+    }
+
+    /**
+     * Создать сервер
      */
     public function createServer(
         string $server_name,
         int    $server_plan,
         int    $autoprolong = 0,
         int    $datacenter = 1,
-        int    $template = 23
+        int    $template = 23,
+        int    $backup_auto = 0
     ): array
     {
-        try {
-            $action = 'server';
+        $serverData = [
+            'name' => $server_name,
+            'server-plan' => $server_plan,
+            'autoprolong' => $autoprolong,
+            'datacenter' => $datacenter,
+            'template' => $template,
+            'backup_auto' => $backup_auto
+        ];
 
-            $headers = [
-                'headers' => [
-                    'Authorization' => $this->apiKey,
-                ],
-                RequestOptions::JSON => [
-                    'name' => $server_name,
-                    'server-plan' => $server_plan,
-                    'autoprolong' => $autoprolong,
-                    'datacenter' => $datacenter,
-                    'template' => $template,
-                    'backup_auto' => 0 //авто бекап
-                ]
-            ];
+        Log::info('Creating VDSina server', $serverData);
 
-            Log::info('Creating server in VDSina', [
-                'action' => $action,
-                'name' => $server_name,
-                'server-plan' => $server_plan,
-                'datacenter' => $datacenter,
-                'template' => $template
-            ]);
-
-            $client = new Client(['base_uri' => self::HOST_COM]);
-            $response = $client->post($action, $headers);
-            $result = $response->getBody()->getContents();
-            $data = json_decode($result, true);
-
-            if (!is_array($data)) {
-                Log::error('Invalid JSON response from VDSina', [
-                    'response' => $result
-                ]);
-                throw new RuntimeException('Invalid JSON response from VDSina');
-            }
-
-            if (!isset($data['status']) || $data['status'] !== 'ok') {
-                Log::error('Error response from VDSina', [
-                    'response' => $data
-                ]);
-                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
-            }
-
-            Log::info('Successfully created server in VDSina', [
-                'server_id' => $data['data']['id'] ?? null
-            ]);
-
-            return $data;
-
-        } catch (GuzzleException $e) {
-            Log::error('HTTP error while creating server in VDSina', [
-                'error' => $e->getMessage(),
-                'code' => $e->getCode()
-            ]);
-            throw $e;
-        } catch (Exception $e) {
-            Log::error('Error while creating server in VDSina', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            throw new RuntimeException('Error creating server in VDSina: ' . $e->getMessage());
-        }
+        return $this->makeRequest('server', 'POST', $serverData);
     }
 
     /**
-     * @param int $provider_id
-     * @return array
-     * @throws GuzzleException
+     * Обновить пароль сервера
      */
-    public function getServerById(int $provider_id): array
+    public function updatePassword(int $serverId, string $password): array
     {
-        try {
-            $action = 'server/' . $provider_id;
+        Log::info('Updating VDSina server password', [
+            'server_id' => $serverId
+        ]);
 
-            $headers = [
-                'headers' => [
-                    'Authorization' => $this->apiKey,
-                ]
-            ];
-
-            Log::info('Getting server from VDSina', [
-                'provider_id' => $provider_id,
-                'action' => $action
-            ]);
-
-            $client = new Client(['base_uri' => self::HOST_COM]);
-            $response = $client->get($action, $headers);
-            $result = $response->getBody()->getContents();
-            $data = json_decode($result, true);
-
-            if (!is_array($data)) {
-                Log::error('Invalid JSON response from VDSina', [
-                    'provider_id' => $provider_id,
-                    'response' => $result
-                ]);
-                throw new RuntimeException('Invalid JSON response from VDSina');
-            }
-
-            if (!isset($data['status']) || $data['status'] !== 'ok') {
-                Log::error('Error response from VDSina', [
-                    'provider_id' => $provider_id,
-                    'response' => $data
-                ]);
-                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
-            }
-
-            if (!isset($data['data']) || !is_array($data['data'])) {
-                Log::error('Invalid data structure from VDSina', [
-                    'provider_id' => $provider_id,
-                    'response' => $data
-                ]);
-                throw new RuntimeException('Invalid data structure from VDSina');
-            }
-
-            Log::info('Successfully got server from VDSina', [
-                'provider_id' => $provider_id,
-                'status' => $data['data']['status'] ?? 'unknown'
-            ]);
-
-            return $data;
-
-        } catch (GuzzleException $e) {
-            Log::error('HTTP error while getting server from VDSina', [
-                'provider_id' => $provider_id,
-                'error' => $e->getMessage(),
-                'code' => $e->getCode()
-            ]);
-            throw $e;
-        } catch (Exception $e) {
-            Log::error('Error while getting server from VDSina', [
-                'provider_id' => $provider_id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            throw new RuntimeException('Error getting server from VDSina: ' . $e->getMessage());
-        }
+        return $this->makeRequest("server.password/{$serverId}", 'PUT', [
+            'password' => $password
+        ]);
     }
 
     /**
-     * @param int $provider_id
-     * @param string $password
-     * @return array
-     * @throws GuzzleException
+     * Удалить сервер
      */
-    public function updatePassword(int $provider_id, string $password): array
+    public function deleteServer(int $serverId): array
     {
-        try {
-            $action = 'server.password/' . $provider_id;
+        Log::info('Deleting VDSina server', [
+            'server_id' => $serverId
+        ]);
 
-            $requestParam = [
-                'headers' => [
-                    'Authorization' => $this->apiKey,
-                ],
-                'json' => [
-                    'password' => $password
-                ],
-            ];
-
-            Log::info('Updating server password in VDSina', [
-                'provider_id' => $provider_id,
-                'action' => $action
-            ]);
-
-            $client = new Client(['base_uri' => self::HOST_COM]);
-            $response = $client->put($action, $requestParam);
-            $result = $response->getBody()->getContents();
-            $data = json_decode($result, true);
-
-            if (!is_array($data)) {
-                Log::error('Invalid JSON response from VDSina', [
-                    'provider_id' => $provider_id,
-                    'response' => $result
-                ]);
-                throw new RuntimeException('Invalid JSON response from VDSina');
-            }
-
-            if (!isset($data['status']) || $data['status'] !== 'ok') {
-                Log::error('Error response from VDSina', [
-                    'provider_id' => $provider_id,
-                    'response' => $data
-                ]);
-                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
-            }
-
-            Log::info('Successfully updated server password in VDSina', [
-                'provider_id' => $provider_id
-            ]);
-
-            return $data;
-
-        } catch (GuzzleException $e) {
-            Log::error('HTTP error while updating password in VDSina', [
-                'provider_id' => $provider_id,
-                'error' => $e->getMessage(),
-                'code' => $e->getCode()
-            ]);
-            throw $e;
-        } catch (Exception $e) {
-            Log::error('Error while updating password in VDSina', [
-                'provider_id' => $provider_id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            throw new RuntimeException('Error updating password in VDSina: ' . $e->getMessage());
-        }
+        return $this->makeRequest("server/{$serverId}", 'DELETE');
     }
 
     /**
-     * @param int $provider_id
-     * @return array
-     * @throws GuzzleException
+     * Удалить все бэкапы
      */
-    public function deleteAllBackups(int $provider_id): array
+    public function deleteAllBackups(int $serverId): array
     {
-        try {
-            $action = 'server.schedule/' . $provider_id;
+        Log::info('Deleting VDSina server backups', [
+            'server_id' => $serverId
+        ]);
 
-            $requestParam = [
-                'headers' => [
-                    'Authorization' => $this->apiKey,
-                ]
-            ];
-
-            Log::info('Deleting all backups from VDSina', [
-                'provider_id' => $provider_id,
-                'action' => $action
-            ]);
-
-            $client = new Client(['base_uri' => self::HOST_COM]);
-            $response = $client->delete($action, $requestParam);
-            $result = $response->getBody()->getContents();
-            $data = json_decode($result, true);
-
-            if (!is_array($data)) {
-                Log::error('Invalid JSON response from VDSina', [
-                    'provider_id' => $provider_id,
-                    'response' => $result
-                ]);
-                throw new RuntimeException('Invalid JSON response from VDSina');
-            }
-
-            if (!isset($data['status']) || $data['status'] !== 'ok') {
-                Log::error('Error response from VDSina', [
-                    'provider_id' => $provider_id,
-                    'response' => $data
-                ]);
-                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
-            }
-
-            Log::info('Successfully deleted all backups from VDSina', [
-                'provider_id' => $provider_id
-            ]);
-
-            return $data;
-
-        } catch (GuzzleException $e) {
-            Log::error('HTTP error while deleting all backups from VDSina', [
-                'provider_id' => $provider_id,
-                'error' => $e->getMessage(),
-                'code' => $e->getCode()
-            ]);
-            throw $e;
-        } catch (Exception $e) {
-            Log::error('Error while deleting all backups from VDSina', [
-                'provider_id' => $provider_id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            throw new RuntimeException('Error deleting all backups from VDSina: ' . $e->getMessage());
-        }
+        return $this->makeRequest("server.schedule/{$serverId}", 'DELETE');
     }
 
     /**
-     * @param int $provider_id
-     * @return array
-     * @throws GuzzleException
+     * Перезагрузить сервер
      */
-    public function deleteServer(int $provider_id): array
+    public function rebootServer(int $serverId): array
+    {
+        Log::info('Rebooting VDSina server', [
+            'server_id' => $serverId
+        ]);
+
+        return $this->makeRequest("server.reboot/{$serverId}", 'PUT');
+    }
+
+    /**
+     * Выключить сервер
+     */
+    public function powerOffServer(int $serverId): array
+    {
+        Log::info('Powering off VDSina server', [
+            'server_id' => $serverId
+        ]);
+
+        return $this->makeRequest("server.poweroff/{$serverId}", 'PUT');
+    }
+
+    /**
+     * Включить сервер
+     */
+    public function powerOnServer(int $serverId): array
+    {
+        Log::info('Powering on VDSina server', [
+            'server_id' => $serverId
+        ]);
+
+        return $this->makeRequest("server.poweron/{$serverId}", 'PUT');
+    }
+
+    /**
+     * Переустановить сервер
+     */
+    public function reinstallServer(int $serverId, int $templateId): array
+    {
+        Log::info('Reinstalling VDSina server', [
+            'server_id' => $serverId,
+            'template_id' => $templateId
+        ]);
+
+        return $this->makeRequest("server.reinstall/{$serverId}", 'PUT', [
+            'template' => $templateId
+        ]);
+    }
+
+    /**
+     * Получить статистику сервера
+     */
+    public function getServerStats(int $serverId): array
+    {
+        return $this->makeRequest("server.stats/{$serverId}");
+    }
+
+    /**
+     * Получить список бэкапов
+     */
+    public function getBackups(int $serverId): array
+    {
+        return $this->makeRequest("server.backup/{$serverId}");
+    }
+
+    /**
+     * Проверить доступность API
+     */
+    public function testConnection(): bool
     {
         try {
-            $action = 'server/' . $provider_id;
-
-            $requestParam = [
-                'headers' => [
-                    'Authorization' => $this->apiKey,
-                ]
-            ];
-
-            Log::info('Deleting server from VDSina', [
-                'provider_id' => $provider_id,
-                'action' => $action
-            ]);
-
-            $client = new Client(['base_uri' => self::HOST_COM]);
-            $response = $client->delete($action, $requestParam);
-            $result = $response->getBody()->getContents();
-            $data = json_decode($result, true);
-
-            if (!is_array($data)) {
-                Log::error('Invalid JSON response from VDSina', [
-                    'provider_id' => $provider_id,
-                    'response' => $result
-                ]);
-                throw new RuntimeException('Invalid JSON response from VDSina');
-            }
-
-            if (!isset($data['status']) || $data['status'] !== 'ok') {
-                Log::error('Error response from VDSina', [
-                    'provider_id' => $provider_id,
-                    'response' => $data
-                ]);
-                throw new RuntimeException('Error response from VDSina: ' . ($data['status_msg'] ?? 'Unknown error'));
-            }
-
-            Log::info('Successfully deleted server from VDSina', [
-                'provider_id' => $provider_id
-            ]);
-
-            return $data;
-
-        } catch (GuzzleException $e) {
-            Log::error('HTTP error while deleting server from VDSina', [
-                'provider_id' => $provider_id,
-                'error' => $e->getMessage(),
-                'code' => $e->getCode()
-            ]);
-            throw $e;
+            $result = $this->getAccount();
+            return isset($result['status']) && $result['status'] === 'ok';
         } catch (Exception $e) {
-            Log::error('Error while deleting server from VDSina', [
-                'provider_id' => $provider_id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+            Log::error('VDSina API connection test failed', [
+                'error' => $e->getMessage()
             ]);
-            throw new RuntimeException('Error deleting server from VDSina: ' . $e->getMessage());
+            return false;
         }
     }
 }

@@ -12,7 +12,6 @@ use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
-use Symfony\Component\Process\Process;
 
 class VdsinaService
 {
@@ -25,13 +24,6 @@ class VdsinaService
 
     /**
      * Первоначальная настройка сервера
-     *
-     * @param int $location_id
-     * @param string $provider
-     * @param bool $isFree
-     * @return Server
-     * @throws GuzzleException
-     * @throws Exception
      */
     public function configure(int $location_id, string $provider, bool $isFree): Server
     {
@@ -82,8 +74,8 @@ class VdsinaService
                 throw new RuntimeException('Ubuntu 24.04 template not found in VDSina');
             }
 
-            // 3. Проверяем доступность тарифных планов
-            $plans = $this->vdsinaApi->getServerPlan();
+            // 3. Проверяем доступность тарифных планов (ИЗМЕНЕНИЕ!)
+            $plans = $this->vdsinaApi->getServerPlan(2); // ID группы серверов = 2
             if (!isset($plans['data']) || !is_array($plans['data'])) {
                 throw new RuntimeException('Invalid server plan response from VDSina');
             }
@@ -137,11 +129,6 @@ class VdsinaService
 
     /**
      * Окончательная настройка сервера
-     *
-     * @param int $server_id
-     * @return void
-     * @throws GuzzleException
-     * @throws Exception
      */
     public function finishConfigure(int $server_id)
     {
@@ -163,17 +150,19 @@ class VdsinaService
             // Получаем информацию о сервере от провайдера
             $vdsina_server = $this->vdsinaApi->getServerById($server->provider_id);
 
-            Log::warning('THIS DATA VDSINA', [
-                'SERVER' => $vdsina_server,
+            Log::info('VDSina server data', [
+                'server_id' => $server_id,
+                'provider_data' => $vdsina_server
             ]);
 
             if (!isset($vdsina_server['data']['ip']['ip'])) {
                 throw new RuntimeException('Server IP not found in provider response');
             }
 
+            // Удаляем бэкапы (работает без изменений)
             $this->vdsinaApi->deleteAllBackups($server->provider_id);
 
-            // Генерируем и обновляем пароль
+            // Генерируем и обновляем пароль (работает без изменений)
             $new_password = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 16);
             Log::info('Updating server password', [
                 'server_id' => $server_id,
@@ -263,10 +252,6 @@ class VdsinaService
 
     /**
      * Проверка всех, только созданных серверов VDSINA
-     *
-     * @return void
-     * @throws GuzzleException
-     * @throws Exception
      */
     public function checkStatus()
     {
@@ -342,11 +327,6 @@ class VdsinaService
 
     /**
      * Проверка статуса создания сервера у провайдера
-     *
-     * @param int $provider_id
-     * @return bool
-     * @throws GuzzleException
-     * @throws Exception
      */
     public function serverStatus(int $provider_id): bool
     {
@@ -393,10 +373,6 @@ class VdsinaService
 
     /**
      * Удаление сервера
-     *
-     * @param Server $server
-     * @return void
-     * @throws Exception|GuzzleException
      */
     public function delete(Server $server): void
     {
@@ -445,7 +421,6 @@ class VdsinaService
                 $server->panel->panel_status = Panel::PANEL_DELETED;
                 $server->panel->save();
             }
-
 
             // Удаляем сервер из базы
             $server->server_status = Server::SERVER_DELETED;

@@ -15,7 +15,8 @@ class Kernel extends ConsoleKernel
     protected $commands = [
         \App\Console\Commands\PanelSelectionDebugCommand::class,
         \App\Console\Commands\PanelSelectionTestCommand::class,
-    ];
+        \App\Console\Commands\TestVdsinaConnection::class,
+        ];
 
     /**
      * Define the application's command schedule.
