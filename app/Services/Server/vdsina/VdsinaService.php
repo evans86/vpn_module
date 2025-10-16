@@ -74,7 +74,7 @@ class VdsinaService
                 throw new RuntimeException('Ubuntu 24.04 template not found in VDSina');
             }
 
-            // 3. Проверяем доступность тарифных планов (ИЗМЕНЕНИЕ!)
+            // 3. Проверяем доступность тарифных планов
             $plans = $this->vdsinaApi->getServerPlan(2); // ID группы серверов = 2
             if (!isset($plans['data']) || !is_array($plans['data'])) {
                 throw new RuntimeException('Invalid server plan response from VDSina');
@@ -135,9 +135,6 @@ class VdsinaService
         try {
             Log::info('Starting server configuration', ['server_id' => $server_id]);
 
-            /**
-             * @var Server $server
-             */
             $server = Server::query()->where('id', $server_id)->first();
             if (!$server) {
                 throw new RuntimeException('Server not found');
@@ -150,26 +147,12 @@ class VdsinaService
             // Получаем информацию о сервере от провайдера
             $vdsina_server = $this->vdsinaApi->getServerById($server->provider_id);
 
-            Log::info('VDSina server data', [
-                'server_id' => $server_id,
-                'provider_data' => $vdsina_server
-            ]);
-
             if (!isset($vdsina_server['data']['ip']['ip'])) {
                 throw new RuntimeException('Server IP not found in provider response');
             }
 
-            // Удаляем бэкапы (работает без изменений)
+            // Удаляем бэкапы
             $this->vdsinaApi->deleteAllBackups($server->provider_id);
-
-            // Генерируем и обновляем пароль (работает без изменений)
-            $new_password = $this->vdsinaApi->generateVdsinaPassword();
-            Log::info('Updating server password', [
-                'server_id' => $server_id,
-                'provider_id' => $server->provider_id
-            ]);
-//            $this->vdsinaApi->updatePassword($server->provider_id, $new_password);
-            $this->vdsinaApi->updatePasswordWithRetry($server->provider_id);
 
             // Создаем или обновляем DNS запись
             $serverName = $vdsina_server['data']['name'];
@@ -181,58 +164,30 @@ class VdsinaService
                 'ip' => $serverIp
             ]);
 
-            try {
-                $cloudflare_service = new CloudflareService();
-                $host = $cloudflare_service->createSubdomain($serverName, $serverIp);
+            $cloudflare_service = new CloudflareService();
+            $host = $cloudflare_service->createSubdomain($serverName, $serverIp);
 
-                if (!isset($host->id) || !isset($host->name)) {
-                    throw new RuntimeException('Invalid response from Cloudflare: missing id or name');
-                }
-
-                // Ждем 5 секунд для пропагации DNS
-                Log::info('Waiting for DNS propagation', [
-                    'server_id' => $server_id,
-                    'host' => $host->name,
-                    'ip' => $serverIp
-                ]);
-                sleep(5);
-
-                // Обновляем информацию о сервере
-                $server->ip = $serverIp;
-                $server->login = 'root';
-                $server->password = $new_password;
-                $server->name = $serverName;
-                $server->host = $host->name;
-                $server->dns_record_id = $host->id;
-                $server->server_status = Server::SERVER_CONFIGURED;
-
-                $server->save();
-
-                Log::info('Server configuration completed', [
-                    'server_id' => $server_id,
-                    'provider_id' => $server->provider_id,
-                    'host' => $host->name,
-                    'dns_record_id' => $host->id
-                ]);
-            } catch (Exception $e) {
-                Log::error('Failed to configure DNS for server', [
-                    'server_id' => $server_id,
-                    'name' => $serverName,
-                    'ip' => $serverIp,
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
-                ]);
-
-                // Даже если не удалось настроить DNS, сохраняем основную информацию о сервере
-                $server->ip = $serverIp;
-                $server->login = 'root';
-                $server->password = $new_password;
-                $server->name = $serverName;
-                $server->server_status = Server::SERVER_ERROR;
-                $server->save();
-
-                throw $e;
+            if (!isset($host->id) || !isset($host->name)) {
+                throw new RuntimeException('Invalid response from Cloudflare: missing id or name');
             }
+
+            // Ждем 5 секунд для пропагации DNS
+            sleep(5);
+
+            // Устанавливаем временную метку вместо пароля - крон обновит его позже
+            $server->ip = $serverIp;
+            $server->login = 'root';
+            $server->password = 'PENDING_VDSINA_PASSWORD_' . time(); // Временная метка
+            $server->name = $serverName;
+            $server->host = $host->name;
+            $server->dns_record_id = $host->id;
+            $server->server_status = Server::SERVER_CONFIGURED;
+            $server->save();
+
+            Log::info('Server configuration completed - password will be updated by cron', [
+                'server_id' => $server_id,
+                'provider_id' => $server->provider_id
+            ]);
 
         } catch (Exception $e) {
             Log::error('Failed to configure server', [
@@ -241,7 +196,6 @@ class VdsinaService
                 'trace' => $e->getTraceAsString()
             ]);
 
-            // Помечаем сервер как ошибочный
             if (isset($server)) {
                 $server->server_status = Server::SERVER_ERROR;
                 $server->save();
@@ -249,6 +203,94 @@ class VdsinaService
 
             throw $e;
         }
+    }
+
+    /**
+     * Получить реальный пароль сервера от VDSina
+     */
+    public function getServerPassword(int $server_id): ?string
+    {
+        try {
+            $server = Server::query()->where('id', $server_id)->first();
+            if (!$server || !$server->provider_id) {
+                return null;
+            }
+
+            // Получаем детальную информацию о сервере
+            $serverInfo = $this->vdsinaApi->getServerById($server->provider_id);
+
+            Log::info('Searching for password in VDSina response', [
+                'server_id' => $server_id,
+                'provider_id' => $server->provider_id
+            ]);
+
+            // Ищем пароль в различных возможных местах ответа VDSina
+            $password = $this->findPasswordInResponse($serverInfo);
+
+            if ($password) {
+                Log::info('Password found in VDSina response', [
+                    'server_id' => $server_id,
+                    'password_length' => strlen($password)
+                ]);
+                return $password;
+            }
+
+            // Если пароль не найден, логируем структуру ответа для отладки
+            Log::warning('No password found in VDSina response', [
+                'server_id' => $server_id,
+                'available_keys' => array_keys($serverInfo['data'] ?? [])
+            ]);
+
+            return null;
+
+        } catch (Exception $e) {
+            Log::error('Failed to get server password from VDSina', [
+                'server_id' => $server_id,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Поиск пароля в ответе VDSina API
+     */
+    private function findPasswordInResponse(array $serverInfo): ?string
+    {
+        $data = $serverInfo['data'] ?? [];
+
+        // Возможные места где VDSina может возвращать пароль
+        $passwordFields = [
+            'password',
+            'initial_password',
+            'root_password',
+            'admin_password',
+            'default_password',
+            'system_password',
+            'os_password',
+            'user_password',
+        ];
+
+        foreach ($passwordFields as $field) {
+            if (isset($data[$field]) && !empty($data[$field]) && is_string($data[$field])) {
+                return $data[$field];
+            }
+        }
+
+        // Проверяем вложенные структуры
+        $nestedStructures = ['credentials', 'os', 'system', 'admin', 'user'];
+
+        foreach ($nestedStructures as $nested) {
+            if (isset($data[$nested]) && is_array($data[$nested])) {
+                foreach ($passwordFields as $field) {
+                    if (isset($data[$nested][$field]) && !empty($data[$nested][$field]) && is_string($data[$nested][$field])) {
+                        return $data[$nested][$field];
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

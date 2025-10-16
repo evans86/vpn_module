@@ -8,74 +8,21 @@ use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
-/**
- * Консольная команда для проверки статуса созданных серверов и их конфигурации при готовности.
- *
- * Команда выполняет следующие действия:
- * 1. Находит все серверы со статусом "создан" и не старше 2 часов
- * 2. Для каждого сервера проверяет его текущий статус через соответствующую стратегию
- * 3. Обновляет статус сервера на основе результатов проверки
- * 4. Обрабатывает возможные ошибки, логируя их и помечая сервер как ошибочный при необходимости
- */
 class CheckServerStatusCommand extends Command
 {
-    /**
-     * Сигнатура команды для вызова из консоли.
-     *
-     * @var string
-     */
     protected $signature = 'servers:check-status';
-    /**
-     * Описание команды, отображаемое при выводе списка команд.
-     *
-     * @var string
-     */
     protected $description = 'Check status of all created servers and configure them if ready';
 
-    /**
-     * Основной метод выполнения команды.
-     *
-     * @return int Возвращает 0 при успешном выполнении, 1 при ошибке
-     * @throws GuzzleException
-     */
     public function handle(): int
     {
         try {
-            // Получаем все серверы в статусе "создан" и не старше 2 часов
-            $servers = Server::where('server_status', Server::SERVER_CREATED)
-                ->where('created_at', '>=', now()->subHours(2))
-                ->get();
+            // 1. Проверяем и настраиваем новые серверы
+            $this->checkAndConfigureNewServers();
 
-            $this->info("Found {$servers->count()} servers to check");
+            // 2. Обновляем пароли для уже сконфигурированных серверов
+            $this->updatePasswordsForConfiguredServers();
 
-            foreach ($servers as $server) {
-                try {
-                    $strategy = new ServerStrategy($server->provider);
-
-                    $this->info("Checking server {$server->id} ({$server->provider})...");
-                    $strategy->checkStatus();
-
-                    // После checkStatus сервер должен быть либо сконфигурирован, либо остаться в статусе создан
-                    $server->refresh();
-                    $this->info("Server {$server->id} status: {$server->server_status}");
-
-                } catch (\Exception $e) {
-                    Log::error('Error checking server status', [
-                        'server_id' => $server->id,
-                        'provider' => $server->provider,
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
-                    ]);
-
-                    $this->error("Error checking server, retrying server {$server->id}: {$e->getMessage()}");
-
-                    // Помечаем сервер как ошибочный
-                    $server->server_status = Server::SERVER_ERROR;
-                    $server->save();
-                }
-            }
-
-            $this->info('Status check completed');
+            $this->info('Status check and password update completed');
 
         } catch (\Exception $e) {
             Log::error('Server status check command failed', [
@@ -88,5 +35,93 @@ class CheckServerStatusCommand extends Command
         }
 
         return 0;
+    }
+
+    /**
+     * Проверяет и настраивает новые серверы
+     */
+    private function checkAndConfigureNewServers(): void
+    {
+        // Получаем все серверы в статусе "создан" и не старше 2 часов
+        $servers = Server::where('server_status', Server::SERVER_CREATED)
+            ->where('created_at', '>=', now()->subHours(2))
+            ->get();
+
+        $this->info("Found {$servers->count()} new servers to check");
+
+        foreach ($servers as $server) {
+            try {
+                $strategy = new ServerStrategy($server->provider);
+
+                $this->info("Checking server {$server->id} ({$server->provider})...");
+                $strategy->checkStatus();
+
+                // После checkStatus сервер должен быть либо сконфигурирован, либо остаться в статусе создан
+                $server->refresh();
+                $this->info("Server {$server->id} status: {$server->server_status}");
+
+            } catch (\Exception $e) {
+                Log::error('Error checking server status', [
+                    'server_id' => $server->id,
+                    'provider' => $server->provider,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+
+                $this->error("Error checking server {$server->id}: {$e->getMessage()}");
+
+                // Помечаем сервер как ошибочный
+                $server->server_status = Server::SERVER_ERROR;
+                $server->save();
+            }
+        }
+    }
+
+    /**
+     * Обновляет пароли для уже сконфигурированных серверов
+     */
+    private function updatePasswordsForConfiguredServers(): void
+    {
+        // Находим серверы VDSina которые сконфигурированы но имеют заглушку пароля
+        $servers = Server::where('provider', Server::VDSINA)
+            ->where('server_status', Server::SERVER_CONFIGURED)
+            ->where(function($query) {
+                $query->where('password', 'VDSINA_AUTO_GENERATED')
+                    ->orWhere('password', 'like', 'PENDING_%')
+                    ->orWhereNull('password');
+            })
+            ->get();
+
+        $this->info("Found {$servers->count()} VDSina servers to update passwords");
+
+        $updatedCount = 0;
+
+        foreach ($servers as $server) {
+            try {
+                $strategy = new ServerStrategy($server->provider);
+
+                // Пытаемся получить реальный пароль
+                $realPassword = $strategy->getServerPassword($server->id);
+
+                if ($realPassword && $realPassword !== $server->password) {
+                    $server->password = $realPassword;
+                    $server->save();
+
+                    $updatedCount++;
+                    $this->info("✅ Server {$server->id}: Password updated");
+                } else {
+                    $this->warn("⚠️ Server {$server->id}: Password not available yet");
+                }
+
+            } catch (\Exception $e) {
+                Log::error('Error updating password for server', [
+                    'server_id' => $server->id,
+                    'error' => $e->getMessage()
+                ]);
+                $this->error("❌ Server {$server->id}: {$e->getMessage()}");
+            }
+        }
+
+        $this->info("Password update: {$updatedCount} servers updated");
     }
 }

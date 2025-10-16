@@ -32,7 +32,7 @@ class VdsinaAPI
                 'headers' => [
                     'Authorization' => 'Bearer ' . $this->apiKey,
                     'Accept' => 'application/json',
-                    'Content-Type' => 'application/json', // Исправлено на JSON
+                    'Content-Type' => 'application/json',
                     'User-Agent' => 'VDSina-Client/1.0',
                 ],
                 'timeout' => 30,
@@ -44,20 +44,14 @@ class VdsinaAPI
                 if ($method === 'GET') {
                     $options['query'] = $data;
                 } else {
-                    // Для POST/PUT используем json
                     $options['json'] = $data;
-
-                    // Дополнительная отладка
-                    Log::debug('Request JSON data', [
-                        'json' => json_encode($data, JSON_PRETTY_PRINT)
-                    ]);
                 }
             }
 
             Log::info('VDSina API Request', [
                 'action' => $action,
                 'method' => $method,
-                'data' => $data
+                'data_keys' => array_keys($data)
             ]);
 
             $client = new Client(['base_uri' => self::BASE_URL]);
@@ -92,16 +86,6 @@ class VdsinaAPI
         } catch (GuzzleException $e) {
             $statusCode = $e->getCode();
             $message = $e->getMessage();
-
-            // Детальное логирование для ошибок валидации
-            if ($statusCode === 400) {
-                Log::error('VDSina API Validation Error Details', [
-                    'action' => $action,
-                    'method' => $method,
-                    'full_error' => $message, // Полное сообщение об ошибке
-                    'data_sent' => $data
-                ]);
-            }
 
             Log::error('VDSina API HTTP error', [
                 'action' => $action,
@@ -205,106 +189,6 @@ class VdsinaAPI
         Log::info('Creating VDSina server', $serverData);
 
         return $this->makeRequest('server', 'POST', $serverData);
-    }
-
-    public function updatePasswordWithRetry(int $serverId): array
-    {
-        Log::info('Updating VDSina server password with retry', [
-            'server_id' => $serverId
-        ]);
-
-        $passwordAttempts = [
-            // Попробуем простой пароль без спецсимволов
-            'Simple123456',
-            // Попробуем только буквы
-            'MyServerPassword',
-            // Попробуем с минимальной длиной
-            'Pass1234',
-            // Попробуем с дефисами
-            'My-Password-123',
-            // Попробуем с подчеркиваниями
-            'My_Password_123',
-            // Попробуем совсем простой
-            'password123',
-        ];
-
-        foreach ($passwordAttempts as $password) {
-            try {
-                Log::info("Trying password: {$password}");
-
-                $result = $this->makeRequest("server.password/{$serverId}", 'PUT', [
-                    'password' => $password
-                ]);
-
-                Log::info("✅ Password accepted: {$password}");
-                return $result;
-
-            } catch (\Exception $e) {
-                Log::warning("❌ Password rejected: {$password} - " . $e->getMessage());
-                continue;
-            }
-        }
-
-        throw new RuntimeException('All password attempts failed');
-    }
-
-    /**
-     * Обновить пароль сервера
-     */
-    public function updatePassword(int $serverId, string $validPassword): array
-    {
-        Log::info('Updating VDSina server password', [
-            'server_id' => $serverId
-        ]);
-
-        Log::info("Password to set: {$validPassword}");
-
-        // Явно создаем JSON структуру как в документации
-        $requestData = [
-            'password' => $validPassword
-        ];
-
-        Log::info('Sending password update request', [
-            'server_id' => $serverId,
-            'data_structure' => $requestData
-        ]);
-
-        return $this->makeRequest("server.password/{$serverId}", 'PUT', $requestData);
-    }
-
-    /**
-     * Генерация пароля, соответствующего требованиям VDSina
-     * Требования: минимум 8 символов, буквы + цифры + специальные символы
-     */
-    public function generateVdsinaPassword(): string
-    {
-        // VDSina требует пароль для суперпользователя
-        // Создаем надежный пароль с буквами, цифрами и длиной 12-16 символов
-        $length = random_int(12, 16);
-        $chars = [
-            'abcdefghijklmnopqrstuvwxyz',
-            'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-            '0123456789',
-            '!@#$%^&*'
-        ];
-
-        $password = '';
-
-        // Гарантируем наличие хотя бы одного символа из каждой группы
-        foreach ($chars as $charGroup) {
-            $password .= $charGroup[random_int(0, strlen($charGroup) - 1)];
-        }
-
-        // Добавляем остальные символы
-        $allChars = implode('', $chars);
-        for ($i = strlen($password); $i < $length; $i++) {
-            $password .= $allChars[random_int(0, strlen($allChars) - 1)];
-        }
-
-        // Перемешиваем пароль
-        $password = str_shuffle($password);
-
-        return $password;
     }
 
     /**
