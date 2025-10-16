@@ -4,17 +4,17 @@ namespace App\Console\Commands;
 
 use App\Services\External\VdsinaAPI;
 use Illuminate\Console\Command;
-use GuzzleHttp\Client;
 
 class TestVdsinaConnection extends Command
 {
-    protected $signature = 'vdsina:test-connection {--debug}';
+    protected $signature = 'vdsina:test-connection {--debug} {--test-auth}';
     protected $description = 'Test connection to VDSina API with detailed diagnostics';
 
     public function handle()
     {
         $apiKey = config('services.api_keys.vdsina_key');
         $debug = $this->option('debug');
+        $testAuth = $this->option('test-auth');
 
         if (empty($apiKey)) {
             $this->error('❌ VDSina API key is not set in configuration');
@@ -31,51 +31,39 @@ class TestVdsinaConnection extends Command
         }
 
         try {
-            // 1. Проверяем базовое подключение к API endpoint
-            $this->info('');
-            $this->info('1. Testing API endpoint connectivity...');
+            $vdsina = new VdsinaAPI($apiKey);
 
-            $hostTest = $this->testApiEndpoint();
-            if (!$hostTest['success']) {
-                $this->error('❌ API endpoint error: ' . $hostTest['message']);
-
-                if ($debug) {
-                    $this->info('📄 Response: ' . json_encode($hostTest['response'] ?? [], JSON_PRETTY_PRINT));
-                }
-
-                // Но продолжаем, так как корневой URL может не существовать
-                $this->warn('⚠️  Continuing test despite endpoint warning...');
-            } else {
-                $this->info('✅ API endpoint is reachable');
+            // Если запрошен тест методов аутентификации
+            if ($testAuth) {
+                return $this->testAllAuthMethods($vdsina);
             }
 
-            // 2. Тестируем API с реальными запросами
+            // 1. Тестируем API с автоматическим подбором аутентификации
             $this->info('');
-            $this->info('2. Testing API authentication...');
+            $this->info('1. Testing API authentication (auto-detection)...');
 
-            $vdsina = new VdsinaAPI($apiKey);
             $testResult = $vdsina->testConnection();
 
             if (!$testResult['success']) {
                 $this->error('❌ API authentication failed: ' . $testResult['message']);
 
                 if ($debug) {
-                    $this->info('📄 Full response: ' . json_encode($testResult['response'] ?? [], JSON_PRETTY_PRINT));
-                    if (isset($testResult['error'])) {
-                        $this->info('📄 Error: ' . $testResult['error']);
-                    }
+                    $this->info('📄 Error: ' . $testResult['error']);
                 }
 
-                $this->suggestSolutions($testResult['message']);
+                $this->info('');
+                $this->info('🔄 Trying to detect correct authentication method...');
+                $this->testAllAuthMethods($vdsina);
+
                 return 1;
             }
 
             $this->info('✅ Authentication successful');
             $this->info('   Account: ' . $testResult['account']);
 
-            // 3. Тестируем основные методы API
+            // 2. Тестируем основные методы API
             $this->info('');
-            $this->info('3. Testing API methods...');
+            $this->info('2. Testing API methods...');
 
             $this->testApiMethods($vdsina);
 
@@ -95,35 +83,35 @@ class TestVdsinaConnection extends Command
         }
     }
 
-    private function testApiEndpoint(): array
+    private function testAllAuthMethods(VdsinaAPI $vdsina): int
     {
-        try {
-            $client = new Client(['timeout' => 10]);
+        $this->info('');
+        $this->info('🔐 Testing all authentication methods...');
 
-            // Тестируем конкретный endpoint вместо корневого
-            $response = $client->get('https://userapi.vdsina.com/v1/account', [
-                'headers' => [
-                    'Accept' => 'application/json',
-                ],
-                'verify' => false,
-            ]);
+        $results = $vdsina->testAuthMethods();
 
-            return [
-                'success' => true,
-                'message' => 'Endpoint is reachable',
-                'status_code' => $response->getStatusCode()
-            ];
+        $hasSuccess = false;
 
-        } catch (\Exception $e) {
-            return [
-                'success' => false,
-                'message' => $e->getMessage(),
-                'response' => [
-                    'error' => $e->getMessage(),
-                    'code' => $e->getCode()
-                ]
-            ];
+        foreach ($results as $method => $result) {
+            if ($result['success']) {
+                $this->info("✅ {$method}: SUCCESS - " . ($result['status_msg'] ?? 'Authenticated'));
+                $hasSuccess = true;
+            } else {
+                $error = $result['error'] ?? ($result['status_msg'] ?? 'Unknown error');
+                $this->error("❌ {$method}: FAILED - {$error}");
+            }
         }
+
+        if (!$hasSuccess) {
+            $this->info('');
+            $this->error('💥 All authentication methods failed!');
+            $this->suggestAuthSolutions();
+            return 1;
+        }
+
+        $this->info('');
+        $this->info('✅ Found working authentication method!');
+        return 0;
     }
 
     private function testApiMethods(VdsinaAPI $vdsina): void
@@ -156,26 +144,17 @@ class TestVdsinaConnection extends Command
         }
     }
 
-    private function suggestSolutions(string $errorMessage): void
+    private function suggestAuthSolutions(): void
     {
         $this->info('');
-        $this->info('🔧 Possible solutions:');
-
-        if (str_contains($errorMessage, '401') || str_contains($errorMessage, 'Unauthorized') || str_contains($errorMessage, 'Incorrect token')) {
-            $this->info('   • 🔑 Check your API key in VDSina panel');
-            $this->info('   • 📋 Ensure the key has correct permissions');
-            $this->info('   • 🔄 Generate a new API key if needed');
-            $this->info('   • 👀 Verify the key is copied correctly (no spaces)');
-        } elseif (str_contains($errorMessage, 'cURL') || str_contains($errorMessage, 'SSL')) {
-            $this->info('   • 🌐 Check your internet connection');
-            $this->info('   • 📜 Verify SSL certificates are installed');
-        } elseif (str_contains($errorMessage, 'timeout')) {
-            $this->info('   • 🔥 Check your firewall settings');
-            $this->info('   • 📡 Verify network connectivity to VDSina');
-        }
-
-        $this->info('   • 📞 Contact VDSina support if problem persists');
+        $this->info('🔧 Possible solutions for authentication issues:');
+        $this->info('   • 🔑 Verify API key in VDSina panel is active');
+        $this->info('   • 📋 Check that API key has all necessary permissions');
+        $this->info('   • 🔄 Generate a new API key');
+        $this->info('   • 👀 Ensure key is copied correctly (no spaces, no quotes)');
+        $this->info('   • 🌐 Try accessing API through different network (VPN)');
+        $this->info('   • 📞 Contact VDSina support for correct authentication format');
         $this->info('');
-        $this->info('📖 VDSina API documentation: https://www.vdsina.com/ru/tech/api');
+        $this->info('💡 Try creating a new API key with different permissions');
     }
 }
