@@ -23,90 +23,90 @@ class VdsinaAPI
     }
 
     /**
-     * Базовый метод для выполнения запросов с разными методами аутентификации
+     * Базовый метод для выполнения запросов
      */
     private function makeRequest(string $action, string $method = 'GET', array $data = []): array
     {
-        $authMethods = [
-            'bearer_token' => ['Authorization' => 'Bearer ' . $this->apiKey],
-            'token_only' => ['Authorization' => $this->apiKey],
-            'x_api_key' => ['X-API-Key' => $this->apiKey],
-            'api_key_header' => ['API-Key' => $this->apiKey],
-            'bearer_lowercase' => ['authorization' => 'bearer ' . $this->apiKey],
-        ];
+        try {
+            $options = [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $this->apiKey, // Рабочий метод
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/x-www-form-urlencoded',
+                    'User-Agent' => 'VDSina-Client/1.0',
+                ],
+                'timeout' => 30,
+                'connect_timeout' => 10,
+            ];
 
-        $lastError = null;
-
-        foreach ($authMethods as $authName => $authHeaders) {
-            try {
-                Log::info("Trying authentication method: {$authName}", ['headers' => array_keys($authHeaders)]);
-
-                $options = [
-                    'headers' => array_merge([
-                        'Accept' => 'application/json',
-                        'Content-Type' => 'application/x-www-form-urlencoded',
-                        'User-Agent' => 'VDSina-Client/1.0',
-                    ], $authHeaders),
-                    'timeout' => 30,
-                    'connect_timeout' => 10,
-                ];
-
-                // Для разных методов используем разные форматы данных
-                if (!empty($data)) {
-                    if ($method === 'GET') {
-                        $options['query'] = $data;
-                    } else {
-                        $options['form_params'] = $data;
-                    }
+            // Для разных методов используем разные форматы данных
+            if (!empty($data)) {
+                if ($method === 'GET') {
+                    $options['query'] = $data;
+                } else {
+                    $options['form_params'] = $data;
                 }
+            }
 
-                $client = new Client(['base_uri' => self::BASE_URL]);
-                $response = $client->request($method, $action, $options);
+            Log::info('VDSina API Request', [
+                'action' => $action,
+                'method' => $method,
+                'data_keys' => array_keys($data)
+            ]);
 
-                $result = $response->getBody()->getContents();
-                $data = json_decode($result, true);
+            $client = new Client(['base_uri' => self::BASE_URL]);
+            $response = $client->request($method, $action, $options);
 
-                if (!is_array($data)) {
-                    throw new RuntimeException('Invalid JSON response from VDSina');
-                }
+            $result = $response->getBody()->getContents();
+            $data = json_decode($result, true);
 
-                if (!isset($data['status']) || $data['status'] !== 'ok') {
-                    // Если это ошибка аутентификации, пробуем следующий метод
-                    if (isset($data['status_code']) && $data['status_code'] === 401) {
-                        $lastError = "Auth method '{$authName}' failed: " . ($data['status_msg'] ?? 'Unauthorized');
-                        Log::warning($lastError);
-                        continue; // Пробуем следующий метод аутентификации
-                    }
+            if (!is_array($data)) {
+                Log::error('Invalid JSON response from VDSina', [
+                    'response' => $result
+                ]);
+                throw new RuntimeException('Invalid JSON response from VDSina');
+            }
 
-                    throw new RuntimeException('VDSina API error: ' . ($data['status_msg'] ?? 'Unknown error'));
-                }
-
-                Log::info("✅ Authentication successful with method: {$authName}");
-                Log::info('VDSina API Response Success', [
-                    'action' => $action,
-                    'auth_method' => $authName,
-                    'data_count' => isset($data['data']) ? (is_array($data['data']) ? count($data['data']) : 'single') : 'none'
+            if (!isset($data['status']) || $data['status'] !== 'ok') {
+                Log::error('API error response from VDSina', [
+                    'response' => $data,
+                    'status_code' => $data['status_code'] ?? 'unknown'
                 ]);
 
-                return $data;
-
-            } catch (GuzzleException $e) {
-                $statusCode = $e->getCode();
-
-                // Если это 401 ошибка, пробуем следующий метод аутентификации
-                if ($statusCode === 401) {
-                    $lastError = "Auth method '{$authName}' failed with 401: " . $e->getMessage();
-                    Log::warning($lastError);
-                    continue;
-                }
-
-                // Другие ошибки - сразу выбрасываем исключение
-                throw $e;
+                throw new RuntimeException('VDSina API error: ' . ($data['status_msg'] ?? 'Unknown error'));
             }
-        }
 
-        // Если все методы аутентификации провалились
-        throw new RuntimeException('All authentication methods failed. Last error: ' . $lastError);
+            Log::info('VDSina API Response Success', [
+                'action' => $action,
+                'data_count' => isset($data['data']) ? (is_array($data['data']) ? count($data['data']) : 'single') : 'none'
+            ]);
+
+            return $data;
+
+        } catch (GuzzleException $e) {
+            $statusCode = $e->getCode();
+            $message = $e->getMessage();
+
+            Log::error('VDSina API HTTP error', [
+                'action' => $action,
+                'method' => $method,
+                'error' => $message,
+                'code' => $statusCode
+            ]);
+
+            if ($statusCode === 401) {
+                throw new RuntimeException('VDSina API authentication failed. Please check your API token.');
+            }
+
+            throw $e;
+        } catch (Exception $e) {
+            Log::error('VDSina API general error', [
+                'action' => $action,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw new RuntimeException('VDSina API request failed: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -241,7 +241,8 @@ class VdsinaAPI
                 return [
                     'success' => true,
                     'message' => 'Connection successful',
-                    'account' => $result['data']['email'] ?? 'Unknown'
+                    'account' => $result['data']['email'] ?? 'Unknown',
+                    'balance' => $result['data']['balance'] ?? 0
                 ];
             }
 
@@ -258,53 +259,5 @@ class VdsinaAPI
                 'error' => $e->getMessage()
             ];
         }
-    }
-
-    /**
-     * Прямой тест аутентификации с разными методами
-     */
-    public function testAuthMethods(): array
-    {
-        $methods = [
-            'Bearer Token' => ['Authorization' => 'Bearer ' . $this->apiKey],
-            'Token Only' => ['Authorization' => $this->apiKey],
-            'X-API-Key' => ['X-API-Key' => $this->apiKey],
-            'API-Key' => ['API-Key' => $this->apiKey],
-            'Bearer lowercase' => ['authorization' => 'bearer ' . $this->apiKey],
-        ];
-
-        $results = [];
-
-        foreach ($methods as $methodName => $headers) {
-            try {
-                $client = new Client(['base_uri' => self::BASE_URL, 'timeout' => 10]);
-
-                $response = $client->get('account', [
-                    'headers' => array_merge([
-                        'Accept' => 'application/json',
-                        'User-Agent' => 'VDSina-Client/1.0',
-                    ], $headers),
-                ]);
-
-                $result = $response->getBody()->getContents();
-                $data = json_decode($result, true);
-
-                $results[$methodName] = [
-                    'success' => isset($data['status']) && $data['status'] === 'ok',
-                    'status' => $data['status'] ?? 'error',
-                    'status_msg' => $data['status_msg'] ?? null,
-                    'status_code' => $data['status_code'] ?? $response->getStatusCode(),
-                ];
-
-            } catch (\Exception $e) {
-                $results[$methodName] = [
-                    'success' => false,
-                    'error' => $e->getMessage(),
-                    'code' => $e->getCode(),
-                ];
-            }
-        }
-
-        return $results;
     }
 }
