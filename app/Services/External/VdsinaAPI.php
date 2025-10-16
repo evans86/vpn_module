@@ -209,23 +209,33 @@ class VdsinaAPI
      * Генерация пароля, соответствующего требованиям VDSina
      * Требования: минимум 8 символов, буквы + цифры + специальные символы
      */
-    public function generateValidPassword(): string
+    private function generateVdsinaPassword(): string
     {
-        $length = 12;
-        $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_-=+';
+        // VDSina требует пароль для суперпользователя
+        // Создаем надежный пароль с буквами, цифрами и длиной 12-16 символов
+        $length = random_int(12, 16);
+        $chars = [
+            'abcdefghijklmnopqrstuvwxyz',
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+            '0123456789',
+            '!@#$%^&*'
+        ];
 
-        do {
-            $password = '';
-            for ($i = 0; $i < $length; $i++) {
-                $password .= $chars[random_int(0, strlen($chars) - 1)];
-            }
+        $password = '';
 
-            // Проверяем, что пароль содержит хотя бы одну цифру, одну букву и один спецсимвол
-            $hasDigit = preg_match('/\d/', $password);
-            $hasLetter = preg_match('/[a-zA-Z]/', $password);
-            $hasSpecial = preg_match('/[!@#$%^&*()_\-=+]/', $password);
+        // Гарантируем наличие хотя бы одного символа из каждой группы
+        foreach ($chars as $charGroup) {
+            $password .= $charGroup[random_int(0, strlen($charGroup) - 1)];
+        }
 
-        } while (!($hasDigit && $hasLetter && $hasSpecial));
+        // Добавляем остальные символы
+        $allChars = implode('', $chars);
+        for ($i = strlen($password); $i < $length; $i++) {
+            $password .= $allChars[random_int(0, strlen($allChars) - 1)];
+        }
+
+        // Перемешиваем пароль
+        $password = str_shuffle($password);
 
         return $password;
     }
