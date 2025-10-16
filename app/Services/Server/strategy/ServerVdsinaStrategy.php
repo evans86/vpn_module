@@ -25,12 +25,6 @@ class ServerVdsinaStrategy extends ServerMainStrategy
 
     /**
      * Первоначальное создание сервера
-     *
-     * @param int $location_id
-     * @param string $provider
-     * @param bool $isFree
-     * @return Server
-     * @throws GuzzleException
      */
     public function configure(int $location_id, string $provider, bool $isFree): Server
     {
@@ -39,18 +33,15 @@ class ServerVdsinaStrategy extends ServerMainStrategy
 
     /**
      * @param int $server_id
-     * @return string
+     * @return string|null
      */
-    public function getServerPassword(int $server_id): string
+    public function getServerPassword(int $server_id): ?string // Исправлено на ?string
     {
         return $this->service->getServerPassword($server_id);
     }
 
     /**
      * Проверка статуса сервера и окончательная настройка
-     *
-     * @return void
-     * @throws GuzzleException
      */
     public function checkStatus(): void
     {
@@ -59,11 +50,6 @@ class ServerVdsinaStrategy extends ServerMainStrategy
 
     /**
      * Добавление панели к серверу
-     *
-     * @param int $server_id
-     * @param string $panel
-     * @return void
-     * @throws Exception
      */
     public function setPanel(int $server_id, string $panel): void
     {
@@ -75,10 +61,6 @@ class ServerVdsinaStrategy extends ServerMainStrategy
 
     /**
      * Удаление сервера
-     *
-     * @param Server $server
-     * @return void
-     * @throws Exception|GuzzleException
      */
     public function delete(Server $server): void
     {

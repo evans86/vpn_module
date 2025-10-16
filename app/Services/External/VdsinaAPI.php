@@ -110,6 +110,14 @@ class VdsinaAPI
     }
 
     /**
+     * Получить пароль сервера через специальный эндпоинт
+     */
+    public function getServerPassword(int $serverId): array
+    {
+        return $this->makeRequest("server.password/{$serverId}");
+    }
+
+    /**
      * Получить информацию об аккаунте
      */
     public function getAccount(): array

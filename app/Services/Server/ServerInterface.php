@@ -24,7 +24,7 @@ interface ServerInterface
      * @param int $server_id
      * @return string|null
      */
-    public function getServerPassword(int $server_id): ?string;
+    public function getServerPassword(int $server_id): ?string; // Исправлено на ?string
 
     /**
      * @return void

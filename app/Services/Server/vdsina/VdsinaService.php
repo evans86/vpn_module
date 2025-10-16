@@ -154,6 +154,14 @@ class VdsinaService
             // Удаляем бэкапы
             $this->vdsinaApi->deleteAllBackups($server->provider_id);
 
+            // ПОЛУЧАЕМ РЕАЛЬНЫЙ ПАРОЛЬ СРАЗУ
+            $realPassword = $this->getServerPassword($server_id);
+
+            if (!$realPassword) {
+                Log::warning('Could not retrieve password from VDSina, using temporary value');
+                $realPassword = 'TEMPORARY_PASSWORD_' . time();
+            }
+
             // Создаем или обновляем DNS запись
             $serverName = $vdsina_server['data']['name'];
             $serverIp = $vdsina_server['data']['ip']['ip'];
@@ -174,19 +182,20 @@ class VdsinaService
             // Ждем 5 секунд для пропагации DNS
             sleep(5);
 
-            // Устанавливаем временную метку вместо пароля - крон обновит его позже
+            // Сохраняем РЕАЛЬНЫЙ пароль (или временный если не удалось получить)
             $server->ip = $serverIp;
             $server->login = 'root';
-            $server->password = 'PENDING_VDSINA_PASSWORD_' . time(); // Временная метка
+            $server->password = $realPassword;
             $server->name = $serverName;
             $server->host = $host->name;
             $server->dns_record_id = $host->id;
             $server->server_status = Server::SERVER_CONFIGURED;
             $server->save();
 
-            Log::info('Server configuration completed - password will be updated by cron', [
+            Log::info('Server configuration completed with password', [
                 'server_id' => $server_id,
-                'provider_id' => $server->provider_id
+                'provider_id' => $server->provider_id,
+                'password_set' => $realPassword !== 'TEMPORARY_PASSWORD_' . time()
             ]);
 
         } catch (Exception $e) {
@@ -213,32 +222,33 @@ class VdsinaService
         try {
             $server = Server::query()->where('id', $server_id)->first();
             if (!$server || !$server->provider_id) {
+                Log::warning('Server not found or no provider_id', ['server_id' => $server_id]);
                 return null;
             }
 
-            // Получаем детальную информацию о сервере
-            $serverInfo = $this->vdsinaApi->getServerById($server->provider_id);
-
-            Log::info('Searching for password in VDSina response', [
+            Log::info('Getting server password from VDSina API', [
                 'server_id' => $server_id,
                 'provider_id' => $server->provider_id
             ]);
 
-            // Ищем пароль в различных возможных местах ответа VDSina
-            $password = $this->findPasswordInResponse($serverInfo);
+            // Используем специальный эндпоинт для получения пароля
+            $passwordResponse = $this->vdsinaApi->getServerPassword($server->provider_id);
 
-            if ($password) {
-                Log::info('Password found in VDSina response', [
+            // Согласно документации, пароль находится в data.password
+            if (isset($passwordResponse['data']['password']) && !empty($passwordResponse['data']['password'])) {
+                $password = $passwordResponse['data']['password'];
+
+                Log::info('Password retrieved successfully from VDSina', [
                     'server_id' => $server_id,
                     'password_length' => strlen($password)
                 ]);
+
                 return $password;
             }
 
-            // Если пароль не найден, логируем структуру ответа для отладки
-            Log::warning('No password found in VDSina response', [
+            Log::warning('No password found in VDSina password response', [
                 'server_id' => $server_id,
-                'available_keys' => array_keys($serverInfo['data'] ?? [])
+                'response_structure' => $passwordResponse
             ]);
 
             return null;
@@ -250,47 +260,6 @@ class VdsinaService
             ]);
             return null;
         }
-    }
-
-    /**
-     * Поиск пароля в ответе VDSina API
-     */
-    private function findPasswordInResponse(array $serverInfo): ?string
-    {
-        $data = $serverInfo['data'] ?? [];
-
-        // Возможные места где VDSina может возвращать пароль
-        $passwordFields = [
-            'password',
-            'initial_password',
-            'root_password',
-            'admin_password',
-            'default_password',
-            'system_password',
-            'os_password',
-            'user_password',
-        ];
-
-        foreach ($passwordFields as $field) {
-            if (isset($data[$field]) && !empty($data[$field]) && is_string($data[$field])) {
-                return $data[$field];
-            }
-        }
-
-        // Проверяем вложенные структуры
-        $nestedStructures = ['credentials', 'os', 'system', 'admin', 'user'];
-
-        foreach ($nestedStructures as $nested) {
-            if (isset($data[$nested]) && is_array($data[$nested])) {
-                foreach ($passwordFields as $field) {
-                    if (isset($data[$nested][$field]) && !empty($data[$nested][$field]) && is_string($data[$nested][$field])) {
-                        return $data[$nested][$field];
-                    }
-                }
-            }
-        }
-
-        return null;
     }
 
     /**
