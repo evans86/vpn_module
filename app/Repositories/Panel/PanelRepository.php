@@ -195,7 +195,7 @@ class PanelRepository extends BaseRepository
         }
 
         // Кэшируем результат на 2 минуты
-        return Cache::remember('optimized_marzban_panel', 120, function () use ($panels) {
+        return Cache::remember('optimized_marzban_panel', 60, function () use ($panels) {
             return $this->selectOptimalPanelIntelligent($panels);
         });
     }
