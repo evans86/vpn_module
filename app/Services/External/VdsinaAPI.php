@@ -207,6 +207,47 @@ class VdsinaAPI
         return $this->makeRequest('server', 'POST', $serverData);
     }
 
+    public function updatePasswordWithRetry(int $serverId): array
+    {
+        Log::info('Updating VDSina server password with retry', [
+            'server_id' => $serverId
+        ]);
+
+        $passwordAttempts = [
+            // Попробуем простой пароль без спецсимволов
+            'Simple123456',
+            // Попробуем только буквы
+            'MyServerPassword',
+            // Попробуем с минимальной длиной
+            'Pass1234',
+            // Попробуем с дефисами
+            'My-Password-123',
+            // Попробуем с подчеркиваниями
+            'My_Password_123',
+            // Попробуем совсем простой
+            'password123',
+        ];
+
+        foreach ($passwordAttempts as $password) {
+            try {
+                Log::info("Trying password: {$password}");
+
+                $result = $this->makeRequest("server.password/{$serverId}", 'PUT', [
+                    'password' => $password
+                ]);
+
+                Log::info("✅ Password accepted: {$password}");
+                return $result;
+
+            } catch (\Exception $e) {
+                Log::warning("❌ Password rejected: {$password} - " . $e->getMessage());
+                continue;
+            }
+        }
+
+        throw new RuntimeException('All password attempts failed');
+    }
+
     /**
      * Обновить пароль сервера
      */

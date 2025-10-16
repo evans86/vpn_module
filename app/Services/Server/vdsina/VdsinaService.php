@@ -168,7 +168,8 @@ class VdsinaService
                 'server_id' => $server_id,
                 'provider_id' => $server->provider_id
             ]);
-            $this->vdsinaApi->updatePassword($server->provider_id, $new_password);
+//            $this->vdsinaApi->updatePassword($server->provider_id, $new_password);
+            $this->vdsinaApi->updatePasswordWithRetry($server->provider_id);
 
             // Создаем или обновляем DNS запись
             $serverName = $vdsina_server['data']['name'];
