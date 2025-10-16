@@ -93,6 +93,16 @@ class VdsinaAPI
             $statusCode = $e->getCode();
             $message = $e->getMessage();
 
+            // Детальное логирование для ошибок валидации
+            if ($statusCode === 400) {
+                Log::error('VDSina API Validation Error Details', [
+                    'action' => $action,
+                    'method' => $method,
+                    'full_error' => $message, // Полное сообщение об ошибке
+                    'data_sent' => $data
+                ]);
+            }
+
             Log::error('VDSina API HTTP error', [
                 'action' => $action,
                 'method' => $method,
