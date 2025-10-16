@@ -302,16 +302,32 @@ class VdsinaAPI
     /**
      * Проверить доступность API
      */
-    public function testConnection(): bool
+// В классе VdsinaAPI замените метод testConnection():
+    public function testConnection(): array
     {
         try {
             $result = $this->getAccount();
-            return isset($result['status']) && $result['status'] === 'ok';
+
+            if (isset($result['status']) && $result['status'] === 'ok') {
+                return [
+                    'success' => true,
+                    'message' => 'Connection successful',
+                    'account' => $result['data']['email'] ?? 'Unknown'
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => 'API returned error: ' . ($result['status_msg'] ?? 'Unknown error'),
+                'response' => $result
+            ];
+
         } catch (Exception $e) {
-            Log::error('VDSina API connection test failed', [
+            return [
+                'success' => false,
+                'message' => 'Connection failed: ' . $e->getMessage(),
                 'error' => $e->getMessage()
-            ]);
-            return false;
+            ];
         }
     }
 }
