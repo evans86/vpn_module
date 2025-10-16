@@ -209,7 +209,7 @@ class VdsinaAPI
      * Генерация пароля, соответствующего требованиям VDSina
      * Требования: минимум 8 символов, буквы + цифры + специальные символы
      */
-    private function generateVdsinaPassword(): string
+    public function generateVdsinaPassword(): string
     {
         // VDSina требует пароль для суперпользователя
         // Создаем надежный пароль с буквами, цифрами и длиной 12-16 символов

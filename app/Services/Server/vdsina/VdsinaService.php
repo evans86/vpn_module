@@ -163,7 +163,7 @@ class VdsinaService
             $this->vdsinaApi->deleteAllBackups($server->provider_id);
 
             // Генерируем и обновляем пароль (работает без изменений)
-            $new_password = $this->vdsinaApi->generateValidPassword();
+            $new_password = $this->vdsinaApi->generateVdsinaPassword();
             Log::info('Updating server password', [
                 'server_id' => $server_id,
                 'provider_id' => $server->provider_id
