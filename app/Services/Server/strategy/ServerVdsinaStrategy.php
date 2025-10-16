@@ -38,6 +38,15 @@ class ServerVdsinaStrategy extends ServerMainStrategy
     }
 
     /**
+     * @param int $server_id
+     * @return string
+     */
+    public function getServerPassword(int $server_id): string
+    {
+        return $this->service->getServerPassword($server_id);
+    }
+
+    /**
      * Проверка статуса сервера и окончательная настройка
      *
      * @return void

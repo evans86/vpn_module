@@ -21,6 +21,12 @@ interface ServerInterface
     public function configure(int $location_id, string $provider, bool $isFree): Server;
 
     /**
+     * @param int $server_id
+     * @return string|null
+     */
+    public function getServerPassword(int $server_id): ?string;
+
+    /**
      * @return void
      */
     public function checkStatus(): void;

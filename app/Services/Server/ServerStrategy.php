@@ -46,6 +46,15 @@ class ServerStrategy
     }
 
     /**
+     * @param int $server_id
+     * @return string
+     */
+    public function getServerPassword(int $server_id): string
+    {
+        return $this->strategy->getServerPassword($server_id);
+    }
+
+    /**
      * Проверка статуса сервера с окончательной настройкой сервера
      *
      * @return void
