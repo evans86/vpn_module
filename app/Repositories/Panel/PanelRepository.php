@@ -13,6 +13,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class PanelRepository extends BaseRepository
 {
@@ -68,6 +69,7 @@ class PanelRepository extends BaseRepository
             ->get();
 
         if ($panels->isEmpty()) {
+            Log::info('PANEL_SELECTION: No configured panels available');
             return null;
         }
 
@@ -82,11 +84,18 @@ class PanelRepository extends BaseRepository
 
         // Если на всех панелях нет ключей, выбираем случайную панель
         if ($panelsWithKeyCount->sum('key_count') === 0) {
-            return $panels->random();
+            $selectedPanel = $panels->random();
+            Log::info('PANEL_SELECTION [OLD]: Random selection - Panel ID: ' . $selectedPanel->id . ' (no keys on any panel)');
+            return $selectedPanel;
         }
 
         // Иначе выбираем панель с минимальным количеством ключей
-        return $panelsWithKeyCount->sortBy('key_count')->first()['panel'];
+        $selectedPanel = $panelsWithKeyCount->sortBy('key_count')->first()['panel'];
+
+        Log::info('PANEL_SELECTION [OLD]: Least loaded panel - Panel ID: ' . $selectedPanel->id .
+            ', Keys: ' . $panelsWithKeyCount->sortBy('key_count')->first()['key_count']);
+
+        return $selectedPanel;
     }
 
     /**
@@ -181,6 +190,7 @@ class PanelRepository extends BaseRepository
             ->get();
 
         if ($panels->isEmpty()) {
+            Log::warning('PANEL_SELECTION [NEW]: No available panels after filtering');
             return null;
         }
 
@@ -240,13 +250,111 @@ class PanelRepository extends BaseRepository
     {
         $scoredPanels = $panels->map(function ($panel) {
             $activeUsers = $this->getActiveUsersFromStats($panel->id);
+            $score = $this->calculatePanelScore($panel, $activeUsers);
+
             return [
                 'panel' => $panel,
-                'score' => $this->calculatePanelScore($panel, $activeUsers)
+                'score' => $score,
+                'active_users' => $activeUsers,
+                'details' => $this->getPanelSelectionDetails($panel, $activeUsers, $score)
             ];
         });
 
-        return $scoredPanels->sortByDesc('score')->first()['panel'];
+        $selectedPanelData = $scoredPanels->sortByDesc('score')->first();
+        $selectedPanel = $selectedPanelData['panel'];
+
+        // Логируем детали выбора
+        $this->logPanelSelection($selectedPanelData);
+
+        return $selectedPanel;
+    }
+
+    /**
+     * Логирование выбора панели
+     */
+    private function logPanelSelection(array $selectedPanelData): void
+    {
+        $panel = $selectedPanelData['panel'];
+        $score = $selectedPanelData['score'];
+        $activeUsers = $selectedPanelData['active_users'];
+        $details = $selectedPanelData['details'];
+
+        $logMessage = sprintf(
+            "PANEL_SELECTION [NEW]: Selected Panel ID: %d | Score: %.1f | Active Users: %d | CPU: %.1f%% | Memory: %.1f%% | Last Activity: %s",
+            $panel->id,
+            $score,
+            $activeUsers,
+            $details['cpu_usage'],
+            $details['memory_usage'],
+            $details['last_activity_human']
+        );
+
+        Log::info($logMessage, [
+            'panel_id' => $panel->id,
+            'panel_address' => $panel->panel_adress,
+            'score' => $score,
+            'active_users' => $activeUsers,
+            'total_users' => $this->getTotalUsersCount($panel->id),
+            'cpu_usage' => $details['cpu_usage'],
+            'memory_usage' => $details['memory_usage'],
+            'last_activity' => $details['last_activity'],
+            'selection_reason' => $details['selection_reason']
+        ]);
+    }
+
+    /**
+     * Получение деталей для логирования
+     */
+    private function getPanelSelectionDetails(Panel $panel, int $activeUsers, float $score): array
+    {
+        $latestStats = $this->getLatestPanelStats($panel->id);
+        $lastActivity = $this->getLastUserCreationTime($panel->id);
+
+        $cpuUsage = $latestStats['cpu_usage'] ?? 0;
+        $memoryUsed = $latestStats['mem_used'] ?? 0;
+        $memoryTotal = $latestStats['mem_total'] ?? 1;
+        $memoryUsage = ($memoryTotal > 0) ? ($memoryUsed / $memoryTotal) * 100 : 0;
+
+        // Определяем причину выбора
+        $selectionReason = $this->getSelectionReason($activeUsers, $cpuUsage, $memoryUsage, $lastActivity);
+
+        return [
+            'cpu_usage' => round($cpuUsage, 1),
+            'memory_usage' => round($memoryUsage, 1),
+            'last_activity' => $lastActivity,
+            'last_activity_human' => $lastActivity ? $lastActivity->diffForHumans() : 'never',
+            'selection_reason' => $selectionReason
+        ];
+    }
+
+    /**
+     * Определение причины выбора панели
+     */
+    private function getSelectionReason(int $activeUsers, float $cpuUsage, float $memoryUsage, ?Carbon $lastActivity): string
+    {
+        $reasons = [];
+
+        if ($activeUsers < 480) {
+            $reasons[] = 'low users';
+        }
+
+        if ($cpuUsage < 40) {
+            $reasons[] = 'low cpu';
+        }
+
+        if ($memoryUsage < 50) {
+            $reasons[] = 'low memory';
+        }
+
+        if ($lastActivity && $lastActivity->diffInMinutes(now()) > 30) {
+            $reasons[] = 'inactive period';
+        }
+
+        if (empty($reasons)) {
+            return 'balanced load';
+        }
+
+        return implode(', ', $reasons);
     }
 
     /**
