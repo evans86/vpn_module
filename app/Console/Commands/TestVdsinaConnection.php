@@ -24,6 +24,10 @@ class TestVdsinaConnection extends Command
         $this->info('🔑 Testing connection to VDSina API...');
         $this->info('API Key: ' . substr($apiKey, 0, 8) . '...' . substr($apiKey, -4));
 
+        if ($debug) {
+            $this->info('🔍 Debug mode: ON');
+        }
+
         try {
             $vdsina = new VdsinaAPI($apiKey);
 
@@ -46,7 +50,7 @@ class TestVdsinaConnection extends Command
             $this->info('');
             $this->info('2. Testing API methods...');
 
-            $this->testApiMethods($vdsina);
+            $this->testApiMethods($vdsina, $debug);
 
             $this->info('');
             $this->info('🎉 All tests passed! VDSina API is working correctly.');
@@ -65,7 +69,7 @@ class TestVdsinaConnection extends Command
         }
     }
 
-    private function testApiMethods(VdsinaAPI $vdsina): void
+    private function testApiMethods(VdsinaAPI $vdsina, bool $debug = false): void
     {
         $methods = [
             'getDatacenter' => 'Data centers',
@@ -99,7 +103,7 @@ class TestVdsinaConnection extends Command
 
             if ($debug && !empty($result['data'])) {
                 $firstPlan = $result['data'][0];
-                $this->info("   💰 Example: {$firstPlan['name']} - ${$firstPlan['price']}/month");
+                $this->info("   💰 Example: {$firstPlan['name']} - \${$firstPlan['price']}/month");
             }
 
         } catch (\Exception $e) {
