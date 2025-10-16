@@ -11,7 +11,7 @@ use InvalidArgumentException;
 
 class VdsinaAPI
 {
-    const HOST_COM = 'https://userapi.vdsina.com/v1/';
+    const BASE_URL = 'https://userapi.vdsina.com/v1/';
     private string $apiKey;
 
     public function __construct($apiKey)
@@ -32,6 +32,7 @@ class VdsinaAPI
                 'headers' => [
                     'Authorization' => 'Bearer ' . $this->apiKey,
                     'Accept' => 'application/json',
+                    'Content-Type' => 'application/x-www-form-urlencoded',
                 ],
                 'timeout' => 30,
                 'connect_timeout' => 10,
@@ -52,7 +53,7 @@ class VdsinaAPI
                 'data_keys' => array_keys($data)
             ]);
 
-            $client = new Client(['base_uri' => self::HOST_COM]);
+            $client = new Client(['base_uri' => self::BASE_URL]);
             $response = $client->request($method, $action, $options);
 
             $result = $response->getBody()->getContents();
@@ -233,76 +234,8 @@ class VdsinaAPI
     }
 
     /**
-     * Перезагрузить сервер
+     * Тестирование подключения
      */
-    public function rebootServer(int $serverId): array
-    {
-        Log::info('Rebooting VDSina server', [
-            'server_id' => $serverId
-        ]);
-
-        return $this->makeRequest("server.reboot/{$serverId}", 'PUT');
-    }
-
-    /**
-     * Выключить сервер
-     */
-    public function powerOffServer(int $serverId): array
-    {
-        Log::info('Powering off VDSina server', [
-            'server_id' => $serverId
-        ]);
-
-        return $this->makeRequest("server.poweroff/{$serverId}", 'PUT');
-    }
-
-    /**
-     * Включить сервер
-     */
-    public function powerOnServer(int $serverId): array
-    {
-        Log::info('Powering on VDSina server', [
-            'server_id' => $serverId
-        ]);
-
-        return $this->makeRequest("server.poweron/{$serverId}", 'PUT');
-    }
-
-    /**
-     * Переустановить сервер
-     */
-    public function reinstallServer(int $serverId, int $templateId): array
-    {
-        Log::info('Reinstalling VDSina server', [
-            'server_id' => $serverId,
-            'template_id' => $templateId
-        ]);
-
-        return $this->makeRequest("server.reinstall/{$serverId}", 'PUT', [
-            'template' => $templateId
-        ]);
-    }
-
-    /**
-     * Получить статистику сервера
-     */
-    public function getServerStats(int $serverId): array
-    {
-        return $this->makeRequest("server.stats/{$serverId}");
-    }
-
-    /**
-     * Получить список бэкапов
-     */
-    public function getBackups(int $serverId): array
-    {
-        return $this->makeRequest("server.backup/{$serverId}");
-    }
-
-    /**
-     * Проверить доступность API
-     */
-// В классе VdsinaAPI замените метод testConnection():
     public function testConnection(): array
     {
         try {

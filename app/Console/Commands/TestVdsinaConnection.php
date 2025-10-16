@@ -31,17 +31,25 @@ class TestVdsinaConnection extends Command
         }
 
         try {
-            // 1. Проверяем базовое подключение к хосту
+            // 1. Проверяем базовое подключение к API endpoint
             $this->info('');
-            $this->info('1. Testing host connectivity...');
+            $this->info('1. Testing API endpoint connectivity...');
 
-            if (!$this->testHostConnectivity()) {
-                $this->error('❌ Cannot reach VDSina API host');
-                return 1;
+            $hostTest = $this->testApiEndpoint();
+            if (!$hostTest['success']) {
+                $this->error('❌ API endpoint error: ' . $hostTest['message']);
+
+                if ($debug) {
+                    $this->info('📄 Response: ' . json_encode($hostTest['response'] ?? [], JSON_PRETTY_PRINT));
+                }
+
+                // Но продолжаем, так как корневой URL может не существовать
+                $this->warn('⚠️  Continuing test despite endpoint warning...');
+            } else {
+                $this->info('✅ API endpoint is reachable');
             }
-            $this->info('✅ Host is reachable');
 
-            // 2. Тестируем API
+            // 2. Тестируем API с реальными запросами
             $this->info('');
             $this->info('2. Testing API authentication...');
 
@@ -51,8 +59,11 @@ class TestVdsinaConnection extends Command
             if (!$testResult['success']) {
                 $this->error('❌ API authentication failed: ' . $testResult['message']);
 
-                if ($debug && isset($testResult['response'])) {
-                    $this->info('📄 Full response: ' . json_encode($testResult['response'], JSON_PRETTY_PRINT));
+                if ($debug) {
+                    $this->info('📄 Full response: ' . json_encode($testResult['response'] ?? [], JSON_PRETTY_PRINT));
+                    if (isset($testResult['error'])) {
+                        $this->info('📄 Error: ' . $testResult['error']);
+                    }
                 }
 
                 $this->suggestSolutions($testResult['message']);
@@ -84,18 +95,34 @@ class TestVdsinaConnection extends Command
         }
     }
 
-    private function testHostConnectivity(): bool
+    private function testApiEndpoint(): array
     {
         try {
             $client = new Client(['timeout' => 10]);
-            $response = $client->get('https://userapi.vdsina.com/', [
-                'verify' => false, // Отключаем SSL verification для теста
+
+            // Тестируем конкретный endpoint вместо корневого
+            $response = $client->get('https://userapi.vdsina.com/v1/account', [
+                'headers' => [
+                    'Accept' => 'application/json',
+                ],
+                'verify' => false,
             ]);
 
-            return $response->getStatusCode() === 200;
+            return [
+                'success' => true,
+                'message' => 'Endpoint is reachable',
+                'status_code' => $response->getStatusCode()
+            ];
+
         } catch (\Exception $e) {
-            $this->warn('   Host connectivity warning: ' . $e->getMessage());
-            return false;
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+                'response' => [
+                    'error' => $e->getMessage(),
+                    'code' => $e->getCode()
+                ]
+            ];
         }
     }
 
@@ -105,16 +132,11 @@ class TestVdsinaConnection extends Command
             'getDatacenter' => 'Data centers',
             'getServerGroup' => 'Server groups',
             'getTemplate' => 'Templates',
-            'getServerPlan' => 'Server plans',
         ];
 
         foreach ($methods as $method => $description) {
             try {
-                if ($method === 'getServerPlan') {
-                    $result = $vdsina->getServerPlan(2); // ID для Standard servers
-                } else {
-                    $result = call_user_func([$vdsina, $method]);
-                }
+                $result = call_user_func([$vdsina, $method]);
 
                 $count = isset($result['data']) ? (is_array($result['data']) ? count($result['data']) : 1) : 0;
                 $this->info("✅ {$description}: {$count} items");
@@ -123,6 +145,15 @@ class TestVdsinaConnection extends Command
                 $this->error("❌ {$description}: " . $e->getMessage());
             }
         }
+
+        // Отдельно тестируем server-plan с параметром
+        try {
+            $result = $vdsina->getServerPlan(2);
+            $count = isset($result['data']) ? (is_array($result['data']) ? count($result['data']) : 1) : 0;
+            $this->info("✅ Server plans: {$count} items");
+        } catch (\Exception $e) {
+            $this->error("❌ Server plans: " . $e->getMessage());
+        }
     }
 
     private function suggestSolutions(string $errorMessage): void
@@ -130,21 +161,20 @@ class TestVdsinaConnection extends Command
         $this->info('');
         $this->info('🔧 Possible solutions:');
 
-        if (str_contains($errorMessage, '401') || str_contains($errorMessage, 'Unauthorized')) {
-            $this->info('   • Check your API key in VDSina panel');
-            $this->info('   • Ensure the key has correct permissions');
-            $this->info('   • Generate a new API key if needed');
+        if (str_contains($errorMessage, '401') || str_contains($errorMessage, 'Unauthorized') || str_contains($errorMessage, 'Incorrect token')) {
+            $this->info('   • 🔑 Check your API key in VDSina panel');
+            $this->info('   • 📋 Ensure the key has correct permissions');
+            $this->info('   • 🔄 Generate a new API key if needed');
+            $this->info('   • 👀 Verify the key is copied correctly (no spaces)');
         } elseif (str_contains($errorMessage, 'cURL') || str_contains($errorMessage, 'SSL')) {
-            $this->info('   • Check your internet connection');
-            $this->info('   • Verify SSL certificates are installed');
-            $this->info('   • Try using HTTP instead of HTTPS (if supported)');
+            $this->info('   • 🌐 Check your internet connection');
+            $this->info('   • 📜 Verify SSL certificates are installed');
         } elseif (str_contains($errorMessage, 'timeout')) {
-            $this->info('   • Check your firewall settings');
-            $this->info('   • Verify network connectivity to VDSina');
-            $this->info('   • Try increasing timeout in API client');
+            $this->info('   • 🔥 Check your firewall settings');
+            $this->info('   • 📡 Verify network connectivity to VDSina');
         }
 
-        $this->info('   • Contact VDSina support if problem persists');
+        $this->info('   • 📞 Contact VDSina support if problem persists');
         $this->info('');
         $this->info('📖 VDSina API documentation: https://www.vdsina.com/ru/tech/api');
     }
