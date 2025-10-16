@@ -255,7 +255,7 @@ class KeyActivateService
             // Определение панели для активации
             $panel = $key->packSalesman->salesman->panel_id
                 ? $key->packSalesman->salesman->panel
-                : $this->panelRepository->getConfiguredMarzbanPanel();
+                : $this->panelRepository->getOptimizedMarzbanPanel();
 
             if (!$panel) {
                 throw new RuntimeException('Активная панель Marzban не найдена');
@@ -358,10 +358,10 @@ class KeyActivateService
                     $panel = $key->packSalesman->salesman->panel;
                 } else {
                     // Получаем активную панель Marzban по алгоритму
-                    $panel = $this->panelRepository->getConfiguredMarzbanPanel();
+                    $panel = $this->panelRepository->getOptimizedMarzbanPanel();
                 }
             } else {
-                $panel = $this->panelRepository->getConfiguredMarzbanPanel();
+                $panel = $this->panelRepository->getOptimizedMarzbanPanel();
             }
 
             if (!$panel) {
