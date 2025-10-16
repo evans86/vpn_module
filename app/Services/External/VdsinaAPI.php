@@ -30,9 +30,9 @@ class VdsinaAPI
         try {
             $options = [
                 'headers' => [
-                    'Authorization' => 'Bearer ' . $this->apiKey, // Рабочий метод
+                    'Authorization' => 'Bearer ' . $this->apiKey,
                     'Accept' => 'application/json',
-                    'Content-Type' => 'application/x-www-form-urlencoded',
+                    'Content-Type' => 'application/json', // Исправлено на JSON
                     'User-Agent' => 'VDSina-Client/1.0',
                 ],
                 'timeout' => 30,
@@ -44,14 +44,14 @@ class VdsinaAPI
                 if ($method === 'GET') {
                     $options['query'] = $data;
                 } else {
-                    $options['form_params'] = $data;
+                    $options['json'] = $data; // Исправлено на json вместо form_params
                 }
             }
 
             Log::info('VDSina API Request', [
                 'action' => $action,
                 'method' => $method,
-                'data_keys' => array_keys($data)
+                'data' => $data
             ]);
 
             $client = new Client(['base_uri' => self::BASE_URL]);
@@ -227,6 +227,42 @@ class VdsinaAPI
         ]);
 
         return $this->makeRequest("server.schedule/{$serverId}", 'DELETE');
+    }
+
+    /**
+     * Перезагрузить сервер
+     */
+    public function rebootServer(int $serverId): array
+    {
+        Log::info('Rebooting VDSina server', [
+            'server_id' => $serverId
+        ]);
+
+        return $this->makeRequest("server.reboot/{$serverId}", 'PUT');
+    }
+
+    /**
+     * Выключить сервер
+     */
+    public function powerOffServer(int $serverId): array
+    {
+        Log::info('Powering off VDSina server', [
+            'server_id' => $serverId
+        ]);
+
+        return $this->makeRequest("server.poweroff/{$serverId}", 'PUT');
+    }
+
+    /**
+     * Включить сервер
+     */
+    public function powerOnServer(int $serverId): array
+    {
+        Log::info('Powering on VDSina server', [
+            'server_id' => $serverId
+        ]);
+
+        return $this->makeRequest("server.poweron/{$serverId}", 'PUT');
     }
 
     /**
