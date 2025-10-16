@@ -44,7 +44,13 @@ class VdsinaAPI
                 if ($method === 'GET') {
                     $options['query'] = $data;
                 } else {
-                    $options['json'] = $data; // Исправлено на json вместо form_params
+                    // Для POST/PUT используем json
+                    $options['json'] = $data;
+
+                    // Дополнительная отладка
+                    Log::debug('Request JSON data', [
+                        'json' => json_encode($data, JSON_PRETTY_PRINT)
+                    ]);
                 }
             }
 
@@ -200,9 +206,19 @@ class VdsinaAPI
             'server_id' => $serverId
         ]);
 
-        return $this->makeRequest("server.password/{$serverId}", 'PUT', [
+        Log::info("Password to set: {$validPassword}");
+
+        // Явно создаем JSON структуру как в документации
+        $requestData = [
             'password' => $validPassword
+        ];
+
+        Log::info('Sending password update request', [
+            'server_id' => $serverId,
+            'data_structure' => $requestData
         ]);
+
+        return $this->makeRequest("server.password/{$serverId}", 'PUT', $requestData);
     }
 
     /**
