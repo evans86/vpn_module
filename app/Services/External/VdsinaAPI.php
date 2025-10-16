@@ -194,15 +194,40 @@ class VdsinaAPI
     /**
      * Обновить пароль сервера
      */
-    public function updatePassword(int $serverId, string $password): array
+    public function updatePassword(int $serverId, string $validPassword): array
     {
         Log::info('Updating VDSina server password', [
             'server_id' => $serverId
         ]);
 
         return $this->makeRequest("server.password/{$serverId}", 'PUT', [
-            'password' => $password
+            'password' => $validPassword
         ]);
+    }
+
+    /**
+     * Генерация пароля, соответствующего требованиям VDSina
+     * Требования: минимум 8 символов, буквы + цифры + специальные символы
+     */
+    public function generateValidPassword(): string
+    {
+        $length = 12;
+        $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_-=+';
+
+        do {
+            $password = '';
+            for ($i = 0; $i < $length; $i++) {
+                $password .= $chars[random_int(0, strlen($chars) - 1)];
+            }
+
+            // Проверяем, что пароль содержит хотя бы одну цифру, одну букву и один спецсимвол
+            $hasDigit = preg_match('/\d/', $password);
+            $hasLetter = preg_match('/[a-zA-Z]/', $password);
+            $hasSpecial = preg_match('/[!@#$%^&*()_\-=+]/', $password);
+
+        } while (!($hasDigit && $hasLetter && $hasSpecial));
+
+        return $password;
     }
 
     /**
