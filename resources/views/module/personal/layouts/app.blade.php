@@ -249,6 +249,17 @@
 {{--                    </a>--}}
 {{--                </li>--}}
                 <li>
+                    <a href="{{ route('personal.network.index') }}"
+                       class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.network.*') ? 'active' : '' }} tooltip">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M3 12h3m12 0h3M7 12a5 5 0 1010 0 5 5 0 00-10 0z"/>
+                        </svg>
+                        <span class="ml-3" id="network-text">Проверка сети</span>
+                        <span class="tooltip-text">Проверка сети</span>
+                    </a>
+                </li>
+                <li>
                     <a href="{{ route('personal.faq') }}"
                        class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.faq') ? 'active' : '' }} tooltip">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none"

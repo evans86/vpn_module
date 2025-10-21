@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Module\NetworkCheckController;
 use App\Http\Controllers\Module\PersonalController;
 use App\Http\Controllers\Module\ServerController;
 use App\Http\Controllers\Module\PanelController;
@@ -43,6 +44,18 @@ Route::prefix('personal')->name('personal.')->group(function () {
         Route::get('/keys', [PersonalController::class, 'keys'])->name('keys');
 //        Route::get('/stats', [PersonalController::class, 'stats'])->name('stats');
         Route::get('/packages', [PersonalController::class, 'packages'])->name('packages');
+
+        // Проверка соединения
+        Route::prefix('network-check')->name('network.')->group(function () {
+            Route::get('/', [NetworkCheckController::class, 'index'])->name('index');
+            Route::get('/ping', [NetworkCheckController::class, 'ping'])->name('ping'); // latency
+            Route::get('/payload/{size}', [NetworkCheckController::class, 'payload'])
+                ->where(['size' => '^[0-9]+(kb|mb|b)$'])
+                ->name('payload')
+                ->middleware('throttle:120,1'); // защита от ab/use
+
+            Route::post('/report', [NetworkCheckController::class, 'report'])->name('report');
+        });
 
         // FAQ и инструкции
         Route::prefix('faq')->group(function () {
