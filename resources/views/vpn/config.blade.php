@@ -1,5 +1,8 @@
 @extends('layouts.public')
 
+@section('title', 'Конфигурация VPN — High VPN')
+@section('header-subtitle', 'Профиль и ключи подключения')
+
 @section('content')
     <div class="container mx-auto px-4 py-8">
         <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">

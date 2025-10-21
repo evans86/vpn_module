@@ -17,6 +17,7 @@ use App\Http\Controllers\Module\ServerUserController;
 use App\Http\Controllers\Module\ServerUserTransferController;
 use App\Services\Telegram\ModuleBot\FatherBotController;
 use App\Http\Controllers\Auth\Personal\SalesmanAuthController;
+use App\Http\Controllers\PublicNetworkCheckController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -80,6 +81,17 @@ Route::post('/telegram/webhook/{token}', [FatherBotController::class, 'handle'])
 
 // VPN Config Download
 Route::get('/config/{token}', [VpnConfigController::class, 'show'])->name('vpn.config.show');
+
+// Public Network Check
+Route::prefix('netcheck')->name('netcheck.')->group(function () {
+    Route::get('/', [PublicNetworkCheckController::class, 'index'])->name('index');
+    Route::get('/ping', [PublicNetworkCheckController::class, 'ping'])->name('ping')->middleware('throttle:180,1');
+    Route::get('/payload/{size}', [PublicNetworkCheckController::class, 'payload'])
+        ->where(['size' => '^[0-9]+(kb|mb|b)$'])
+        ->name('payload')
+        ->middleware('throttle:120,1');
+    Route::post('/report', [PublicNetworkCheckController::class, 'report'])->name('report');
+});
 
 // Admin Routes
 Route::prefix('admin')->name('admin.')->group(function () {

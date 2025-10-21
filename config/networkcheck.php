@@ -2,38 +2,49 @@
 
 return [
     'resources_must' => [
-        ['label' => 'Google (204)',        'url' => 'https://www.gstatic.com/generate_204',  'mode' => 'nocors'],
-        ['label' => 'Wikipedia robots',    'url' => 'https://en.wikipedia.org/robots.txt',   'mode' => 'nocors'],
-        ['label' => 'Telegram Web',        'url' => 'https://web.telegram.org/',             'mode' => 'nocors'],
-        ['label' => 'Cloudflare Trace',    'url' => 'https://www.cloudflare.com/cdn-cgi/trace','mode'=>'nocors'],
-        ['label' => 'ipify (IP API)',      'url' => 'https://api.ipify.org?format=json',     'mode' => 'json'],
+        ['label' => 'Cloudflare (204)', 'url' => 'https://www.cloudflare.com/cdn-cgi/trace'],
+        ['label' => 'Google robots',    'url' => 'https://www.google.com/robots.txt'],
     ],
-
     'resources_often_blocked' => [
-        ['label' => 'YouTube (204)',       'url' => 'https://www.youtube.com/generate_204',  'mode' => 'nocors'],
-        ['label' => 'Instagram robots',    'url' => 'https://www.instagram.com/robots.txt',  'mode' => 'nocors'],
-        ['label' => 'Facebook robots',     'url' => 'https://www.facebook.com/robots.txt',   'mode' => 'nocors'],
-        ['label' => 'TikTok robots',       'url' => 'https://www.tiktok.com/robots.txt',     'mode' => 'nocors'],
-        ['label' => 'VK robots',           'url' => 'https://vk.com/robots.txt',             'mode' => 'nocors'],
+        ['label' => 'YouTube robots',   'url' => 'https://www.youtube.com/robots.txt'],
+        ['label' => 'Instagram robots', 'url' => 'https://www.instagram.com/robots.txt'],
+        ['label' => 'Facebook robots',  'url' => 'https://www.facebook.com/robots.txt'],
+        ['label' => 'TikTok robots',    'url' => 'https://www.tiktok.com/robots.txt'],
+        ['label' => 'VK robots',        'url' => 'https://vk.com/robots.txt'],
     ],
+    'download_sizes' => ['1mb','5mb','10mb'],
 
-    // Размеры теста скачивания
-    'download_sizes' => [
-        '1 MB' => 1048576,
-        '5 MB' => 5242880,
-    ],
+    'doh_domains' => ['google.com','cloudflare.com','yandex.ru','vk.com','t.me','whatsapp.com'],
 
-    // DoH-домены (без изменений)
-    'doh_domains' => ['google.com', 'wikipedia.org', 'telegram.org', 'youtube.com', 'vk.com'],
-
-    // Региональные пробы — заменены на стабильные robots.txt
     'regional_probes' => [
-        ['label' => 'EU (BBC)',          'url' => 'https://www.bbc.co.uk/robots.txt',    'mode' => 'nocors'],
-        ['label' => 'US (NYTimes)',      'url' => 'https://www.nytimes.com/robots.txt',  'mode' => 'nocors'],
-        ['label' => 'JP (Yahoo.co.jp)',  'url' => 'https://www.yahoo.co.jp/robots.txt',  'mode' => 'nocors'],
-        ['label' => 'DE (DW)',           'url' => 'https://www.dw.com/robots.txt',       'mode' => 'nocors'],
-        ['label' => 'TR (Hurriyet)',     'url' => 'https://www.hurriyet.com.tr/robots.txt','mode'=>'nocors'],
-        ['label' => 'RU (Yandex)',       'url' => 'https://yandex.ru/robots.txt',        'mode' => 'nocors'],
-        ['label' => 'BR (Globo)',        'url' => 'https://www.globo.com/robots.txt',    'mode' => 'nocors'],
+        ['label' => 'Европа (CF)',     'url' => 'https://www.cloudflare.com/cdn-cgi/trace'],
+        ['label' => 'США (Cloudfront)','url' => 'https://d1czd1c8nvr2l2.cloudfront.net/robots.txt'],
+        ['label' => 'Азия (Akamai)',   'url' => 'https://www.akamai.com/site/en/documents/akamai/akamai-technologies-robots-txt.txt'],
+    ],
+
+    'youtube' => [
+        ['label' => 'YouTube (204)',   'url' => 'https://www.youtube.com/generate_204'],
+        ['label' => 'YT Images (204)', 'url' => 'https://i.ytimg.com/generate_204'],
+    ],
+
+    'ru_services' => [
+        ['label' => 'Yandex',      'url' => 'https://yandex.ru/robots.txt'],
+        ['label' => 'VK',          'url' => 'https://vk.com/robots.txt'],
+        ['label' => 'Gosuslugi',   'url' => 'https://www.gosuslugi.ru/favicon.ico'],
+        ['label' => 'Sberbank',    'url' => 'https://www.sberbank.ru/'],
+        ['label' => 'Tinkoff',     'url' => 'https://www.tinkoff.ru/robots.txt'],
+        ['label' => 'VTB',         'url' => 'https://www.vtb.ru/robots.txt'],
+    ],
+
+    'messengers' => [
+        ['label' => 'Telegram Web', 'url' => 'https://web.telegram.org/'],
+        ['label' => 'Telegram CDN', 'url' => 'https://cdn4.telesco.pe/'],
+        ['label' => 't.me',         'url' => 'https://t.me/'],
+        ['label' => 'WhatsApp Web', 'url' => 'https://web.whatsapp.com/'],
+        ['label' => 'WA Static',    'url' => 'https://static.whatsapp.net/'],
+    ],
+
+    'http_probe' => [
+        ['label' => 'Example.com', 'url' => 'http://example.com/'],
     ],
 ];
