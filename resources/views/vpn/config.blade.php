@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', 'Конфигурация VPN — High VPN')
+@section('title', 'Конфигурация VPN — VPN Service')
 @section('header-subtitle', 'Профиль и ключи подключения')
 
 @section('content')

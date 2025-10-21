@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', 'Проверка доступности и качества сети — High VPN')
+@section('title', 'Проверка доступности и качества сети — VPN Service')
 @section('header-subtitle', 'Диагностика подключения')
 
 @section('content')
