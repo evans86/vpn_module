@@ -15,6 +15,7 @@ use App\Http\Controllers\VpnConfigController;
 use App\Http\Controllers\LogController;
 use App\Http\Controllers\Module\ServerUserController;
 use App\Http\Controllers\Module\ServerUserTransferController;
+use App\Http\Middleware\VerifyCsrfToken;
 use App\Services\Telegram\ModuleBot\FatherBotController;
 use App\Http\Controllers\Auth\Personal\SalesmanAuthController;
 use App\Http\Controllers\PublicNetworkCheckController;
@@ -91,6 +92,10 @@ Route::prefix('netcheck')->name('netcheck.')->group(function () {
         ->name('payload')
         ->middleware('throttle:120,1');
     Route::post('/report', [PublicNetworkCheckController::class, 'report'])->name('report');
+    Route::post('/telemetry', [PublicNetworkCheckController::class, 'telemetry'])
+        ->name('telemetry')
+        ->withoutMiddleware([VerifyCsrfToken::class])
+        ->middleware('throttle:240,1');
 });
 
 // Admin Routes

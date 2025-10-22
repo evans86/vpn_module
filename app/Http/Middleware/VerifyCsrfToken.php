@@ -12,6 +12,7 @@ class VerifyCsrfToken extends Middleware
      * @var array
      */
     protected $except = [
-        '/father-bot/init'
+        '/father-bot/init',
+        'netcheck/telemetry',
     ];
 }

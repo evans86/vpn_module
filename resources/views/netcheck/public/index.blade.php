@@ -345,17 +345,18 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
     <script>
         (function () {
-            const RUN_LABELS = {
-                ip: 'Определяем IP/гео',
-                latency: 'Пинг/джиттер',
-                loss: 'Пакетные потери',
-                speed: 'Скорость скачивания',
-                res: 'Доступность ресурсов',
-                doh: 'DNS поверх HTTPS',
-                regions: 'Региональные пробы',
-                ext: 'Расширенные проверки',
-                webrtc: 'WebRTC кандидаты',
-                done: 'Готово'
+            // ==== прогресс и чекпоинты ====
+            const CHECKPOINT_LABELS = {
+                10: 'IP/гео',
+                20: 'Пинг/джиттер',
+                30: 'Пакетные потери',
+                40: 'Скорость скачивания',
+                50: 'Доступность ресурсов',
+                60: 'DNS поверх HTTPS (DoH)',
+                70: 'Региональные пробы',
+                80: 'Расширенные проверки (YouTube, .ru, мессенджеры, HTTP:80)',
+                90: 'WebRTC/VoIP',
+                100: 'Готово'
             };
 
             const runBtn = document.getElementById('runBtn');
@@ -376,25 +377,96 @@
             const payloadUrl = (size) => @json(route('netcheck.payload', ['size' => 'SIZE_PLACEHOLDER'])).
             replace('SIZE_PLACEHOLDER', size);
             const reportUrl = @json(route('netcheck.report'));
+            // телеметрия (должен существовать маршрут netcheck.telemetry)
+            const telemetryUrl = @json(route('netcheck.telemetry'));
+            const runId = (crypto && crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(16).slice(2)));
 
-            const setProgress = (pct, key) => {
+            // безопасная отправка телеметрии
+            function sendTelemetry(payload) {
+                try {
+                    if (!telemetryUrl) return;
+                    const body = JSON.stringify(payload);
+                    if (navigator.sendBeacon) {
+                        navigator.sendBeacon(telemetryUrl, new Blob([body], {type: 'application/json'}));
+                    } else {
+                        fetch(telemetryUrl, {method: 'POST', headers: {'Content-Type': 'application/json'}, body});
+                    }
+                } catch (_) {
+                }
+            }
+
+            function tStart() {
+                sendTelemetry({event: 'run:start', runId, ts: new Date().toISOString(), ua: env.ua, tz: env.tz});
+            }
+
+            function tDone() {
+                sendTelemetry({event: 'run:done', runId, ts: new Date().toISOString()});
+            }
+
+            // единый «чекпоинт»-лог: 10/20/.../100
+            function tCheckpoint(pct, status, error) {
+                sendTelemetry({
+                    event: 'checkpoint',
+                    runId,
+                    ts: new Date().toISOString(),
+                    pct,
+                    label: CHECKPOINT_LABELS[pct] || '',
+                    status,           // 'success' | 'error'
+                    error: error || null
+                });
+            }
+
+            const setProgress = (pct) => {
                 progress.classList.remove('hidden');
                 pbar.style.width = pct + '%';
-                ptext.textContent = `Готово ${pct}% — ${RUN_LABELS[key] || ''}`;
+                ptext.textContent = `Готово ${pct}% — ${CHECKPOINT_LABELS[pct] || ''}`;
             };
+
+            // универсальная обёртка шага с логом
+            async function step(pct, fn) {
+                setProgress(pct);
+                try {
+                    const res = await fn();
+                    tCheckpoint(pct, 'success', null);
+                    return res;
+                } catch (e) {
+                    const msg = (e && e.message) ? e.message : String(e);
+                    tCheckpoint(pct, 'error', msg);
+                    // не валим общий сценарий, а прокидываем дальше, чтобы можно было отобразить alert
+                    throw e;
+                }
+            }
+
+            // ловим необработанные ошибки/отклонения (на моб. браузерах это частая причина «зависания»)
+            window.addEventListener('error', (e) => sendTelemetry({
+                event: 'window:error',
+                runId,
+                ts: new Date().toISOString(),
+                message: e.message,
+                line: e.lineno,
+                col: e.colno
+            }));
+            window.addEventListener('unhandledrejection', (e) => sendTelemetry({
+                event: 'window:unhandledrejection',
+                runId,
+                ts: new Date().toISOString(),
+                reason: (e && e.reason && (e.reason.message || String(e.reason))) || 'unknown'
+            }));
+
+            // ==== helper-функции ====
             const ms = () => performance.now();
 
             async function fetchWithTimeout(url, timeoutMs) {
                 const ctrl = new AbortController();
-                const t = setTimeout(() => ctrl.abort(), timeoutMs);
+                const tmo = setTimeout(() => ctrl.abort(), timeoutMs);
                 const t0 = ms();
                 try {
                     await fetch(url, {signal: ctrl.signal, cache: 'no-store'});
                     return {ok: true, time: ms() - t0};
                 } catch (e) {
-                    return {ok: false, time: timeoutMs};
+                    return {ok: false, time: ms() - t0, error: (e && e.name) || 'Error'};
                 } finally {
-                    clearTimeout(t);
+                    clearTimeout(tmo);
                 }
             }
 
@@ -405,7 +477,7 @@
                 let data = null;
                 try {
                     data = await resp.json();
-                } catch (e) {
+                } catch (_) {
                 }
                 return {ok: resp.ok || resp.type === 'opaque', time: dt, data, status: resp.status, type: resp.type};
             }
@@ -419,12 +491,12 @@
                 try {
                     const a = await fetchJSON('https://api.ipify.org?format=json', {cache: 'no-store'});
                     if (a?.data?.ip) ip = a.data.ip;
-                } catch (e) {
+                } catch (_) {
                 }
                 try {
                     const b = await fetchJSON('https://ipapi.co/json/', {cache: 'no-store'});
                     if (b?.data?.country_name) country = b.data.country_name + (b?.data?.city ? `, ${b.data.city}` : '');
-                } catch (e) {
+                } catch (_) {
                 }
                 document.getElementById('ip').textContent = ip;
                 document.getElementById('country').textContent = country;
@@ -432,16 +504,12 @@
             }
 
             async function testLatency(samples = 15) {
-                const url = pingUrl;
                 const rtts = [];
                 for (let i = 0; i < samples; i++) {
-                    const t0 = ms();
-                    try {
-                        await fetch(url, {cache: 'no-store'});
-                    } catch (e) {
-                    }
-                    rtts.push(ms() - t0);
-                    await new Promise(r => setTimeout(r, 100));
+                    const url = (i === 0) ? (pingUrl + '?debug=1') : pingUrl; // первый запрос с debug флагом
+                    const r = await fetchWithTimeout(url, 2000);
+                    rtts.push(r.time);
+                    await new Promise(r2 => setTimeout(r2, 100));
                 }
                 const avg = rtts.reduce((a, b) => a + b, 0) / rtts.length;
                 const jitter = Math.sqrt(rtts.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / rtts.length);
@@ -452,11 +520,10 @@
             }
 
             async function testPacketLoss(total = 40, timeout = 1500, gap = 150) {
-                const url = pingUrl;
                 let ok = 0;
                 const times = [];
                 for (let i = 0; i < total; i++) {
-                    const r = await fetchWithTimeout(url, timeout);
+                    const r = await fetchWithTimeout(pingUrl, timeout);
                     if (r.ok) ok++;
                     times.push(r.time);
                     await new Promise(r2 => setTimeout(r2, gap));
@@ -481,7 +548,7 @@
                         if (done) break;
                         received += (value?.length || 0);
                     }
-                } catch (e) {
+                } catch (_) {
                     ok = false;
                 }
                 const dt = (ms() - t0) / 1000;
@@ -498,7 +565,7 @@
                 try {
                     await fetch(url, {mode: 'no-cors', cache: 'no-store', signal: ctrl.signal});
                     return {ok: true, time: ms() - t0};
-                } catch (e) {
+                } catch (_) {
                     return {ok: false, time: ms() - t0};
                 } finally {
                     clearTimeout(timer);
@@ -510,14 +577,14 @@
                     try {
                         const r = await fetchJSON(url, {cache: 'no-store'});
                         return {ok: r.ok, time: r.time};
-                    } catch (e) {
+                    } catch (_) {
                         return {ok: false, time: 0};
                     }
                 }
                 return await fetchNoCors(url, 7000);
             }
 
-            function paintRow(prefix, idx, ok, t) {
+            function paintRow(prefix, idx, ok, tms) {
                 const row = document.querySelector(`tr[data-row="${prefix}-${idx}"]`);
                 if (!row) return;
                 const statusCell = row.querySelector('[data-status]');
@@ -525,7 +592,7 @@
                 statusCell.innerHTML = ok
                     ? '<span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">доступен</span>'
                     : '<span class="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-800">недоступен</span>';
-                timeCell.textContent = Math.round(t) + ' мс';
+                timeCell.textContent = Math.round(tms) + ' мс';
             }
 
             async function testResources() {
@@ -556,7 +623,7 @@
                         const j = await r.json();
                         const answers = Array.isArray(j.Answer) ? j.Answer.length : 0;
                         return {ok: r.ok && answers > 0 && (j.Status === 0), time: dt, answers};
-                    } catch (e) {
+                    } catch (_) {
                         return {ok: false, time: 0, answers: 0};
                     }
                 };
@@ -570,7 +637,7 @@
                         const j = await r.json();
                         const answers = Array.isArray(j.Answer) ? j.Answer.length : 0;
                         return {ok: r.ok && answers > 0 && (j.Status === 0), time: dt, answers};
-                    } catch (e) {
+                    } catch (_) {
                         return {ok: false, time: 0, answers: 0};
                     }
                 };
@@ -653,7 +720,7 @@
                         document.getElementById('webrtc').textContent = [...discovered].join(', ');
                     };
                     await new Promise(r => setTimeout(r, 1500));
-                } catch (e) {
+                } catch (_) {
                 }
                 pc.close();
                 return [...discovered];
@@ -671,15 +738,15 @@
                         if (e.candidate) ice.push(e.candidate.candidate);
                     };
                     await new Promise(r => setTimeout(r, 2000));
-                } catch (e) {
+                } catch (_) {
                 }
                 pc.close();
 
                 const hasSrflx = ice.some(c => /typ srflx/.test(c));
                 const hasRelay = ice.some(c => /typ relay/.test(c));
                 const hasHost = ice.some(c => /typ host/.test(c));
-
                 const ok = hasSrflx || hasRelay;
+
                 const text = ok
                     ? (hasSrflx ? 'UDP доступен (srflx найден) — звонки должны работать.' : 'TURN/relay найден — звонки вероятно будут работать.')
                     : 'UDP/relay не обнаружен — звонки могут не работать в этой сети.';
@@ -688,6 +755,7 @@
                 return {candidates: ice, hasSrflx, hasRelay, hasHost, ok};
             }
 
+            // графики
             function drawLatencyChart(samples) {
                 const ctx = document.getElementById('latencyChart').getContext('2d');
                 new Chart(ctx, {
@@ -711,38 +779,38 @@
                 });
             }
 
-            function composeUserMessage({ip, latency, loss, download, resources, yt, ru, msg, http80, voip}) {
+            // составление итогов
+            function composeUserMessage({ip, latency, loss, download, ru, yt, msg, http80, voip}) {
                 const parts = [];
-                const bad = arr => (arr || []).filter(x => !x.ok).length;
-                const ratio = (arr) => {
-                    const b = bad(arr);
+                const badPct = (arr) => {
                     const total = (arr || []).length || 1;
-                    return Math.round((b / total) * 100);
+                    const bad = (arr || []).filter(x => !x.ok).length;
+                    return Math.round((bad / total) * 100);
                 };
 
-                parts.push(`Мы проверили подключение. Внешний IP: ${ip.ip || '—'}.`);
-                parts.push(`Задержка ~${Math.round(latency.avg)} мс, джиттер ~${Math.round(latency.jitter)} мс.`);
-                parts.push(loss.lossPct >= 10
-                    ? `Пакетные потери повышенные (${loss.lossPct}%). Возможны подвисания/обрывы.`
-                    : `Пакетные потери низкие (${loss.lossPct}%).`);
-                parts.push(!download.ok || (download.mbps || 0) < 5
-                    ? `Скорость скачивания низкая (${(download.mbps || 0).toFixed(1)} Мбит/с).`
-                    : `Скорость скачивания достаточная (${(download.mbps || 0).toFixed(1)} Мбит/с).`);
+                parts.push(`Мы проверили подключение. Внешний IP: ${ip?.ip || '—'}.`);
+                parts.push(`Задержка ~${Math.round(latency?.avg || 0)} мс, джиттер ~${Math.round(latency?.jitter || 0)} мс.`);
+                parts.push((loss?.lossPct || 0) >= 10
+                    ? `Пакетные потери повышенные (${loss?.lossPct || 0}%). Возможны подвисания/обрывы.`
+                    : `Пакетные потери низкие (${loss?.lossPct || 0}%).`);
+                parts.push(!download?.ok || (download?.mbps || 0) < 5
+                    ? `Скорость скачивания низкая (${(download?.mbps || 0).toFixed(1)} Мбит/с).`
+                    : `Скорость скачивания достаточная (${(download?.mbps || 0).toFixed(1)} Мбит/с).`);
 
-                if (ratio(ru) >= 50) parts.push(`Часть .ru/банков/госуслуг недоступна напрямую (${ratio(ru)}%).`);
-                if (ratio(yt) > 0) parts.push(`YouTube частично недоступен (${ratio(yt)}%).`);
-                if (ratio(msg) > 0) parts.push(`У мессенджеров есть проблемы с веб/медиа (${ratio(msg)}%).`);
-                if (ratio(http80) > 0) parts.push(`HTTP (порт 80) может блокироваться (${ratio(http80)}%).`);
+                if (badPct(ru) >= 50) parts.push(`Часть .ru/банков/госуслуг недоступна напрямую (${badPct(ru)}%).`);
+                if (badPct(yt) > 0) parts.push(`YouTube частично недоступен (${badPct(yt)}%).`);
+                if (badPct(msg) > 0) parts.push(`У мессенджеров есть проблемы с веб/медиа (${badPct(msg)}%).`);
+                if (badPct(http80) > 0) parts.push(`HTTP (порт 80) может блокироваться (${badPct(http80)}%).`);
 
-                parts.push(voip.ok ? `VoIP/WebRTC: OK (звонки должны работать).` : `VoIP/WebRTC: возможно не работает в этой сети.`);
+                parts.push(voip?.ok ? `VoIP/WebRTC: OK (звонки должны работать).` : `VoIP/WebRTC: возможно не работает в этой сети.`);
                 return parts.join(' ');
             }
 
             function makeVerdict({latency, loss, download, resources, doh, regions, yt, ru, msg, http80, voip}) {
                 const v = [];
-                if (loss.lossPct >= 10) v.push('Высокие потери пакетов (≥10%).');
-                if (latency.avg > 150) v.push('Высокая средняя задержка (>150 мс).');
-                if (!download.ok || (download.mbps || 0) < 5) v.push('Низкая скорость скачивания (<5 Мбит/с).');
+                if ((loss?.lossPct || 0) >= 10) v.push('Высокие потери пакетов (≥10%).');
+                if ((latency?.avg || 0) > 150) v.push('Высокая средняя задержка (>150 мс).');
+                if (!download?.ok || (download?.mbps || 0) < 5) v.push('Низкая скорость скачивания (<5 Мбит/с).');
 
                 const dohFails = Object.values(doh || {}).filter(x => !(x.google?.ok) && !(x.cf?.ok)).length;
                 if (dohFails === Object.keys(doh || {}).length && dohFails > 0) v.push('Вероятна блокировка DoH/HTTPS.');
@@ -763,12 +831,13 @@
                 if (badPct(@json($youtube)) > 0) v.push('Проблемы с YouTube/ytimg.');
                 if (badPct(@json($mess)) > 0) v.push('Проблемы с веб-точками мессенджеров.');
                 if (badPct(@json($http80)) > 0) v.push('Порт 80 (HTTP) местами недоступен.');
-                if (!voip.ok) v.push('VoIP/WebRTC: UDP/TURN не обнаружен.');
+                if (!voip?.ok) v.push('VoIP/WebRTC: UDP/TURN не обнаружен.');
 
                 if (!v.length) v.push('Критичных проблем не обнаружено.');
                 return v;
             }
 
+            // ВОТ ЭТА ФУНКЦИЯ — была причиной ошибки, вернул её.
             function renderFindings(humanText, verdictArray) {
                 const ul = document.getElementById('findings');
                 ul.innerHTML = '';
@@ -776,7 +845,7 @@
                 li1.textContent = humanText;
                 ul.appendChild(li1);
                 const li2 = document.createElement('li');
-                li2.textContent = 'Техническое резюме: ' + verdictArray.join(' ');
+                li2.textContent = 'Техническое резюме: ' + (verdictArray || []).join(' ');
                 ul.appendChild(li2);
             }
 
@@ -788,7 +857,7 @@
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                         'Accept': 'application/pdf',
-                        'X-Requested-With': 'XMLHttpRequest' // иногда WAF снисходительнее к AJAX
+                        'X-Requested-With': 'XMLHttpRequest'
                     },
                     body: JSON.stringify(window.__lastReport)
                 });
@@ -817,40 +886,52 @@
             }
 
             async function runAll() {
-                try {
-                    runBtn.disabled = true;
-                    pdfBtn.disabled = true;
-                    env.startedAt = new Date().toISOString();
-                    loadUA();
+                runBtn.disabled = true;
+                pdfBtn.disabled = true;
+                env.startedAt = new Date().toISOString();
+                loadUA();
+                tStart();
 
-                    setProgress(5, 'ip');
-                    const ip = await detectIP();
-                    setProgress(20, 'latency');
-                    const latency = await testLatency(15);
-                    setProgress(35, 'loss');
-                    const loss = await testPacketLoss(40, 1500, 150);
-                    setProgress(50, 'speed');
-                    const download = await testDownload();
-                    setProgress(62, 'res');
-                    const resources = await testResources();
-                    setProgress(74, 'doh');
-                    const doh = await testDoH();
-                    setProgress(84, 'regions');
-                    const regions = await probeRegions();
-                    setProgress(90, 'ext');
-                    const yt = await testYouTube();
-                    setProgress(92, 'ext');
-                    const ru = await testRU();
-                    setProgress(94, 'ext');
-                    const msg = await testMessengers();
-                    setProgress(96, 'ext');
-                    const http80 = await testHTTP();
-                    setProgress(98, 'webrtc');
-                    const webrtc = await detectWebRTC();
-                    const voip = await testVoipReadiness();
+                // значения по умолчанию, чтобы не падать, если шаг ошибся
+                let ip = {ip: '—', country: '—'};
+                let latency = {avg: 0, jitter: 0, samples: []};
+                let loss = {lossPct: 0, p50: 0, p95: 0, total: 0, ok: 0};
+                let download = {ok: false, mbps: 0};
+                let resources = {must: [], blocked: []};
+                let doh = {};
+                let regions = [];
+                let yt = [], ru = [], msg = [], http80 = [];
+                let webrtc = [], voip = {ok: false};
+
+                try {
+                    ip = await step(10, async () => await detectIP());
+                    latency = await step(20, async () => await testLatency(15));
+                    loss = await step(30, async () => await testPacketLoss(40, 1500, 150));
+                    download = await step(40, async () => await testDownload());
+                    resources = await step(50, async () => await testResources());
+                    doh = await step(60, async () => await testDoH());
+                    regions = await step(70, async () => await probeRegions());
+                    const ext = await step(80, async () => {
+                        const ytR = await testYouTube();
+                        const ruR = await testRU();
+                        const msgR = await testMessengers();
+                        const httpR = await testHTTP();
+                        return {yt: ytR, ru: ruR, msg: msgR, http80: httpR};
+                    });
+                    yt = ext.yt;
+                    ru = ext.ru;
+                    msg = ext.msg;
+                    http80 = ext.http80;
+
+                    const wv = await step(90, async () => {
+                        const w = await detectWebRTC();
+                        const v = await testVoipReadiness();
+                        return {webrtc: w, voip: v};
+                    });
+                    webrtc = wv.webrtc;
+                    voip = wv.voip;
 
                     env.finishedAt = new Date().toISOString();
-                    setProgress(100, 'done');
 
                     window.__lastReport = {
                         summary: {
@@ -867,18 +948,7 @@
                         startedAt: env.startedAt, finishedAt: env.finishedAt
                     };
 
-                    const userMsg = composeUserMessage({
-                        ip,
-                        latency,
-                        loss,
-                        download,
-                        resources,
-                        yt,
-                        ru,
-                        msg,
-                        http80,
-                        voip
-                    });
+                    const userMsg = composeUserMessage({ip, latency, loss, download, ru, yt, msg, http80, voip});
                     const verdictArr = makeVerdict({
                         latency,
                         loss,
@@ -893,9 +963,20 @@
                         voip
                     });
                     renderFindings(userMsg, verdictArr);
+
+                    setProgress(100);
+                    tCheckpoint(100, 'success', null);
+                    tDone();
+
                     pdfBtn.disabled = false;
                 } catch (e) {
-                    console.error(e);
+                    // общий фэйл — лог и предупреждение
+                    sendTelemetry({
+                        event: 'run:error',
+                        runId,
+                        ts: new Date().toISOString(),
+                        message: (e && e.message) || 'unknown'
+                    });
                     alert('Что-то пошло не так во время теста. Попробуйте ещё раз.');
                     pdfBtn.disabled = !window.__lastReport;
                 } finally {
