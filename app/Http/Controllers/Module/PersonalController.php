@@ -49,7 +49,7 @@ class PersonalController extends Controller
         if ($hasModule) {
             $botModule = BottApi::getBot($salesman->botModule->public_key);
             if ($botModule['result']) {
-                $botModuleLink = 'https://t.me/' . $botModule['data']['title'];
+                $botModuleLink = 'https://t.me/' . $botModule['data']['name'];
             } else {
                 $botModuleLink = null;
             }
