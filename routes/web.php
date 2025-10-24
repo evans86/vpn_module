@@ -34,17 +34,13 @@ Auth::routes(['register' => false]);
 Route::prefix('personal')->name('personal.')->group(function () {
     // Авторизация через Telegram
     Route::get('/auth', [SalesmanAuthController::class, 'showLoginForm'])->name('auth');
-    Route::get('/auth/telegram', [SalesmanAuthController::class, 'redirect'])
-        ->name('auth.telegram');
-
-    Route::get('/auth/telegram/callback', [SalesmanAuthController::class, 'callback'])
-        ->name('auth.telegram.callback');
+    Route::get('/auth/telegram', [SalesmanAuthController::class, 'redirect'])->name('auth.telegram');
+    Route::get('/auth/telegram/callback', [SalesmanAuthController::class, 'callback'])->name('auth.telegram.callback');
 
     // Защищенные маршруты
     Route::middleware(['auth:salesman'])->group(function () {
         Route::get('/dashboard', [PersonalController::class, 'dashboard'])->name('dashboard');
         Route::get('/keys', [PersonalController::class, 'keys'])->name('keys');
-//        Route::get('/stats', [PersonalController::class, 'stats'])->name('stats');
         Route::get('/packages', [PersonalController::class, 'packages'])->name('packages');
 
         // Проверка соединения
@@ -64,16 +60,14 @@ Route::prefix('personal')->name('personal.')->group(function () {
             Route::get('/', [PersonalController::class, 'faq'])->name('faq');
             Route::post('/update', [PersonalController::class, 'updateFaq'])->name('faq.update');
             Route::post('/reset', [PersonalController::class, 'resetFaq'])->name('faq.reset');
-            Route::post('/vpn-instructions/update', [PersonalController::class, 'updateVpnInstructions'])
-                ->name('faq.vpn-instructions.update');
-            Route::post('/vpn-instructions/reset', [PersonalController::class, 'resetVpnInstructions'])
-                ->name('faq.vpn-instructions.reset');
+            Route::post('/vpn-instructions/update', [PersonalController::class, 'updateVpnInstructions'])->name('faq.vpn-instructions.update');
+            Route::post('/vpn-instructions/reset', [PersonalController::class, 'resetVpnInstructions'])->name('faq.vpn-instructions.reset');
         });
     });
 
     Route::post('/logout', function () {
         Auth::guard('salesman')->logout();
-        return redirect()->route('personal.auth'); // Изменено с personal.auth.telegram
+        return redirect()->route('personal.auth');
     })->name('logout');
 });
 
@@ -91,7 +85,10 @@ Route::prefix('netcheck')->name('netcheck.')->group(function () {
         ->where(['size' => '^[0-9]+(kb|mb|b)$'])
         ->name('payload')
         ->middleware('throttle:120,1');
+
     Route::post('/report', [PublicNetworkCheckController::class, 'report'])->name('report');
+
+    // телеметрия чекпоинтов (без CSRF — нужно для sendBeacon)
     Route::post('/telemetry', [PublicNetworkCheckController::class, 'telemetry'])
         ->name('telemetry')
         ->withoutMiddleware([VerifyCsrfToken::class])
@@ -101,7 +98,7 @@ Route::prefix('netcheck')->name('netcheck.')->group(function () {
 // Admin Routes
 Route::prefix('admin')->name('admin.')->group(function () {
     Route::middleware(['auth'])->group(function () {
-        // Logs Routes (должны быть первыми, чтобы не перехватывались другими маршрутами)
+        // Logs
         Route::get('/logs', [LogController::class, 'index'])->name('logs.index');
         Route::get('/logs/{log}', [LogController::class, 'show'])->name('logs.show');
 
@@ -129,7 +126,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/{panel}/update-config', [PanelController::class, 'updateConfig'])->name('update-config');
             });
 
-            // Salesman Routes
+            // Salesman
             Route::prefix('salesman')->name('salesman.')->group(function () {
                 Route::get('/', [SalesmanController::class, 'index'])->name('index');
                 Route::get('/{salesman}', [SalesmanController::class, 'show'])->name('show');
@@ -140,10 +137,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/{id}/assign-pack', [SalesmanController::class, 'assignPack'])->name('assign-pack');
                 Route::post('/{id}/assign-panel', [SalesmanController::class, 'assignPanel'])->name('assign-panel');
                 Route::post('/{id}/reset-panel', [SalesmanController::class, 'resetPanel'])->name('reset-panel');
-//                Route::post('/{id}/remove-pack', [SalesmanController::class, 'removePack'])->name('remove-pack');
             });
 
-            // Pack Routes
+            // Pack
             Route::prefix('pack')->name('pack.')->group(function () {
                 Route::get('/', [PackController::class, 'index'])->name('index');
                 Route::post('/', [PackController::class, 'store'])->name('store');
@@ -151,7 +147,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::delete('/{pack}', [PackController::class, 'destroy'])->name('destroy');
             });
 
-            // Pack Salesman Routes
+            // Pack-Salesman
             Route::prefix('pack-salesman')->name('pack-salesman.')->group(function () {
                 Route::get('/', [PackSalesmanController::class, 'index'])->name('index');
                 Route::post('/', [PackSalesmanController::class, 'store'])->name('store');
@@ -160,38 +156,38 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/{id}/mark-as-paid', [PackSalesmanController::class, 'markAsPaid'])->name('mark-as-paid');
             });
 
-            // Server User Transfer Routes
+            // Server User Transfer
             Route::prefix('server-user-transfer')->name('server-user-transfer.')->group(function () {
                 Route::post('/panels', [ServerUserTransferController::class, 'getPanels'])->name('panels');
                 Route::post('/transfer', [ServerUserTransferController::class, 'transfer'])->name('transfer');
             });
 
-            // Key Activate Routes
+            // Key Activate
             Route::prefix('key-activate')->name('key-activate.')->group(function () {
                 Route::get('/', [KeyActivateController::class, 'index'])->name('index');
                 Route::delete('/{id}', [KeyActivateController::class, 'destroy'])->name('destroy');
                 Route::post('/update-date', [KeyActivateController::class, 'updateDate'])->name('update-date');
             });
 
-            // Server Monitoring Routes
+            // Server Monitoring
             Route::prefix('server-monitoring')->name('server-monitoring.')->group(function () {
                 Route::get('/', [ServerMonitoringController::class, 'index'])->name('index');
                 Route::get('/{panel_id?}', [ServerMonitoringController::class, 'index'])->name('index');
             });
 
-            // Server User Routes
+            // Server Users
             Route::prefix('server-users')->name('server-users.')->group(function () {
                 Route::get('/', [ServerUserController::class, 'index'])->name('index');
                 Route::get('/{panel_id}', [ServerUserController::class, 'show'])->name('show');
             });
 
-            // Bot Routes
+            // Bot
             Route::prefix('bot')->name('bot.')->group(function () {
                 Route::get('/', [BotController::class, 'index'])->name('index');
                 Route::post('/update-token', [BotController::class, 'updateToken'])->name('update-token');
             });
 
-            // Telegram User Routes
+            // Telegram Users
             Route::prefix('telegram-users')->name('telegram-users.')->group(function () {
                 Route::get('/', [TelegramUserController::class, 'index'])->name('index');
                 Route::post('/{id}/toggle-status', [TelegramUserController::class, 'toggleStatus'])->name('toggle-status');
@@ -205,7 +201,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     });
 });
 
-// Redirect root to admin panel if authenticated
+// Redirect root
 Route::get('/', function () {
     if (Auth::check()) {
         return redirect()->route('admin.module.server.index');

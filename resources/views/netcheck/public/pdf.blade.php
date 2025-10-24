@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="utf-8">
-    <title>Network Report</title>
+    <title>Network Report — {{ $brand ?? 'High VPN' }}</title>
     <style>
         body { font-family: DejaVu Sans, sans-serif; font-size: 12px; color: #111; }
         h1,h2 { margin: 0 0 6px; }
@@ -17,7 +17,7 @@
     </style>
 </head>
 <body>
-<h1>Отчёт проверки сети</h1>
+<h1>Отчёт проверки сети — {{ $brand ?? 'High VPN' }}</h1>
 <p class="muted small">Сгенерировано: {{ $generatedAt }}</p>
 
 <h2>Общие сведения</h2>
@@ -33,20 +33,32 @@
 <table>
     <tr><th>Внешний IP</th><td>{{ $data['summary']['ip'] }}</td></tr>
     <tr><th>Страна</th><td>{{ $data['summary']['country'] }}</td></tr>
+    <tr><th>IP (альт.)</th><td>
+            @php $alt = $data['ip_alt'] ?? null; @endphp
+            {{ ($alt['ip'] ?? '—') }}@if(!empty($alt['country'])) ({{ $alt['country'] }}) @endif
+        </td></tr>
     <tr><th>Пинг (ср.)</th><td>{{ $data['summary']['latency_avg_ms'] }} мс</td></tr>
     <tr><th>Джиттер</th><td>{{ $data['summary']['jitter_ms'] }} мс</td></tr>
     <tr><th>Потери пакетов</th><td>{{ $data['summary']['packet_loss_pct'] ?? '—' }} %</td></tr>
     <tr><th>Скорость скачивания</th><td>{{ $data['summary']['download_mbps'] }} Мбит/с</td></tr>
-    <tr><th>WebRTC кандидаты</th><td class="small">{{ implode(', ', $data['summary']['webrtc_candidates'] ?? []) }}</td></tr>
+    <tr><th>.ru-скорость</th><td>
+            @php $rs = $data['ru_speed'] ?? null; @endphp
+            @if(!empty($rs['ok'])) {{ number_format($rs['mbps'] ?? 0, 1, '.', ' ') }} Мбит/с ({{ $rs['source_label'] ?? '—' }}) @else — @endif
+        </td></tr>
+    <tr><th>VoIP / WebRTC</th><td>{!! !empty($data['voip']['ok']) ? '<span class="badge ok">OK</span>' : '<span class="badge fail">Риск проблем</span>' !!}</td></tr>
+    <tr><th>Оценка VPN</th><td>
+            @php $vpn = $data['vpn'] ?? null; @endphp
+            @if(!empty($vpn['score'])) {{ $vpn['score'] }} / 100 (режим: {{ $vpn['mode'] ?? '—' }}) @else — @endif
+        </td></tr>
 </table>
 
 <h2>Доступность ресурсов (должны открываться)</h2>
 <table>
-    <thead><tr><th>URL</th><th>Статус</th><th>Время</th></tr></thead>
+    <thead><tr><th>Ресурс</th><th>Статус</th><th>Время</th></tr></thead>
     <tbody>
     @foreach(($data['resources']['must'] ?? []) as $r)
         <tr>
-            <td class="small">{{ $r['url'] }}</td>
+            <td class="small">{{ $r['label'] ?? '—' }}</td>
             <td>{!! !empty($r['ok']) ? '<span class="badge ok">доступен</span>' : '<span class="badge fail">недоступен</span>' !!}</td>
             <td>{{ isset($r['time']) ? round($r['time']) : '—' }} мс</td>
         </tr>
@@ -56,11 +68,11 @@
 
 <h2>Доступность ресурсов (часто блокируемые)</h2>
 <table>
-    <thead><tr><th>URL</th><th>Статус</th><th>Время</th></tr></thead>
+    <thead><tr><th>Ресурс</th><th>Статус</th><th>Время</th></tr></thead>
     <tbody>
     @foreach(($data['resources']['blocked'] ?? []) as $r)
         <tr>
-            <td class="small">{{ $r['url'] }}</td>
+            <td class="small">{{ $r['label'] ?? '—' }}</td>
             <td>{!! !empty($r['ok']) ? '<span class="badge ok">доступен</span>' : '<span class="badge fail">недоступен</span>' !!}</td>
             <td>{{ isset($r['time']) ? round($r['time']) : '—' }} мс</td>
         </tr>
@@ -99,12 +111,11 @@
 @if(!empty($data['regional']))
     <h2>Региональные пробы</h2>
     <table>
-        <thead><tr><th>Регион</th><th>URL</th><th>Статус</th><th>Время</th></tr></thead>
+        <thead><tr><th>Регион</th><th>Статус</th><th>Время</th></tr></thead>
         <tbody>
         @foreach($data['regional'] as $r)
             <tr>
                 <td>{{ $r['label'] }}</td>
-                <td class="small">{{ $r['url'] }}</td>
                 <td>{!! !empty($r['ok']) ? '<span class="badge ok">доступен</span>' : '<span class="badge fail">недоступен</span>' !!}</td>
                 <td>{{ isset($r['time']) ? round($r['time']) : '—' }} мс</td>
             </tr>
@@ -116,12 +127,11 @@
 @if(!empty($data['youtube']))
     <h2>YouTube</h2>
     <table>
-        <thead><tr><th>Точка</th><th>URL</th><th>Статус</th><th>Время</th></tr></thead>
+        <thead><tr><th>Точка</th><th>Статус</th><th>Время</th></tr></thead>
         <tbody>
         @foreach($data['youtube'] as $r)
             <tr>
                 <td>{{ $r['label'] ?? '' }}</td>
-                <td class="small">{{ $r['url'] ?? '' }}</td>
                 <td>{!! !empty($r['ok']) ? '<span class="badge ok">OK</span>' : '<span class="badge fail">FAIL</span>' !!}</td>
                 <td>{{ isset($r['time']) ? round($r['time']) : '—' }} мс</td>
             </tr>
@@ -133,12 +143,11 @@
 @if(!empty($data['ru_services']))
     <h2>.ru / банки / госуслуги</h2>
     <table>
-        <thead><tr><th>Сервис</th><th>URL</th><th>Статус</th><th>Время</th></tr></thead>
+        <thead><tr><th>Сервис</th><th>Статус</th><th>Время</th></tr></thead>
         <tbody>
         @foreach($data['ru_services'] as $r)
             <tr>
                 <td>{{ $r['label'] ?? '' }}</td>
-                <td class="small">{{ $r['url'] ?? '' }}</td>
                 <td>{!! !empty($r['ok']) ? '<span class="badge ok">OK</span>' : '<span class="badge fail">FAIL</span>' !!}</td>
                 <td>{{ isset($r['time']) ? round($r['time']) : '—' }} мс</td>
             </tr>
@@ -148,14 +157,29 @@
 @endif
 
 @if(!empty($data['messengers']))
-    <h2>Мессенджеры</h2>
+    <h2>Мессенджеры (включая Telegram/WhatsApp)</h2>
     <table>
-        <thead><tr><th>Сервис</th><th>URL</th><th>Статус</th><th>Время</th></tr></thead>
+        <thead><tr><th>Сервис</th><th>Статус</th><th>Время</th></tr></thead>
         <tbody>
         @foreach($data['messengers'] as $r)
             <tr>
                 <td>{{ $r['label'] ?? '' }}</td>
-                <td class="small">{{ $r['url'] ?? '' }}</td>
+                <td>{!! !empty($r['ok']) ? '<span class="badge ok">OK</span>' : '<span class="badge fail">FAIL</span>' !!}</td>
+                <td>{{ isset($r['time']) ? round($r['time']) : '—' }} мс</td>
+            </tr>
+        @endforeach
+        </tbody>
+    </table>
+@endif
+
+@if(!empty($data['socials']))
+    <h2>Соцсети</h2>
+    <table>
+        <thead><tr><th>Сервис</th><th>Статус</th><th>Время</th></tr></thead>
+        <tbody>
+        @foreach($data['socials'] as $r)
+            <tr>
+                <td>{{ $r['label'] ?? '' }}</td>
                 <td>{!! !empty($r['ok']) ? '<span class="badge ok">OK</span>' : '<span class="badge fail">FAIL</span>' !!}</td>
                 <td>{{ isset($r['time']) ? round($r['time']) : '—' }} мс</td>
             </tr>
@@ -167,12 +191,11 @@
 @if(!empty($data['http80']))
     <h2>HTTP (порт 80)</h2>
     <table>
-        <thead><tr><th>Точка</th><th>URL</th><th>Статус</th><th>Время</th></tr></thead>
+        <thead><tr><th>Точка</th><th>Статус</th><th>Время</th></tr></thead>
         <tbody>
         @foreach($data['http80'] as $r)
             <tr>
                 <td>{{ $r['label'] ?? '' }}</td>
-                <td class="small">{{ $r['url'] ?? '' }}</td>
                 <td>{!! !empty($r['ok']) ? '<span class="badge ok">OK</span>' : '<span class="badge fail">FAIL</span>' !!}</td>
                 <td>{{ isset($r['time']) ? round($r['time']) : '—' }} мс</td>
             </tr>
@@ -192,7 +215,7 @@
 @if(!empty($data['voip']))
     <h2>VoIP / WebRTC</h2>
     <table>
-        <tr><th>Готовность</th><td>{!! !empty($data['voip']['ok']) ? '<span class="badge ok">OK</span>' : '<span class="badge fail">Проблемы</span>' !!}</td></tr>
+        <tr><th>Готовность</th><td>{!! !empty($data['voip']['ok']) ? '<span class="badge ok">Вероятно OK</span>' : '<span class="badge fail">Риск проблем</span>' !!}</td></tr>
         <tr><th>host/srflx/relay</th>
             <td class="small">
                 host: {{ !empty($data['voip']['hasHost']) ? 'да' : 'нет' }},

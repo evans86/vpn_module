@@ -1,10 +1,21 @@
 @extends('layouts.public')
 
-@section('title', 'Проверка доступности и качества сети — VPN Service')
-@section('header-subtitle', 'Диагностика подключения')
+@section('title', 'Проверка сети — ' . ($brand ?? 'High VPN'))
+@section('header-subtitle', 'Диагностика подключения и качества VPN')
 
 @section('content')
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#4f46e5">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(() => {
+                });
+            });
+        }
+    </script>
 
     <div class="px-4 py-6 sm:px-0">
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -12,18 +23,43 @@
             <div class="lg:col-span-1">
                 <div class="bg-white shadow rounded-lg p-6 mb-6">
                     <h3 class="text-lg font-medium text-gray-900 mb-4">Старт проверки</h3>
-                    <p class="text-sm text-gray-600 mb-3">
-                        Тест: IP/гео, пинг/джиттер, потери, скорость, DoH, регионы, YouTube, .ru/банки, мессенджеры,
-                        HTTP:80, VoIP.
-                    </p>
-                    <button id="runBtn"
-                            class="w-full inline-flex justify-center items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        Запустить тест
-                    </button>
 
-                    <button id="pdfBtn" disabled
+                    <div class="mb-3">
+                        <label class="block text-sm text-gray-600 mb-1">Режим проверки</label>
+                        <div class="flex items-center gap-3 text-sm">
+                            <label class="inline-flex items-center gap-2">
+                                <input type="radio" name="mode" value="direct" class="modeRadio" checked>
+                                <span>Без VPN</span>
+                            </label>
+                            <label class="inline-flex items-center gap-2">
+                                <input type="radio" name="mode" value="vpn" class="modeRadio">
+                                <span>С {{ $brand ?? 'High VPN' }}</span>
+                            </label>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Скрипт сохранит результаты каждого режима и покажет
+                            сравнение.</p>
+                    </div>
+
+                    <p class="text-sm text-gray-600 mb-3">
+                        Тест: IP/гео, пинг/джиттер, потери, скорость, .ru-скорость, DoH, регионы, YouTube, .ru/банки,
+                        мессенджеры (включая Telegram/WhatsApp), соцсети, HTTP:80, WebRTC/VoIP.
+                    </p>
+
+                    <div class="flex gap-2">
+                        <button id="runBtn"
+                                class="flex-1 inline-flex justify-center items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            Запустить тест
+                        </button>
+
+                        <button id="pdfBtn" disabled
+                                class="inline-flex justify-center items-center px-4 py-2 text-sm font-medium rounded-md text-indigo-600 bg-indigo-50 hover:bg-indigo-100 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50">
+                            PDF
+                        </button>
+                    </div>
+
+                    <button id="saveHtmlBtn" disabled
                             class="mt-2 w-full inline-flex justify-center items-center px-4 py-2 text-sm font-medium rounded-md text-indigo-600 bg-indigo-50 hover:bg-indigo-100 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50">
-                        Скачать PDF отчёт
+                        Скачать страницу (HTML)
                     </button>
 
                     <div id="progress" class="mt-4 hidden">
@@ -44,6 +80,10 @@
                         <div class="py-2 flex justify-between">
                             <dt class="text-gray-500">Страна</dt>
                             <dd id="country">—</dd>
+                        </div>
+                        <div class="py-2 flex justify-between">
+                            <dt class="text-gray-500">IP (альт. сервис)</dt>
+                            <dd id="ipAlt" class="font-mono">—</dd>
                         </div>
                         <div class="py-2">
                             <dt class="text-gray-500 mb-1">User-Agent</dt>
@@ -72,6 +112,21 @@
                         </div>
                     </dl>
                 </div>
+
+                <div class="bg-white shadow rounded-lg p-6 mt-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Сравнение режимов</h3>
+                    <p class="text-xs text-gray-500 mb-3">Результаты последних запусков «Без VPN» и
+                        «С {{ $brand ?? 'High VPN' }}».</p>
+                    <div id="compareBox" class="text-sm text-gray-700 space-y-1">
+                        <div>Пинг: <span id="cmpLatency">—</span></div>
+                        <div>Потери: <span id="cmpLoss">—</span></div>
+                        <div>Скорость: <span id="cmpSpeed">—</span></div>
+                        <div>.ru-скорость: <span id="cmpRuSpeed">—</span></div>
+                        <div>Доступность (часто блок.): <span id="cmpBlocked">—</span></div>
+                        <div>Мессенджеры/соцсети: <span id="cmpMsg">—</span></div>
+                        <div>Оценка VPN: <span id="cmpScore">—</span></div>
+                    </div>
+                </div>
             </div>
 
             <!-- Правая колонка -->
@@ -79,7 +134,7 @@
                 <!-- Качество связи -->
                 <div class="bg-white shadow rounded-lg p-6">
                     <h3 class="text-lg font-medium text-gray-900 mb-4">Качество связи</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-5 gap-4">
                         <div class="p-4 bg-gray-50 rounded border">
                             <div class="text-gray-500 text-xs mb-1"
                                  title="Как быстро откликается сеть. Меньше — лучше.">Задержка (пинг)
@@ -88,25 +143,31 @@
                                     class="text-sm">мс</span></div>
                         </div>
                         <div class="p-4 bg-gray-50 rounded border">
-                            <div class="text-gray-500 text-xs mb-1" title="Насколько прыгает задержка между запросами.">
-                                Джиттер
-                            </div>
+                            <div class="text-gray-500 text-xs mb-1" title="Насколько прыгает задержка.">Джиттер</div>
                             <div class="text-2xl font-semibold"><span id="latencyJitter">—</span> <span class="text-sm">мс</span>
                             </div>
                         </div>
                         <div class="p-4 bg-gray-50 rounded border">
-                            <div class="text-gray-500 text-xs mb-1"
-                                 title="Сколько запросов теряется по дороге. >10% уже заметно.">Потери пакетов
+                            <div class="text-gray-500 text-xs mb-1" title="Сколько запросов теряется. >10% заметно.">
+                                Потери пакетов
                             </div>
                             <div class="text-2xl font-semibold"><span id="lossPct">—</span> <span
                                     class="text-sm">%</span></div>
                         </div>
                         <div class="p-4 bg-gray-50 rounded border">
-                            <div class="text-gray-500 text-xs mb-1" title="Как быстро загрузятся файлы и видео.">
-                                Скорость скачивания
+                            <div class="text-gray-500 text-xs mb-1" title="Как быстро грузятся данные.">Скорость
+                                скачивания
                             </div>
                             <div class="text-2xl font-semibold"><span id="downloadMbps">—</span> <span class="text-sm">Мбит/с</span>
                             </div>
+                        </div>
+                        <div class="p-4 bg-gray-50 rounded border">
+                            <div class="text-gray-500 text-xs mb-1"
+                                 title="Оценка скорости на .ru (по статическому файлу).">.ru-скорость
+                            </div>
+                            <div class="text-2xl font-semibold"><span id="downloadRuMbps">—</span> <span
+                                    class="text-sm">Мбит/с</span></div>
+                            <div class="text-[10px] text-gray-500 mt-1" id="downloadRuSrc">Источник: —</div>
                         </div>
                     </div>
 
@@ -115,7 +176,7 @@
                     </div>
                 </div>
 
-                <!-- Доступность ресурсов -->
+                <!-- Доступность ресурсов (без показа URL) -->
                 <div class="bg-white shadow rounded-lg p-6">
                     <h3 class="text-lg font-medium text-gray-900 mb-4">Доступность ресурсов</h3>
 
@@ -125,7 +186,6 @@
                             <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-4 py-2 text-left text-gray-500">Ресурс</th>
-                                <th class="px-4 py-2 text-left text-gray-500">URL</th>
                                 <th class="px-4 py-2 text-left text-gray-500">Статус</th>
                                 <th class="px-4 py-2 text-left text-gray-500">Время</th>
                             </tr>
@@ -134,7 +194,6 @@
                             @foreach($must as $i => $t)
                                 <tr data-row="must-{{ $i }}">
                                     <td class="px-4 py-2">{{ $t['label'] }}</td>
-                                    <td class="px-4 py-2 text-blue-600 break-all">{{ $t['url'] }}</td>
                                     <td class="px-4 py-2" data-status>—</td>
                                     <td class="px-4 py-2" data-time>—</td>
                                 </tr>
@@ -149,7 +208,6 @@
                             <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-4 py-2 text-left text-gray-500">Ресурс</th>
-                                <th class="px-4 py-2 text-left text-gray-500">URL</th>
                                 <th class="px-4 py-2 text-left text-gray-500">Статус</th>
                                 <th class="px-4 py-2 text-left text-gray-500">Время</th>
                             </tr>
@@ -158,7 +216,6 @@
                             @foreach($blocked as $i => $t)
                                 <tr data-row="blocked-{{ $i }}">
                                     <td class="px-4 py-2">{{ $t['label'] }}</td>
-                                    <td class="px-4 py-2 text-blue-600 break-all">{{ $t['url'] }}</td>
                                     <td class="px-4 py-2" data-status>—</td>
                                     <td class="px-4 py-2" data-time>—</td>
                                 </tr>
@@ -168,7 +225,7 @@
                     </div>
                 </div>
 
-                <!-- DoH диагностика -->
+                <!-- DoH -->
                 <div class="bg-white shadow rounded-lg p-6">
                     <h3 class="text-lg font-medium text-gray-900 mb-4">DNS поверх HTTPS (DoH)</h3>
                     <div class="overflow-x-auto">
@@ -194,7 +251,7 @@
                     <p class="text-xs text-gray-500 mt-2">Если оба резолвера не отвечают — вероятна блокировка DoH.</p>
                 </div>
 
-                <!-- Региональные пробы -->
+                <!-- Регионы -->
                 <div class="bg-white shadow rounded-lg p-6">
                     <h3 class="text-lg font-medium text-gray-900 mb-4">Региональная доступность</h3>
                     <div class="overflow-x-auto">
@@ -202,7 +259,6 @@
                             <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-4 py-2 text-left text-gray-500">Регион</th>
-                                <th class="px-4 py-2 text-left text-gray-500">URL</th>
                                 <th class="px-4 py-2 text-left text-gray-500">Статус</th>
                                 <th class="px-4 py-2 text-left text-gray-500">Время</th>
                             </tr>
@@ -211,7 +267,6 @@
                             @foreach($regions as $i => $p)
                                 <tr data-region="{{ $i }}">
                                     <td class="px-4 py-2">{{ $p['label'] }}</td>
-                                    <td class="px-4 py-2 text-blue-600 break-all">{{ $p['url'] }}</td>
                                     <td class="px-4 py-2" data-status>—</td>
                                     <td class="px-4 py-2" data-time>—</td>
                                 </tr>
@@ -235,7 +290,6 @@
                             <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-4 py-2 text-left text-gray-500">Точка</th>
-                                <th class="px-4 py-2 text-left text-gray-500">URL</th>
                                 <th class="px-4 py-2 text-left text-gray-500">Статус</th>
                                 <th class="px-4 py-2 text-left text-gray-500">Время</th>
                             </tr>
@@ -244,7 +298,6 @@
                             @foreach($youtube as $i => $t)
                                 <tr data-row="yt-{{ $i }}">
                                     <td class="px-4 py-2">{{ $t['label'] }}</td>
-                                    <td class="px-4 py-2 text-blue-600 break-all">{{ $t['url'] }}</td>
                                     <td class="px-4 py-2" data-status>—</td>
                                     <td class="px-4 py-2" data-time>—</td>
                                 </tr>
@@ -259,7 +312,6 @@
                             <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-4 py-2 text-left text-gray-500">Сервис</th>
-                                <th class="px-4 py-2 text-left text-gray-500">URL</th>
                                 <th class="px-4 py-2 text-left text-gray-500">Статус</th>
                                 <th class="px-4 py-2 text-left text-gray-500">Время</th>
                             </tr>
@@ -268,7 +320,6 @@
                             @foreach($ru as $i => $t)
                                 <tr data-row="ru-{{ $i }}">
                                     <td class="px-4 py-2">{{ $t['label'] }}</td>
-                                    <td class="px-4 py-2 text-blue-600 break-all">{{ $t['url'] }}</td>
                                     <td class="px-4 py-2" data-status>—</td>
                                     <td class="px-4 py-2" data-time>—</td>
                                 </tr>
@@ -283,7 +334,6 @@
                             <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-4 py-2 text-left text-gray-500">Сервис</th>
-                                <th class="px-4 py-2 text-left text-gray-500">URL</th>
                                 <th class="px-4 py-2 text-left text-gray-500">Статус</th>
                                 <th class="px-4 py-2 text-left text-gray-500">Время</th>
                             </tr>
@@ -292,7 +342,28 @@
                             @foreach($mess as $i => $t)
                                 <tr data-row="msg-{{ $i }}">
                                     <td class="px-4 py-2">{{ $t['label'] }}</td>
-                                    <td class="px-4 py-2 text-blue-600 break-all">{{ $t['url'] }}</td>
+                                    <td class="px-4 py-2" data-status>—</td>
+                                    <td class="px-4 py-2" data-time>—</td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h4 class="text-sm font-semibold text-gray-700 mb-2">Соцсети</h4>
+                    <div class="overflow-x-auto mb-4">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm" id="tblSOC">
+                            <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-gray-500">Сервис</th>
+                                <th class="px-4 py-2 text-left text-gray-500">Статус</th>
+                                <th class="px-4 py-2 text-left text-gray-500">Время</th>
+                            </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                            @foreach($socials as $i => $t)
+                                <tr data-row="soc-{{ $i }}">
+                                    <td class="px-4 py-2">{{ $t['label'] }}</td>
                                     <td class="px-4 py-2" data-status>—</td>
                                     <td class="px-4 py-2" data-time>—</td>
                                 </tr>
@@ -307,7 +378,6 @@
                             <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-4 py-2 text-left text-gray-500">Точка</th>
-                                <th class="px-4 py-2 text-left text-gray-500">URL</th>
                                 <th class="px-4 py-2 text-left text-gray-500">Статус</th>
                                 <th class="px-4 py-2 text-left text-gray-500">Время</th>
                             </tr>
@@ -316,7 +386,6 @@
                             @foreach($http80 as $i => $t)
                                 <tr data-row="http-{{ $i }}">
                                     <td class="px-4 py-2">{{ $t['label'] }}</td>
-                                    <td class="px-4 py-2 text-blue-600 break-all">{{ $t['url'] }}</td>
                                     <td class="px-4 py-2" data-status>—</td>
                                     <td class="px-4 py-2" data-time>—</td>
                                 </tr>
@@ -345,22 +414,25 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
     <script>
         (function () {
+            let CURRENT_PCT = 0;
             // ==== прогресс и чекпоинты ====
             const CHECKPOINT_LABELS = {
                 10: 'IP/гео',
                 20: 'Пинг/джиттер',
                 30: 'Пакетные потери',
                 40: 'Скорость скачивания',
+                45: '.ru-скорость',
                 50: 'Доступность ресурсов',
                 60: 'DNS поверх HTTPS (DoH)',
                 70: 'Региональные пробы',
-                80: 'Расширенные проверки (YouTube, .ru, мессенджеры, HTTP:80)',
+                80: 'Расширенные проверки (YouTube, .ru, мессенджеры, соцсети, HTTP:80)',
                 90: 'WebRTC/VoIP',
                 100: 'Готово'
             };
 
             const runBtn = document.getElementById('runBtn');
             const pdfBtn = document.getElementById('pdfBtn');
+            const saveHtmlBtn = document.getElementById('saveHtmlBtn');
             const progress = document.getElementById('progress');
             const pbar = document.getElementById('progressBar');
             const ptext = document.getElementById('progressText');
@@ -372,16 +444,24 @@
                 finishedAt: null,
             };
 
-            // роуты
             const pingUrl = @json(route('netcheck.ping'));
             const payloadUrl = (size) => @json(route('netcheck.payload', ['size' => 'SIZE_PLACEHOLDER'])).
             replace('SIZE_PLACEHOLDER', size);
             const reportUrl = @json(route('netcheck.report'));
-            // телеметрия (должен существовать маршрут netcheck.telemetry)
             const telemetryUrl = @json(route('netcheck.telemetry'));
             const runId = (crypto && crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(16).slice(2)));
 
-            // безопасная отправка телеметрии
+            const ruSpeedAssets = @json($ruSpeed ?? []);
+            const must = @json($must);
+            const blocked = @json($blocked);
+            const youtube = @json($youtube);
+            const ru = @json($ru);
+            const mess = @json($mess);
+            const socials = @json($socials);
+            const http80 = @json($http80);
+
+            const brand = @json($brand ?? 'High VPN');
+
             function sendTelemetry(payload) {
                 try {
                     if (!telemetryUrl) return;
@@ -403,7 +483,6 @@
                 sendTelemetry({event: 'run:done', runId, ts: new Date().toISOString()});
             }
 
-            // единый «чекпоинт»-лог: 10/20/.../100
             function tCheckpoint(pct, status, error) {
                 sendTelemetry({
                     event: 'checkpoint',
@@ -411,18 +490,18 @@
                     ts: new Date().toISOString(),
                     pct,
                     label: CHECKPOINT_LABELS[pct] || '',
-                    status,           // 'success' | 'error'
+                    status,
                     error: error || null
                 });
             }
 
             const setProgress = (pct) => {
+                CURRENT_PCT = pct; // <— запоминаем чекпоинт
                 progress.classList.remove('hidden');
                 pbar.style.width = pct + '%';
                 ptext.textContent = `Готово ${pct}% — ${CHECKPOINT_LABELS[pct] || ''}`;
             };
 
-            // универсальная обёртка шага с логом
             async function step(pct, fn) {
                 setProgress(pct);
                 try {
@@ -432,17 +511,15 @@
                 } catch (e) {
                     const msg = (e && e.message) ? e.message : String(e);
                     tCheckpoint(pct, 'error', msg);
-                    // не валим общий сценарий, а прокидываем дальше, чтобы можно было отобразить alert
                     throw e;
                 }
             }
 
-            // ловим необработанные ошибки/отклонения (на моб. браузерах это частая причина «зависания»)
             window.addEventListener('error', (e) => sendTelemetry({
                 event: 'window:error',
                 runId,
                 ts: new Date().toISOString(),
-                message: e.message,
+                error: e.message, // <—
                 line: e.lineno,
                 col: e.colno
             }));
@@ -450,10 +527,9 @@
                 event: 'window:unhandledrejection',
                 runId,
                 ts: new Date().toISOString(),
-                reason: (e && e.reason && (e.reason.message || String(e.reason))) || 'unknown'
+                error: (e && e.reason && (e.reason.message || String(e.reason))) || 'unknown' // <—
             }));
 
-            // ==== helper-функции ====
             const ms = () => performance.now();
 
             async function fetchWithTimeout(url, timeoutMs) {
@@ -486,6 +562,7 @@
                 document.getElementById('ua').textContent = navigator.userAgent;
             }
 
+            // IP (основной) + страна
             async function detectIP() {
                 let ip = '—', country = '—';
                 try {
@@ -503,10 +580,33 @@
                 return {ip, country};
             }
 
+            // Альтернативный IP (2ip-подобный)
+            async function detectIPAlt() {
+                const candidates = [
+                    {name: 'myip.com', url: 'https://api.myip.com/'},
+                    {name: 'ipify.org', url: 'https://api.ipify.org?format=json'},
+                    {name: 'ipapi.co', url: 'https://ipapi.co/json/'},
+                ];
+                for (const c of candidates) {
+                    try {
+                        const r = await fetchJSON(c.url, {cache: 'no-store'});
+                        const d = r.data || {};
+                        const ip = d.ip || d.query || '';
+                        const country = d.country_name || d.country || '';
+                        if (ip) {
+                            document.getElementById('ipAlt').textContent = `${ip}${country ? ' (' + country + ')' : ''}`;
+                            return {service: c.name, ip, country: country || null};
+                        }
+                    } catch (_) {
+                    }
+                }
+                return {service: null, ip: null, country: null};
+            }
+
             async function testLatency(samples = 15) {
                 const rtts = [];
                 for (let i = 0; i < samples; i++) {
-                    const url = (i === 0) ? (pingUrl + '?debug=1') : pingUrl; // первый запрос с debug флагом
+                    const url = (i === 0) ? (pingUrl + '?debug=1') : pingUrl;
                     const r = await fetchWithTimeout(url, 2000);
                     rtts.push(r.time);
                     await new Promise(r2 => setTimeout(r2, 100));
@@ -530,7 +630,6 @@
                 }
                 const lossPct = Math.round((1 - ok / total) * 100);
                 document.getElementById('lossPct').textContent = lossPct;
-
                 const sorted = times.slice().sort((a, b) => a - b);
                 const p = (q) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
                 return {total, ok, lossPct, p50: Math.round(p(0.5)), p95: Math.round(p(0.95))};
@@ -558,6 +657,45 @@
                 return {ok, bytes: received, seconds: dt, mbps: speed};
             }
 
+            // .ru-скорость: грузим <img> известного размера (указан в конфиге), CORS не нужен.
+            async function testRuSpeed() {
+                if (!Array.isArray(ruSpeedAssets) || ruSpeedAssets.length === 0) return {
+                    ok: false,
+                    mbps: 0,
+                    source_label: null
+                };
+                const tryOne = (asset) => new Promise((resolve) => {
+                    const img = new Image();
+                    const t0 = ms();
+                    let done = false;
+                    const cleanup = (ok) => {
+                        if (done) return;
+                        done = true;
+                        const dt = (ms() - t0) / 1000;
+                        const bits = (asset.bytes || 0) * 8;
+                        const mbps = dt > 0 && asset.bytes ? (bits / 1024 / 1024) / dt : 0;
+                        resolve({ok, mbps, source_label: asset.label || ''});
+                    };
+                    img.onload = () => cleanup(true);
+                    img.onerror = () => cleanup(false);
+                    img.src = asset.url + (asset.url.includes('?') ? '&' : '?') + 'nc=' + Date.now();
+                    // таймаут 8с
+                    setTimeout(() => cleanup(false), 8000);
+                });
+
+                for (const a of ruSpeedAssets) {
+                    const r = await tryOne(a);
+                    if (r.ok && r.mbps > 0) {
+                        document.getElementById('downloadRuMbps').textContent = r.mbps.toFixed(1);
+                        document.getElementById('downloadRuSrc').textContent = 'Источник: ' + (r.source_label || '—');
+                        return r;
+                    }
+                }
+                document.getElementById('downloadRuMbps').textContent = '—';
+                document.getElementById('downloadRuSrc').textContent = 'Источник: —';
+                return {ok: false, mbps: 0, source_label: null};
+            }
+
             async function fetchNoCors(url, timeoutMs = 7000) {
                 const ctrl = new AbortController();
                 const t0 = ms();
@@ -572,16 +710,14 @@
                 }
             }
 
-            async function probe({url, mode}) {
-                if (mode === 'json') {
-                    try {
-                        const r = await fetchJSON(url, {cache: 'no-store'});
-                        return {ok: r.ok, time: r.time};
-                    } catch (_) {
-                        return {ok: false, time: 0};
-                    }
+            async function probe(item) {
+                // item: {label, url, mode?}
+                try {
+                    const r = await fetchNoCors(item.url, 7000);
+                    return {ok: r.ok, time: r.time};
+                } catch (_) {
+                    return {ok: false, time: 0};
                 }
-                return await fetchNoCors(url, 7000);
             }
 
             function paintRow(prefix, idx, ok, tms) {
@@ -595,21 +731,21 @@
                 timeCell.textContent = Math.round(tms) + ' мс';
             }
 
-            async function testResources() {
-                const must = @json($must);
-                const blocked = @json($blocked);
-                const results = {must: [], blocked: []};
-                for (let i = 0; i < must.length; i++) {
-                    const res = await probe(must[i]);
-                    results.must.push({url: must[i].url, ok: res.ok, time: res.time});
-                    paintRow('must', i, res.ok, res.time);
-                }
-                for (let i = 0; i < blocked.length; i++) {
-                    const res = await probe(blocked[i]);
-                    results.blocked.push({url: blocked[i].url, ok: res.ok, time: res.time});
-                    paintRow('blocked', i, res.ok, res.time);
+            async function testTable(prefix, list) {
+                const results = [];
+                for (let i = 0; i < list.length; i++) {
+                    const r = await probe(list[i]);
+                    results.push({label: list[i].label, ok: r.ok, time: r.time});
+                    paintRow(prefix, i, r.ok, r.time);
                 }
                 return results;
+            }
+
+            async function testResources() {
+                return {
+                    must: await testTable('must', must),
+                    blocked: await testTable('blocked', blocked),
+                };
             }
 
             async function testDoH() {
@@ -664,7 +800,7 @@
                 const out = [];
                 for (let i = 0; i < list.length; i++) {
                     const r = await fetchNoCors(list[i].url, 7000);
-                    out.push({label: list[i].label, url: list[i].url, ok: r.ok, time: r.time});
+                    out.push({label: list[i].label, ok: r.ok, time: r.time});
                     const row = document.querySelector(`tr[data-region="${i}"]`);
                     if (!row) continue;
                     const st = row.querySelector('[data-status]');
@@ -676,33 +812,6 @@
                 }
                 drawRegionalChart(out);
                 return out;
-            }
-
-            // Расширенные проверки
-            async function testGeneric(prefix, list) {
-                const results = [];
-                for (let i = 0; i < list.length; i++) {
-                    const r = await fetchNoCors(list[i].url, 7000);
-                    results.push({label: list[i].label, url: list[i].url, ok: r.ok, time: r.time});
-                    paintRow(prefix, i, r.ok, r.time);
-                }
-                return results;
-            }
-
-            async function testYouTube() {
-                return await testGeneric('yt',   @json($youtube));
-            }
-
-            async function testRU() {
-                return await testGeneric('ru',   @json($ru));
-            }
-
-            async function testMessengers() {
-                return await testGeneric('msg',  @json($mess));
-            }
-
-            async function testHTTP() {
-                return await testGeneric('http', @json($http80));
             }
 
             async function detectWebRTC() {
@@ -719,14 +828,14 @@
                         if (m && m[1]) discovered.add(m[1]);
                         document.getElementById('webrtc').textContent = [...discovered].join(', ');
                     };
-                    await new Promise(r => setTimeout(r, 1500));
+                    await new Promise(r => setTimeout(r, 4000)); // дольше — меньше ложных
                 } catch (_) {
                 }
                 pc.close();
                 return [...discovered];
             }
 
-            // Heuristics: VoIP readiness (srflx presence implies UDP mapping works)
+            // Консервативная эвристика VoIP
             async function testVoipReadiness() {
                 const ice = [];
                 const pc = new RTCPeerConnection({iceServers: [{urls: 'stun:stun.l.google.com:19302'}]});
@@ -737,7 +846,7 @@
                     pc.onicecandidate = (e) => {
                         if (e.candidate) ice.push(e.candidate.candidate);
                     };
-                    await new Promise(r => setTimeout(r, 2000));
+                    await new Promise(r => setTimeout(r, 4000));
                 } catch (_) {
                 }
                 pc.close();
@@ -745,11 +854,13 @@
                 const hasSrflx = ice.some(c => /typ srflx/.test(c));
                 const hasRelay = ice.some(c => /typ relay/.test(c));
                 const hasHost = ice.some(c => /typ host/.test(c));
-                const ok = hasSrflx || hasRelay;
+
+                // Консерватизм: считаем OK только если есть srflx ИЛИ relay; иначе — «есть риск проблем»
+                const ok = !!(hasSrflx || hasRelay);
 
                 const text = ok
-                    ? (hasSrflx ? 'UDP доступен (srflx найден) — звонки должны работать.' : 'TURN/relay найден — звонки вероятно будут работать.')
-                    : 'UDP/relay не обнаружен — звонки могут не работать в этой сети.';
+                    ? (hasRelay ? 'Есть TURN/relay — звонки вероятно будут работать.' : 'Найдены srflx — звонки скорее всего будут работать.')
+                    : 'UDP/TURN не обнаружен — звонки могут не работать в этой сети.';
 
                 document.getElementById('voipSummary').textContent = `Готовность к звонкам: ${text}`;
                 return {candidates: ice, hasSrflx, hasRelay, hasHost, ok};
@@ -757,64 +868,94 @@
 
             // графики
             function drawLatencyChart(samples) {
-                const ctx = document.getElementById('latencyChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: samples.map((_, i) => i + 1),
-                        datasets: [{label: 'RTT, мс', data: samples.map(x => Math.round(x))}]
-                    },
-                    options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {display: false}}}
-                });
+                if (typeof window.Chart === 'undefined') {
+                    // Один раз можно показать мягкое уведомление, что графики отключены
+                    console.warn('Chart.js не загружен, пропускаем отрисовку графика задержки');
+                    return;
+                }
+                try {
+                    const ctx = document.getElementById('latencyChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: samples.map((_, i) => i + 1),
+                            datasets: [{label: 'RTT, мс', data: samples.map(x => Math.round(x))}]
+                        },
+                        options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {display: false}}}
+                    });
+                } catch (e) {
+                    console.warn('Ошибка отрисовки графика задержки:', e);
+                }
             }
 
             function drawRegionalChart(rows) {
-                const ctx = document.getElementById('regionalChart').getContext('2d');
-                const labels = rows.map(r => r.label);
-                const data = rows.map(r => Math.round(r.time));
-                new Chart(ctx, {
-                    type: 'bar',
-                    data: {labels, datasets: [{label: 'Отклик, мс', data}]},
-                    options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {display: false}}}
-                });
+                if (typeof window.Chart === 'undefined') {
+                    console.warn('Chart.js не загружен, пропускаем отрисовку регионального графика');
+                    return;
+                }
+                try {
+                    const ctx = document.getElementById('regionalChart').getContext('2d');
+                    const labels = rows.map(r => r.label);
+                    const data = rows.map(r => Math.round(r.time));
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: {labels, datasets: [{label: 'Отклик, мс', data}]},
+                        options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {display: false}}}
+                    });
+                } catch (e) {
+                    console.warn('Ошибка отрисовки регионального графика:', e);
+                }
             }
 
-            // составление итогов
-            function composeUserMessage({ip, latency, loss, download, ru, yt, msg, http80, voip}) {
-                const parts = [];
-                const badPct = (arr) => {
-                    const total = (arr || []).length || 1;
-                    const bad = (arr || []).filter(x => !x.ok).length;
-                    return Math.round((bad / total) * 100);
-                };
+            // итоги
+            function pctBad(arr) {
+                const t = (arr || []).length || 1;
+                const b = (arr || []).filter(x => !x.ok).length;
+                return Math.round((b / t) * 100);
+            }
 
-                parts.push(`Мы проверили подключение. Внешний IP: ${ip?.ip || '—'}.`);
+            function composeUserMessage({ip, latency, loss, download, ruSpeed, ru, yt, msg, soc, http80, voip}) {
+                const parts = [];
+                parts.push(`Внешний IP: ${ip?.ip || '—'}.`);
                 parts.push(`Задержка ~${Math.round(latency?.avg || 0)} мс, джиттер ~${Math.round(latency?.jitter || 0)} мс.`);
-                parts.push((loss?.lossPct || 0) >= 10
-                    ? `Пакетные потери повышенные (${loss?.lossPct || 0}%). Возможны подвисания/обрывы.`
-                    : `Пакетные потери низкие (${loss?.lossPct || 0}%).`);
+                parts.push((loss?.lossPct || 0) >= 10 ? `Пакетные потери повышены (${loss?.lossPct || 0}%).` : `Потери низкие (${loss?.lossPct || 0}%).`);
                 parts.push(!download?.ok || (download?.mbps || 0) < 5
                     ? `Скорость скачивания низкая (${(download?.mbps || 0).toFixed(1)} Мбит/с).`
                     : `Скорость скачивания достаточная (${(download?.mbps || 0).toFixed(1)} Мбит/с).`);
-
-                if (badPct(ru) >= 50) parts.push(`Часть .ru/банков/госуслуг недоступна напрямую (${badPct(ru)}%).`);
-                if (badPct(yt) > 0) parts.push(`YouTube частично недоступен (${badPct(yt)}%).`);
-                if (badPct(msg) > 0) parts.push(`У мессенджеров есть проблемы с веб/медиа (${badPct(msg)}%).`);
-                if (badPct(http80) > 0) parts.push(`HTTP (порт 80) может блокироваться (${badPct(http80)}%).`);
-
-                parts.push(voip?.ok ? `VoIP/WebRTC: OK (звонки должны работать).` : `VoIP/WebRTC: возможно не работает в этой сети.`);
+                parts.push(ruSpeed?.ok ? `.ru-скорость ${ruSpeed.mbps.toFixed(1)} Мбит/с (источник: ${ruSpeed.source_label || '—'}).` : `.ru-скорость не измерена.`);
+                if (pctBad(ru) >= 50) parts.push(`Часть .ru/банков/госуслуг недоступна (${pctBad(ru)}%).`);
+                if (pctBad(yt) > 0) parts.push(`YouTube частично недоступен (${pctBad(yt)}%).`);
+                if (pctBad(msg) > 0) parts.push(`Мессенджеры частично недоступны (${pctBad(msg)}%).`);
+                if (pctBad(soc) > 0) parts.push(`Соцсети частично недоступны (${pctBad(soc)}%).`);
+                if (pctBad(http80) > 0) parts.push(`HTTP (порт 80) местами недоступен (${pctBad(http80)}%).`);
+                parts.push(voip?.ok ? `VoIP/WebRTC: вероятно OK.` : `VoIP/WebRTC: есть риск проблем.`);
                 return parts.join(' ');
             }
 
-            function makeVerdict({latency, loss, download, resources, doh, regions, yt, ru, msg, http80, voip}) {
+            function makeVerdict({
+                                     latency,
+                                     loss,
+                                     download,
+                                     ruSpeed,
+                                     resources,
+                                     doh,
+                                     regions,
+                                     yt,
+                                     ru,
+                                     msg,
+                                     soc,
+                                     http80,
+                                     voip
+                                 }) {
                 const v = [];
                 if ((loss?.lossPct || 0) >= 10) v.push('Высокие потери пакетов (≥10%).');
-                if ((latency?.avg || 0) > 150) v.push('Высокая средняя задержка (>150 мс).');
+                if ((latency?.avg || 0) > 150) v.push('Высокая задержка (>150 мс).');
                 if (!download?.ok || (download?.mbps || 0) < 5) v.push('Низкая скорость скачивания (<5 Мбит/с).');
+                if (ruSpeed?.ok && (ruSpeed.mbps || 0) < 3) v.push('Низкая .ru-скорость (<3 Мбит/с).');
 
                 const dohFails = Object.values(doh || {}).filter(x => !(x.google?.ok) && !(x.cf?.ok)).length;
-                if (dohFails === Object.keys(doh || {}).length && dohFails > 0) v.push('Вероятна блокировка DoH/HTTPS.');
-                else if (dohFails > 0) v.push('Частичные проблемы с DoH.');
+                if (dohFails === Object.keys(doh || {}).length && dohFails > 0) v.push('Вероятна блокировка DoH.');
+                else if (dohFails > 0) v.push('Частичные проблемы DoH.');
 
                 const blocked = (resources?.blocked || []);
                 if (blocked.filter(r => !r.ok).length >= Math.ceil(blocked.length / 2)) v.push('Недоступна большая часть часто блокируемых ресурсов.');
@@ -822,22 +963,41 @@
                 const slowRegions = (regions || []).filter(r => r.ok && r.time > 700).map(r => r.label);
                 if (slowRegions.length) v.push('Высокое время до регионов: ' + slowRegions.join(', ') + '.');
 
-                const badPct = (arr) => {
-                    const total = (arr || []).length || 1;
-                    const bad = (arr || []).filter(x => !x.ok).length;
-                    return Math.round((bad / total) * 100);
-                };
-                if (badPct(@json($ru)) >= 50) v.push('.ru/банки/госуслуги — существенные ограничения.');
-                if (badPct(@json($youtube)) > 0) v.push('Проблемы с YouTube/ytimg.');
-                if (badPct(@json($mess)) > 0) v.push('Проблемы с веб-точками мессенджеров.');
-                if (badPct(@json($http80)) > 0) v.push('Порт 80 (HTTP) местами недоступен.');
-                if (!voip?.ok) v.push('VoIP/WebRTC: UDP/TURN не обнаружен.');
+                if (pctBad(ru) >= 50) v.push('.ru/банки/госуслуги — существенные ограничения.');
+                if (pctBad(yt) > 0) v.push('Проблемы с YouTube.');
+                if (pctBad(msg) > 0) v.push('Проблемы с мессенджерами (вкл. Telegram/WhatsApp).');
+                if (pctBad(soc) > 0) v.push('Проблемы с соцсетями.');
+                if (pctBad(http80) > 0) v.push('Порт 80 (HTTP) местами недоступен.');
+                if (!voip?.ok) v.push('VoIP: UDP/TURN не обнаружен — возможны проблемы со звонками.');
 
                 if (!v.length) v.push('Критичных проблем не обнаружено.');
                 return v;
             }
 
-            // ВОТ ЭТА ФУНКЦИЯ — была причиной ошибки, вернул её.
+            // оценка качества VPN (0..100)
+            function scoreVPN({latency, loss, download, ruSpeed, msg, soc, http80, voip}) {
+                let score = 100;
+                const lat = latency?.avg || 0;
+                const jit = latency?.jitter || 0;
+                const lp = loss?.lossPct || 0;
+                const dmb = download?.mbps || 0;
+                const rmb = ruSpeed?.mbps || 0;
+
+                // штрафы
+                if (lat > 50) score -= Math.min(30, Math.round((lat - 50) / 2));
+                if (jit > 20) score -= Math.min(20, Math.round((jit - 20) / 1));
+                if (lp > 2) score -= Math.min(25, Math.round((lp - 2) * 1.5));
+                if (dmb < 10) score -= Math.min(25, Math.round((10 - dmb) * 1.5));
+                if (rmb && rmb < 5) score -= Math.min(15, Math.round((5 - rmb) * 2));
+                score -= Math.min(10, Math.round(pctBad(msg) / 10));
+                score -= Math.min(10, Math.round(pctBad(soc) / 10));
+                score -= Math.min(10, Math.round(pctBad(http80) / 10));
+                if (!voip?.ok) score -= 10;
+
+                score = Math.max(0, Math.min(100, score));
+                return score;
+            }
+
             function renderFindings(humanText, verdictArray) {
                 const ul = document.getElementById('findings');
                 ul.innerHTML = '';
@@ -864,7 +1024,7 @@
 
                 const ct = resp.headers.get('Content-Type') || '';
                 if (resp.status === 429) {
-                    alert('Слишком много запросов на генерацию отчёта. Попробуйте повторить чуть позже.');
+                    alert('Слишком много запросов. Попробуйте позже.');
                     return;
                 }
                 if (!resp.ok || !ct.includes('application/pdf')) {
@@ -885,22 +1045,107 @@
                 URL.revokeObjectURL(a.href);
             }
 
+            // Сохранение как автономный HTML (без внешних CDN, только таблицы/текст)
+            function downloadAsHTML() {
+                if (!window.__lastReport) return;
+                const R = window.__lastReport;
+                const html =
+                    `<!doctype html><html lang="ru"><meta charset="utf-8"><title>Netcheck Report (${brand})</title>
+<style>body{font-family:Arial,Helvetica,sans-serif;margin:20px;color:#111}h1,h2{margin:0 0 8px}
+table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ddd;padding:6px;font-size:13px}th{text-align:left;background:#f5f5f5}
+.badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:11px}.ok{background:#DCFCE7;color:#166534}.fail{background:#FEE2E2;color:#991B1B}
+.small{font-size:12px;color:#444}</style>
+<h1>Отчёт проверки сети — ${brand}</h1>
+<p class="small">Сгенерировано: ${(new Date()).toLocaleString()}</p>
+<h2>Итоги</h2>
+<table>
+<tr><th>Внешний IP</th><td>${R.summary.ip || '—'}</td></tr>
+<tr><th>Страна</th><td>${R.summary.country || '—'}</td></tr>
+<tr><th>Пинг (ср.)</th><td>${R.summary.latency_avg_ms || '—'} мс</td></tr>
+<tr><th>Джиттер</th><td>${R.summary.jitter_ms || '—'} мс</td></tr>
+<tr><th>Потери</th><td>${(R.summary.packet_loss_pct ?? '—')}%</td></tr>
+<tr><th>Скорость</th><td>${R.summary.download_mbps || '—'} Мбит/с</td></tr>
+<tr><th>.ru-скорость</th><td>${(R.ru_speed && R.ru_speed.ok) ? (R.ru_speed.mbps.toFixed(1) + ' Мбит/с') : '—'}</td></tr>
+<tr><th>VoIP</th><td>${(R.voip && R.voip.ok) ? 'OK' : 'Риск проблем'}</td></tr>
+</table>`;
+                const blob = new Blob([html], {type: 'text/html;charset=utf-8'});
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'network-report.html';
+                a.click();
+                URL.revokeObjectURL(a.href);
+            }
+
+            // хранение baseline (direct/vpn)
+            function saveBaseline(mode, payload) {
+                localStorage.setItem('netcheck:last:' + mode, JSON.stringify(payload));
+            }
+
+            function loadBaseline(mode) {
+                try {
+                    const s = localStorage.getItem('netcheck:last:' + mode);
+                    return s ? JSON.parse(s) : null;
+                } catch (_) {
+                    return null;
+                }
+            }
+
+            function renderCompare() {
+                const A = loadBaseline('direct');
+                const B = loadBaseline('vpn');
+                const el = (id, v) => document.getElementById(id).textContent = v;
+                if (!A || !B) {
+                    el('cmpLatency', '—');
+                    el('cmpLoss', '—');
+                    el('cmpSpeed', '—');
+                    el('cmpRuSpeed', '—');
+                    el('cmpBlocked', '—');
+                    el('cmpMsg', '—');
+                    el('cmpScore', '—');
+                    return;
+                }
+                const d = (x, y) => (x != null && y != null) ? (y - x) : null;
+                const latA = A.latency?.avg || 0, latB = B.latency?.avg || 0;
+                const lossA = A.packetLoss?.lossPct || 0, lossB = B.packetLoss?.lossPct || 0;
+                const spA = A.download?.mbps || 0, spB = B.download?.mbps || 0;
+                const ruA = A.ru_speed?.mbps || 0, ruB = B.ru_speed?.mbps || 0;
+                const blkA = pctBad(A.resources?.blocked || []), blkB = pctBad(B.resources?.blocked || []);
+                const msgA = pctBad(A.messengers || []) + pctBad(A.socials || []);
+                const msgB = pctBad(B.messengers || []) + pctBad(B.socials || []);
+                el('cmpLatency', `${Math.round(latA)} → ${Math.round(latB)} мс (${d(latA, latB) > 0 ? '+' : ''}${Math.round(d(latA, latB))} мс)`);
+                el('cmpLoss', `${lossA}% → ${lossB}% (${d(lossA, lossB) > 0 ? '+' : ''}${d(lossA, lossB)} п.п.)`);
+                el('cmpSpeed', `${spA.toFixed(1)} → ${spB.toFixed(1)} Мбит/с (${d(spA, spB) > 0 ? '+' : ''}${d(spA, spB).toFixed(1)})`);
+                el('cmpRuSpeed', `${ruA.toFixed(1)} → ${ruB.toFixed(1)} Мбит/с (${d(ruA, ruB) > 0 ? '+' : ''}${d(ruA, ruB).toFixed(1)})`);
+                el('cmpBlocked', `${blkA}% → ${blkB}% (${d(blkA, blkB) > 0 ? '+' : ''}${d(blkA, blkB)} п.п.)`);
+                el('cmpMsg', `${msgA}% → ${msgB}% (${d(msgA, msgB) > 0 ? '+' : ''}${d(msgA, msgB)} п.п.)`);
+                el('cmpScore', `${A.vpn?.score ?? '—'} → ${B.vpn?.score ?? '—'}`);
+            }
+
+            // выбор режима (radio)
+            const modeRadios = document.querySelectorAll('.modeRadio');
+
+            function currentMode() {
+                const el = Array.from(modeRadios).find(r => r.checked);
+                return el ? el.value : 'direct';
+            }
+
             async function runAll() {
                 runBtn.disabled = true;
                 pdfBtn.disabled = true;
+                saveHtmlBtn.disabled = true;
                 env.startedAt = new Date().toISOString();
                 loadUA();
                 tStart();
+                const mode = currentMode(); // 'direct' | 'vpn'
 
-                // значения по умолчанию, чтобы не падать, если шаг ошибся
-                let ip = {ip: '—', country: '—'};
+                let ip = {ip: '—', country: '—'}, ipAlt = {service: null, ip: null, country: null};
                 let latency = {avg: 0, jitter: 0, samples: []};
                 let loss = {lossPct: 0, p50: 0, p95: 0, total: 0, ok: 0};
                 let download = {ok: false, mbps: 0};
+                let ruSpeed = {ok: false, mbps: 0, source_label: null};
                 let resources = {must: [], blocked: []};
-                let doh = {};
-                let regions = [];
-                let yt = [], ru = [], msg = [], http80 = [];
+                let doh = {}, regions = [];
+                let yt = [], ruRes = [], msg = [], soc = [], httpRes = [];
                 let webrtc = [], voip = {ok: false};
 
                 try {
@@ -908,20 +1153,23 @@
                     latency = await step(20, async () => await testLatency(15));
                     loss = await step(30, async () => await testPacketLoss(40, 1500, 150));
                     download = await step(40, async () => await testDownload());
+                    ruSpeed = await step(45, async () => await testRuSpeed());
                     resources = await step(50, async () => await testResources());
                     doh = await step(60, async () => await testDoH());
                     regions = await step(70, async () => await probeRegions());
                     const ext = await step(80, async () => {
-                        const ytR = await testYouTube();
-                        const ruR = await testRU();
-                        const msgR = await testMessengers();
-                        const httpR = await testHTTP();
-                        return {yt: ytR, ru: ruR, msg: msgR, http80: httpR};
+                        const ytR = await testTable('yt', youtube);
+                        const ruR = await testTable('ru', ru);
+                        const msgR = await testTable('msg', mess);      // Telegram/WhatsApp включены в $mess
+                        const socR = await testTable('soc', socials);    // новые соцсети
+                        const httpR = await testTable('http', http80);
+                        return {yt: ytR, ru: ruR, msg: msgR, soc: socR, http80: httpR};
                     });
                     yt = ext.yt;
-                    ru = ext.ru;
+                    ruRes = ext.ru;
                     msg = ext.msg;
-                    http80 = ext.http80;
+                    soc = ext.soc;
+                    httpRes = ext.http80;
 
                     const wv = await step(90, async () => {
                         const w = await detectWebRTC();
@@ -931,7 +1179,12 @@
                     webrtc = wv.webrtc;
                     voip = wv.voip;
 
+                    // альтернативный IP в самом конце, чтобы не влиять на тайминги
+                    ipAlt = await detectIPAlt();
+
                     env.finishedAt = new Date().toISOString();
+
+                    const vpnScore = scoreVPN({latency, loss, download, ruSpeed, msg, soc, http80: httpRes, voip});
 
                     window.__lastReport = {
                         summary: {
@@ -942,24 +1195,45 @@
                             download_mbps: download.mbps ? download.mbps.toFixed(1) : null,
                             webrtc_candidates: webrtc,
                         },
-                        latency, packetLoss: loss, download, resources, doh, regional: regions,
-                        youtube: yt, ru_services: ru, messengers: msg, http80, voip,
+                        latency, packetLoss: loss, download, ru_speed: ruSpeed,
+                        resources, doh, regional: regions,
+                        youtube: yt, ru_services: ruRes, messengers: msg, socials: soc, http80: httpRes, voip,
+                        ip_alt: ipAlt,
+                        vpn: {mode, score: vpnScore},
                         env: {ua: env.ua, tz: env.tz},
                         startedAt: env.startedAt, finishedAt: env.finishedAt
                     };
 
-                    const userMsg = composeUserMessage({ip, latency, loss, download, ru, yt, msg, http80, voip});
+                    // сохранить baseline по режиму
+                    saveBaseline(mode, window.__lastReport);
+                    renderCompare();
+
+                    const userMsg = composeUserMessage({
+                        ip,
+                        latency,
+                        loss,
+                        download,
+                        ruSpeed,
+                        ru: ruRes,
+                        yt,
+                        msg,
+                        soc,
+                        http80: httpRes,
+                        voip
+                    });
                     const verdictArr = makeVerdict({
                         latency,
                         loss,
                         download,
+                        ruSpeed,
                         resources,
                         doh,
                         regions,
                         yt,
-                        ru,
+                        ru: ruRes,
                         msg,
-                        http80,
+                        soc,
+                        http80: httpRes,
                         voip
                     });
                     renderFindings(userMsg, verdictArr);
@@ -969,13 +1243,15 @@
                     tDone();
 
                     pdfBtn.disabled = false;
+                    saveHtmlBtn.disabled = false;
                 } catch (e) {
-                    // общий фэйл — лог и предупреждение
                     sendTelemetry({
                         event: 'run:error',
                         runId,
                         ts: new Date().toISOString(),
-                        message: (e && e.message) || 'unknown'
+                        error: (e && e.message) ? e.message : String(e),   // <— было message, стало error
+                        pct: CURRENT_PCT,
+                        label: CHECKPOINT_LABELS[CURRENT_PCT] || null
                     });
                     alert('Что-то пошло не так во время теста. Попробуйте ещё раз.');
                     pdfBtn.disabled = !window.__lastReport;
@@ -986,7 +1262,9 @@
 
             runBtn.addEventListener('click', runAll);
             pdfBtn.addEventListener('click', downloadPDF);
+            saveHtmlBtn.addEventListener('click', downloadAsHTML);
             loadUA();
+            renderCompare();
         })();
     </script>
 @endsection
