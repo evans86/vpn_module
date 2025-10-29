@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ServerUser\ServerUser;
 use App\Repositories\KeyActivateUser\KeyActivateUserRepository;
 use App\Repositories\ServerUser\ServerUserRepository;
+use App\Services\External\MarzbanAPI;
+use App\Services\Panel\marzban\MarzbanService;
 use App\Services\Panel\PanelStrategy;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
@@ -45,6 +48,9 @@ class VpnConfigController extends Controller
 
             // Декодируем ключи подключения
             $connectionKeys = json_decode($serverUser->keys, true);
+
+            // ВСЕГДА ПОЛУЧАЕМ АКТУАЛЬНЫЕ КЛЮЧИ ИЗ PANEL
+            $connectionKeys = $this->getFreshUserLinks($serverUser);
 
             if (!$connectionKeys) {
                 throw new RuntimeException('Invalid connection keys format');
@@ -97,6 +103,48 @@ class VpnConfigController extends Controller
             return response()->view('vpn.error', [
                 'message' => 'Не удалось загрузить конфигурацию VPN. Пожалуйста, проверьте правильность ссылки.'
             ]);
+        }
+    }
+
+    private function getFreshUserLinks(ServerUser $serverUser): array
+    {
+        try {
+            $marzbanService = new MarzbanService();
+            $panel = $marzbanService->updateMarzbanToken($serverUser->panel_id);
+            $marzbanApi = new MarzbanAPI($panel->api_address);
+
+            // Получаем актуальные данные пользователя из Marzban
+            $userData = $marzbanApi->getUser($panel->auth_token, $serverUser->id);
+
+            // Обновляем ссылки в БД
+            if (!empty($userData['links'])) {
+                $serverUser->keys = json_encode($userData['links']);
+                $serverUser->save();
+
+                Log::info('User links updated from panel', ['user_id' => $serverUser->id]);
+                return $userData['links'];
+            }
+
+            // Если links нет, но есть subscription_url
+            if (!empty($userData['subscription_url'])) {
+                $links = [$userData['subscription_url']];
+                $serverUser->keys = json_encode($links);
+                $serverUser->save();
+                return $links;
+            }
+
+            // Если не удалось получить из panel, используем сохраненные ключи
+            Log::warning('Using stored keys for user', ['user_id' => $serverUser->id]);
+            return json_decode($serverUser->keys, true) ?? [];
+
+        } catch (Exception $e) {
+            Log::error('Failed to get fresh user links', [
+                'user_id' => $serverUser->id,
+                'error' => $e->getMessage()
+            ]);
+
+            // В случае ошибки возвращаем сохраненные ключи
+            return json_decode($serverUser->keys, true) ?? [];
         }
     }
 
