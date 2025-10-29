@@ -126,9 +126,8 @@ class MarzbanAPI
                 ],
                 'json' => [
                     'username' => $userId,
-                    'data_limit' => $data_limit, //лимит 25 гигов
-                    'expire' => $expire, //время окончания через 30 дней
-//                    'max_connections' => 1,
+                    'data_limit' => $data_limit,
+                    'expire' => $expire,
                     'proxies' => [
                         "vmess" => [
                             "id" => Str::uuid()->toString()
@@ -144,37 +143,30 @@ class MarzbanAPI
                         ]
                     ],
                     'inbounds' => [
-                        'vmess' => [
-                            "VMESS HTTPUPGRADE NoTLS",
-                        ],
-                        'vless' => [
-                            "VLESS HTTPUPGRADE NoTLS",
-                        ],
-//                        'trojan' => [
-//                            "TROJAN WS NOTLS (WS)",
-//                        ],
-//                        'shadowsocks' => [
-//                            "SHADOWSOCKS TCP (TCP)",
-//                        ],
+                        'vmess' => ["VMESS-WS"],
+                        'vless' => ["VLESS-WS"],
+                        'trojan' => ["TROJAN-WS"],
+                        'shadowsocks' => ["Shadowsocks-TCP"],
                     ],
                 ],
-                'verify' => false // Отключаем проверку SSL сертификата
+                'verify' => false
             ];
 
             $client = new Client([
                 'base_uri' => $this->host . '/api/',
-                'verify' => false // Отключаем проверку SSL сертификата
+                'verify' => false
             ]);
 
             $response = $client->post($action, $requestParam);
-
             $result = $response->getBody()->getContents();
 
-            return (json_decode($result, true));
-        } catch (RuntimeException $r) {
-            throw new RuntimeException($r->getMessage());
+            return json_decode($result, true);
         } catch (Exception $e) {
-            throw new Exception($e->getMessage());
+            Log::error('Failed to create user', [
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            throw new Exception('Failed to create user: ' . $e->getMessage());
         }
     }
 

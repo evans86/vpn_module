@@ -500,105 +500,82 @@ class MarzbanService
     public function updateConfiguration(int $panel_id): void
     {
         $panel = self::updateMarzbanToken($panel_id);
-        $panel->panel_status = Panel::PANEL_CONFIGURED;
-        $panel->save();
 
         $marzbanApi = new MarzbanAPI($panel->api_address);
 
         $json_config = [
             "log" => [
-                "loglevel" => "debug",
-                "access" => "/var/lib/marzban/access.log",
-                "error" => "/var/lib/marzban/error.log",
-                "dnsLog" => true
+                "loglevel" => "warning"
             ],
             "inbounds" => [
                 [
-                    "tag" => "VLESS HTTPUPGRADE NoTLS",
+                    "tag" => "VLESS-WS",
                     "listen" => "0.0.0.0",
                     "port" => 2095,
                     "protocol" => "vless",
                     "settings" => [
-                        "clients" => [
-                        ],
+                        "clients" => [],
                         "decryption" => "none"
                     ],
                     "streamSettings" => [
-                        "network" => "httpupgrade",
-                        "httpupgradeSettings" => [
-                            "path" => "/",
-                            "host" => ""
-                        ],
-                        "security" => "none"
+                        "network" => "ws",
+                        "security" => "none",
+                        "wsSettings" => [
+                            "path" => "/vless"
+                        ]
                     ],
                     "sniffing" => [
                         "enabled" => true,
-                        "destOverride" => [
-                            "http",
-                            "tls",
-                            "quic"
-                        ]
+                        "destOverride" => ["http", "tls"]
                     ]
                 ],
                 [
-                    "tag" => "VMESS HTTPUPGRADE NoTLS",
+                    "tag" => "VMESS-WS",
                     "listen" => "0.0.0.0",
-                    "port" => 2095,
+                    "port" => 2096,
                     "protocol" => "vmess",
                     "settings" => [
-                        "clients" => [
-                        ]
-                    ],
-                    "streamSettings" => [
-                        "network" => "httpupgrade",
-                        "httpupgradeSettings" => [
-                            "path" => "/",
-                            "host" => ""
-                        ],
-                        "security" => "none"
-                    ],
-                    "sniffing" => [
-                        "enabled" => true,
-                        "destOverride" => [
-                            "http",
-                            "tls",
-                            "quic"
-                        ]
-                    ]
-                ],
-                [
-                    "tag" => "TROJAN WS NOTLS",
-                    "listen" => "0.0.0.0",
-                    "port" => 8080,
-                    "protocol" => "trojan",
-                    "settings" => [
-                        "clients" => [
-                        ]
+                        "clients" => []
                     ],
                     "streamSettings" => [
                         "network" => "ws",
+                        "security" => "none",
                         "wsSettings" => [
-                            "path" => "/"
-                        ],
-                        "security" => "none"
+                            "path" => "/vmess"
+                        ]
                     ],
                     "sniffing" => [
                         "enabled" => true,
-                        "destOverride" => [
-                            "http",
-                            "tls",
-                            "quic"
-                        ]
+                        "destOverride" => ["http", "tls"]
                     ]
                 ],
                 [
-                    "tag" => "Shadowsocks TCP",
+                    "tag" => "TROJAN-WS",
                     "listen" => "0.0.0.0",
-                    "port" => 1080,
+                    "port" => 2097,
+                    "protocol" => "trojan",
+                    "settings" => [
+                        "clients" => []
+                    ],
+                    "streamSettings" => [
+                        "network" => "ws",
+                        "security" => "none",
+                        "wsSettings" => [
+                            "path" => "/trojan"
+                        ]
+                    ],
+                    "sniffing" => [
+                        "enabled" => true,
+                        "destOverride" => ["http", "tls"]
+                    ]
+                ],
+                [
+                    "tag" => "Shadowsocks-TCP",
+                    "listen" => "0.0.0.0",
+                    "port" => 2098,
                     "protocol" => "shadowsocks",
                     "settings" => [
-                        "clients" => [
-                        ],
+                        "clients" => [],
                         "network" => "tcp,udp"
                     ]
                 ]
@@ -607,32 +584,24 @@ class MarzbanService
                 [
                     "protocol" => "freedom",
                     "tag" => "DIRECT"
-                ],
-                [
-                    "protocol" => "blackhole",
-                    "tag" => "BLOCK"
-                ]
-            ],
-            "routing" => [
-                "rules" => [
-                    [
-                        "ip" => [
-                            "geoip:private"
-                        ],
-                        "domain" => [
-                            "geosite:private"
-                        ],
-                        "protocol" => [
-                            "bittorrent"
-                        ],
-                        "outboundTag" => "BLOCK",
-                        "type" => "field"
-                    ]
                 ]
             ]
         ];
 
-        $marzbanApi->modifyConfig($panel->auth_token, $json_config);
+        try {
+            $marzbanApi->modifyConfig($panel->auth_token, $json_config);
+
+            $panel->panel_status = Panel::PANEL_CONFIGURED;
+            $panel->save();
+
+            Log::info('4-protocol configuration updated successfully', ['panel_id' => $panel_id]);
+        } catch (Exception $e) {
+            Log::error('Failed to update configuration', [
+                'panel_id' => $panel_id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
     }
 
     /**
