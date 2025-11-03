@@ -15,9 +15,8 @@ class PublicNetworkCheckController extends Controller
 {
     public function index()
     {
-        $brand = config('app.brand', 'High VPN');
+        $brand = config('app.brand', 'VPN Service');
 
-        // Упрощенная конфигурация целей для проверки
         $targets = [
             'local_services' => [
                 ['label' => 'Яндекс', 'url' => 'https://yandex.ru/favicon.ico'],
@@ -35,17 +34,16 @@ class PublicNetworkCheckController extends Controller
                 ['label' => 'Google', 'url' => 'https://google.com/favicon.ico'],
                 ['label' => 'Netflix', 'url' => 'https://netflix.com/favicon.ico'],
             ],
-            'vpn_quality' => [
+            'network_health' => [
+                ['label' => 'Проверка DNS', 'url' => 'https://dns.google/resolve?name=google.com&type=A'],
                 ['label' => 'Основной шлюз', 'url' => 'https://api.ipify.org?format=json'],
-                ['label' => 'Резервный шлюз', 'url' => 'https://www.cloudflare.com/cdn-cgi/trace'],
-                ['label' => 'Сервисный endpoint', 'url' => 'https://captive.apple.com/hotspot-detect.html'],
+                ['label' => 'Резервный шлюз', 'url' => 'https://www.gstatic.com/generate_204'],
             ]
         ];
 
         return view('netcheck.public.simple', compact('brand', 'targets'));
     }
 
-    // Остальные методы остаются без изменений...
     public function ping(Request $request)
     {
         $resp = response()->json([
@@ -163,7 +161,6 @@ class PublicNetworkCheckController extends Controller
                 'finish' => $finish->format('d.m.Y H:i:s'),
             ];
 
-            // Логируем данные для отладки
             Log::info('PDF generation data', [
                 'resources' => $data['resources'] ?? [],
                 'summary' => $data['summary'] ?? []
@@ -177,7 +174,7 @@ class PublicNetworkCheckController extends Controller
             ])->loadView('netcheck.public.simple-pdf', [
                 'data'        => $data,
                 'generatedAt' => now()->format('d.m.Y H:i:s'),
-                'brand'       => config('app.brand', 'High VPN'),
+                'brand'       => config('app.brand', 'VPN Service'),
             ])->setPaper('a4');
 
             $content  = $pdf->output();

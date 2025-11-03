@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', 'Проверка сети — VPN Service')
+@section('title', 'Проверка сети')
 @section('header-subtitle', 'Тестирование подключения и доступности сайтов')
 
 @section('content')
@@ -8,7 +8,8 @@
         <!-- Заголовок -->
         <div class="text-center mb-8">
             <h1 class="text-4xl font-bold text-gray-900 mb-4">Проверка сети</h1>
-            <p class="text-xl text-gray-600 mb-6">Узнайте качество вашего подключения и доступность популярных сайтов</p>
+            <p class="text-xl text-gray-600 mb-6">Узнайте качество вашего подключения и доступность популярных
+                сайтов</p>
 
             <button id="runTest"
                     class="bg-blue-600 hover:bg-blue-700 text-white px-12 py-6 rounded-2xl text-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg">
@@ -46,7 +47,8 @@
                     <span id="progressPercent" class="text-sm font-medium">0%</span>
                 </div>
                 <div class="w-full bg-gray-200 rounded-full h-3">
-                    <div id="progressBar" class="bg-blue-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    <div id="progressBar" class="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                         style="width: 0%"></div>
                 </div>
             </div>
         </div>
@@ -62,8 +64,8 @@
                 <div class="text-sm text-gray-600">Скорость, Мбит/с</div>
             </div>
             <div class="bg-white rounded-lg shadow p-4 text-center">
-                <div class="text-2xl font-bold text-purple-600 mb-2" id="vpnScore">—</div>
-                <div class="text-sm text-gray-600">Качество VPN</div>
+                <div class="text-2xl font-bold text-purple-600 mb-2" id="stabilityScore">—</div>
+                <div class="text-sm text-gray-600">Стабильность</div>
             </div>
             <div class="bg-white rounded-lg shadow p-4 text-center">
                 <div class="text-2xl font-bold text-orange-600 mb-2" id="availability">—</div>
@@ -102,16 +104,17 @@
             </div>
         </div>
 
-        <!-- Качество VPN -->
+        <!-- Здоровье сети -->
         <div class="bg-white rounded-lg shadow mb-8">
             <div class="px-6 py-4 border-b bg-purple-50">
                 <h3 class="text-lg font-semibold flex items-center">
-                    <span class="mr-2">🛡️</span>
-                    Качество подключения
+                    <span class="mr-2">📡</span>
+                    Здоровье сети
                 </h3>
+                <p class="text-sm text-gray-600 mt-1">Проверка основных сетевых компонентов</p>
             </div>
-            <div class="p-6 space-y-3" id="vpnResults">
-                <div class="text-gray-500 text-center py-4">Проверка серверов...</div>
+            <div class="p-6 space-y-3" id="networkHealthResults">
+                <div class="text-gray-500 text-center py-4">Проверка компонентов...</div>
             </div>
         </div>
 
@@ -124,12 +127,14 @@
             <div id="verdictContent" class="space-y-4"></div>
 
             <div class="mt-6 pt-6 border-t flex flex-col sm:flex-row gap-4 justify-center">
-                <button id="retryTest" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors flex items-center justify-center">
+                <button id="retryTest"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors flex items-center justify-center">
                     <span class="mr-2">🔄</span>
                     Проверить снова
                 </button>
 
-                <button id="downloadPdf" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition-colors flex items-center justify-center">
+                <button id="downloadPdf"
+                        class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition-colors flex items-center justify-center">
                     <span class="mr-2">📄</span>
                     Скачать PDF-отчёт
                 </button>
@@ -142,7 +147,8 @@
             constructor() {
                 this.targets = @json($targets);
                 this.pingUrl = @json(route('netcheck.ping'));
-                this.payloadUrl = (size) => @json(route('netcheck.payload', ['size' => 'SIZE'])).replace('SIZE', size);
+                this.payloadUrl = (size) => @json(route('netcheck.payload', ['size' => 'SIZE'])).
+                replace('SIZE', size);
                 this.reportUrl = @json(route('netcheck.report'));
                 this.isRunning = false;
                 this.currentResults = null;
@@ -183,8 +189,8 @@
                     await this.updateProgress(75, 'Проверка глобальных сервисов...');
                     const globalResults = await this.testCategory('global_services', 'globalResults');
 
-                    await this.updateProgress(85, 'Проверка качества подключения...');
-                    const vpnResults = await this.testCategory('vpn_quality', 'vpnResults');
+                    await this.updateProgress(85, 'Проверка здоровья сети...');
+                    const networkHealthResults = await this.testCategory('network_health', 'networkHealthResults');
 
                     // 4. Сохранение результатов и итоги
                     await this.updateProgress(95, 'Анализ результатов...');
@@ -195,11 +201,11 @@
                         speed,
                         localResults,
                         globalResults,
-                        vpnResults,
+                        networkHealthResults,
                         timestamp: new Date().toISOString()
                     };
 
-                    this.calculateFinalScore(ping, speed, localResults, globalResults, vpnResults);
+                    this.calculateFinalScore(ping, speed, localResults, globalResults, networkHealthResults);
 
                 } catch (error) {
                     console.error('Test failed:', error);
@@ -236,12 +242,12 @@
                     document.getElementById('countryInfo').textContent = country;
                     document.getElementById('providerInfo').textContent = isp.length > 20 ? isp.substring(0, 20) + '...' : isp;
 
-                    return { ip: data.ip, country, isp };
+                    return {ip: data.ip, country, isp};
                 } catch (error) {
                     document.getElementById('ipAddress').textContent = 'Не определен';
                     document.getElementById('countryInfo').textContent = 'Не определено';
                     document.getElementById('providerInfo').textContent = 'Не определен';
-                    return { ip: null, country: null, isp: null };
+                    return {ip: null, country: null, isp: null};
                 }
             }
 
@@ -394,7 +400,7 @@
                 return div;
             }
 
-            calculateFinalScore(ping, speed, localResults, globalResults, vpnResults) {
+            calculateFinalScore(ping, speed, localResults, globalResults, networkHealthResults) {
                 // Расчет доступности локальных сервисов
                 const localSuccess = localResults.filter(r => r.status === 'success').length;
                 const localTotal = localResults.length;
@@ -405,23 +411,23 @@
                 const globalTotal = globalResults.length;
                 const globalPercent = Math.round((globalSuccess / globalTotal) * 100);
 
-                // Качество подключения
-                const vpnSuccess = vpnResults.filter(r => r.status === 'success').length;
-                const vpnTotal = vpnResults.length;
-                const vpnScore = Math.round((vpnSuccess / vpnTotal) * 100);
+                // Стабильность сети
+                const networkSuccess = networkHealthResults.filter(r => r.status === 'success').length;
+                const networkTotal = networkHealthResults.length;
+                const stabilityScore = Math.round((networkSuccess / networkTotal) * 100);
 
                 // Общая доступность
                 const overallAvailability = Math.round((localPercent + globalPercent) / 2);
 
                 // Обновление интерфейса
-                document.getElementById('vpnScore').textContent = vpnScore + '%';
+                document.getElementById('stabilityScore').textContent = stabilityScore + '%';
                 document.getElementById('availability').textContent = overallAvailability + '%';
 
                 // Итоговый вердикт
-                this.showFinalVerdict(ping, speed, localPercent, globalPercent, vpnScore, overallAvailability);
+                this.showFinalVerdict(ping, speed, localPercent, globalPercent, stabilityScore, overallAvailability);
             }
 
-            showFinalVerdict(ping, speed, localPercent, globalPercent, vpnScore, overallAvailability) {
+            showFinalVerdict(ping, speed, localPercent, globalPercent, stabilityScore, overallAvailability) {
                 const verdict = document.getElementById('finalVerdict');
                 const content = document.getElementById('verdictContent');
 
@@ -429,12 +435,12 @@
                 let color = 'text-green-600';
                 let emoji = '✅';
 
-                // Анализируем доступность глобальных сервисов для определения качества VPN
-                const hasGoodVPN = globalPercent >= 70;
+                // Анализируем доступность глобальных сервисов
+                const hasGoodGlobalAccess = globalPercent >= 70;
 
                 if (overallAvailability >= 80) {
-                    if (hasGoodVPN) {
-                        message = 'Отличное подключение! VPN работает эффективно - большинство сайтов доступно.';
+                    if (hasGoodGlobalAccess) {
+                        message = 'Отличное подключение! Большинство сайтов доступно без ограничений.';
                         color = 'text-green-600';
                         emoji = '🎉';
                     } else {
@@ -443,8 +449,8 @@
                         emoji = '👍';
                     }
                 } else if (overallAvailability >= 50) {
-                    if (hasGoodVPN) {
-                        message = 'Удовлетворительное подключение. VPN работает, но есть небольшие проблемы.';
+                    if (hasGoodGlobalAccess) {
+                        message = 'Удовлетворительное подключение. Есть небольшие проблемы с доступностью.';
                         color = 'text-orange-600';
                         emoji = '⚠️';
                     } else {
@@ -497,30 +503,22 @@
                         </span>
                     </div>
                     <div class="flex justify-between">
-                        <span>Качество подключения:</span>
-                        <span class="font-semibold ${vpnScore >= 80 ? 'text-green-600' : vpnScore >= 50 ? 'text-orange-600' : 'text-red-600'}">
-                            ${vpnScore}%
+                        <span>Стабильность сети:</span>
+                        <span class="font-semibold ${stabilityScore >= 80 ? 'text-green-600' : stabilityScore >= 50 ? 'text-orange-600' : 'text-red-600'}">
+                            ${stabilityScore}%
                         </span>
                     </div>
                 </div>
             </div>
-            ${hasGoodVPN ? `
-            <div class="mt-4 p-4 bg-green-50 rounded-lg">
-                <h4 class="font-semibold mb-2 text-green-800">🛡️ VPN работает отлично!</h4>
-                <p class="text-sm text-green-700">
-                    Вы имеете доступ к ${globalPercent}% международных сервисов.
-                    Это указывает на эффективную работу VPN-подключения.
-                </p>
-            </div>
-            ` : `
+            ${!hasGoodGlobalAccess ? `
             <div class="mt-4 p-4 bg-blue-50 rounded-lg">
                 <h4 class="font-semibold mb-2 text-blue-800">💡 Для полного доступа:</h4>
                 <p class="text-sm text-blue-700">
                     Доступно только ${globalPercent}% международных сервисов.
-                    Для разблокировки остальных сайтов рекомендуется использовать VPN.
+                    Это может указывать на ограничения в вашей сети.
                 </p>
             </div>
-            `}
+            ` : ''}
         `;
 
                 verdict.classList.remove('hidden');
@@ -565,7 +563,7 @@
                                 ok: item.status === 'success',
                                 time: item.time
                             })),
-                            vpn_quality: this.currentResults.vpnResults.map(item => ({
+                            network_health: this.currentResults.networkHealthResults.map(item => ({
                                 label: item.label,
                                 ok: item.status === 'success',
                                 time: item.time
@@ -579,7 +577,7 @@
                         finishedAt: new Date().toISOString(),
                     };
 
-                    console.log('Sending PDF data:', reportData); // Для отладки
+                    console.log('Sending PDF data:', reportData);
 
                     const response = await fetch(this.reportUrl, {
                         method: 'POST',
@@ -612,6 +610,7 @@
             }
 
             retryTest() {
+                this.resetResults();
                 this.runFullTest();
             }
 
@@ -634,16 +633,25 @@
             }
 
             resetResults() {
-                ['localResults', 'globalResults', 'vpnResults'].forEach(id => {
+                // Исправлено: убраны ссылки на несуществующие элементы
+                ['localResults', 'globalResults', 'networkHealthResults'].forEach(id => {
                     const element = document.getElementById(id);
-                    element.innerHTML = '<div class="text-gray-500 text-center py-4">Проверка...</div>';
+                    if (element) {
+                        element.innerHTML = '<div class="text-gray-500 text-center py-4">Проверка...</div>';
+                    }
                 });
 
-                ['pingValue', 'speedValue', 'vpnScore', 'availability'].forEach(id => {
-                    document.getElementById(id).textContent = '—';
+                ['pingValue', 'speedValue', 'stabilityScore', 'availability'].forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.textContent = '—';
+                    }
                 });
 
-                document.getElementById('finalVerdict').classList.add('hidden');
+                const finalVerdict = document.getElementById('finalVerdict');
+                if (finalVerdict) {
+                    finalVerdict.classList.add('hidden');
+                }
             }
 
             showError(message) {
@@ -653,10 +661,15 @@
             <strong>Ошибка:</strong> ${message}
         `;
 
-                document.querySelector('.max-w-6xl').insertBefore(errorDiv, document.getElementById('progressSection'));
+                const container = document.querySelector('.max-w-6xl');
+                if (container) {
+                    container.insertBefore(errorDiv, document.getElementById('progressSection'));
+                }
 
                 setTimeout(() => {
-                    errorDiv.remove();
+                    if (errorDiv.parentNode) {
+                        errorDiv.remove();
+                    }
                 }, 5000);
             }
 

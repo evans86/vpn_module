@@ -21,7 +21,7 @@
     </style>
 </head>
 <body>
-<h1>Отчёт проверки сети — {{ $brand }}</h1>
+<h1>Отчёт проверки сети</h1>
 <p class="muted small">Сгенерировано: {{ $generatedAt }}</p>
 
 <h2>Основные показатели</h2>
@@ -108,18 +108,18 @@
 </div>
 
 <div class="section">
-    <h3>🛡️ Качество подключения</h3>
+    <h3>📡 Здоровье сети</h3>
     <table>
         <thead>
         <tr>
-            <th>Сервер</th>
+            <th>Компонент</th>
             <th class="status-cell">Статус</th>
             <th>Время ответа</th>
         </tr>
         </thead>
         <tbody>
-        @if(!empty($data['resources']['vpn_quality']))
-            @foreach($data['resources']['vpn_quality'] as $item)
+        @if(!empty($data['resources']['network_health']))
+            @foreach($data['resources']['network_health'] as $item)
                 <tr>
                     <td>{{ $item['label'] ?? '—' }}</td>
                     <td class="status-cell">
@@ -143,7 +143,7 @@
     // Расчет статистики
     $localServices = $data['resources']['local_services'] ?? [];
     $globalServices = $data['resources']['global_services'] ?? [];
-    $vpnServices = $data['resources']['vpn_quality'] ?? [];
+    $networkHealth = $data['resources']['network_health'] ?? [];
 
     $localCount = count(array_filter($localServices, fn($s) => $s['ok'] ?? false));
     $localTotal = count($localServices) ?: 1;
@@ -153,9 +153,9 @@
     $globalTotal = count($globalServices) ?: 1;
     $globalPercent = round(($globalCount / $globalTotal) * 100);
 
-    $vpnCount = count(array_filter($vpnServices, fn($s) => $s['ok'] ?? false));
-    $vpnTotal = count($vpnServices) ?: 1;
-    $vpnPercent = round(($vpnCount / $vpnTotal) * 100);
+    $networkCount = count(array_filter($networkHealth, fn($s) => $s['ok'] ?? false));
+    $networkTotal = count($networkHealth) ?: 1;
+    $networkPercent = round(($networkCount / $networkTotal) * 100);
 @endphp
 
 <div class="section">
@@ -193,12 +193,12 @@
             </td>
         </tr>
         <tr>
-            <td>Качество подключения</td>
-            <td>{{ $vpnPercent }}% ({{ $vpnCount }}/{{ $vpnTotal }})</td>
+            <td>Стабильность сети</td>
+            <td>{{ $networkPercent }}% ({{ $networkCount }}/{{ $networkTotal }})</td>
             <td class="status-cell">
-                @if($vpnPercent >= 80)
+                @if($networkPercent >= 80)
                     <span class="badge ok">Стабильно</span>
-                @elseif($vpnPercent >= 50)
+                @elseif($networkPercent >= 50)
                     <span class="badge ok">Удовлетворительно</span>
                 @else
                     <span class="badge fail">Нестабильно</span>
@@ -210,16 +210,17 @@
 
 @if($globalPercent >= 70)
     <div class="section" style="background: #f0fdf4; padding: 10px; border-radius: 5px; border: 1px solid #bbf7d0;">
-        <h3 style="color: #166534; margin: 0 0 5px 0;">🛡️ Высокая доступность глобальных сервисов</h3>
+        <h3 style="color: #166534; margin: 0 0 5px 0;">✅ Отличная доступность</h3>
         <p style="color: #166534; margin: 0; font-size: 11px;">
-            Доступ к {{ $globalPercent }}% международных сайтов указывает на эффективную работу подключения.
+            Доступ к {{ $globalPercent }}% международных сайтов указывает на хорошее сетевое подключение.
         </p>
     </div>
 @else
     <div class="section" style="background: #eff6ff; padding: 10px; border-radius: 5px; border: 1px solid #bfdbfe;">
         <h3 style="color: #1e40af; margin: 0 0 5px 0;">💡 Рекомендация</h3>
         <p style="color: #1e40af; margin: 0; font-size: 11px;">
-            Доступно только {{ $globalPercent }}% международных сервисов. Для полного доступа рекомендуется использовать VPN.
+            Доступно только {{ $globalPercent }}% международных сервисов.
+            Это может указывать на ограничения в сети.
         </p>
     </div>
 @endif
