@@ -49,6 +49,7 @@ class VpnConfigController extends Controller
             // Декодируем ключи подключения
             $connectionKeys = json_decode($serverUser->keys, true);
 
+            //ЖЕСТОКИЙ КОСТЫЛЬ
             // ВСЕГДА ПОЛУЧАЕМ АКТУАЛЬНЫЕ КЛЮЧИ ИЗ PANEL
             $connectionKeys = $this->getFreshUserLinks($serverUser);
 
@@ -106,6 +107,8 @@ class VpnConfigController extends Controller
         }
     }
 
+
+    //ЖЕСТОКИЙ КОСТЫЛЬ
     private function getFreshUserLinks(ServerUser $serverUser): array
     {
         try {
