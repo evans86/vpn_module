@@ -15,24 +15,37 @@ class PublicNetworkCheckController extends Controller
 {
     public function index()
     {
-        $must     = config('networkcheck.resources_must', []);
-        $blocked  = config('networkcheck.resources_often_blocked', []);
-        $sizes    = config('networkcheck.download_sizes', []);
-        $youtube  = config('networkcheck.youtube', []);
-        $ru       = config('networkcheck.ru_services', []);
-        $mess     = config('networkcheck.messengers', []);       // включает Telegram/WhatsApp
-        $socials  = config('networkcheck.socials', []);          // новые соцсети
-        $http80   = config('networkcheck.http_probe', []);
-        $doh      = config('networkcheck.doh_domains', []);
-        $regions  = config('networkcheck.regional_probes', []);
-        $ruSpeed  = config('networkcheck.ru_speed_assets', []);  // [{label,url,bytes}]
-        $brand    = config('app.brand', 'High VPN');
+        $brand = config('app.brand', 'High VPN');
 
-        return view('netcheck.public.index', compact(
-            'must','blocked','sizes','youtube','ru','mess','socials','http80','doh','regions','ruSpeed','brand'
-        ));
+        // Упрощенная конфигурация целей для проверки
+        $targets = [
+            'local_services' => [
+                ['label' => 'Яндекс', 'url' => 'https://yandex.ru/favicon.ico'],
+                ['label' => 'Госуслуги', 'url' => 'https://www.gosuslugi.ru/favicon.ico'],
+                ['label' => 'Сбербанк', 'url' => 'https://www.sberbank.ru/favicon.ico'],
+                ['label' => 'ВКонтакте', 'url' => 'https://vk.com/favicon.ico'],
+            ],
+            'global_services' => [
+                ['label' => 'YouTube', 'url' => 'https://www.youtube.com/favicon.ico'],
+                ['label' => 'Telegram', 'url' => 'https://telegram.org/favicon.ico'],
+                ['label' => 'WhatsApp', 'url' => 'https://web.whatsapp.com/favicon.ico'],
+                ['label' => 'Instagram', 'url' => 'https://www.instagram.com/favicon.ico'],
+                ['label' => 'Twitter/X', 'url' => 'https://twitter.com/favicon.ico'],
+                ['label' => 'Facebook', 'url' => 'https://www.facebook.com/favicon.ico'],
+                ['label' => 'Google', 'url' => 'https://google.com/favicon.ico'],
+                ['label' => 'Netflix', 'url' => 'https://netflix.com/favicon.ico'],
+            ],
+            'vpn_quality' => [
+                ['label' => 'Основной шлюз', 'url' => 'https://api.ipify.org?format=json'],
+                ['label' => 'Резервный шлюз', 'url' => 'https://www.cloudflare.com/cdn-cgi/trace'],
+                ['label' => 'Сервисный endpoint', 'url' => 'https://captive.apple.com/hotspot-detect.html'],
+            ]
+        ];
+
+        return view('netcheck.public.simple', compact('brand', 'targets'));
     }
 
+    // Остальные методы остаются без изменений...
     public function ping(Request $request)
     {
         $resp = response()->json([
@@ -43,9 +56,6 @@ class PublicNetworkCheckController extends Controller
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, private')
             ->header('Access-Control-Allow-Origin', '*');
 
-        if ($request->boolean('debug')) {
-            Log::info('netcheck.ping', ['ip' => $request->ip(), 'ua' => $request->userAgent()]);
-        }
         return $resp;
     }
 
@@ -61,8 +71,8 @@ class PublicNetworkCheckController extends Controller
                 'label'  => 'nullable|string|max:120',
                 'status' => 'nullable|string|in:success,error',
                 'error'  => 'nullable|string|max:2000',
-                'message'=> 'nullable|string|max:2000',   // <— добавили
-                'reason' => 'nullable|string|max:2000',   // <— добавили
+                'message'=> 'nullable|string|max:2000',
+                'reason' => 'nullable|string|max:2000',
                 'ua'     => 'nullable|string|max:2000',
                 'tz'     => 'nullable|string|max:100',
                 'ts'     => 'nullable|string|max:64',
@@ -77,7 +87,7 @@ class PublicNetworkCheckController extends Controller
                 'pct'       => $data['pct'] ?? null,
                 'label'     => $data['label'] ?? null,
                 'status'    => $data['status'] ?? null,
-                'error'     => $data['error'] ?? $data['message'] ?? $data['reason'] ?? null, // <—
+                'error'     => $data['error'] ?? $data['message'] ?? $data['reason'] ?? null,
                 'tz'        => $data['tz'] ?? null,
                 'client_ts' => $data['ts'] ?? null,
             ];
@@ -102,7 +112,7 @@ class PublicNetworkCheckController extends Controller
 
         $headers = [
             'Content-Type'                => 'application/octet-stream',
-            'Content-Disposition'         => 'inline; filename="payload_'.$label.'.bin"',
+            'Content-Disposition'         => 'inline; filename="speedtest_'.$label.'.bin"',
             'Cache-Control'               => 'no-store, no-cache, must-revalidate, private',
             'X-Content-Length-Bytes'      => (string) $bytes,
             'Access-Control-Allow-Origin' => '*',
@@ -134,18 +144,6 @@ class PublicNetworkCheckController extends Controller
             'env'         => 'required|array',
             'startedAt'   => 'required|string',
             'finishedAt'  => 'required|string',
-            'packetLoss'  => 'sometimes|array',
-            'doh'         => 'sometimes|array',
-            'regional'    => 'sometimes|array',
-            'youtube'     => 'sometimes|array',
-            'ru_services' => 'sometimes|array',
-            'messengers'  => 'sometimes|array',
-            'socials'     => 'sometimes|array',
-            'http80'      => 'sometimes|array',
-            'voip'        => 'sometimes|array',
-            'ru_speed'    => 'sometimes|array', // {ok, mbps, source_label}
-            'ip_alt'      => 'sometimes|array', // {service, ip, country}
-            'vpn'         => 'sometimes|array', // {mode: 'direct'|'vpn', score}
         ]);
 
         try {
@@ -165,12 +163,18 @@ class PublicNetworkCheckController extends Controller
                 'finish' => $finish->format('d.m.Y H:i:s'),
             ];
 
+            // Логируем данные для отладки
+            Log::info('PDF generation data', [
+                'resources' => $data['resources'] ?? [],
+                'summary' => $data['summary'] ?? []
+            ]);
+
             if (ob_get_length()) { @ob_end_clean(); }
 
             $pdf = Pdf::setOptions([
                 'isRemoteEnabled' => false,
                 'enable_php'      => false,
-            ])->loadView('netcheck.public.pdf', [
+            ])->loadView('netcheck.public.simple-pdf', [
                 'data'        => $data,
                 'generatedAt' => now()->format('d.m.Y H:i:s'),
                 'brand'       => config('app.brand', 'High VPN'),
@@ -185,12 +189,15 @@ class PublicNetworkCheckController extends Controller
                 'Cache-Control'       => 'no-store, no-cache, must-revalidate, private',
             ]);
         } catch (Throwable $e) {
-            Log::error('Public PDF generation failed', ['e' => $e]);
-            return response()->json(['ok' => false, 'message' => 'PDF generation failed'], 500);
+            Log::error('Public PDF generation failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'data' => $data ?? []
+            ]);
+            return response()->json(['ok' => false, 'message' => 'PDF generation failed: ' . $e->getMessage()], 500);
         }
     }
 
-    // PHP 7.4 совместимый
     private function parseSizeToBytes(string $size): array
     {
         $size = strtolower($size);
