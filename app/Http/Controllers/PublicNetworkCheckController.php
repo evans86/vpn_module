@@ -21,18 +21,19 @@ class PublicNetworkCheckController extends Controller
             'local_services' => [
                 ['label' => 'Яндекс', 'url' => 'https://yandex.ru/favicon.ico'],
                 ['label' => 'Госуслуги', 'url' => 'https://www.gosuslugi.ru/favicon.ico'],
-                ['label' => 'Сбербанк', 'url' => 'https://www.sberbank.ru/favicon.ico'],
+                ['label' => 'Т-Банк', 'url' => 'https://www.tbank.ru/favicon.ico'],
                 ['label' => 'ВКонтакте', 'url' => 'https://vk.com/favicon.ico'],
+                ['label' => 'Авито', 'url' => 'https://www.avito.ru/favicon.ico'],
             ],
             'global_services' => [
                 ['label' => 'YouTube', 'url' => 'https://www.youtube.com/favicon.ico'],
                 ['label' => 'Telegram', 'url' => 'https://telegram.org/favicon.ico'],
                 ['label' => 'WhatsApp', 'url' => 'https://web.whatsapp.com/favicon.ico'],
-                ['label' => 'Instagram', 'url' => 'https://www.instagram.com/favicon.ico'],
-                ['label' => 'Twitter/X', 'url' => 'https://twitter.com/favicon.ico'],
-                ['label' => 'Facebook', 'url' => 'https://www.facebook.com/favicon.ico'],
                 ['label' => 'Google', 'url' => 'https://google.com/favicon.ico'],
-                ['label' => 'Netflix', 'url' => 'https://netflix.com/favicon.ico'],
+                ['label' => 'GitHub', 'url' => 'https://github.com/favicon.ico'],
+                ['label' => 'StackOverflow', 'url' => 'https://stackoverflow.com/favicon.ico'],
+                ['label' => 'LinkedIn', 'url' => 'https://linkedin.com/favicon.ico'],
+                ['label' => 'Reddit', 'url' => 'https://reddit.com/favicon.ico'],
             ],
             'network_health' => [
                 ['label' => 'Проверка DNS', 'url' => 'https://dns.google/resolve?name=google.com&type=A'],
@@ -134,17 +135,22 @@ class PublicNetworkCheckController extends Controller
 
     public function report(Request $request)
     {
-        $data = $request->validate([
-            'summary'     => 'required|array',
-            'latency'     => 'required|array',
-            'download'    => 'required|array',
-            'resources'   => 'required|array',
-            'env'         => 'required|array',
-            'startedAt'   => 'required|string',
-            'finishedAt'  => 'required|string',
-        ]);
-
         try {
+            $data = $request->validate([
+                'summary'     => 'required|array',
+                'latency'     => 'required|array',
+                'download'    => 'required|array',
+                'resources'   => 'required|array',
+                'env'         => 'required|array',
+                'startedAt'   => 'required|string',
+                'finishedAt'  => 'required|string',
+            ]);
+
+            // Очистка буфера вывода
+            if (ob_get_length()) {
+                ob_end_clean();
+            }
+
             $tz = $data['env']['tz'] ?? config('app.timezone', 'UTC');
 
             try {
@@ -161,37 +167,27 @@ class PublicNetworkCheckController extends Controller
                 'finish' => $finish->format('d.m.Y H:i:s'),
             ];
 
-            Log::info('PDF generation data', [
-                'resources' => $data['resources'] ?? [],
-                'summary' => $data['summary'] ?? []
-            ]);
-
-            if (ob_get_length()) { @ob_end_clean(); }
-
-            $pdf = Pdf::setOptions([
-                'isRemoteEnabled' => false,
-                'enable_php'      => false,
-            ])->loadView('netcheck.public.simple-pdf', [
+            // Упрощенная генерация PDF
+            $pdf = Pdf::loadView('netcheck.public.simple-pdf', [
                 'data'        => $data,
                 'generatedAt' => now()->format('d.m.Y H:i:s'),
                 'brand'       => config('app.brand', 'VPN Service'),
             ])->setPaper('a4');
 
-            $content  = $pdf->output();
-            $filename = 'network-report-'.Str::uuid()->toString().'.pdf';
+            $filename = 'network-report-' . Str::uuid()->toString() . '.pdf';
 
-            return response($content, 200, [
-                'Content-Type'        => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="'.$filename.'"',
-                'Cache-Control'       => 'no-store, no-cache, must-revalidate, private',
-            ]);
+            return $pdf->download($filename);
+
         } catch (Throwable $e) {
             Log::error('Public PDF generation failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'data' => $data ?? []
             ]);
-            return response()->json(['ok' => false, 'message' => 'PDF generation failed: ' . $e->getMessage()], 500);
+            return response()->json([
+                'ok' => false,
+                'message' => 'PDF generation failed: ' . $e->getMessage()
+            ], 500);
         }
     }
 

@@ -182,15 +182,13 @@
                     await this.updateProgress(40, 'Тест скорости...');
                     const speed = await this.testSpeed();
 
-                    // 3. Проверка доступности сайтов
-                    await this.updateProgress(60, 'Проверка локальных сервисов...');
-                    const localResults = await this.testCategory('local_services', 'localResults');
-
-                    await this.updateProgress(75, 'Проверка глобальных сервисов...');
-                    const globalResults = await this.testCategory('global_services', 'globalResults');
-
-                    await this.updateProgress(85, 'Проверка здоровья сети...');
-                    const networkHealthResults = await this.testCategory('network_health', 'networkHealthResults');
+                    // 3. Проверка доступности сайтов (параллельно для скорости)
+                    await this.updateProgress(60, 'Проверка сервисов...');
+                    const [localResults, globalResults, networkHealthResults] = await Promise.all([
+                        this.testCategory('local_services', 'localResults'),
+                        this.testCategory('global_services', 'globalResults'),
+                        this.testCategory('network_health', 'networkHealthResults')
+                    ]);
 
                     // 4. Сохранение результатов и итоги
                     await this.updateProgress(95, 'Анализ результатов...');
@@ -219,7 +217,8 @@
             async detectIP() {
                 try {
                     const response = await fetch('https://api.ipify.org?format=json', {
-                        cache: 'no-store'
+                        cache: 'no-store',
+                        signal: AbortSignal.timeout(3000)
                     });
                     const data = await response.json();
 
@@ -228,7 +227,8 @@
 
                     try {
                         const geoResponse = await fetch('https://ipapi.co/json/', {
-                            cache: 'no-store'
+                            cache: 'no-store',
+                            signal: AbortSignal.timeout(3000)
                         });
                         const geoData = await geoResponse.json();
                         country = geoData.country_name || 'Не определено';
@@ -253,24 +253,22 @@
 
             async testPing() {
                 const times = [];
-                for (let i = 0; i < 5; i++) {
+                for (let i = 0; i < 3; i++) {
                     const start = performance.now();
                     try {
-                        const controller = new AbortController();
-                        const timeout = setTimeout(() => controller.abort(), 5000);
-
-                        await fetch(this.pingUrl + '?t=' + Date.now(), {
+                        const response = await fetch(this.pingUrl + '?t=' + Date.now(), {
                             cache: 'no-store',
-                            signal: controller.signal
+                            signal: AbortSignal.timeout(2000)
                         });
 
-                        clearTimeout(timeout);
+                        if (!response.ok) throw new Error('Ping failed');
+
                         const duration = performance.now() - start;
                         times.push(duration);
                     } catch (e) {
                         times.push(999);
                     }
-                    await this.delay(100);
+                    if (i < 2) await this.delay(100);
                 }
 
                 const validTimes = times.filter(t => t < 500);
@@ -283,19 +281,18 @@
             }
 
             async testSpeed() {
-                const size = '5mb';
+                const size = '2mb';
                 const url = this.payloadUrl(size);
                 const startTime = performance.now();
                 let loadedBytes = 0;
 
                 try {
-                    const controller = new AbortController();
-                    const timeout = setTimeout(() => controller.abort(), 15000);
-
                     const response = await fetch(url, {
                         cache: 'no-store',
-                        signal: controller.signal
+                        signal: AbortSignal.timeout(8000)
                     });
+
+                    if (!response.ok) throw new Error('Speed test failed');
 
                     const reader = response.body.getReader();
 
@@ -305,7 +302,6 @@
                         loadedBytes += value.length;
                     }
 
-                    clearTimeout(timeout);
                     const endTime = performance.now();
                     const duration = (endTime - startTime) / 1000;
                     const speedMbps = (loadedBytes * 8) / (1024 * 1024) / duration;
@@ -321,18 +317,19 @@
             async testCategory(categoryKey, resultsElementId) {
                 const category = this.targets[categoryKey] || [];
                 const container = document.getElementById(resultsElementId);
+                if (!container) return [];
+
                 container.innerHTML = '';
-                const results = [];
 
-                for (const target of category) {
-                    const result = await this.testTarget(target);
-                    results.push(result);
+                // Запускаем все проверки параллельно для скорости
+                const promises = category.map(target => this.testTarget(target));
+                const results = await Promise.all(promises);
 
+                // Отображаем результаты по мере готовности
+                results.forEach((result, index) => {
                     const element = this.createResultElement(result, categoryKey);
                     container.appendChild(element);
-
-                    await this.delay(300);
-                }
+                });
 
                 return results;
             }
@@ -343,30 +340,73 @@
                 let responseTime = 0;
 
                 try {
-                    const controller = new AbortController();
-                    const timeout = setTimeout(() => controller.abort(), 8000);
+                    // Сначала пробуем HEAD запрос (самый надежный)
+                    status = await this.testWithHeadRequest(target.url);
 
-                    await fetch(target.url, {
-                        mode: 'no-cors',
-                        signal: controller.signal,
-                        cache: 'no-store'
-                    });
+                    // Если не сработало, пробуем через Image для favicon
+                    if (status === 'error' && target.url.includes('favicon.ico')) {
+                        status = await this.testWithImage(target.url);
+                    }
 
-                    clearTimeout(timeout);
                     responseTime = performance.now() - startTime;
-                    status = 'success';
 
                 } catch (error) {
                     responseTime = performance.now() - startTime;
                     status = 'error';
                 }
 
+                // Для отладки
+                console.log(`Test ${target.label}: ${status}, ${responseTime}ms`);
+
                 return {
                     label: target.label,
                     status: status,
                     time: Math.round(responseTime),
-                    type: target.type
+                    url: target.url
                 };
+            }
+
+            async testWithHeadRequest(url) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+                    const response = await fetch(url, {
+                        method: 'HEAD',
+                        mode: 'no-cors',
+                        signal: controller.signal,
+                        cache: 'no-store',
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                        }
+                    });
+
+                    clearTimeout(timeoutId);
+                    return 'success';
+                } catch (error) {
+                    return 'error';
+                }
+            }
+
+            async testWithImage(url) {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    const timeout = setTimeout(() => {
+                        resolve('error');
+                    }, 3000);
+
+                    img.onload = () => {
+                        clearTimeout(timeout);
+                        resolve('success');
+                    };
+
+                    img.onerror = () => {
+                        clearTimeout(timeout);
+                        resolve('error');
+                    };
+
+                    img.src = url + '?t=' + Date.now();
+                });
             }
 
             createResultElement(result, category) {
@@ -382,7 +422,7 @@
                     bgClass = category === 'local_services' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800';
                 } else {
                     icon = '❌';
-                    statusText = 'недоступен';
+                    statusText = result.time > 2900 ? 'таймаут' : 'недоступен';
                     colorClass = 'text-red-600';
                     bgClass = 'bg-red-100 text-red-800';
                 }
@@ -585,7 +625,8 @@
                             'Content-Type': 'application/json',
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                         },
-                        body: JSON.stringify(reportData)
+                        body: JSON.stringify(reportData),
+                        signal: AbortSignal.timeout(15000)
                     });
 
                     if (!response.ok) {
@@ -633,7 +674,6 @@
             }
 
             resetResults() {
-                // Исправлено: убраны ссылки на несуществующие элементы
                 ['localResults', 'globalResults', 'networkHealthResults'].forEach(id => {
                     const element = document.getElementById(id);
                     if (element) {
