@@ -152,9 +152,11 @@
                 this.reportUrl = @json(route('netcheck.report'));
                 this.isRunning = false;
                 this.currentResults = null;
-                this.hasInternetConnection = false;
+                this.hasInternetConnection = null; // null - неизвестно, true/false - известно
+                this.noInternetBanner = null;
 
                 this.bindEvents();
+                this.checkInitialConnection();
             }
 
             bindEvents() {
@@ -163,8 +165,21 @@
                 document.getElementById('retryTest').addEventListener('click', () => this.retryTest());
             }
 
+            // Проверка соединения при загрузке страницы
+            async checkInitialConnection() {
+                const hasInternet = await this.checkInternetConnection();
+                if (!hasInternet) {
+                    this.showNoInternetBanner();
+                }
+            }
+
             async runFullTest() {
                 if (this.isRunning) return;
+
+                // Если уже знаем, что нет интернета - не запускаем проверку
+                if (this.hasInternetConnection === false) {
+                    return;
+                }
 
                 this.isRunning = true;
                 this.showProgress();
@@ -177,9 +192,12 @@
                     const hasInternet = await this.checkInternetConnection();
 
                     if (!hasInternet) {
-                        this.showNoInternetError();
+                        this.showNoInternetBanner();
                         return;
                     }
+
+                    // Убираем баннер если он был
+                    this.hideNoInternetBanner();
 
                     // 1. Определение IP и геолокации
                     await this.updateProgress(10, 'Определение IP-адреса...');
@@ -217,14 +235,20 @@
 
                 } catch (error) {
                     console.error('Test failed:', error);
-                    this.showError('Произошла ошибка при проверке: ' + error.message);
+                    // При ошибке проверяем соединение
+                    const hasInternet = await this.checkInternetConnection();
+                    if (!hasInternet) {
+                        this.showNoInternetBanner();
+                    } else {
+                        this.showError('Произошла ошибка при проверке: ' + error.message);
+                    }
                 } finally {
                     this.isRunning = false;
                     this.hideProgress();
                 }
             }
 
-            // Новая функция проверки интернет-соединения
+            // Функция проверки интернет-соединения
             async checkInternetConnection() {
                 try {
                     // Пробуем несколько надежных endpoints для проверки
@@ -260,50 +284,151 @@
                 }
             }
 
-            // Новая функция для показа ошибки отсутствия интернета
-            showNoInternetError() {
-                this.hideProgress();
-
-                // Показываем сообщение об отсутствии интернета
-                const errorDiv = document.createElement('div');
-                errorDiv.className = 'bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg mb-6 text-center';
-                errorDiv.innerHTML = `
-                <div class="flex items-center justify-center mb-2">
-                    <span class="text-2xl mr-2">🚫</span>
-                    <h3 class="text-lg font-bold">Отсутствует интернет-соединение</h3>
-                </div>
-                <p class="mb-3">Не удалось установить соединение с интернетом. Пожалуйста, проверьте:</p>
-                <ul class="text-sm text-left max-w-md mx-auto space-y-1">
-                    <li>• Подключение к сети Wi-Fi или Ethernet</li>
-                    <li>• Настройки роутера или модема</li>
-                    <li>• Работу сетевого кабеля</li>
-                    <li>• Наличие интернета у провайдера</li>
-                </ul>
-                <button class="mt-4 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg transition-colors"
-                        onclick="this.parentElement.remove(); document.getElementById('runTest').disabled = false;">
-                    Понятно
-                </button>
-            `;
-
-                const container = document.querySelector('.max-w-6xl');
-                if (container) {
-                    container.insertBefore(errorDiv, document.getElementById('progressSection'));
+            // Показ баннера при отсутствии интернета
+            showNoInternetBanner() {
+                // Если баннер уже показан - не создаем новый
+                if (this.noInternetBanner && document.body.contains(this.noInternetBanner)) {
+                    return;
                 }
 
-                // Сбрасываем состояние кнопки
-                document.getElementById('runTest').disabled = false;
-                document.getElementById('runTest').textContent = '🚀 Запустить проверку';
+                // Скрываем основной контент
+                this.hideMainContent();
+
+                // Создаем баннер
+                this.noInternetBanner = document.createElement('div');
+                this.noInternetBanner.className = 'fixed inset-0 bg-white z-50 flex items-center justify-center p-4';
+                this.noInternetBanner.innerHTML = `
+                <div class="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 text-center border border-red-200">
+                    <div class="text-6xl mb-4">🚫</div>
+                    <h1 class="text-2xl font-bold text-gray-900 mb-4">Отсутствует интернет-соединение</h1>
+                    <p class="text-gray-600 mb-6">Проверьте подключение к сети и попробуйте снова</p>
+
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-left">
+                        <h3 class="font-semibold text-red-800 mb-2">Что проверить:</h3>
+                        <ul class="text-sm text-red-700 space-y-1">
+                            <li>• Подключение к Wi-Fi или Ethernet</li>
+                            <li>• Работу роутера/модема</li>
+                            <li>• Сетевой кабель</li>
+                            <li>• Наличие интернета у провайдера</li>
+                        </ul>
+                    </div>
+
+                    <div class="space-y-3">
+                        <button id="retryConnection"
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors font-semibold">
+                            🔄 Проверить соединение
+                        </button>
+                        <button onclick="location.reload()"
+                                class="w-full bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg transition-colors font-semibold">
+                            📄 Обновить страницу
+                        </button>
+                    </div>
+                </div>
+            `;
+
+                document.body.appendChild(this.noInternetBanner);
+
+                // Добавляем обработчик для кнопки повторной проверки
+                document.getElementById('retryConnection').addEventListener('click', () => {
+                    this.retryConnectionCheck();
+                });
+
+                // Запускаем периодическую проверку соединения
+                this.startConnectionMonitoring();
+            }
+
+            // Скрытие баннера
+            hideNoInternetBanner() {
+                if (this.noInternetBanner && document.body.contains(this.noInternetBanner)) {
+                    this.noInternetBanner.remove();
+                    this.noInternetBanner = null;
+                }
+                this.showMainContent();
+                this.stopConnectionMonitoring();
+            }
+
+            // Скрытие основного контента
+            hideMainContent() {
+                const mainContent = document.querySelector('.max-w-6xl');
+                if (mainContent) {
+                    mainContent.style.display = 'none';
+                }
+            }
+
+            // Показ основного контента
+            showMainContent() {
+                const mainContent = document.querySelector('.max-w-6xl');
+                if (mainContent) {
+                    mainContent.style.display = 'block';
+                }
+            }
+
+            // Периодическая проверка соединения
+            startConnectionMonitoring() {
+                this.connectionMonitor = setInterval(async () => {
+                    const hasInternet = await this.checkInternetConnection();
+                    if (hasInternet) {
+                        this.hideNoInternetBanner();
+                        this.showReconnectedMessage();
+                    }
+                }, 5000); // Проверяем каждые 5 секунд
+            }
+
+            // Остановка мониторинга
+            stopConnectionMonitoring() {
+                if (this.connectionMonitor) {
+                    clearInterval(this.connectionMonitor);
+                    this.connectionMonitor = null;
+                }
+            }
+
+            // Сообщение о восстановлении соединения
+            showReconnectedMessage() {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                messageDiv.innerHTML = `
+                <div class="flex items-center">
+                    <span class="text-xl mr-2">✅</span>
+                    <span class="font-semibold">Соединение восстановлено!</span>
+                </div>
+            `;
+
+                document.body.appendChild(messageDiv);
+
+                // Автоматически скрываем через 3 секунды
+                setTimeout(() => {
+                    if (messageDiv.parentNode) {
+                        messageDiv.remove();
+                    }
+                }, 3000);
+            }
+
+            // Ручная проверка соединения
+            async retryConnectionCheck() {
+                const retryBtn = document.getElementById('retryConnection');
+                const originalText = retryBtn.textContent;
+
+                retryBtn.disabled = true;
+                retryBtn.textContent = 'Проверка...';
+                retryBtn.classList.add('opacity-50');
+
+                const hasInternet = await this.checkInternetConnection();
+
+                if (hasInternet) {
+                    this.hideNoInternetBanner();
+                    this.showReconnectedMessage();
+                } else {
+                    // Показываем, что проверка прошла, но интернета нет
+                    retryBtn.textContent = 'Интернета нет';
+                    setTimeout(() => {
+                        retryBtn.disabled = false;
+                        retryBtn.textContent = originalText;
+                        retryBtn.classList.remove('opacity-50');
+                    }, 1000);
+                }
             }
 
             async detectIP() {
-                // Если нет интернета, показываем соответствующие значения
-                if (!this.hasInternetConnection) {
-                    document.getElementById('ipAddress').textContent = 'Нет соединения';
-                    document.getElementById('countryInfo').textContent = '—';
-                    document.getElementById('providerInfo').textContent = '—';
-                    return {ip: null, country: null, isp: null};
-                }
-
                 try {
                     const response = await fetch('https://api.ipify.org?format=json', {
                         cache: 'no-store',
@@ -341,12 +466,6 @@
             }
 
             async testPing() {
-                // Если нет интернета, возвращаем ошибку
-                if (!this.hasInternetConnection) {
-                    document.getElementById('pingValue').textContent = '—';
-                    return 999;
-                }
-
                 const times = [];
                 for (let i = 0; i < 3; i++) {
                     const start = performance.now();
@@ -376,12 +495,6 @@
             }
 
             async testSpeed() {
-                // Если нет интернета, возвращаем 0
-                if (!this.hasInternetConnection) {
-                    document.getElementById('speedValue').textContent = '0';
-                    return 0;
-                }
-
                 const size = '2mb';
                 const url = this.payloadUrl(size);
                 const startTime = performance.now();
@@ -422,23 +535,6 @@
 
                 container.innerHTML = '';
 
-                // Если нет интернета, показываем все как недоступные
-                if (!this.hasInternetConnection) {
-                    const results = category.map(target => ({
-                        label: target.label,
-                        status: 'error',
-                        time: 0,
-                        url: target.url
-                    }));
-
-                    results.forEach((result, index) => {
-                        const element = this.createResultElement(result, categoryKey);
-                        container.appendChild(element);
-                    });
-
-                    return results;
-                }
-
                 // Запускаем все проверки параллельно для скорости
                 const promises = category.map(target => this.testTarget(target));
                 const results = await Promise.all(promises);
@@ -456,16 +552,6 @@
                 const startTime = performance.now();
                 let status = 'error';
                 let responseTime = 0;
-
-                // Если нет интернета, сразу возвращаем ошибку
-                if (!this.hasInternetConnection) {
-                    return {
-                        label: target.label,
-                        status: 'error',
-                        time: 0,
-                        url: target.url
-                    };
-                }
 
                 try {
                     // Сначала пробуем HEAD запрос (самый надежный)
@@ -547,8 +633,7 @@
                     bgClass = category === 'local_services' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800';
                 } else {
                     icon = '❌';
-                    // Если нет интернета, показываем специальное сообщение
-                    statusText = !this.hasInternetConnection ? 'нет сети' : (result.time > 2900 ? 'таймаут' : 'недоступен');
+                    statusText = result.time > 2900 ? 'таймаут' : 'недоступен';
                     colorClass = 'text-red-600';
                     bgClass = 'bg-red-100 text-red-800';
                 }
@@ -567,16 +652,6 @@
             }
 
             calculateFinalScore(ping, speed, localResults, globalResults, networkHealthResults) {
-                // Если нет интернета, показываем соответствующие значения
-                if (!this.hasInternetConnection) {
-                    document.getElementById('stabilityScore').textContent = '0%';
-                    document.getElementById('availability').textContent = '0%';
-
-                    // Показываем специальный вердикт для отсутствия интернета
-                    this.showNoInternetVerdict();
-                    return;
-                }
-
                 // Расчет доступности локальных сервисов
                 const localSuccess = localResults.filter(r => r.status === 'success').length;
                 const localTotal = localResults.length;
@@ -601,48 +676,6 @@
 
                 // Итоговый вердикт
                 this.showFinalVerdict(ping, speed, localPercent, globalPercent, stabilityScore, overallAvailability);
-            }
-
-            // Новая функция для вердикта при отсутствии интернета
-            showNoInternetVerdict() {
-                const verdict = document.getElementById('finalVerdict');
-                const content = document.getElementById('verdictContent');
-
-                content.innerHTML = `
-                <div class="text-red-600 font-semibold text-lg mb-4 flex items-center">
-                    <span class="mr-2 text-2xl">🚫</span>
-                    Отсутствует интернет-соединение
-                </div>
-                <div class="p-4 bg-red-50 rounded-lg border border-red-200">
-                    <h4 class="font-semibold mb-2 text-red-800">❌ Проблемы с подключением:</h4>
-                    <ul class="text-sm text-red-700 space-y-1">
-                        <li>• Не удалось установить соединение с интернетом</li>
-                        <li>• Проверьте подключение к сети Wi-Fi или Ethernet</li>
-                        <li>• Убедитесь, что роутер/модем работают корректно</li>
-                        <li>• Проверьте наличие интернета у провайдера</li>
-                    </ul>
-                </div>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm opacity-50">
-                    <div class="text-center p-3 bg-gray-50 rounded">
-                        <div class="font-bold text-lg">—</div>
-                        <div class="text-gray-600">Пинг</div>
-                    </div>
-                    <div class="text-center p-3 bg-gray-50 rounded">
-                        <div class="font-bold text-lg">0</div>
-                        <div class="text-gray-600">Мбит/с</div>
-                    </div>
-                    <div class="text-center p-3 bg-gray-50 rounded">
-                        <div class="font-bold text-lg">0%</div>
-                        <div class="text-gray-600">Локальные</div>
-                    </div>
-                    <div class="text-center p-3 bg-gray-50 rounded">
-                        <div class="font-bold text-lg">0%</div>
-                        <div class="text-gray-600">Глобальные</div>
-                    </div>
-                </div>
-            `;
-
-                verdict.classList.remove('hidden');
             }
 
             showFinalVerdict(ping, speed, localPercent, globalPercent, stabilityScore, overallAvailability) {
@@ -742,7 +775,6 @@
                 verdict.classList.remove('hidden');
             }
 
-            // Остальные методы остаются без изменений...
             showConnectionInfo() {
                 document.getElementById('connectionInfo').classList.remove('hidden');
             }
