@@ -121,9 +121,13 @@ class ConnectionMonitorService
     {
         $logPath = '/var/lib/marzban/access.log';
 
-        // Простая команда - берем 3 поле (IP) и предпоследнее поле (email)
+        // Получаем дату 24 часа назад в формате логов
+        $yesterday = date('Y/m/d', strtotime('-1 day'));
+
         return "grep 'accepted' {$logPath} " .
-            "| awk '{print $(NF-1), $3}' " .
+            "| grep '{$yesterday}' " . // Только записи за последние 24 часа
+            "| grep 'email:' " .
+            "| awk '{ip=\$3; email=\$(NF-1); print email, ip}' " .
             "| sed 's/email://g' " .
             "| sort | uniq";
     }
