@@ -40,7 +40,7 @@ class CheckXrayLogsCommand extends Command
 
             $serverDto = ServerFactory::fromEntity($server);
             // Получаем логи через SSH
-            $ssh = $marzbanService->connectSshAdapter($server);
+            $ssh = $marzbanService->connectSshAdapter($serverDto);
 
             $commands = [
                 // Ищем логи ограничений подключений
