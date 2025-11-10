@@ -121,11 +121,9 @@ class ConnectionMonitorService
     {
         $logPath = '/var/lib/marzban/access.log';
 
-        // Получаем дату 24 часа назад в формате логов
-        $yesterday = date('Y/m/d', strtotime('-1 day'));
-
+        // Вместо фильтра по конкретной дате, анализируем все доступные логи
+        // Marzban логи обычно содержат последние подключения
         return "grep 'accepted' {$logPath} " .
-            "| grep '{$yesterday}' " . // Только записи за последние 24 часа
             "| grep 'email:' " .
             "| awk '{ip=\$3; email=\$(NF-1); print email, ip}' " .
             "| sed 's/email://g' " .
