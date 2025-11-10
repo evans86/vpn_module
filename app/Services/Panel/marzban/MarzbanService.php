@@ -505,7 +505,10 @@ class MarzbanService
 
         $json_config = [
             "log" => [
-                "loglevel" => "warning"
+                "loglevel" => "warning",
+                "access" => "/var/lib/marzban/access.log",
+                "error" => "/var/lib/marzban/error.log",
+                "dnsLog" => true
             ],
             "inbounds" => [
                 [
@@ -777,7 +780,7 @@ class MarzbanService
                         $salesman = $key_activate->moduleSalesman;
 
                         BottApi::senModuleMessage(BotModuleFactory::fromEntity($salesman->botModule), $key_activate->user_tg_id, $message);
-                    }else {
+                    } else {
                         $salesman = $key_activate->packSalesman->salesman;
                         $telegram = new Api($salesman->token);
                         $telegram->sendMessage([

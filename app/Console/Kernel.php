@@ -23,6 +23,7 @@ class Kernel extends ConsoleKernel
         \App\Console\Commands\TestSpecificKeyCommand::class,
         \App\Console\Commands\CheckXrayLogsCommand::class,
         \App\Console\Commands\TestConnectionLimitsCommand::class,
+        \App\Console\Commands\MonitorXrayLogsCommand ::class,
         ];
 
     /**
