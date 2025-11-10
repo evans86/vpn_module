@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Dto\Server\ServerFactory;
 use App\Models\KeyActivate\KeyActivate;
 use App\Services\Panel\marzban\MarzbanService;
 use Illuminate\Console\Command;
@@ -37,6 +38,7 @@ class CheckXrayLogsCommand extends Command
 
             $marzbanService = app(MarzbanService::class);
 
+            $serverDto = ServerFactory::fromEntity($server);
             // Получаем логи через SSH
             $ssh = $marzbanService->connectSshAdapter($server);
 
