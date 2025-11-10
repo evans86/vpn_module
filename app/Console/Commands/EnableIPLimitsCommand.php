@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 
 class EnableIPLimitsCommand extends Command
 {
-    protected $signature = 'vpn:enable-ip-limits {--panel-id=}';
+    protected $signature = 'vpn:enable-ip-limits {--panel-id=} {--test}';
     protected $description = 'Enable IP limits for Marzban panels';
 
     private V2IPLimitService $limitService;
@@ -22,6 +22,7 @@ class EnableIPLimitsCommand extends Command
     public function handle()
     {
         $panelId = $this->option('panel-id');
+        $testMode = $this->option('test');
 
         if ($panelId) {
             $panel = Panel::find($panelId);
@@ -37,20 +38,42 @@ class EnableIPLimitsCommand extends Command
         $this->info("Enabling IP limits for {$panels->count()} panels...");
 
         foreach ($panels as $panel) {
-            $this->info("Processing panel: {$panel->id} ({$panel->panel_adress})");
+            $this->info("\n🔧 Processing panel: {$panel->id} ({$panel->panel_adress})");
 
-            if ($this->limitService->checkPolicySupport($panel)) {
+            // Проверяем базовую поддержку
+            if (!$this->limitService->checkPanelSupport($panel)) {
+                $this->error("❌ Panel {$panel->id} doesn't support configuration");
+                continue;
+            }
+
+            if ($testMode) {
+                // Только тестовый режим
+                $this->info("🧪 Testing user creation...");
+                if ($this->limitService->testUserCreation($panel)) {
+                    $this->info("✅ Test passed for panel {$panel->id}");
+                } else {
+                    $this->error("❌ Test failed for panel {$panel->id}");
+                }
+            } else {
+                // Режим применения конфигурации
+                $this->info("⚙️ Applying IP limit configuration...");
                 if ($this->limitService->enableIPLimitForPanel($panel)) {
                     $this->info("✅ IP limits enabled for panel {$panel->id}");
+
+                    // Тестируем создание пользователя
+                    $this->info("🧪 Testing configuration...");
+                    if ($this->limitService->testUserCreation($panel)) {
+                        $this->info("✅ Configuration test passed");
+                    } else {
+                        $this->warn("⚠️ Configuration test failed, but limits may still work");
+                    }
                 } else {
                     $this->error("❌ Failed to enable IP limits for panel {$panel->id}");
                 }
-            } else {
-                $this->warn("⚠️ Policy not supported for panel {$panel->id}");
             }
         }
 
-        $this->info("IP limits configuration completed");
+        $this->info("\n🎉 IP limits configuration completed");
         return 0;
     }
 }

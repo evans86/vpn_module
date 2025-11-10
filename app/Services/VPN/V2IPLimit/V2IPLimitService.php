@@ -3,7 +3,6 @@
 namespace App\Services\VPN\V2IPLimit;
 
 use App\Models\Panel\Panel;
-use App\Services\External\MarzbanAPI;
 use App\Services\Panel\marzban\MarzbanService;
 use App\Logging\DatabaseLogger;
 use Illuminate\Support\Facades\Log;
@@ -22,59 +21,39 @@ class V2IPLimitService
     }
 
     /**
-     * Проверяем поддержку политик в текущей конфигурации
+     * Упрощенная проверка - смотрим только на инбаунды
      */
-    public function checkPolicySupport(Panel $panel): bool
+    public function checkPanelSupport(Panel $panel): bool
     {
         try {
             $config = $this->getCurrentConfig($panel);
-
-            $hasPolicy = isset($config['policy']['levels']);
-            $hasInbounds = isset($config['inbounds']);
-
-            $this->logger->info('Проверка поддержки политик', [
-                'panel_id' => $panel->id,
-                'has_policy' => $hasPolicy,
-                'has_inbounds' => $hasInbounds
-            ]);
-
-            return $hasPolicy && $hasInbounds;
-
+            return isset($config['inbounds']) && is_array($config['inbounds']);
         } catch (\Exception $e) {
-            $this->logger->error('Ошибка проверки политик', [
-                'panel_id' => $panel->id,
-                'error' => $e->getMessage()
-            ]);
             return false;
         }
     }
 
     /**
-     * Получаем текущую конфигурацию панели
-     */
-    private function getCurrentConfig(Panel $panel): array
-    {
-        // Используем существующий метод MarzbanService для получения конфига
-        $panel = $this->marzbanService->updateMarzbanToken($panel->id);
-        $marzbanApi = new MarzbanAPI($panel->api_address);
-
-        // Получаем текущий конфиг
-        return $marzbanApi->getConfig($panel->auth_token);
-    }
-
-    /**
-     * Включаем IP лимиты для панели
+     * Включаем IP лимиты (создаем политики если их нет)
      */
     public function enableIPLimitForPanel(Panel $panel): bool
     {
         try {
             $currentConfig = $this->getCurrentConfig($panel);
-            $updatedConfig = $this->injectIPLimitConfig($currentConfig);
 
+            if (!isset($currentConfig['inbounds'])) {
+                $this->logger->error('No inbounds found in panel config', [
+                    'panel_id' => $panel->id
+                ]);
+                return false;
+            }
+
+            $updatedConfig = $this->createIPLimitConfig($currentConfig);
             $this->updatePanelConfig($panel, $updatedConfig);
 
-            $this->logger->info('IP лимиты включены для панели', [
-                'panel_id' => $panel->id
+            $this->logger->info('IP лимиты успешно включены', [
+                'panel_id' => $panel->id,
+                'inbounds_count' => count($updatedConfig['inbounds'])
             ]);
 
             return true;
@@ -82,18 +61,19 @@ class V2IPLimitService
         } catch (\Exception $e) {
             $this->logger->error('Ошибка включения IP лимитов', [
                 'panel_id' => $panel->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             return false;
         }
     }
 
     /**
-     * Внедряем IP лимит в конфигурацию
+     * Создаем конфигурацию с IP лимитами
      */
-    private function injectIPLimitConfig(array $config): array
+    private function createIPLimitConfig(array $config): array
     {
-        // Добавляем политики ограничения подключений
+        // 1. Добавляем политики ограничения подключений
         $config['policy'] = [
             'levels' => [
                 '0' => [ // Базовый уровень - 3 подключения
@@ -102,7 +82,8 @@ class V2IPLimitService
                     'uplinkOnly' => 1,
                     'downlinkOnly' => 1,
                     'statsUserUplink' => true,
-                    'statsUserDownlink' => true
+                    'statsUserDownlink' => true,
+                    'bufferSize' => 10240
                 ],
                 '1' => [ // Премиум уровень - 5 подключений
                     'handshake' => 4,
@@ -110,7 +91,8 @@ class V2IPLimitService
                     'uplinkOnly' => 1,
                     'downlinkOnly' => 1,
                     'statsUserUplink' => true,
-                    'statsUserDownlink' => true
+                    'statsUserDownlink' => true,
+                    'bufferSize' => 20480
                 ]
             ],
             'system' => [
@@ -119,10 +101,10 @@ class V2IPLimitService
             ]
         ];
 
-        // Устанавливаем уровень по умолчанию для всех инбаундов
+        // 2. Устанавливаем уровень по умолчанию для всех инбаундов
         foreach ($config['inbounds'] as &$inbound) {
+            // Для инбаундов с клиентами устанавливаем уровень по умолчанию
             if (isset($inbound['settings']['clients'])) {
-                // Устанавливаем уровень для всех будущих клиентов
                 $inbound['settings']['level'] = 0;
             }
         }
@@ -131,13 +113,70 @@ class V2IPLimitService
     }
 
     /**
+     * Получаем текущую конфигурацию панели
+     */
+    public function getCurrentConfig(Panel $panel): array
+    {
+        try {
+            $panel = $this->marzbanService->updateMarzbanToken($panel->id);
+            $marzbanApi = new \App\Services\External\MarzbanAPI($panel->api_address);
+
+            // Используем reflection для вызова protected/private методов если нужно
+            return $marzbanApi->getConfig($panel->auth_token);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to get panel config', [
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
      * Обновляем конфигурацию панели
      */
     private function updatePanelConfig(Panel $panel, array $config): void
     {
         $panel = $this->marzbanService->updateMarzbanToken($panel->id);
-        $marzbanApi = new MarzbanAPI($panel->api_address);
+        $marzbanApi = new \App\Services\External\MarzbanAPI($panel->api_address);
 
         $marzbanApi->updateConfig($panel->auth_token, $config);
+
+        // Ждем немного для применения конфигурации
+        sleep(2);
+    }
+
+    /**
+     * Тестируем создание пользователя с лимитом
+     */
+    public function testUserCreation(Panel $panel): bool
+    {
+        try {
+            $testUsername = 'test_user_' . time();
+            $panel = $this->marzbanService->updateMarzbanToken($panel->id);
+            $marzbanApi = new \App\Services\External\MarzbanAPI($panel->api_address);
+
+            // Создаем тестового пользователя
+            $userData = $marzbanApi->createUser(
+                $panel->auth_token,
+                $testUsername,
+                1073741824, // 1GB
+                time() + 3600, // 1 hour
+                3 // 3 connections
+            );
+
+            // Удаляем тестового пользователя
+            $marzbanApi->deleteUser($panel->auth_token, $testUsername);
+
+            return true;
+
+        } catch (\Exception $e) {
+            Log::error('Test user creation failed', [
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
     }
 }

@@ -17,6 +17,8 @@ class Kernel extends ConsoleKernel
         \App\Console\Commands\PanelSelectionTestCommand::class,
         \App\Console\Commands\TestVdsinaConnection::class,
         \App\Console\Commands\EnableIPLimitsCommand::class,
+        \App\Console\Commands\DiagnosePanelsCommand::class,
+        \App\Console\Commands\TestMarzbanAPICommand::class,
         ];
 
     /**
