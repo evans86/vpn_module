@@ -32,7 +32,7 @@ interface PanelInterface
      * @param string $key_activate_id
      * @return ServerUser
      */
-    public function addServerUser(int $panel_id, int $userTgId, int $data_limit, int $expire, string $key_activate_id): ServerUser;
+    public function addServerUser(int $panel_id, int $userTgId, int $data_limit, int $expire, string $key_activate_id, array $options): ServerUser;
 
     /**
      * Проверка использования пользователя

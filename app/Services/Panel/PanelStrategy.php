@@ -78,9 +78,23 @@ class PanelStrategy
      * @return ServerUser
      * @throws GuzzleException
      */
-    public function addServerUser(int $panel_id, int $userTgId, int $data_limit, int $expire, string $key_activate_id): ServerUser
+    public function addServerUser(
+        int    $panel_id,
+        int    $userTgId,
+        int    $data_limit,
+        int    $expire,
+        string $key_activate_id,
+        array  $options
+    ): ServerUser
     {
-        return $this->strategy->addServerUser($panel_id, $userTgId, $data_limit, $expire, $key_activate_id);
+        return $this->strategy->addServerUser(
+            $panel_id,
+            $userTgId,
+            $data_limit,
+            $expire,
+            $key_activate_id,
+            $options
+        );
     }
 
     /**

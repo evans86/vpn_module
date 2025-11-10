@@ -287,7 +287,8 @@ class KeyActivateService
                 $userTgId,
                 $key->traffic_limit,
                 $finishAt,
-                $key->id
+                $key->id,
+                ['max_connections' => 3] // ← ДОБАВЛЯЕМ ЛИМИТ
             );
 
             // Обновляем данные активации
@@ -383,7 +384,8 @@ class KeyActivateService
                 $userTgId,
                 $key->traffic_limit,
                 $finishAt,
-                $key->id
+                $key->id,
+                ['max_connections' => 3] // ← ДОБАВЛЯЕМ ЛИМИТ
             );
 
             // Обновляем данные активации

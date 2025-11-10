@@ -113,10 +113,12 @@ class MarzbanAPI
      * @throws GuzzleException
      * @throws Exception
      */
-    public function createUser(string $token, string $userId, int $data_limit, int $expire)
+    public function createUser(string $token, string $userId, int $data_limit, int $expire, int $maxConnections = 3)
     {
         try {
             $action = 'user';
+
+            $level = $maxConnections <= 3 ? 0 : 1;
 
             $requestParam = [
                 'headers' => [
@@ -148,6 +150,7 @@ class MarzbanAPI
                         'trojan' => ["TROJAN-WS"],
                         'shadowsocks' => ["Shadowsocks-TCP"],
                     ],
+                    'level' => $level // ← ДОБАВЛЯЕМ УРОВЕНЬ ПОЛИТИКИ
                 ],
                 'verify' => false
             ];
@@ -345,39 +348,60 @@ class MarzbanAPI
     }
 
     /**
-     * @TODO не работает правльно
-     *
-     * Обновление данных администратора панели
-     *
-     * @param string $token
-     * @param string $username
-     * @param array $data
-     * @return mixed
-     * @throws GuzzleException
-     * @throws Exception
+     * Получение текущей конфигурации
      */
-    public function modifyAdmin(string $token, string $username, array $data)
+    public function getConfig(string $token): array
     {
         try {
             $client = new Client([
-                'base_uri' => rtrim($this->host, '/') . '/api/',
+                'base_uri' => $this->host . '/api/',
                 'verify' => false
             ]);
 
-            $requestParam = [
+            $response = $client->get('core/config', [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $token,
-                    'Content-Type' => 'application/json',
                     'Accept' => 'application/json'
-                ],
-                'json' => $data,
-                'verify' => false
-            ];
+                ]
+            ]);
 
-            $response = $client->put('admin/' . $username, $requestParam);
+            $result = json_decode($response->getBody()->getContents(), true);
+            return $result ?? [];
+
+        } catch (\Exception $e) {
+            Log::error('Failed to get Marzban config', [
+                'error' => $e->getMessage()
+            ]);
+            return [];
+        }
+    }
+
+    /**
+     * Обновление конфигурации
+     */
+    public function updateConfig(string $token, array $config): array
+    {
+        try {
+            $client = new Client([
+                'base_uri' => $this->host . '/api/',
+                'verify' => false
+            ]);
+
+            $response = $client->put('core/config', [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'Content-Type' => 'application/json'
+                ],
+                'json' => $config
+            ]);
+
             return json_decode($response->getBody()->getContents(), true);
-        } catch (Exception $e) {
-            throw new RuntimeException('Ошибка при обновлении данных администратора: ' . $e->getMessage());
+
+        } catch (\Exception $e) {
+            Log::error('Failed to update Marzban config', [
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
         }
     }
 }

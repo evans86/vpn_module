@@ -615,7 +615,7 @@ class MarzbanService
      * @return ServerUser
      * @throws GuzzleException
      */
-    public function addServerUser(int $panel_id, int $userTgId, int $data_limit, int $expire, string $key_activate_id): ServerUser
+    public function addServerUser(int $panel_id, int $userTgId, int $data_limit, int $expire, string $key_activate_id, array $options = []): ServerUser
     {
         try {
             Log::info('Creating server user', [
@@ -637,8 +637,15 @@ class MarzbanService
 
             $marzbanApi = new MarzbanAPI($panel->api_address);
             $userId = Str::uuid();
+            $maxConnections = $options['max_connections'] ?? 3;
 
-            $userData = $marzbanApi->createUser($panel->auth_token, $userId, $data_limit, $expire);
+            $userData = $marzbanApi->createUser(
+                $panel->auth_token,
+                $userId,
+                $data_limit,
+                $expire,
+                $maxConnections // ← ПЕРЕДАЕМ ЛИМИТ ПОДКЛЮЧЕНИЙ
+            );
 
             if (empty($userData['links'])) {
                 throw new RuntimeException('Failed to get user links from Marzban API');
@@ -686,60 +693,6 @@ class MarzbanService
                 'trace' => $e->getTraceAsString()
             ]);
             throw new RuntimeException($e->getMessage());
-        }
-    }
-
-    /**
-     * @TODO не работает правльно
-     *
-     * Обновление данных администратора панели
-     *
-     * @param int $panel_id
-     * @param array $data
-     * @return void
-     * @throws GuzzleException
-     * @throws Exception
-     */
-    public function updateAdminCredentials(int $panel_id, array $data): void
-    {
-        try {
-            /** @var Panel $panel */
-            $panel = Panel::query()->findOrFail($panel_id);
-
-            // Получаем текущий токен или обновляем его если истек
-            $panel = self::updateMarzbanToken($panel->id);
-
-            $marzbanApi = new MarzbanAPI($panel->api_address);
-
-            // Подготавливаем данные для обновления
-            $updateData = [
-                'is_sudo' => true // Обязательный параметр
-            ];
-
-            // Добавляем только те поля, которые были переданы
-            if (isset($data['username'])) {
-                $updateData['username'] = $data['username'];
-            }
-            if (isset($data['password'])) {
-                $updateData['password'] = $data['password'];
-            }
-
-            // Обновляем данные администратора через API
-            $result = $marzbanApi->modifyAdmin($panel->auth_token, $panel->panel_login, $updateData);
-
-            // Если был изменен логин, обновляем его в базе
-            if (isset($data['username'])) {
-                $panel->login = $data['username'];
-                $panel->save();
-            }
-
-            Log::info('Admin credentials updated successfully', ['panel_id' => $panel_id]);
-        } catch (Exception $e) {
-            Log::error('Error updating admin credentials', [
-                'panel_id' => $panel_id,
-                'error' => $e->getMessage()
-            ]);
-            throw new RuntimeException('Ошибка при обновлении данных администратора: ' . $e->getMessage());
         }
     }
 
