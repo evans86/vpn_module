@@ -20,6 +20,9 @@ class Kernel extends ConsoleKernel
         \App\Console\Commands\DiagnosePanelsCommand::class,
         \App\Console\Commands\TestMarzbanAPICommand::class,
         \App\Console\Commands\TestSpecificKeyCommand::class,
+        \App\Console\Commands\TestSpecificKeyCommand::class,
+        \App\Console\Commands\CheckXrayLogsCommand::class,
+        \App\Console\Commands\TestConnectionLimitsCommand::class,
         ];
 
     /**
