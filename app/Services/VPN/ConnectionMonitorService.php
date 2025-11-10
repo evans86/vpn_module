@@ -101,7 +101,7 @@ class ConnectionMonitorService
             Log::info("Test command output for server {$server->host}", ['test_output' => $testOutput]);
 
             // 5. Проверим нашу команду анализа на этих 10 строках (с -a)
-            $testAnalysisCommand = "grep -a 'accepted' /var/lib/marzban/access.log | grep -a 'email:' | head -10 | awk '{ip=\$3; email=\$(NF-1); print \"IP:\" ip \" EMAIL:\" email}'";
+            $testAnalysisCommand = "grep -a 'accepted' /var/lib/marzban/access.log | grep -a 'email:' | head -10 | awk '{print \$(NF-1), \$4}' | sed 's/email://g; s/:[0-9]*\$//'";
             $testAnalysis = $ssh->exec($testAnalysisCommand);
             Log::info("Test analysis output for server {$server->host}", ['test_analysis' => $testAnalysis]);
 
@@ -179,8 +179,8 @@ class ConnectionMonitorService
 
         return "grep -a 'accepted' {$logPath} " .
             "| grep -a 'email:' " .
-            "| awk '{ip=\$3; email=\$(NF-1); print email, ip}' " .
-            "| sed 's/email://g' " .
+            "| awk '{print \$(NF-1), \$4}' " . // предпоследнее поле = email, 4 поле = IP
+            "| sed 's/email://g; s/:[0-9]*\$//' " .
             "| sort | uniq";
     }
 
@@ -195,12 +195,12 @@ class ConnectionMonitorService
         foreach ($lines as $line) {
             if (empty($line)) continue;
 
-            // Формат: user_uuid client_ip
+            // Формат: user_uuid client_ip (без порта)
             $parts = explode(' ', trim($line));
             if (count($parts) < 2) continue;
 
             $userId = trim($parts[0]);  // UUID пользователя
-            $clientIp = trim($parts[1]); // IP-адрес клиента
+            $clientIp = trim($parts[1]); // IP-адрес клиента (уже без порта)
 
             if (!isset($userConnections[$userId])) {
                 $userConnections[$userId] = [
