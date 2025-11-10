@@ -518,7 +518,8 @@ class MarzbanService
                     "protocol" => "vless",
                     "settings" => [
                         "clients" => [],
-                        "decryption" => "none"
+                        "decryption" => "none",
+                        "level" => 0
                     ],
                     "streamSettings" => [
                         "network" => "ws",
@@ -538,7 +539,8 @@ class MarzbanService
                     "port" => 2096,
                     "protocol" => "vmess",
                     "settings" => [
-                        "clients" => []
+                        "clients" => [],
+                        "level" => 0
                     ],
                     "streamSettings" => [
                         "network" => "ws",
@@ -558,7 +560,8 @@ class MarzbanService
                     "port" => 2097,
                     "protocol" => "trojan",
                     "settings" => [
-                        "clients" => []
+                        "clients" => [],
+                        "level" => 0
                     ],
                     "streamSettings" => [
                         "network" => "ws",
@@ -579,7 +582,8 @@ class MarzbanService
                     "protocol" => "shadowsocks",
                     "settings" => [
                         "clients" => [],
-                        "network" => "tcp,udp"
+                        "network" => "tcp,udp",
+                        "level" => 0
                     ]
                 ]
             ],
@@ -587,6 +591,22 @@ class MarzbanService
                 [
                     "protocol" => "freedom",
                     "tag" => "DIRECT"
+                ]
+            ],
+            "policy" => [
+                "levels" => [
+                    [
+                        "handshake" => 4,
+                        "connIdle" => 300,
+                        "uplinkOnly" => 1,
+                        "downlinkOnly" => 1,
+                        "statsUserUplink" => true,
+                        "statsUserDownlink" => true
+                    ]
+                ],
+                "system" => [
+                    "statsInboundUplink" => true,
+                    "statsInboundDownlink" => true
                 ]
             ]
         ];

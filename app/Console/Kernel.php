@@ -13,18 +13,7 @@ class Kernel extends ConsoleKernel
      * @var array
      */
     protected $commands = [
-        \App\Console\Commands\PanelSelectionDebugCommand::class,
-        \App\Console\Commands\PanelSelectionTestCommand::class,
-        \App\Console\Commands\TestVdsinaConnection::class,
-        \App\Console\Commands\EnableIPLimitsCommand::class,
-        \App\Console\Commands\DiagnosePanelsCommand::class,
-        \App\Console\Commands\TestMarzbanAPICommand::class,
-        \App\Console\Commands\TestSpecificKeyCommand::class,
-        \App\Console\Commands\TestSpecificKeyCommand::class,
-        \App\Console\Commands\CheckXrayLogsCommand::class,
-        \App\Console\Commands\TestConnectionLimitsCommand::class,
-        \App\Console\Commands\MonitorXrayLogsCommand ::class,
-        ];
+    ];
 
     /**
      * Define the application's command schedule.
@@ -54,7 +43,7 @@ class Kernel extends ConsoleKernel
      */
     protected function commands()
     {
-        $this->load(__DIR__.'/Commands');
+        $this->load(__DIR__ . '/Commands');
 
         require base_path('routes/console.php');
     }
