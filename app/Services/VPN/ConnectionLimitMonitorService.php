@@ -4,7 +4,6 @@ namespace App\Services\VPN;
 
 use App\Models\VPN\ConnectionLimitViolation;
 use App\Models\KeyActivate\KeyActivate;
-use App\Models\Panel\Panel;
 use App\Logging\DatabaseLogger;
 use Illuminate\Support\Facades\Log;
 
@@ -22,51 +21,28 @@ class ConnectionLimitMonitorService
      */
     public function recordViolation(
         KeyActivate $keyActivate,
-        int $actualConnections,
-        array $ipAddresses = []
+        int $uniqueIpCount,
+        array $ipAddresses = [],
+        ?int $panelId = null
     ): ConnectionLimitViolation {
         try {
-            $allowedConnections = 3; // Базовый лимит
+            $allowedConnections = 3; // Лимит подключений
             $serverUser = $keyActivate->keyActivateUser->serverUser;
-            $panel = $serverUser->panel;
 
-            // Проверяем существующее активное нарушение
-            $existingViolation = ConnectionLimitViolation::where([
-                'key_activate_id' => $keyActivate->id,
-                'status' => ConnectionLimitViolation::STATUS_ACTIVE
-            ])->first();
-
-            if ($existingViolation) {
-                // Обновляем существующее нарушение
-                $existingViolation->update([
-                    'actual_connections' => $actualConnections,
-                    'ip_addresses' => array_unique(array_merge(
-                        $existingViolation->ip_addresses ?? [],
-                        $ipAddresses
-                    )),
-                    'violation_count' => $existingViolation->violation_count + 1
-                ]);
-
-                $this->logger->warning('Обновлено нарушение лимита подключений', [
-                    'key_id' => $keyActivate->id,
-                    'user_tg_id' => $keyActivate->user_tg_id,
-                    'allowed' => $allowedConnections,
-                    'actual' => $actualConnections,
-                    'violation_count' => $existingViolation->violation_count,
-                    'ip_count' => count($ipAddresses)
-                ]);
-
-                return $existingViolation;
+            // Если panelId не указан, используем панель пользователя
+            if (!$panelId) {
+                $panel = $serverUser->panel;
+                $panelId = $panel->id;
             }
 
             // Создаем новое нарушение
             $violation = ConnectionLimitViolation::create([
                 'key_activate_id' => $keyActivate->id,
                 'server_user_id' => $serverUser->id,
-                'panel_id' => $panel->id,
+                'panel_id' => $panelId,
                 'user_tg_id' => $keyActivate->user_tg_id,
                 'allowed_connections' => $allowedConnections,
-                'actual_connections' => $actualConnections,
+                'actual_connections' => $uniqueIpCount, // Количество уникальных IP
                 'ip_addresses' => $ipAddresses,
                 'violation_count' => 1,
                 'status' => ConnectionLimitViolation::STATUS_ACTIVE
@@ -75,9 +51,9 @@ class ConnectionLimitMonitorService
             $this->logger->warning('Зафиксировано нарушение лимита подключений', [
                 'key_id' => $keyActivate->id,
                 'user_tg_id' => $keyActivate->user_tg_id,
-                'allowed' => $allowedConnections,
-                'actual' => $actualConnections,
-                'ip_count' => count($ipAddresses),
+                'allowed_connections' => $allowedConnections,
+                'actual_ips' => $uniqueIpCount,
+                'ip_addresses' => $ipAddresses,
                 'violation_id' => $violation->id
             ]);
 

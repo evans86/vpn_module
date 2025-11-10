@@ -107,13 +107,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::prefix('module')->name('module.')->group(function () {
 
             // Connection Limit Violations
-//            Route::prefix('connection-limit-violations')->name('connection-limit-violations.')->group(function () {
-//                Route::get('/', [ConnectionLimitViolationController::class, 'index'])->name('index');
-//                Route::get('/{violation}', [ConnectionLimitViolationController::class, 'show'])->name('show');
-//                Route::post('/{violation}/resolve', [ConnectionLimitViolationController::class, 'resolve'])->name('resolve');
-//                Route::post('/{violation}/ignore', [ConnectionLimitViolationController::class, 'ignore'])->name('ignore');
-//                Route::get('/stats/overview', [ConnectionLimitViolationController::class, 'stats'])->name('stats');
-//            });
+            Route::prefix('connection-limit-violations')->name('connection-limit-violations.')->group(function () {
+                Route::get('/', [ConnectionLimitViolationController::class, 'index'])->name('index');
+                Route::get('/{violation}', [ConnectionLimitViolationController::class, 'show'])->name('show');
+                Route::post('/{violation}/resolve', [ConnectionLimitViolationController::class, 'resolve'])->name('resolve');
+                Route::post('/{violation}/ignore', [ConnectionLimitViolationController::class, 'ignore'])->name('ignore');
+                Route::get('/stats/overview', [ConnectionLimitViolationController::class, 'stats'])->name('stats');
+            });
 
             // Серверы
             Route::prefix('server')->name('server.')->group(function () {
