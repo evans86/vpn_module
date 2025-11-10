@@ -96,22 +96,22 @@ Route::prefix('netcheck')->name('netcheck.')->group(function () {
 });
 
 // Public Network Check - Simplified version
-Route::prefix('netcheck')->name('netcheck.')->group(function () {
-    Route::get('/simple', [PublicNetworkCheckController::class, 'index'])->name('simple');
-    Route::get('/ping', [PublicNetworkCheckController::class, 'ping'])->name('ping')->middleware('throttle:180,1');
-    Route::get('/payload/{size}', [PublicNetworkCheckController::class, 'payload'])
-        ->where(['size' => '^[0-9]+(kb|mb|b)$'])
-        ->name('payload')
-        ->middleware('throttle:120,1');
-
-    Route::post('/report', [PublicNetworkCheckController::class, 'report'])->name('report');
-
-    // телеметрия чекпоинтов
-    Route::post('/telemetry', [PublicNetworkCheckController::class, 'telemetry'])
-        ->name('telemetry')
-        ->withoutMiddleware([VerifyCsrfToken::class])
-        ->middleware('throttle:240,1');
-});
+//Route::prefix('netcheck')->name('netcheck.')->group(function () {
+//    Route::get('/simple', [PublicNetworkCheckController::class, 'index'])->name('simple');
+//    Route::get('/ping', [PublicNetworkCheckController::class, 'ping'])->name('ping')->middleware('throttle:180,1');
+//    Route::get('/payload/{size}', [PublicNetworkCheckController::class, 'payload'])
+//        ->where(['size' => '^[0-9]+(kb|mb|b)$'])
+//        ->name('payload')
+//        ->middleware('throttle:120,1');
+//
+//    Route::post('/report', [PublicNetworkCheckController::class, 'report'])->name('report');
+//
+//    // телеметрия чекпоинтов
+//    Route::post('/telemetry', [PublicNetworkCheckController::class, 'telemetry'])
+//        ->name('telemetry')
+//        ->withoutMiddleware([VerifyCsrfToken::class])
+//        ->middleware('throttle:240,1');
+//});
 
 // Admin Routes
 Route::prefix('admin')->name('admin.')->group(function () {
