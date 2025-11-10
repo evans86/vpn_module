@@ -102,11 +102,6 @@ class TestSpecificKeyCommand extends Command
      */
     private function tryActivateKey(KeyActivate $key): void
     {
-        if (!$this->confirm('Do you want to activate this key?')) {
-            $this->info("Activation cancelled");
-            return;
-        }
-
         try {
             $testTgId = rand(100000000, 999999999);
             $this->info("Using test Telegram ID: {$testTgId}");
