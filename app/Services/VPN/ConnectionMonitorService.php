@@ -28,7 +28,9 @@ class ConnectionMonitorService
      */
     public function monitorDailyConnections(int $threshold = 3): array
     {
-        $servers = Server::where('server_status', 'configured')->get();
+        $servers = Server::where('server_status', Server::SERVER_CONFIGURED)
+            ->where('is_free', true)
+            ->get();
 
         $results = [
             'total_servers' => $servers->count(), // Сразу устанавливаем реальное значение
