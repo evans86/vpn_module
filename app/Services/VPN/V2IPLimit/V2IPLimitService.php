@@ -29,6 +29,10 @@ class V2IPLimitService
             $config = $this->getCurrentConfig($panel);
             return isset($config['inbounds']) && is_array($config['inbounds']);
         } catch (\Exception $e) {
+            $this->logger->error('Panel support check failed', [
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage()
+            ]);
             return false;
         }
     }
@@ -39,27 +43,34 @@ class V2IPLimitService
     public function enableIPLimitForPanel(Panel $panel): bool
     {
         try {
+            $this->logger->info('Starting IP limit enablement', ['panel_id' => $panel->id]);
+
             $currentConfig = $this->getCurrentConfig($panel);
 
             if (!isset($currentConfig['inbounds'])) {
-                $this->logger->error('No inbounds found in panel config', [
-                    'panel_id' => $panel->id
-                ]);
+                $this->logger->error('No inbounds found in panel config', ['panel_id' => $panel->id]);
                 return false;
             }
+
+            $this->logger->info('Current config obtained', [
+                'panel_id' => $panel->id,
+                'inbounds_count' => count($currentConfig['inbounds']),
+                'has_policy' => isset($currentConfig['policy'])
+            ]);
 
             $updatedConfig = $this->createIPLimitConfig($currentConfig);
             $this->updatePanelConfig($panel, $updatedConfig);
 
-            $this->logger->info('IP лимиты успешно включены', [
+            $this->logger->info('IP limits successfully enabled', [
                 'panel_id' => $panel->id,
-                'inbounds_count' => count($updatedConfig['inbounds'])
+                'inbounds_count' => count($updatedConfig['inbounds']),
+                'has_policy' => isset($updatedConfig['policy'])
             ]);
 
             return true;
 
         } catch (\Exception $e) {
-            $this->logger->error('Ошибка включения IP лимитов', [
+            $this->logger->error('Error enabling IP limits', [
                 'panel_id' => $panel->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -82,17 +93,7 @@ class V2IPLimitService
                     'uplinkOnly' => 1,
                     'downlinkOnly' => 1,
                     'statsUserUplink' => true,
-                    'statsUserDownlink' => true,
-                    'bufferSize' => 10240
-                ],
-                '1' => [ // Премиум уровень - 5 подключений
-                    'handshake' => 4,
-                    'connIdle' => 300,
-                    'uplinkOnly' => 1,
-                    'downlinkOnly' => 1,
-                    'statsUserUplink' => true,
-                    'statsUserDownlink' => true,
-                    'bufferSize' => 20480
+                    'statsUserDownlink' => true
                 ]
             ],
             'system' => [
@@ -104,7 +105,7 @@ class V2IPLimitService
         // 2. Устанавливаем уровень по умолчанию для всех инбаундов
         foreach ($config['inbounds'] as &$inbound) {
             // Для инбаундов с клиентами устанавливаем уровень по умолчанию
-            if (isset($inbound['settings']['clients'])) {
+            if (isset($inbound['settings'])) {
                 $inbound['settings']['level'] = 0;
             }
         }
@@ -121,8 +122,13 @@ class V2IPLimitService
             $panel = $this->marzbanService->updateMarzbanToken($panel->id);
             $marzbanApi = new \App\Services\External\MarzbanAPI($panel->api_address);
 
-            // Используем reflection для вызова protected/private методов если нужно
-            return $marzbanApi->getConfig($panel->auth_token);
+            $config = $marzbanApi->getConfig($panel->auth_token);
+
+            if (empty($config)) {
+                throw new \Exception('Empty configuration received');
+            }
+
+            return $config;
 
         } catch (\Exception $e) {
             Log::error('Failed to get panel config', [
@@ -141,10 +147,15 @@ class V2IPLimitService
         $panel = $this->marzbanService->updateMarzbanToken($panel->id);
         $marzbanApi = new \App\Services\External\MarzbanAPI($panel->api_address);
 
-        $marzbanApi->updateConfig($panel->auth_token, $config);
+        $result = $marzbanApi->updateConfig($panel->auth_token, $config);
+
+        // Проверяем результат
+        if (isset($result['status']) && $result['status'] === 'error') {
+            throw new \Exception('Config update failed: ' . ($result['message'] ?? 'Unknown error'));
+        }
 
         // Ждем немного для применения конфигурации
-        sleep(2);
+        sleep(3);
     }
 
     /**
@@ -157,7 +168,12 @@ class V2IPLimitService
             $panel = $this->marzbanService->updateMarzbanToken($panel->id);
             $marzbanApi = new \App\Services\External\MarzbanAPI($panel->api_address);
 
-            // Создаем тестового пользователя
+            $this->logger->info('Testing user creation', [
+                'panel_id' => $panel->id,
+                'test_username' => $testUsername
+            ]);
+
+            // Создаем тестового пользователя с указанием уровня
             $userData = $marzbanApi->createUser(
                 $panel->auth_token,
                 $testUsername,
@@ -166,13 +182,55 @@ class V2IPLimitService
                 3 // 3 connections
             );
 
+            if (!isset($userData['username'])) {
+                throw new \Exception('User creation failed - no username in response');
+            }
+
+            $this->logger->info('Test user created successfully', [
+                'panel_id' => $panel->id,
+                'username' => $userData['username']
+            ]);
+
             // Удаляем тестового пользователя
             $marzbanApi->deleteUser($panel->auth_token, $testUsername);
+
+            $this->logger->info('Test user deleted', ['panel_id' => $panel->id]);
 
             return true;
 
         } catch (\Exception $e) {
-            Log::error('Test user creation failed', [
+            $this->logger->error('Test user creation failed', [
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Проверяем, применены ли политики
+     */
+    public function verifyIPLimitsEnabled(Panel $panel): bool
+    {
+        try {
+            $config = $this->getCurrentConfig($panel);
+
+            $hasPolicy = isset($config['policy']['levels']);
+            $hasLevelInInbounds = false;
+
+            if (isset($config['inbounds'])) {
+                foreach ($config['inbounds'] as $inbound) {
+                    if (isset($inbound['settings']['level'])) {
+                        $hasLevelInInbounds = true;
+                        break;
+                    }
+                }
+            }
+
+            return $hasPolicy && $hasLevelInInbounds;
+
+        } catch (\Exception $e) {
+            $this->logger->error('IP limits verification failed', [
                 'panel_id' => $panel->id,
                 'error' => $e->getMessage()
             ]);
