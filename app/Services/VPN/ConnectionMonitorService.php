@@ -80,18 +80,73 @@ class ConnectionMonitorService
             $serverDto = ServerFactory::fromEntity($server);
             $ssh = $this->marzbanService->connectSshAdapter($serverDto);
 
-            // Получаем список всех подключений за 24 часа
-            $logOutput = $ssh->exec($this->buildLogAnalysisCommand());
+            // 1. Сначала проверим что файл существует и его размер
+            $fileInfoCommand = "ls -la /var/lib/marzban/access.log";
+            $fileInfo = $ssh->exec($fileInfoCommand);
+            Log::info("File info for server {$server->host}", ['file_info' => $fileInfo]);
+
+            // 2. Проверим количество строк в логе
+            $lineCountCommand = "wc -l /var/lib/marzban/access.log";
+            $lineCount = trim($ssh->exec($lineCountCommand));
+            Log::info("Total lines in log for server {$server->host}", ['line_count' => $lineCount]);
+
+            // 3. Проверим последние 5 строк лога чтобы увидеть формат
+            $lastLinesCommand = "tail -5 /var/lib/marzban/access.log";
+            $lastLines = $ssh->exec($lastLinesCommand);
+            Log::info("Last 5 lines of log for server {$server->host}", ['last_lines' => $lastLines]);
+
+            // 4. Проверим нашу команду на маленьком наборе данных
+            $testCommand = "grep 'accepted' /var/lib/marzban/access.log | grep 'email:' | head -10";
+            $testOutput = $ssh->exec($testCommand);
+            Log::info("Test command output for server {$server->host}", ['test_output' => $testOutput]);
+
+            // 5. Проверим нашу команду анализа на этих 10 строках
+            $testAnalysisCommand = "grep 'accepted' /var/lib/marzban/access.log | grep 'email:' | head -10 | awk '{ip=\$3; email=\$(NF-1); print \"IP:\" ip \" EMAIL:\" email}'";
+            $testAnalysis = $ssh->exec($testAnalysisCommand);
+            Log::info("Test analysis output for server {$server->host}", ['test_analysis' => $testAnalysis]);
+
+            // 6. Только после этого запускаем основную команду
+            $command = $this->buildLogAnalysisCommand();
+            $logOutput = $ssh->exec($command);
+
+            Log::info("Main command output for server {$server->host}", [
+                'output_length' => strlen($logOutput),
+                'first_500_chars' => substr($logOutput, 0, 500)
+            ]);
+
+            if (empty(trim($logOutput))) {
+                Log::warning("No data from main command for server {$server->host}");
+                return [
+                    'violations_count' => 0,
+                    'users_checked' => 0
+                ];
+            }
+
             $userConnections = $this->parseLogOutput($logOutput);
             $usersChecked = count($userConnections);
+
+            Log::info("Parsed users for server {$server->host}", [
+                'users_count' => $usersChecked,
+                'first_users' => array_slice(array_keys($userConnections), 0, 3)
+            ]);
 
             // Анализируем подключения каждого пользователя
             foreach ($userConnections as $userId => $connectionData) {
                 $uniqueIps = $connectionData['unique_ips'];
                 $ipCount = count($uniqueIps);
 
-                // Если уникальных IP больше лимита - нарушение
+                Log::info("User analysis for server {$server->host}", [
+                    'user_id' => $userId,
+                    'unique_ips_count' => $ipCount
+                ]);
+
                 if ($ipCount > $threshold) {
+                    Log::warning("VIOLATION detected for server {$server->host}", [
+                        'user_id' => $userId,
+                        'unique_ips_count' => $ipCount,
+                        'ip_addresses' => $uniqueIps
+                    ]);
+
                     $violationCreated = $this->handleUserViolation($userId, $ipCount, $uniqueIps, $server);
                     if ($violationCreated) {
                         $violationsCount++;
@@ -100,9 +155,9 @@ class ConnectionMonitorService
             }
 
         } catch (\Exception $e) {
-            Log::error('Failed to analyze server logs', [
-                'server_id' => $server->id,
-                'error' => $e->getMessage()
+            Log::error("Error analyzing server {$server->host}", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             throw $e;
         }
