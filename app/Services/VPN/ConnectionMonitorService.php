@@ -95,17 +95,17 @@ class ConnectionMonitorService
             $lastLines = $ssh->exec($lastLinesCommand);
             Log::info("Last 5 lines of log for server {$server->host}", ['last_lines' => $lastLines]);
 
-            // 4. Проверим нашу команду на маленьком наборе данных
-            $testCommand = "grep 'accepted' /var/lib/marzban/access.log | grep 'email:' | head -10";
+            // 4. Проверим нашу команду на маленьком наборе данных (с -a)
+            $testCommand = "grep -a 'accepted' /var/lib/marzban/access.log | grep -a 'email:' | head -10";
             $testOutput = $ssh->exec($testCommand);
             Log::info("Test command output for server {$server->host}", ['test_output' => $testOutput]);
 
-            // 5. Проверим нашу команду анализа на этих 10 строках
-            $testAnalysisCommand = "grep 'accepted' /var/lib/marzban/access.log | grep 'email:' | head -10 | awk '{ip=\$3; email=\$(NF-1); print \"IP:\" ip \" EMAIL:\" email}'";
+            // 5. Проверим нашу команду анализа на этих 10 строках (с -a)
+            $testAnalysisCommand = "grep -a 'accepted' /var/lib/marzban/access.log | grep -a 'email:' | head -10 | awk '{ip=\$3; email=\$(NF-1); print \"IP:\" ip \" EMAIL:\" email}'";
             $testAnalysis = $ssh->exec($testAnalysisCommand);
             Log::info("Test analysis output for server {$server->host}", ['test_analysis' => $testAnalysis]);
 
-            // 6. Только после этого запускаем основную команду
+            // 6. Только после этого запускаем основную команду (с -a)
             $command = $this->buildLogAnalysisCommand();
             $logOutput = $ssh->exec($command);
 
@@ -127,7 +127,7 @@ class ConnectionMonitorService
 
             Log::info("Parsed users for server {$server->host}", [
                 'users_count' => $usersChecked,
-                'first_users' => array_slice(array_keys($userConnections), 0, 3)
+                'first_users' => array_slice(array_keys($userConnections), 0, 5)
             ]);
 
             // Анализируем подключения каждого пользователя
@@ -137,11 +137,12 @@ class ConnectionMonitorService
 
                 Log::info("User analysis for server {$server->host}", [
                     'user_id' => $userId,
-                    'unique_ips_count' => $ipCount
+                    'unique_ips_count' => $ipCount,
+                    'ip_addresses' => $uniqueIps
                 ]);
 
                 if ($ipCount > $threshold) {
-                    Log::warning("VIOLATION detected for server {$server->host}", [
+                    Log::warning("🚨 VIOLATION detected for server {$server->host}", [
                         'user_id' => $userId,
                         'unique_ips_count' => $ipCount,
                         'ip_addresses' => $uniqueIps
@@ -176,10 +177,8 @@ class ConnectionMonitorService
     {
         $logPath = '/var/lib/marzban/access.log';
 
-        // Вместо фильтра по конкретной дате, анализируем все доступные логи
-        // Marzban логи обычно содержат последние подключения
-        return "grep 'accepted' {$logPath} " .
-            "| grep 'email:' " .
+        return "grep -a 'accepted' {$logPath} " .
+            "| grep -a 'email:' " .
             "| awk '{ip=\$3; email=\$(NF-1); print email, ip}' " .
             "| sed 's/email://g' " .
             "| sort | uniq";
