@@ -19,6 +19,7 @@ class Kernel extends ConsoleKernel
         \App\Console\Commands\EnableIPLimitsCommand::class,
         \App\Console\Commands\DiagnosePanelsCommand::class,
         \App\Console\Commands\TestMarzbanAPICommand::class,
+        \App\Console\Commands\TestKeyActivationWithLimitsCommand::class,
         ];
 
     /**
