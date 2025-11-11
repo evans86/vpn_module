@@ -124,4 +124,49 @@ class ConnectionLimitViolation extends Model
 
         return round((($this->actual_connections - $this->allowed_connections) / $this->allowed_connections) * 100, 1);
     }
+
+    /**
+     * Безопасное получение keyActivate с проверкой
+     */
+    public function getSafeKeyActivateAttribute()
+    {
+        try {
+            return $this->keyActivate;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Безопасное получение serverUser с проверкой
+     */
+    public function getSafeServerUserAttribute()
+    {
+        try {
+            return $this->serverUser;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Безопасное получение panel с проверкой
+     */
+    public function getSafePanelAttribute()
+    {
+        try {
+            return $this->panel;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Получить ID ключа активации безопасно
+     */
+    public function getKeyActivateIdSafeAttribute()
+    {
+        $keyActivate = $this->getSafeKeyActivateAttribute();
+        return $keyActivate ? $keyActivate->id : 'Удален';
+    }
 }

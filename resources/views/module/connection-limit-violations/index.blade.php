@@ -115,7 +115,8 @@
                                     <tr>
                                         <td>{{ $violation->created_at->format('d.m.Y H:i') }}</td>
                                         <td>
-                                            <code>{{ $violation->keyActivate->id }}</code>
+                                            {{-- ФИКС: Используем безопасный метод --}}
+                                            <code>{{ $violation->keyActivateIdSafe }}</code>
                                         </td>
                                         <td>{{ $violation->user_tg_id }}</td>
                                         <td>

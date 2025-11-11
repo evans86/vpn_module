@@ -22,8 +22,13 @@ class ConnectionLimitViolationController extends Controller
      */
     public function index(Request $request): View
     {
-        $query = ConnectionLimitViolation::with(['keyActivate', 'serverUser', 'panel.server'])
-            ->latest();
+        $query = ConnectionLimitViolation::with([
+            'keyActivate' => function($query) {
+                $query->withTrashed(); // Если используется soft delete
+            },
+            'serverUser',
+            'panel.server'
+        ])->latest();
 
         // Фильтрация по статусу
         if ($request->filled('status')) {
@@ -57,7 +62,13 @@ class ConnectionLimitViolationController extends Controller
      */
     public function show(ConnectionLimitViolation $violation): View
     {
-        $violation->load(['keyActivate.packSalesman.pack', 'serverUser', 'panel.server']);
+        $violation->load([
+            'keyActivate.packSalesman.pack' => function($query) {
+                $query->withTrashed();
+            },
+            'serverUser',
+            'panel.server'
+        ]);
 
         return view('module.connection-limit-violations.show', compact('violation'));
     }
