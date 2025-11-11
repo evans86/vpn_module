@@ -8,7 +8,7 @@ use App\Models\Server\Server;
 use App\Dto\Server\ServerFactory;
 use App\Services\Panel\marzban\MarzbanService;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Collection;
+use Carbon\Carbon;
 
 class ConnectionMonitorService
 {
@@ -24,7 +24,7 @@ class ConnectionMonitorService
     }
 
     /**
-     * Мониторинг подключений в скользящем окне 10 минут
+     * Быстрый мониторинг подключений за последние 10 минут
      */
     public function monitorSlidingWindow(int $threshold = 2, int $windowMinutes = 10): array
     {
@@ -39,28 +39,31 @@ class ConnectionMonitorService
 
         foreach ($servers as $server) {
             try {
-                $serverResults = $this->analyzeServerLogsSlidingWindow($server, $threshold, $windowMinutes);
+                $serverResults = $this->analyzeRecentLogs($server, $threshold, $windowMinutes);
                 $results['violations_found'] += $serverResults['violations_count'];
                 $results['servers_checked'][] = [
                     'server_id' => $server->id,
                     'host' => $server->host,
                     'violations' => $serverResults['violations_count'],
                     'users_checked' => $serverResults['users_checked'],
+                    'lines_processed' => $serverResults['lines_processed'],
+                    'processing_time' => $serverResults['processing_time'],
                     'time_window' => "{$windowMinutes}min"
                 ];
 
-                Log::info('Sliding window monitoring completed', [
+                Log::info('Fast sliding window monitoring completed', [
                     'server_id' => $server->id,
                     'violations_found' => $serverResults['violations_count'],
                     'users_checked' => $serverResults['users_checked'],
-                    'window_minutes' => $windowMinutes
+                    'lines_processed' => $serverResults['lines_processed'],
+                    'processing_time' => $serverResults['processing_time']
                 ]);
 
             } catch (\Exception $e) {
                 $errorMsg = "Server {$server->host}: {$e->getMessage()}";
                 $results['errors'][] = $errorMsg;
 
-                Log::error('Sliding window monitoring failed', [
+                Log::error('Fast sliding window monitoring failed', [
                     'server_id' => $server->id,
                     'error' => $e->getMessage()
                 ]);
@@ -71,49 +74,44 @@ class ConnectionMonitorService
     }
 
     /**
-     * Анализ логов в скользящем окне
+     * Быстрый анализ только последних записей лога
      */
-    private function analyzeServerLogsSlidingWindow(Server $server, int $threshold, int $windowMinutes): array
+    private function analyzeRecentLogs(Server $server, int $threshold, int $windowMinutes): array
     {
+        $startTime = microtime(true);
         $violationsCount = 0;
         $usersChecked = 0;
+        $linesProcessed = 0;
 
         try {
             $serverDto = ServerFactory::fromEntity($server);
             $ssh = $this->marzbanService->connectSshAdapter($serverDto);
 
-            // Получаем данные за последние 10 минут с группировкой по 1-минутным интервалам
-            $userConnections = $this->getSlidingWindowData($ssh, $windowMinutes);
+            // Получаем только последние записи (примерно последние 10-15 минут)
+            $userConnections = $this->getRecentLogData($ssh, $windowMinutes);
             $usersChecked = count($userConnections);
+            $linesProcessed = $this->countProcessedLines($userConnections);
 
-            Log::info("Sliding window analysis for server {$server->host}", [
+            Log::info("Fast analysis for server {$server->host}", [
                 'users_count' => $usersChecked,
-                'window_minutes' => $windowMinutes,
-                'sample_users' => array_slice(array_keys($userConnections), 0, 3)
+                'lines_processed' => $linesProcessed,
+                'window_minutes' => $windowMinutes
             ]);
 
-            // Анализируем подключения каждого пользователя в скользящем окне
-            foreach ($userConnections as $userId => $timeSlots) {
-                $maxUniqueIps = $this->calculateMaxUniqueIpsInWindow($timeSlots, $windowMinutes);
+            // Анализируем подключения каждого пользователя
+            foreach ($userConnections as $userId => $connectionData) {
+                $uniqueIps = $connectionData['unique_ips'];
+                $ipCount = count($uniqueIps);
 
-                Log::debug("User sliding window analysis", [
-                    'user_id' => $userId,
-                    'max_unique_ips' => $maxUniqueIps,
-                    'time_slots_count' => count($timeSlots)
-                ]);
-
-                if ($maxUniqueIps > $threshold) {
-                    $ipAddresses = $this->getIpsForViolation($timeSlots, $windowMinutes);
-
-                    Log::warning("🚨 SLIDING WINDOW VIOLATION detected", [
+                if ($ipCount > $threshold) {
+                    Log::warning("🚨 FAST VIOLATION detected", [
                         'user_id' => $userId,
-                        'max_unique_ips' => $maxUniqueIps,
+                        'unique_ips_count' => $ipCount,
                         'threshold' => $threshold,
-                        'window_minutes' => $windowMinutes,
-                        'ip_addresses' => $ipAddresses
+                        'ip_addresses' => $uniqueIps
                     ]);
 
-                    $violationCreated = $this->handleUserViolation($userId, $maxUniqueIps, $ipAddresses, $server);
+                    $violationCreated = $this->handleUserViolation($userId, $ipCount, $uniqueIps, $server);
                     if ($violationCreated) {
                         $violationsCount++;
                     }
@@ -121,32 +119,36 @@ class ConnectionMonitorService
             }
 
         } catch (\Exception $e) {
-            Log::error("Error in sliding window analysis for server {$server->host}", [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+            Log::error("Error in fast analysis for server {$server->host}", [
+                'error' => $e->getMessage()
             ]);
             throw $e;
         }
 
+        $processingTime = round(microtime(true) - $startTime, 2);
+
         return [
             'violations_count' => $violationsCount,
-            'users_checked' => $usersChecked
+            'users_checked' => $usersChecked,
+            'lines_processed' => $linesProcessed,
+            'processing_time' => $processingTime
         ];
     }
 
     /**
-     * Получение данных для скользящего окна
+     * Получение только последних данных из лога (оптимизированно)
      */
-    private function getSlidingWindowData($ssh, int $windowMinutes): array
+    private function getRecentLogData($ssh, int $windowMinutes): array
     {
         $logPath = '/var/lib/marzban/access.log';
 
-        // Команда для получения данных за последние N минут с группировкой по минутам
-        $command = "grep -a 'accepted' {$logPath} " .
-            "| grep -a 'email:' " .
-            "| awk '{\$1=\$1; print \$1 \" \" \$2 \" \" \$4 \" \" \$(NF-1)}' " .
-            "| sed 's/email://g; s/:[0-9]*\$//' " .
-            "| awk '{
+        // Вычисляем временную метку для отсечения старых записей
+        $cutoffTime = time() - ($windowMinutes * 60);
+
+        // Команда которая читает лог с КОНЦА и останавливается когда находит старые записи
+        $command = "tail -n 10000 {$logPath} | " . // Берем только последние 10000 строк
+            "tac | " . // Переворачиваем чтобы читать с конца
+            "awk '/accepted.*email:/ {
                 # Парсим дату и время
                 date_time = \$1 \" \" \$2;
                 gsub(/\\//, \"-\", date_time);
@@ -154,34 +156,118 @@ class ConnectionMonitorService
                 cmd | getline timestamp;
                 close(cmd);
 
-                # Округляем до минуты
-                time_slot = int(timestamp/60) * 60;
+                # Если запись старше нашего окна - выходим
+                if (timestamp < $cutoffTime) exit;
 
-                # UUID пользователя (последнее поле перед email)
-                user_id = \$NF;
+                # UUID пользователя
+                user_id = \$(NF-1);
+                gsub(/email:/, \"\", user_id);
 
-                # IP адрес (третье поле)
-                ip = \$3;
+                # IP адрес (без порта)
+                ip = \$4;
+                gsub(/:[0-9]*\$/, \"\", ip);
 
-                print time_slot \" \" user_id \" \" ip;
-            }' " .
-            "| sort -n";
+                print timestamp \" \" user_id \" \" ip;
+            }' | " .
+            "tac"; // Возвращаем в нормальный порядок
 
         $output = $ssh->exec($command);
-        return $this->parseSlidingWindowData($output, $windowMinutes);
+        return $this->parseRecentLogData($output, $windowMinutes);
     }
 
     /**
-     * Парсинг данных для скользящего окна
+     * Альтернативный метод - используем grep для поиска по времени
      */
-    private function parseSlidingWindowData(string $output, int $windowMinutes): array
+    private function getRecentLogDataAlternative($ssh, int $windowMinutes): array
+    {
+        $logPath = '/var/lib/marzban/access.log';
+
+        // Получаем текущее время и время начала окна
+        $currentTime = date('Y/m/d H:i:s');
+        $startTime = date('Y/m/d H:i:s', strtotime("-$windowMinutes minutes"));
+
+        // Команда использует grep для поиска записей за последние N минут
+        $command = "grep -a 'accepted' {$logPath} | " .
+            "grep -a 'email:' | " .
+            "awk '\$1\" \"\$2 >= \"$startTime\" && \$1\" \"\$2 <= \"$currentTime\" { " .
+            "ip = \$4; gsub(/:[0-9]*\$/, \"\", ip); " .
+            "user_id = \$(NF-1); gsub(/email:/, \"\", user_id); " .
+            "print user_id \" \" ip; }'";
+
+        $output = $ssh->exec($command);
+        return $this->parseSimpleLogData($output);
+    }
+
+    /**
+     * Самый простой и быстрый метод - берем только последние N строк
+     */
+    private function getRecentLogDataSimple($ssh, int $windowMinutes): array
+    {
+        $logPath = '/var/lib/marzban/access.log';
+
+        // Эмпирически определяем сколько строк примерно соответствует 10-15 минутам
+        $estimatedLines = $windowMinutes * 100; // ~100 строк в минуту
+
+        // Берем в 2 раза больше на всякий случай
+        $linesToRead = $estimatedLines * 2;
+
+        $command = "tail -n {$linesToRead} {$logPath} | " .
+            "grep -a 'accepted' | " .
+            "grep -a 'email:' | " .
+            "awk '{
+                ip = \$4;
+                gsub(/:[0-9]*\$/, \"\", ip);
+                user_id = \$(NF-1);
+                gsub(/email:/, \"\", user_id);
+                print user_id \" \" ip;
+            }'";
+
+        $output = $ssh->exec($command);
+        return $this->parseSimpleLogData($output);
+    }
+
+    /**
+     * Парсинг упрощенных данных лога
+     */
+    private function parseSimpleLogData(string $output): array
     {
         $userConnections = [];
         $lines = explode("\n", trim($output));
 
-        // Текущее время (последняя временная метка в логе)
-        $currentTime = time();
-        $windowSeconds = $windowMinutes * 60;
+        foreach ($lines as $line) {
+            if (empty($line)) continue;
+
+            $parts = explode(' ', trim($line));
+            if (count($parts) < 2) continue;
+
+            $userId = trim($parts[0]);
+            $clientIp = trim($parts[1]);
+
+            if (empty($userId) || empty($clientIp)) continue;
+
+            if (!isset($userConnections[$userId])) {
+                $userConnections[$userId] = ['unique_ips' => []];
+            }
+
+            $userConnections[$userId]['unique_ips'][$clientIp] = true;
+        }
+
+        // Преобразуем IP-адреса в массивы
+        foreach ($userConnections as &$data) {
+            $data['unique_ips'] = array_keys($data['unique_ips']);
+        }
+
+        return $userConnections;
+    }
+
+    /**
+     * Парсинг данных с временными метками
+     */
+    private function parseRecentLogData(string $output, int $windowMinutes): array
+    {
+        $userConnections = [];
+        $lines = explode("\n", trim($output));
+        $cutoffTime = time() - ($windowMinutes * 60);
 
         foreach ($lines as $line) {
             if (empty($line)) continue;
@@ -193,91 +279,40 @@ class ConnectionMonitorService
             $userId = $parts[1];
             $clientIp = $parts[2];
 
-            // Пропускаем записи старше нашего окна анализа
-            if ($currentTime - $timestamp > $windowSeconds + 300) { // +5 минут буфер
+            // Дополнительная проверка времени
+            if ($timestamp < $cutoffTime) {
                 continue;
             }
 
-            // Группируем по пользователю и временному слоту (минута)
             if (!isset($userConnections[$userId])) {
-                $userConnections[$userId] = [];
+                $userConnections[$userId] = ['unique_ips' => []];
             }
 
-            $timeSlot = $timestamp;
-            if (!isset($userConnections[$userId][$timeSlot])) {
-                $userConnections[$userId][$timeSlot] = [];
-            }
+            $userConnections[$userId]['unique_ips'][$clientIp] = true;
+        }
 
-            $userConnections[$userId][$timeSlot][$clientIp] = true;
+        // Преобразуем IP-адреса в массивы
+        foreach ($userConnections as &$data) {
+            $data['unique_ips'] = array_keys($data['unique_ips']);
         }
 
         return $userConnections;
     }
 
     /**
-     * Расчет максимального количества уникальных IP в скользящем окне
+     * Подсчет обработанных строк
      */
-    private function calculateMaxUniqueIpsInWindow(array $timeSlots, int $windowMinutes): int
+    private function countProcessedLines(array $userConnections): int
     {
-        $maxUniqueIps = 0;
-        $windowSeconds = $windowMinutes * 60;
-
-        // Сортируем временные слоты
-        ksort($timeSlots);
-        $timeSlots = array_slice($timeSlots, -20); // Берем последние 20 минут для анализа
-
-        if (empty($timeSlots)) {
-            return 0;
+        $count = 0;
+        foreach ($userConnections as $data) {
+            $count += count($data['unique_ips']);
         }
-
-        // Анализируем скользящее окно
-        $timeKeys = array_keys($timeSlots);
-        $startIndex = 0;
-
-        for ($endIndex = 0; $endIndex < count($timeKeys); $endIndex++) {
-            $endTime = $timeKeys[$endIndex];
-
-            // Сдвигаем начало окна, если нужно
-            while ($startIndex <= $endIndex && ($endTime - $timeKeys[$startIndex]) > $windowSeconds) {
-                $startIndex++;
-            }
-
-            // Считаем уникальные IP в текущем окне
-            $uniqueIps = [];
-            for ($i = $startIndex; $i <= $endIndex; $i++) {
-                $slotTime = $timeKeys[$i];
-                $ipsInSlot = array_keys($timeSlots[$slotTime]);
-                $uniqueIps = array_merge($uniqueIps, $ipsInSlot);
-            }
-
-            $uniqueIps = array_unique($uniqueIps);
-            $maxUniqueIps = max($maxUniqueIps, count($uniqueIps));
-        }
-
-        return $maxUniqueIps;
+        return $count;
     }
 
     /**
-     * Получение IP адресов для нарушения (за последние N минут нарушения)
-     */
-    private function getIpsForViolation(array $timeSlots, int $windowMinutes): array
-    {
-        $windowSeconds = $windowMinutes * 60;
-        ksort($timeSlots);
-
-        // Берем последние временные слоты в пределах окна
-        $recentSlots = array_slice($timeSlots, -10, null, true);
-        $ipAddresses = [];
-
-        foreach ($recentSlots as $ips) {
-            $ipAddresses = array_merge($ipAddresses, array_keys($ips));
-        }
-
-        return array_unique($ipAddresses);
-    }
-
-    /**
-     * Обработка нарушения
+     * Обработка нарушения (без изменений)
      */
     private function handleUserViolation(string $userId, int $ipCount, array $ipAddresses, Server $server): bool
     {
@@ -320,7 +355,7 @@ class ConnectionMonitorService
                 $panel->id
             );
 
-            Log::info('New sliding window violation recorded', [
+            Log::info('New violation recorded', [
                 'user_id' => $userId,
                 'unique_ips' => $ipCount,
                 'ip_addresses' => $ipAddresses
@@ -329,7 +364,7 @@ class ConnectionMonitorService
             return true;
 
         } catch (\Exception $e) {
-            Log::error('Failed to handle user violation in sliding window', [
+            Log::error('Failed to handle user violation', [
                 'user_id' => $userId,
                 'error' => $e->getMessage()
             ]);
@@ -357,70 +392,11 @@ class ConnectionMonitorService
         $todayViolations = ConnectionLimitViolation::whereDate('created_at', today())->count();
         $serversCount = Server::where('server_status', 'configured')->count();
 
-        // Статистика по последним нарушениям
-        $recentViolations = ConnectionLimitViolation::with(['keyActivate', 'serverUser'])
-            ->where('created_at', '>=', now()->subHours(24))
-            ->orderBy('created_at', 'desc')
-            ->limit(10)
-            ->get();
-
         return [
             'total_violations' => $totalViolations,
             'active_violations' => $activeViolations,
             'today_violations' => $todayViolations,
             'servers_count' => $serversCount,
-            'recent_violations' => $recentViolations,
-            'monitoring_period' => 'sliding_window_10min'
         ];
-    }
-
-    /**
-     * Альтернативный метод для ежедневного мониторинга (сохраняем для обратной совместимости)
-     */
-    public function monitorDailyConnections(int $threshold = 3): array
-    {
-        // Перенаправляем на новый метод с окном 24 часа (1440 минут)
-        return $this->monitorSlidingWindow($threshold, 1440);
-    }
-
-    /**
-     * Получение детальной статистики по серверам
-     */
-    public function getServerStats(): array
-    {
-        $servers = Server::where('server_status', 'configured')->get();
-        $serverStats = [];
-
-        foreach ($servers as $server) {
-            $violationsCount = ConnectionLimitViolation::whereHas('panel', function ($query) use ($server) {
-                $query->where('server_id', $server->id);
-            })->where('status', ConnectionLimitViolation::STATUS_ACTIVE)->count();
-
-            $serverStats[] = [
-                'server_id' => $server->id,
-                'host' => $server->host,
-                'active_violations' => $violationsCount,
-                'status' => $server->server_status
-            ];
-        }
-
-        return $serverStats;
-    }
-
-    /**
-     * Очистка старых нарушений (старше 30 дней)
-     */
-    public function cleanupOldViolations(int $days = 30): int
-    {
-        $deleted = ConnectionLimitViolation::where('created_at', '<', now()->subDays($days))
-            ->where('status', ConnectionLimitViolation::STATUS_RESOLVED)
-            ->delete();
-
-        Log::info("Cleaned up old connection violations", [
-            'deleted_count' => $deleted,
-            'older_than_days' => $days
-        ]);
-
-        return $deleted;
     }
 }
