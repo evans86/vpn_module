@@ -8,9 +8,10 @@ use App\Services\VPN\ConnectionMonitorService;
 class MonitorConnectionLimits extends Command
 {
     protected $signature = 'vpn:monitor-connections
-                            {--threshold=3 : Maximum allowed unique IPs per subscription}';
+                            {--threshold=2 : Maximum allowed unique IPs per subscription}
+                            {--window=10 : Time window in minutes for analysis}';
 
-    protected $description = 'Monitor VPN connections for subscription sharing violations';
+    protected $description = 'Monitor VPN connections for subscription sharing violations using sliding window';
 
     private ConnectionMonitorService $monitorService;
 
@@ -23,13 +24,14 @@ class MonitorConnectionLimits extends Command
     public function handle()
     {
         $threshold = $this->option('threshold');
+        $window = $this->option('window');
 
-        $this->info("Starting VPN connection monitoring...");
+        $this->info("Starting VPN connection monitoring (Sliding Window)...");
         $this->info("Monitoring subscription sharing (unique IPs per UUID)");
         $this->info("Threshold: {$threshold} unique IPs");
-        $this->info("Period: Last 24 hours");
+        $this->info("Time Window: {$window} minutes");
 
-        $results = $this->monitorService->monitorDailyConnections($threshold);
+        $results = $this->monitorService->monitorSlidingWindow($threshold, $window);
 
         // Вывод результатов
         $this->displayResults($results);
@@ -45,7 +47,7 @@ class MonitorConnectionLimits extends Command
 
     private function displayResults(array $results): void
     {
-        $this->info("\nMonitoring Results:");
+        $this->info("\nSliding Window Monitoring Results:");
         $this->line("Total violations found: {$results['violations_found']}");
         $this->line("Total servers checked: {$results['total_servers']}");
 
@@ -58,7 +60,7 @@ class MonitorConnectionLimits extends Command
 
         $this->info("\nServers checked:");
         foreach ($results['servers_checked'] as $server) {
-            $this->line("- {$server['host']}: {$server['violations']} violations, {$server['users_checked']} users checked");
+            $this->line("- {$server['host']}: {$server['violations']} violations, {$server['users_checked']} users checked ({$server['time_window']})");
         }
     }
 }
