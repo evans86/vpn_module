@@ -219,9 +219,13 @@ class ConnectionMonitorService
                 return false;
             }
 
-            $panel = $server->panels()->first();
+            // ФИКС: Используем правильное отношение panel() вместо panels()
+            $panel = $server->panel;
             if (!$panel) {
-                Log::warning('Panel not found for server', ['server_id' => $server->id]);
+                Log::warning('Panel not found for server', [
+                    'server_id' => $server->id,
+                    'server_host' => $server->host
+                ]);
                 return false;
             }
 
@@ -234,7 +238,9 @@ class ConnectionMonitorService
 
             Log::info('New violation recorded', [
                 'user_id' => $userId,
-                'unique_ips' => $ipCount
+                'unique_ips' => $ipCount,
+                'panel_id' => $panel->id,
+                'server_id' => $server->id
             ]);
 
             return true;
@@ -242,7 +248,8 @@ class ConnectionMonitorService
         } catch (\Exception $e) {
             Log::error('Failed to handle user violation', [
                 'user_id' => $userId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString() // Добавим trace для диагностики
             ]);
             return false;
         }
