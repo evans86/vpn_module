@@ -8,7 +8,6 @@ use App\Models\Server\Server;
 use App\Dto\Server\ServerFactory;
 use App\Services\Panel\marzban\MarzbanService;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
 
 class ConnectionMonitorService
 {
@@ -24,7 +23,7 @@ class ConnectionMonitorService
     }
 
     /**
-     * Умный мониторинг - баланс скорости и качества данных
+     * Исправленный мониторинг с точным временным окном
      */
     public function monitorSlidingWindow(int $threshold = 2, int $windowMinutes = 10): array
     {
@@ -39,31 +38,27 @@ class ConnectionMonitorService
 
         foreach ($servers as $server) {
             try {
-                // Пробуем разные методы по очереди до получения данных
-                $serverResults = $this->analyzeWithFallback($server, $threshold, $windowMinutes);
+                $serverResults = $this->analyzeServerLogsFixed($server, $threshold, $windowMinutes);
                 $results['violations_found'] += $serverResults['violations_count'];
                 $results['servers_checked'][] = [
                     'server_id' => $server->id,
                     'host' => $server->host,
                     'violations' => $serverResults['violations_count'],
                     'users_checked' => $serverResults['users_checked'],
-                    'lines_processed' => $serverResults['lines_processed'],
-                    'processing_time' => $serverResults['processing_time'],
-                    'method_used' => $serverResults['method_used'],
-                    'data_quality' => $serverResults['data_quality']
+                    'unique_ips_total' => $serverResults['unique_ips_total'],
+                    'processing_time' => $serverResults['processing_time']
                 ];
 
-                Log::info('Smart monitoring completed', [
+                Log::info('Fixed monitoring completed', [
                     'server_id' => $server->id,
-                    'method' => $serverResults['method_used'],
-                    'quality' => $serverResults['data_quality'],
-                    'violations' => $serverResults['violations_count']
+                    'violations' => $serverResults['violations_count'],
+                    'users' => $serverResults['users_checked']
                 ]);
 
             } catch (\Exception $e) {
                 $errorMsg = "Server {$server->host}: {$e->getMessage()}";
                 $results['errors'][] = $errorMsg;
-                Log::error('Smart monitoring failed', ['server_id' => $server->id, 'error' => $e->getMessage()]);
+                Log::error('Fixed monitoring failed', ['server' => $server->host, 'error' => $e->getMessage()]);
             }
         }
 
@@ -71,170 +66,36 @@ class ConnectionMonitorService
     }
 
     /**
-     * Анализ с fallback методами
+     * Исправленный анализ с точным временным окном
      */
-    private function analyzeWithFallback(Server $server, int $threshold, int $windowMinutes): array
+    private function analyzeServerLogsFixed(Server $server, int $threshold, int $windowMinutes): array
     {
-        $methods = [
-            'fast_tail' => 'analyzeFastTail',      // Самый быстрый
-            'time_based' => 'analyzeTimeBased',    // Более точный
-            'extended' => 'analyzeExtended'        // Полные данные
-        ];
+        $startTime = microtime(true);
 
-        foreach ($methods as $methodName => $method) {
-            try {
-                $startTime = microtime(true);
-                $result = $this->{$method}($server, $threshold, $windowMinutes);
-                $result['processing_time'] = round(microtime(true) - $startTime, 2);
-                $result['method_used'] = $methodName;
-
-                // Если нашли данные достаточного качества - возвращаем
-                if ($result['data_quality'] >= 0.7 || $result['users_checked'] > 0) {
-                    Log::info("Method {$methodName} succeeded", [
-                        'server' => $server->host,
-                        'quality' => $result['data_quality'],
-                        'users' => $result['users_checked']
-                    ]);
-                    return $result;
-                }
-            } catch (\Exception $e) {
-                Log::warning("Method {$methodName} failed, trying next", [
-                    'server' => $server->host,
-                    'error' => $e->getMessage()
-                ]);
-                continue;
-            }
-        }
-
-        throw new \Exception("All analysis methods failed for server {$server->host}");
-    }
-
-    /**
-     * Метод 1: Быстрый анализ последних строк (качество: 0.8)
-     */
-    private function analyzeFastTail(Server $server, int $threshold, int $windowMinutes): array
-    {
         $serverDto = ServerFactory::fromEntity($server);
         $ssh = $this->marzbanService->connectSshAdapter($serverDto);
 
-        // Эмпирически: ~100 подключений в минуту × окно + запас
-        $linesToRead = $windowMinutes * 150;
+        // Получаем данные за ТОЧНОЕ временное окно
+        $userConnections = $this->getExactTimeWindowData($ssh, $windowMinutes);
 
-        $command = "tail -n {$linesToRead} /var/lib/marzban/access.log | " .
-            "grep -a 'accepted.*email:' | " .
-            "awk '{
-                ip = \$4;
-                gsub(/:[0-9]*\$/, \"\", ip);
-                user_id = \$(NF-1);
-                gsub(/email:/, \"\", user_id);
-                print user_id \" \" ip;
-            }'";
-
-        $output = $ssh->exec($command);
-        $userConnections = $this->parseSimpleLogData($output);
-
-        $violations = $this->detectViolations($userConnections, $threshold, $server);
-
-        return [
-            'violations_count' => $violations['count'],
-            'users_checked' => count($userConnections),
-            'lines_processed' => $violations['total_connections'],
-            'data_quality' => 0.8 // Хорошее качество для текущих нарушений
-        ];
-    }
-
-    /**
-     * Метод 2: Временной анализ (качество: 0.9)
-     */
-    private function analyzeTimeBased(Server $server, int $threshold, int $windowMinutes): array
-    {
-        $serverDto = ServerFactory::fromEntity($server);
-        $ssh = $this->marzbanService->connectSshAdapter($serverDto);
-
-        // Формируем временной диапазон
-        $startTime = date('Y/m/d H:i:s', strtotime("-$windowMinutes minutes"));
-        $endTime = date('Y/m/d H:i:s');
-
-        $command = "grep -a 'accepted' /var/lib/marzban/access.log | " .
-            "grep -a 'email:' | " .
-            "awk '\$1\" \"\$2 >= \"$startTime\" {
-                ip = \$4; gsub(/:[0-9]*\$/, \"\", ip);
-                user_id = \$(NF-1); gsub(/email:/, \"\", user_id);
-                print user_id \" \" ip;
-            }' | " .
-            "head -n 5000"; // Ограничиваем для скорости
-
-        $output = $ssh->exec($command);
-        $userConnections = $this->parseSimpleLogData($output);
-
-        $violations = $this->detectViolations($userConnections, $threshold, $server);
-
-        return [
-            'violations_count' => $violations['count'],
-            'users_checked' => count($userConnections),
-            'lines_processed' => $violations['total_connections'],
-            'data_quality' => 0.9 // Высокое качество
-        ];
-    }
-
-    /**
-     * Метод 3: Расширенный анализ (качество: 1.0)
-     */
-    private function analyzeExtended(Server $server, int $threshold, int $windowMinutes): array
-    {
-        $serverDto = ServerFactory::fromEntity($server);
-        $ssh = $this->marzbanService->connectSshAdapter($serverDto);
-
-        // Используем временные метки для точного окна
-        $cutoffTime = time() - ($windowMinutes * 60);
-
-        $command = "grep -a 'accepted' /var/lib/marzban/access.log | " .
-            "grep -a 'email:' | " .
-            "awk '{
-                # Парсим дату/время в timestamp
-                date_time = \$1 \" \" \$2;
-                gsub(/\\//, \"-\", date_time);
-                cmd = \"date -d \\\"\" date_time \"\\\" +%s 2>/dev/null\";
-                cmd | getline timestamp;
-                close(cmd);
-
-                if (timestamp >= $cutoffTime) {
-                    ip = \$4; gsub(/:[0-9]*\$/, \"\", ip);
-                    user_id = \$(NF-1); gsub(/email:/, \"\", user_id);
-                    print user_id \" \" ip;
-                }
-            }'";
-
-        $output = $ssh->exec($command);
-        $userConnections = $this->parseSimpleLogData($output);
-
-        $violations = $this->detectViolations($userConnections, $threshold, $server);
-
-        return [
-            'violations_count' => $violations['count'],
-            'users_checked' => count($userConnections),
-            'lines_processed' => $violations['total_connections'],
-            'data_quality' => 1.0 // Идеальное качество
-        ];
-    }
-
-    /**
-     * Обнаружение нарушений
-     */
-    private function detectViolations(array $userConnections, int $threshold, Server $server): array
-    {
         $violationsCount = 0;
-        $totalConnections = 0;
+        $uniqueIpsTotal = 0;
 
         foreach ($userConnections as $userId => $connectionData) {
             $uniqueIps = $connectionData['unique_ips'];
             $ipCount = count($uniqueIps);
-            $totalConnections += $ipCount;
+            $uniqueIpsTotal += $ipCount;
+
+            Log::debug("User analysis", [
+                'user_id' => $userId,
+                'unique_ips_count' => $ipCount,
+                'ips' => $uniqueIps
+            ]);
 
             if ($ipCount > $threshold) {
-                Log::warning("Violation detected", [
+                Log::warning("🚨 VIOLATION detected", [
                     'user_id' => $userId,
-                    'unique_ips' => $ipCount,
+                    'unique_ips_count' => $ipCount,
                     'threshold' => $threshold,
                     'ip_addresses' => $uniqueIps
                 ]);
@@ -247,21 +108,102 @@ class ConnectionMonitorService
         }
 
         return [
-            'count' => $violationsCount,
-            'total_connections' => $totalConnections
+            'violations_count' => $violationsCount,
+            'users_checked' => count($userConnections),
+            'unique_ips_total' => $uniqueIpsTotal,
+            'processing_time' => round(microtime(true) - $startTime, 2)
         ];
     }
 
     /**
-     * Парсинг логов
+     * Получение данных за точное временное окно
      */
-    private function parseSimpleLogData(string $output): array
+    private function getExactTimeWindowData($ssh, int $windowMinutes): array
+    {
+        $logPath = '/var/lib/marzban/access.log';
+
+        // Вычисляем временную границу на СЕРВЕРЕ
+        $command = "date -d '{$windowMinutes} minutes ago' '+%Y/%m/%d %H:%M:%S'";
+        $timeThreshold = trim($ssh->exec($command));
+
+        Log::info("Time threshold for analysis", [
+            'window_minutes' => $windowMinutes,
+            'time_threshold' => $timeThreshold
+        ]);
+
+        // Команда для выборки данных за временное окно
+        $analysisCommand = "awk '\$1\" \"\$2 >= \"$timeThreshold\"' {$logPath} | " .
+            "grep -a 'accepted' | " .
+            "grep -a 'email:' | " .
+            "awk '{
+                # Извлекаем IP (4-е поле, убираем порт)
+                ip = \$4;
+                gsub(/:[0-9]*\$/, \"\", ip);
+
+                # Извлекаем email (предпоследнее поле)
+                user_id = \$(NF-1);
+                gsub(/email:/, \"\", user_id);
+
+                print user_id \" \" ip;
+            }'";
+
+        $output = $ssh->exec($analysisCommand);
+
+        Log::debug("Raw log analysis output", [
+            'output_length' => strlen($output),
+            'first_500_chars' => substr($output, 0, 500)
+        ]);
+
+        return $this->parseLogDataFixed($output);
+    }
+
+    /**
+     * Альтернативный метод - используем tail + временную фильтрацию
+     */
+    private function getExactTimeWindowDataAlternative($ssh, int $windowMinutes): array
+    {
+        $logPath = '/var/lib/marzban/access.log';
+
+        // Берем больше строк чтобы покрыть окно
+        $estimatedLines = $windowMinutes * 200; // ~200 строк в минуту
+
+        $command = "tail -n {$estimatedLines} {$logPath} | " .
+            "grep -a 'accepted' | " .
+            "grep -a 'email:' | " .
+            "awk '{
+                # Парсим дату/время в timestamp
+                date_time = \$1 \" \" \$2;
+                gsub(/\\//, \"-\", date_time);
+                cmd = \"date -d \\\"\" date_time \"\\\" +%s 2>/dev/null\";
+                cmd | getline timestamp;
+                close(cmd);
+
+                # Текущее время на сервере
+                current_time = systime();
+
+                # Фильтруем по временному окну
+                if (current_time - timestamp <= {$windowMinutes} * 60) {
+                    ip = \$4;
+                    gsub(/:[0-9]*\$/, \"\", ip);
+                    user_id = \$(NF-1);
+                    gsub(/email:/, \"\", user_id);
+                    print user_id \" \" ip;
+                }
+            }'";
+
+        return $this->parseLogDataFixed($ssh->exec($command));
+    }
+
+    /**
+     * Исправленный парсинг логов
+     */
+    private function parseLogDataFixed(string $output): array
     {
         $userConnections = [];
         $lines = explode("\n", trim($output));
 
         foreach ($lines as $line) {
-            if (empty($line)) continue;
+            if (empty(trim($line))) continue;
 
             $parts = explode(' ', trim($line));
             if (count($parts) < 2) continue;
@@ -269,43 +211,18 @@ class ConnectionMonitorService
             $userId = trim($parts[0]);
             $clientIp = trim($parts[1]);
 
-            if (empty($userId) || empty($clientIp)) continue;
-
-            if (!isset($userConnections[$userId])) {
-                $userConnections[$userId] = ['unique_ips' => []];
+            // Валидация данных
+            if (empty($userId) || empty($clientIp)) {
+                continue;
             }
 
-            $userConnections[$userId]['unique_ips'][$clientIp] = true;
-        }
+            // Проверяем формат UUID (может быть с префиксом типа "3782.")
+            if (!preg_match('/[a-f0-9\-]+$/i', $userId)) {
+                continue;
+            }
 
-        foreach ($userConnections as &$data) {
-            $data['unique_ips'] = array_keys($data['unique_ips']);
-        }
-
-        return $userConnections;
-    }
-
-    /**
-     * Парсинг данных с временными метками
-     */
-    private function parseRecentLogData(string $output, int $windowMinutes): array
-    {
-        $userConnections = [];
-        $lines = explode("\n", trim($output));
-        $cutoffTime = time() - ($windowMinutes * 60);
-
-        foreach ($lines as $line) {
-            if (empty($line)) continue;
-
-            $parts = explode(' ', trim($line));
-            if (count($parts) < 3) continue;
-
-            $timestamp = (int)$parts[0];
-            $userId = $parts[1];
-            $clientIp = $parts[2];
-
-            // Дополнительная проверка времени
-            if ($timestamp < $cutoffTime) {
+            // Проверяем формат IP
+            if (!filter_var($clientIp, FILTER_VALIDATE_IP)) {
                 continue;
             }
 
@@ -321,32 +238,33 @@ class ConnectionMonitorService
             $data['unique_ips'] = array_keys($data['unique_ips']);
         }
 
+        Log::info("Parsed user connections", [
+            'total_users' => count($userConnections),
+            'total_connections' => array_sum(array_map(fn($data) => count($data['unique_ips']), $userConnections)),
+            'sample_users' => array_slice(array_keys($userConnections), 0, 5)
+        ]);
+
         return $userConnections;
     }
 
     /**
-     * Подсчет обработанных строк
-     */
-    private function countProcessedLines(array $userConnections): int
-    {
-        $count = 0;
-        foreach ($userConnections as $data) {
-            $count += count($data['unique_ips']);
-        }
-        return $count;
-    }
-
-    /**
-     * Обработка нарушения (без изменений)
+     * Обработка нарушения
      */
     private function handleUserViolation(string $userId, int $ipCount, array $ipAddresses, Server $server): bool
     {
         try {
-            $keyActivate = $this->findKeyActivateByUserId($userId);
+            // Убираем префикс если есть (типа "3782.") чтобы найти в базе
+            $cleanUserId = $userId;
+            if (preg_match('/\.([a-f0-9\-]+)$/i', $userId, $matches)) {
+                $cleanUserId = $matches[1];
+            }
+
+            $keyActivate = $this->findKeyActivateByUserId($cleanUserId);
 
             if (!$keyActivate) {
                 Log::warning('KeyActivate not found for user', [
-                    'user_id' => $userId
+                    'original_user_id' => $userId,
+                    'clean_user_id' => $cleanUserId
                 ]);
                 return false;
             }
@@ -382,6 +300,7 @@ class ConnectionMonitorService
 
             Log::info('New violation recorded', [
                 'user_id' => $userId,
+                'clean_user_id' => $cleanUserId,
                 'unique_ips' => $ipCount,
                 'ip_addresses' => $ipAddresses
             ]);
