@@ -28,9 +28,11 @@ class DebugLogs extends Command
         $serverHost = $this->argument('server');
         $window = $this->option('window');
 
+//        $servers = Server::where('server_status', Server::SERVER_CONFIGURED)->get();
+
         $servers = $serverHost
-            ? Server::where('host', $serverHost)->where('server_status', 'configured')->get()
-            : Server::where('server_status', 'configured')->get();
+            ? Server::where('host', $serverHost)->where('server_status', Server::SERVER_CONFIGURED)->get()
+            : Server::where('server_status', Server::SERVER_CONFIGURED)->get();
 
         if ($servers->isEmpty()) {
             $this->error('No configured servers found');
