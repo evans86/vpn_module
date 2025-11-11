@@ -9,8 +9,7 @@ class MonitorConnectionLimits extends Command
 {
     protected $signature = 'vpn:monitor-connections
                             {--threshold=2 : Maximum allowed unique IPs per subscription}
-                            {--window=10 : Time window in minutes for analysis}
-                            {--method=simple : Analysis method: simple, recent, or full}';
+                            {--window=10 : Time window in minutes for analysis}';
 
     protected $description = 'Monitor VPN connections for subscription sharing violations';
 
@@ -26,10 +25,8 @@ class MonitorConnectionLimits extends Command
     {
         $threshold = $this->option('threshold');
         $window = $this->option('window');
-        $method = $this->option('method');
 
-        $this->info("🚀 Starting FAST VPN connection monitoring...");
-        $this->info("📊 Method: {$method}");
+        $this->info("🚀 Starting VPN connection monitoring...");
         $this->info("🎯 Threshold: {$threshold} unique IPs");
         $this->info("⏰ Time Window: {$window} minutes");
         $this->info("⏳ Please wait...");
@@ -67,10 +64,21 @@ class MonitorConnectionLimits extends Command
 
         $this->info("\n📊 Servers checked:");
         foreach ($results['servers_checked'] as $server) {
-            $this->line("- {$server['host']}: {$server['violations']} violations, " .
+            $line = "- {$server['host']}: {$server['violations']} violations, " .
                 "{$server['users_checked']} users, " .
-                "{$server['lines_processed']} lines, " .
-                "{$server['processing_time']}s");
+                "{$server['processing_time']}s";
+
+            // Добавляем unique_ips_total если есть
+            if (isset($server['unique_ips_total'])) {
+                $line .= ", {$server['unique_ips_total']} total IPs";
+            }
+
+            // Добавляем lines_processed если есть
+            if (isset($server['lines_processed'])) {
+                $line .= ", {$server['lines_processed']} lines";
+            }
+
+            $this->line($line);
         }
     }
 }
