@@ -23,9 +23,7 @@ class ConnectionLimitViolationController extends Controller
     public function index(Request $request): View
     {
         $query = ConnectionLimitViolation::with([
-            'keyActivate' => function($query) {
-                $query->withTrashed(); // Если используется soft delete
-            },
+            'keyActivate',
             'serverUser',
             'panel.server'
         ])->latest();
@@ -63,9 +61,7 @@ class ConnectionLimitViolationController extends Controller
     public function show(ConnectionLimitViolation $violation): View
     {
         $violation->load([
-            'keyActivate.packSalesman.pack' => function($query) {
-                $query->withTrashed();
-            },
+            'keyActivate.packSalesman.pack',
             'serverUser',
             'panel.server'
         ]);

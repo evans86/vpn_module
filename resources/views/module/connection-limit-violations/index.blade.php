@@ -115,8 +115,12 @@
                                     <tr>
                                         <td>{{ $violation->created_at->format('d.m.Y H:i') }}</td>
                                         <td>
-                                            {{-- ФИКС: Используем безопасный метод --}}
-                                            <code>{{ $violation->keyActivateIdSafe }}</code>
+                                            {{-- ПРОСТАЯ ПРОВЕРКА: если keyActivate существует --}}
+                                            @if($violation->keyActivate)
+                                                <code>{{ $violation->keyActivate->id }}</code>
+                                            @else
+                                                <span class="text-muted">Удален (ID: {{ $violation->key_activate_id }})</span>
+                                            @endif
                                         </td>
                                         <td>{{ $violation->user_tg_id }}</td>
                                         <td>
