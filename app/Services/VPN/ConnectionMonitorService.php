@@ -23,7 +23,7 @@ class ConnectionMonitorService
     }
 
     /**
-     * ИСПРАВЛЕННЫЙ мониторинг
+     * ИСПРАВЛЕННЫЙ мониторинг с новой логикой нарушений
      */
     public function monitorFixed(int $threshold = 2, int $windowMinutes = 60): array
     {
@@ -36,18 +36,19 @@ class ConnectionMonitorService
             'errors' => []
         ];
 
+        // Собираем данные со всех серверов сначала
+        $allUsersData = [];
         foreach ($servers as $server) {
             try {
-                $serverResults = $this->analyzeServerLogsFixed($server, $threshold, $windowMinutes);
-                $results['violations_found'] += $serverResults['violations_count'];
+                $serverUsersData = $this->getServerUsersData($server, $windowMinutes);
+                $allUsersData = array_merge_recursive($allUsersData, $serverUsersData);
+
                 $results['servers_checked'][] = [
                     'server_id' => $server->id,
                     'host' => $server->host,
-                    'violations' => $serverResults['violations_count'],
-                    'users_checked' => $serverResults['users_checked'],
-                    'unique_ips_total' => $serverResults['unique_ips_total'],
-                    'processing_time' => $serverResults['processing_time'],
-                    'data_notes' => $serverResults['data_notes']
+                    'users_count' => count($serverUsersData),
+                    'processing_time' => 0, // будет заполнено позже
+                    'data_notes' => 'Data collected'
                 ];
 
             } catch (\Exception $e) {
@@ -56,29 +57,30 @@ class ConnectionMonitorService
             }
         }
 
+        // Теперь анализируем собранные данные с новой логикой
+        $violationsCount = $this->analyzeUsersWithNewLogic($allUsersData, $threshold);
+        $results['violations_found'] = $violationsCount;
+
         return $results;
     }
 
-    private function analyzeServerLogsFixed(Server $server, int $threshold, int $windowMinutes): array
+    /**
+     * Получить данные пользователей с сервера
+     */
+    private function getServerUsersData(Server $server, int $windowMinutes): array
     {
-        $startTime = microtime(true);
-
         $serverDto = ServerFactory::fromEntity($server);
         $ssh = $this->marzbanService->connectSshAdapter($serverDto);
 
-        // ФИКС 1: Используем grep с -a для бинарных файлов и берем больше данных
-        $linesToRead = $windowMinutes * 200; // Увеличиваем лимит
-
+        $linesToRead = $windowMinutes * 200;
         $command = "tail -n {$linesToRead} /var/lib/marzban/access.log | " .
             "grep -a 'accepted' | " .
             "grep -a 'email:' | " .
             "awk '{
-                       # ФИКС 2: Правильно извлекаем IP (4-е поле, убираем tcp: udp: префиксы)
                        ip = \$4;
-                       gsub(/^(tcp:|udp:)/, \"\", ip);  # Убираем префиксы
-                       gsub(/:[0-9]*\$/, \"\", ip);     # Убираем порт
+                       gsub(/^(tcp:|udp:)/, \"\", ip);
+                       gsub(/:[0-9]*\$/, \"\", ip);
 
-                       # ФИКС 3: Правильно извлекаем UserID (предпоследнее поле)
                        for(i=1; i<=NF; i++) {
                            if (\$i == \"email:\") {
                                user_id = \$(i+1);
@@ -86,114 +88,162 @@ class ConnectionMonitorService
                            }
                        }
 
-                       print user_id \" \" ip;
+                       print user_id \" \" ip \" \" \"{$server->host}\";
                    }'";
 
         $output = $ssh->exec($command);
-
-        Log::info("Fixed monitoring raw output", [
-            'server' => $server->host,
-            'output_length' => strlen($output),
-            'first_5_lines' => array_slice(explode("\n", $output), 0, 5)
-        ]);
+        $usersData = [];
 
         if (empty(trim($output))) {
-            return [
-                'violations_count' => 0,
-                'users_checked' => 0,
-                'unique_ips_total' => 0,
-                'processing_time' => round(microtime(true) - $startTime, 2),
-                'data_notes' => 'No data found in logs'
-            ];
+            return $usersData;
         }
 
-        // ФИКС 4: Правильный парсинг
-        $userConnections = [];
         $lines = explode("\n", trim($output));
-        $validLines = 0;
-
         foreach ($lines as $line) {
             if (empty(trim($line))) continue;
 
             $parts = explode(' ', trim($line));
-            if (count($parts) < 2) continue;
+            if (count($parts) < 3) continue;
 
             $userId = trim($parts[0]);
             $clientIp = trim($parts[1]);
+            $serverHost = trim($parts[2]);
 
-            // ФИКС 5: Валидация данных
-            if (empty($userId) || $userId === 'tcp:' || $userId === 'udp:') {
+            if (empty($userId) || $userId === 'tcp:' || $userId === 'udp:' ||
+                empty($clientIp) || !filter_var($clientIp, FILTER_VALIDATE_IP)) {
                 continue;
             }
 
-            if (empty($clientIp) || !filter_var($clientIp, FILTER_VALIDATE_IP)) {
-                continue;
+            if (!isset($usersData[$userId])) {
+                $usersData[$userId] = [
+                    'unique_ips' => [],
+                    'servers' => [],
+                    'ip_networks' => []
+                ];
             }
 
-            if (!isset($userConnections[$userId])) {
-                $userConnections[$userId] = ['unique_ips' => []];
-            }
+            $usersData[$userId]['unique_ips'][$clientIp] = true;
+            $usersData[$userId]['servers'][$serverHost] = true;
 
-            $userConnections[$userId]['unique_ips'][$clientIp] = true;
-            $validLines++;
+            // Определяем сеть IP (первые 3 октета для IPv4)
+            $ipParts = explode('.', $clientIp);
+            if (count($ipParts) === 4) {
+                $network = $ipParts[0] . '.' . $ipParts[1] . '.' . $ipParts[2] . '.0/24';
+                $usersData[$userId]['ip_networks'][$network] = true;
+            }
         }
 
-        // Анализируем нарушения
+        return $usersData;
+    }
+
+    /**
+     * Новая логика анализа нарушений
+     */
+    private function analyzeUsersWithNewLogic(array $allUsersData, int $threshold): int
+    {
         $violationsCount = 0;
-        $uniqueIpsTotal = 0;
-        $violationsFound = [];
 
-        foreach ($userConnections as $userId => $connectionData) {
-            $uniqueIps = array_keys($connectionData['unique_ips']);
+        foreach ($allUsersData as $userId => $userData) {
+            $uniqueIps = array_keys($userData['unique_ips']);
             $ipCount = count($uniqueIps);
-            $uniqueIpsTotal += $ipCount;
+            $networkCount = count($userData['ip_networks']);
+            $serverCount = count($userData['servers']);
 
-            if ($ipCount > $threshold) {
-                $violationsFound[] = [
-                    'user_id' => $userId,
-                    'ip_count' => $ipCount,
-                    'ips' => $uniqueIps
-                ];
+            Log::info("User analysis", [
+                'user_id' => $userId,
+                'unique_ips_count' => $ipCount,
+                'unique_networks_count' => $networkCount,
+                'servers_count' => $serverCount,
+                'ip_addresses' => $uniqueIps
+            ]);
 
-                Log::warning("🚨 VIOLATION FOUND", [
+            // НОВАЯ ЛОГИКА: Нарушение только если разные сети И превышен порог
+            $isViolation = $this->isRealViolation($uniqueIps, $ipCount, $threshold);
+
+            if ($isViolation) {
+                Log::warning("🚨 REAL VIOLATION FOUND", [
                     'user_id' => $userId,
                     'unique_ips_count' => $ipCount,
-                    'ip_addresses' => $uniqueIps
+                    'unique_networks_count' => $networkCount,
+                    'ip_addresses' => $uniqueIps,
+                    'violation_reason' => 'Multiple networks detected'
                 ]);
 
-                $violationCreated = $this->handleUserViolation($userId, $ipCount, $uniqueIps, $server);
+                $violationCreated = $this->handleUserViolation($userId, $ipCount, $uniqueIps);
                 if ($violationCreated) {
                     $violationsCount++;
                 }
+            } else {
+                Log::info("User within limits (same network)", [
+                    'user_id' => $userId,
+                    'unique_ips_count' => $ipCount,
+                    'networks' => array_keys($userData['ip_networks'])
+                ]);
             }
         }
 
-        $dataNotes = "Processed {$validLines} lines, found " . count($userConnections) . " users";
-        if (!empty($violationsFound)) {
-            $dataNotes .= ", " . count($violationsFound) . " violations";
-        }
-
-        Log::info("Fixed monitoring results", [
-            'server' => $server->host,
-            'users_checked' => count($userConnections),
-            'unique_ips_total' => $uniqueIpsTotal,
-            'violations_found' => $violationsCount,
-            'violations_details' => $violationsFound
-        ]);
-
-        return [
-            'violations_count' => $violationsCount,
-            'users_checked' => count($userConnections),
-            'unique_ips_total' => $uniqueIpsTotal,
-            'processing_time' => round(microtime(true) - $startTime, 2),
-            'data_notes' => $dataNotes
-        ];
+        return $violationsCount;
     }
 
-    private function handleUserViolation(string $userId, int $ipCount, array $ipAddresses, Server $server): bool
+    /**
+     * Определяем настоящее ли это нарушение
+     */
+    private function isRealViolation(array $ipAddresses, int $ipCount, int $threshold): bool
+    {
+        // Если IP меньше порога - не нарушение
+        if ($ipCount <= $threshold) {
+            return false;
+        }
+
+        // Анализируем сети IP-адресов
+        $networks = [];
+        foreach ($ipAddresses as $ip) {
+            $network = $this->getIPNetwork($ip);
+            $networks[$network] = true;
+        }
+
+        $networkCount = count($networks);
+
+        Log::info("Network analysis", [
+            'ip_count' => $ipCount,
+            'network_count' => $networkCount,
+            'networks' => array_keys($networks),
+            'ips' => $ipAddresses
+        ]);
+
+        // НАША НОВАЯ ЛОГИКА:
+        // Нарушение только если есть IP из РАЗНЫХ сетей
+        // Если все IP из одной сети (/24) - это не нарушение (пользователь в одной локации)
+        return $networkCount > 1;
+    }
+
+    /**
+     * Получить сеть IP (/24 для IPv4)
+     */
+    private function getIPNetwork(string $ip): string
+    {
+        if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+            return $ip;
+        }
+
+        // Для IPv4 - берем первые 3 октета
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            $parts = explode('.', $ip);
+            if (count($parts) === 4) {
+                return $parts[0] . '.' . $parts[1] . '.' . $parts[2] . '.0/24';
+            }
+        }
+
+        // Для IPv6 можно добавить свою логику
+        return $ip;
+    }
+
+    /**
+     * Обработка нарушения (упрощенная версия)
+     */
+    private function handleUserViolation(string $userId, int $ipCount, array $ipAddresses): bool
     {
         try {
-            // Убираем префикс если есть
             $cleanUserId = $userId;
             if (preg_match('/\.([a-f0-9\-]+)$/i', $userId, $matches)) {
                 $cleanUserId = $matches[1];
@@ -209,6 +259,7 @@ class ConnectionMonitorService
                 return false;
             }
 
+            // Проверяем есть ли уже активное нарушение
             $existingViolation = ConnectionLimitViolation::where([
                 'key_activate_id' => $keyActivate->id,
                 'status' => ConnectionLimitViolation::STATUS_ACTIVE
@@ -219,28 +270,18 @@ class ConnectionMonitorService
                 return false;
             }
 
-            // ФИКС: Используем правильное отношение panel() вместо panels()
-            $panel = $server->panel;
-            if (!$panel) {
-                Log::warning('Panel not found for server', [
-                    'server_id' => $server->id,
-                    'server_host' => $server->host
-                ]);
-                return false;
-            }
-
+            // Создаем нарушение
             $this->limitMonitorService->recordViolation(
                 $keyActivate,
                 $ipCount,
                 $ipAddresses,
-                $panel->id
+                null // panel_id будет определен в сервисе
             );
 
-            Log::info('New violation recorded', [
+            Log::info('New REAL violation recorded', [
                 'user_id' => $userId,
                 'unique_ips' => $ipCount,
-                'panel_id' => $panel->id,
-                'server_id' => $server->id
+                'ip_networks' => $this->getUniqueNetworks($ipAddresses)
             ]);
 
             return true;
@@ -248,11 +289,22 @@ class ConnectionMonitorService
         } catch (\Exception $e) {
             Log::error('Failed to handle user violation', [
                 'user_id' => $userId,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString() // Добавим trace для диагностики
+                'error' => $e->getMessage()
             ]);
             return false;
         }
+    }
+
+    /**
+     * Получить уникальные сети из списка IP
+     */
+    private function getUniqueNetworks(array $ipAddresses): array
+    {
+        $networks = [];
+        foreach ($ipAddresses as $ip) {
+            $networks[$this->getIPNetwork($ip)] = true;
+        }
+        return array_keys($networks);
     }
 
     private function findKeyActivateByUserId(string $userId): ?KeyActivate

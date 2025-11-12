@@ -26,7 +26,7 @@ class ConnectionLimitMonitorService
         ?int $panelId = null
     ): ConnectionLimitViolation {
         try {
-            $allowedConnections = 5; // Лимит подключений
+            $allowedConnections = 4; // Лимит подключений
             $serverUser = $keyActivate->keyActivateUser->serverUser;
 
             // Если panelId не указан, используем панель пользователя
@@ -66,6 +66,32 @@ class ConnectionLimitMonitorService
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Запись нарушения с дополнительной информацией
+     */
+    public function recordViolationWithDetails(
+        KeyActivate $keyActivate,
+        int $uniqueIpCount,
+        array $ipAddresses = [],
+        ?int $panelId = null,
+        array $violationDetails = []
+    ): ConnectionLimitViolation {
+
+        $violation = $this->recordViolation($keyActivate, $uniqueIpCount, $ipAddresses, $panelId);
+
+        // Логируем детали нарушения
+        $this->logger->warning('Зафиксировано нарушение с деталями', [
+            'key_id' => $keyActivate->id,
+            'user_tg_id' => $keyActivate->user_tg_id,
+            'unique_ips_count' => $uniqueIpCount,
+            'network_count' => $violationDetails['network_count'] ?? 0,
+            'violation_type' => $violationDetails['type'] ?? 'multiple_networks',
+            'violation_id' => $violation->id
+        ]);
+
+        return $violation;
     }
 
     /**
