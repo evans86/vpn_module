@@ -115,7 +115,6 @@
                                     <tr>
                                         <td>{{ $violation->created_at->format('d.m.Y H:i') }}</td>
                                         <td>
-                                            {{-- ПРОСТАЯ ПРОВЕРКА: если keyActivate существует --}}
                                             @if($violation->keyActivate)
                                                 <code>{{ $violation->keyActivate->id }}</code>
                                             @else
@@ -130,7 +129,45 @@
                                             <small class="text-muted">(+{{ $violation->excess_percentage }}%)</small>
                                         </td>
                                         <td>
-                                            <small>{{ $violation->ip_addresses_list }}</small>
+                                            <div class="ip-addresses-container">
+                                                @php
+                                                    $ipAddresses = $violation->ip_addresses ?? [];
+                                                    $totalIps = count($ipAddresses);
+                                                    $maxVisible = 3; // Максимум IP до разворачивания
+                                                @endphp
+
+                                                {{-- Показываем первые несколько IP --}}
+                                                <div class="ip-addresses-preview">
+                                                    @foreach(array_slice($ipAddresses, 0, $maxVisible) as $ip)
+                                                        <span class="badge badge-secondary ip-badge">{{ $ip }}</span>
+                                                    @endforeach
+
+                                                    {{-- Показываем количество скрытых IP --}}
+                                                    @if($totalIps > $maxVisible)
+                                                        <button type="button"
+                                                                class="btn btn-xs btn-outline-primary toggle-ips"
+                                                                data-target="ips-{{ $violation->id }}"
+                                                                title="Показать все IP адреса">
+                                                            +{{ $totalIps - $maxVisible }} ещё
+                                                        </button>
+                                                    @endif
+                                                </div>
+
+                                                {{-- Скрытый блок со всеми IP --}}
+                                                @if($totalIps > $maxVisible)
+                                                    <div class="ip-addresses-full mt-2" id="ips-{{ $violation->id }}" style="display: none;">
+                                                        @foreach($ipAddresses as $ip)
+                                                            <span class="badge badge-light ip-badge">{{ $ip }}</span>
+                                                        @endforeach
+                                                        <button type="button"
+                                                                class="btn btn-xs btn-outline-secondary toggle-ips mt-1"
+                                                                data-target="ips-{{ $violation->id }}"
+                                                                title="Скрыть">
+                                                            Скрыть
+                                                        </button>
+                                                    </div>
+                                                @endif
+                                            </div>
                                         </td>
                                         <td>
                                             <span class="badge badge-warning">{{ $violation->violation_count }}</span>
@@ -189,3 +226,63 @@
         </div>
     </div>
 @endsection
+
+@push('js')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Обработчик для кнопок разворачивания/сворачивания IP адресов
+            document.querySelectorAll('.toggle-ips').forEach(function(button) {
+                button.addEventListener('click', function() {
+                    const targetId = this.getAttribute('data-target');
+                    const targetElement = document.getElementById(targetId);
+
+                    if (targetElement) {
+                        if (targetElement.style.display === 'none') {
+                            targetElement.style.display = 'block';
+                            this.textContent = 'Скрыть';
+                            this.classList.remove('btn-outline-primary');
+                            this.classList.add('btn-outline-secondary');
+                        } else {
+                            targetElement.style.display = 'none';
+                            this.textContent = '+' + (targetElement.querySelectorAll('.ip-badge').length - 3) + ' ещё';
+                            this.classList.remove('btn-outline-secondary');
+                            this.classList.add('btn-outline-primary');
+                        }
+                    }
+                });
+            });
+        });
+    </script>
+@endpush
+
+@push('css')
+    <style>
+        .ip-addresses-container {
+            max-width: 300px;
+        }
+
+        .ip-badge {
+            margin: 2px;
+            font-family: monospace;
+            font-size: 0.8em;
+            display: inline-block;
+        }
+
+        .ip-addresses-preview {
+            line-height: 1.8;
+        }
+
+        .ip-addresses-full {
+            background-color: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+
+        .toggle-ips {
+            font-size: 0.7em;
+            padding: 1px 6px;
+            margin-left: 4px;
+        }
+    </style>
+@endpush
