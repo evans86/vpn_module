@@ -14,7 +14,6 @@ class Kernel extends ConsoleKernel
      */
     protected $commands = [
         \App\Console\Commands\MonitorConnectionLimits::class,
-        \App\Console\Commands\DebugLogs::class,
     ];
 
     /**
