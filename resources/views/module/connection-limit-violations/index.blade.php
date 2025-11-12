@@ -118,7 +118,7 @@
                                             @if($violation->keyActivate)
                                                 <code>{{ $violation->keyActivate->id }}</code>
                                             @else
-                                                <span class="text-muted">Удален</span>
+                                                <span class="text-muted">Удален (ID: {{ $violation->key_activate_id }})</span>
                                             @endif
                                         </td>
                                         <td>{{ $violation->user_tg_id }}</td>
@@ -137,18 +137,33 @@
                                             @if($totalIps <= 5)
                                                 {{-- Показываем все IP если их мало --}}
                                                 @foreach($ipAddresses as $ip)
-                                                    <small class="d-block text-monospace">{{ $ip }}</small>
+                                                    <div class="text-monospace">{{ $ip }}</div>
                                                 @endforeach
                                             @else
-                                                {{-- Показываем первые 3 IP + кнопку --}}
-                                                @foreach(array_slice($ipAddresses, 0, 3) as $ip)
-                                                    <small class="d-block text-monospace">{{ $ip }}</small>
-                                                @endforeach
-                                                <small class="text-muted">и ещё {{ $totalIps - 3 }}</small>
-                                                <a href="{{ route('admin.module.connection-limit-violations.show', $violation) }}"
-                                                   class="btn btn-xs btn-link p-0" title="Посмотреть все IP">
-                                                    <small>показать все</small>
-                                                </a>
+                                                {{-- Свернутый вид --}}
+                                                <div class="ip-collapsed">
+                                                    @foreach(array_slice($ipAddresses, 0, 3) as $ip)
+                                                        <div class="text-monospace">{{ $ip }}</div>
+                                                    @endforeach
+                                                    <div class="text-muted">и ещё {{ $totalIps - 3 }}</div>
+                                                    <a href="javascript:void(0)"
+                                                       class="toggle-ip-link"
+                                                       data-target="ip-full-{{ $violation->id }}">
+                                                        показать все
+                                                    </a>
+                                                </div>
+
+                                                {{-- Развернутый вид (скрыт изначально) --}}
+                                                <div class="ip-expanded" id="ip-full-{{ $violation->id }}" style="display: none;">
+                                                    @foreach($ipAddresses as $ip)
+                                                        <div class="text-monospace">{{ $ip }}</div>
+                                                    @endforeach
+                                                    <a href="javascript:void(0)"
+                                                       class="toggle-ip-link"
+                                                       data-target="ip-full-{{ $violation->id }}">
+                                                        свернуть
+                                                    </a>
+                                                </div>
                                             @endif
                                         </td>
                                         <td>
@@ -208,3 +223,36 @@
         </div>
     </div>
 @endsection
+
+@push('js')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Обработчик для ссылок раскрытия/сворачивания
+            document.querySelectorAll('.toggle-ip-link').forEach(function(link) {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('data-target');
+                    const targetElement = document.getElementById(targetId);
+
+                    if (targetElement) {
+                        // Находим родительский контейнер IP
+                        const ipContainer = this.closest('.ip-collapsed, .ip-expanded');
+
+                        if (ipContainer.classList.contains('ip-collapsed')) {
+                            // Раскрываем - скрываем свернутый, показываем развернутый
+                            ipContainer.style.display = 'none';
+                            targetElement.style.display = 'block';
+                        } else {
+                            // Сворачиваем - скрываем развернутый, показываем свернутый
+                            targetElement.style.display = 'none';
+                            const collapsedElement = targetElement.previousElementSibling;
+                            if (collapsedElement && collapsedElement.classList.contains('ip-collapsed')) {
+                                collapsedElement.style.display = 'block';
+                            }
+                        }
+                    }
+                });
+            });
+        });
+    </script>
+@endpush
