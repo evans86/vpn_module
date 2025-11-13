@@ -26,7 +26,7 @@ class ConnectionLimitMonitorService
         ?int $panelId = null
     ): ConnectionLimitViolation {
         try {
-            $allowedConnections = 4; // Лимит подключений
+            $allowedConnections = 2; // Лимит подключений
             $serverUser = $keyActivate->keyActivateUser->serverUser;
 
             // Если panelId не указан, используем панель пользователя
