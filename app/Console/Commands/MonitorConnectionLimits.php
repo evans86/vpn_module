@@ -43,9 +43,8 @@ class MonitorConnectionLimits extends Command
 
         $this->info("\n📊 Servers checked:");
         foreach ($results['servers_checked'] as $server) {
-            $line = "- {$server['host']}: {$server['violations']} violations, " .
-                "{$server['users_checked']} users, " .
-                "{$server['unique_ips_total']} total IPs, " .
+            $line = "- {$server['host']}: " .
+                "{$server['users_count']} users, " .
                 "{$server['processing_time']}s";
 
             if (isset($server['data_notes'])) {
