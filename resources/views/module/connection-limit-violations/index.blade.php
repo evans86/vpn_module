@@ -308,17 +308,20 @@
                                             <small class="text-muted">(+{{ $violation->excess_percentage }}%)</small>
                                         </td>
                                         <td>
-                                            <div class="d-flex align-items-center" title="Отправлено уведомлений: {{ $violation->getNotificationsSentCount() }}
+                                            <div class="d-flex align-items-center"
+                                                 title="Отправлено уведомлений: {{ $violation->getNotificationsSentCount() }}
 @if($violation->getLastNotificationTime())
-Последнее: {{ $violation->getLastNotificationTime() }}
+Последнее: {{ $violation->getLastNotificationTimeFormatted() }}
 @endif">
                                                 <i class="{{ $violation->notification_icon }} mr-1"></i>
                                                 <span
                                                     class="badge badge-light">{{ $violation->getNotificationsSentCount() }}</span>
                                                 @if($violation->getLastNotificationTime())
                                                     <small class="text-muted ml-1">
-                                                        {{ $violation->getLastNotificationTime() }}
+                                                        {{ $violation->getLastNotificationTimeFormatted() }}
                                                     </small>
+                                                @else
+                                                    <small class="text-muted ml-1">-</small>
                                                 @endif
                                             </div>
                                         </td>
