@@ -11,15 +11,18 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <h5>Быстрая проверка</h5>
-                                <form action="{{ route('admin.module.connection-limit-violations.manual-check') }}" method="POST" class="form-inline">
+                                <form action="{{ route('admin.module.connection-limit-violations.manual-check') }}"
+                                      method="POST" class="form-inline">
                                     @csrf
                                     <div class="form-group mr-2">
                                         <label class="mr-2">Порог:</label>
-                                        <input type="number" name="threshold" value="2" min="1" max="10" class="form-control form-control-sm" style="width: 80px;">
+                                        <input type="number" name="threshold" value="2" min="1" max="10"
+                                               class="form-control form-control-sm" style="width: 80px;">
                                     </div>
                                     <div class="form-group mr-2">
                                         <label class="mr-2">Окно (мин):</label>
-                                        <input type="number" name="window" value="60" min="1" max="1440" class="form-control form-control-sm" style="width: 100px;">
+                                        <input type="number" name="window" value="60" min="1" max="1440"
+                                               class="form-control form-control-sm" style="width: 100px;">
                                     </div>
                                     <button type="submit" class="btn btn-primary btn-sm">
                                         <i class="fas fa-search"></i> Проверить
@@ -27,10 +30,12 @@
                                 </form>
                             </div>
                             <div class="col-md-6 text-right">
-                                <button type="button" class="btn btn-success btn-sm" data-toggle="modal" data-target="#bulkActionsModal">
+                                <button type="button" class="btn btn-success btn-sm" data-toggle="modal"
+                                        data-target="#bulkActionsModal">
                                     <i class="fas fa-tasks"></i> Массовые действия
                                 </button>
-                                <a href="{{ route('admin.module.connection-limit-violations.index') }}" class="btn btn-secondary btn-sm">
+                                <a href="{{ route('admin.module.connection-limit-violations.index') }}"
+                                   class="btn btn-secondary btn-sm">
                                     <i class="fas fa-sync"></i> Обновить
                                 </a>
                             </div>
@@ -128,9 +133,14 @@
                             <label>Статус</label>
                             <select class="form-control" name="status">
                                 <option value="">Все</option>
-                                <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>Активные</option>
-                                <option value="resolved" {{ request('status') == 'resolved' ? 'selected' : '' }}>Решенные</option>
-                                <option value="ignored" {{ request('status') == 'ignored' ? 'selected' : '' }}>Игнорированные</option>
+                                <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>Активные
+                                </option>
+                                <option value="resolved" {{ request('status') == 'resolved' ? 'selected' : '' }}>
+                                    Решенные
+                                </option>
+                                <option value="ignored" {{ request('status') == 'ignored' ? 'selected' : '' }}>
+                                    Игнорированные
+                                </option>
                             </select>
                         </div>
                         <div class="col-md-2">
@@ -147,7 +157,8 @@
                             <select class="form-control" name="panel_id">
                                 <option value="">Все панели</option>
                                 @foreach($panels as $panel)
-                                    <option value="{{ $panel->id }}" {{ request('panel_id') == $panel->id ? 'selected' : '' }}>
+                                    <option
+                                        value="{{ $panel->id }}" {{ request('panel_id') == $panel->id ? 'selected' : '' }}>
                                         {{ $panel->host }}
                                     </option>
                                 @endforeach
@@ -163,13 +174,15 @@
                         </div>
                         <div class="col-md-2">
                             <label>Поиск</label>
-                            <input type="text" class="form-control" name="search" value="{{ request('search') }}" placeholder="ID ключа или пользователя">
+                            <input type="text" class="form-control" name="search" value="{{ request('search') }}"
+                                   placeholder="ID ключа или пользователя">
                         </div>
                     </div>
                     <div class="row mt-3">
                         <div class="col-md-12">
                             <button type="submit" class="btn btn-primary">Применить фильтры</button>
-                            <a href="{{ route('admin.module.connection-limit-violations.index') }}" class="btn btn-secondary">Сбросить</a>
+                            <a href="{{ route('admin.module.connection-limit-violations.index') }}"
+                               class="btn btn-secondary">Сбросить</a>
                         </div>
                     </div>
                 </form>
@@ -181,7 +194,8 @@
             <div class="card-header">
                 <h4 class="card-title">Список нарушений</h4>
                 <div class="card-tools">
-                    <span class="badge badge-light">Показано: {{ $violations->count() }} из {{ $violations->total() }}</span>
+                    <span
+                        class="badge badge-light">Показано: {{ $violations->count() }} из {{ $violations->total() }}</span>
                 </div>
             </div>
             <div class="card-body">
@@ -204,17 +218,19 @@
                                     <th>Ключ</th>
                                     <th>Пользователь</th>
                                     <th>Лимит / Факт</th>
+                                    <th>Уведомления</th>
                                     <th>IP адреса</th>
                                     <th>Повторений</th>
                                     <th>Статус</th>
-                                    <th width="200">Действия</th>
+                                    <th width="250">Действия</th>
                                 </tr>
                                 </thead>
                                 <tbody>
                                 @foreach($violations as $violation)
                                     <tr>
                                         <td>
-                                            <input type="checkbox" name="violation_ids[]" value="{{ $violation->id }}" class="violation-checkbox">
+                                            <input type="checkbox" name="violation_ids[]" value="{{ $violation->id }}"
+                                                   class="violation-checkbox">
                                         </td>
                                         <td>
                                             <small>{{ $violation->created_at->format('d.m.Y H:i') }}</small>
@@ -246,14 +262,16 @@
                                                         @endif
                                                     </small>
                                                 </div>
-                                                @if($violation->keyActivate->packSalesman)
+                                                @if($violation->isKeyReplaced())
                                                     <div>
-                                                        <small class="text-muted">
-                                                            Пакет:
-                                                            <a href="{{ route('admin.module.pack-salesman.index', ['id' => $violation->keyActivate->pack_salesman_id]) }}"
-                                                               class="text-muted">
-                                                                #{{ $violation->keyActivate->pack_salesman_id }}
-                                                            </a>
+                                                        <small class="text-success">
+                                                            <i class="fas fa-key"></i> Ключ заменен
+                                                            @if($violation->getReplacedKeyId())
+                                                                <a href="{{ route('admin.module.key-activate.index', ['id' => $violation->getReplacedKeyId()]) }}"
+                                                                   class="text-success ml-1">
+                                                                    (новый)
+                                                                </a>
+                                                            @endif
                                                         </small>
                                                     </div>
                                                 @endif
@@ -282,16 +300,33 @@
                                             @endif
                                         </td>
                                         <td>
-                                            <span class="badge badge-success">{{ $violation->allowed_connections }}</span>
+                                            <span
+                                                class="badge badge-success">{{ $violation->allowed_connections }}</span>
                                             <span class="text-muted">/</span>
                                             <span class="badge badge-danger">{{ $violation->actual_connections }}</span>
                                             <br>
                                             <small class="text-muted">(+{{ $violation->excess_percentage }}%)</small>
                                         </td>
                                         <td>
+                                            <div class="d-flex align-items-center" title="Отправлено уведомлений: {{ $violation->getNotificationsSentCount() }}
+@if($violation->getLastNotificationTime())
+Последнее: {{ $violation->getLastNotificationTime() }}
+@endif">
+                                                <i class="{{ $violation->notification_icon }} mr-1"></i>
+                                                <span
+                                                    class="badge badge-light">{{ $violation->getNotificationsSentCount() }}</span>
+                                                @if($violation->getLastNotificationTime())
+                                                    <small class="text-muted ml-1">
+                                                        {{ $violation->getLastNotificationTime() }}
+                                                    </small>
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td>
                                             <div class="ip-addresses">
                                                 @foreach(array_slice($violation->ip_addresses ?? [], 0, 3) as $ip)
-                                                    <span class="badge badge-light ip-badge" title="{{ $ip }}">{{ $ip }}</span>
+                                                    <span class="badge badge-light ip-badge"
+                                                          title="{{ $ip }}">{{ $ip }}</span>
                                                 @endforeach
                                                 @if(count($violation->ip_addresses ?? []) > 3)
                                                     <span class="badge badge-secondary"
@@ -302,12 +337,14 @@
                                             </div>
                                         </td>
                                         <td>
-                                            <span class="badge badge-{{ $violation->violation_count >= 3 ? 'danger' : ($violation->violation_count >= 2 ? 'warning' : 'info') }}">
+                                            <span
+                                                class="badge badge-{{ $violation->violation_count >= 3 ? 'danger' : ($violation->violation_count >= 2 ? 'warning' : 'info') }}">
                                                 {{ $violation->violation_count }}
                                             </span>
                                         </td>
                                         <td>
-                                            <span class="badge badge-{{ $violation->status_color }}" id="status-{{ $violation->id }}">
+                                            <span class="badge badge-{{ $violation->status_color }}"
+                                                  id="status-{{ $violation->id }}">
                                                 <i class="{{ $violation->status_icon }} mr-1"></i>
                                                 {{ $violation->status }}
                                             </span>
@@ -322,19 +359,29 @@
                                                     <i class="fas fa-sync"></i>
                                                 </button>
 
+                                                <!-- Игнорировать -->
+                                                @if($violation->status === \App\Models\VPN\ConnectionLimitViolation::STATUS_ACTIVE)
+                                                    <button type="button" class="btn btn-outline-secondary quick-action"
+                                                            data-violation-id="{{ $violation->id }}"
+                                                            data-action="ignore"
+                                                            title="Игнорировать нарушение">
+                                                        <i class="fas fa-eye-slash"></i>
+                                                    </button>
+                                                @endif
+
                                                 <!-- Уведомление -->
                                                 <button type="button" class="btn btn-outline-warning"
                                                         onclick="sendNotification({{ $violation->id }})"
-                                                        title="Отправить уведомление">
+                                                        title="Отправить уведомление (отправлено: {{ $violation->getNotificationsSentCount() }})">
                                                     <i class="fas fa-bell"></i>
                                                 </button>
 
-                                                <!-- Замена ключа -->
-                                                @if($violation->violation_count >= 2 && $violation->keyActivate)
+                                                <!-- Перевыпуск ключа -->
+                                                @if($violation->keyActivate && $violation->status === \App\Models\VPN\ConnectionLimitViolation::STATUS_ACTIVE)
                                                     <button type="button" class="btn btn-outline-danger"
-                                                            onclick="replaceKey({{ $violation->id }})"
-                                                            title="Заменить ключ">
-                                                        <i class="fas fa-key"></i>
+                                                            onclick="reissueKey({{ $violation->id }})"
+                                                            title="Перевыпустить ключ">
+                                                        <i class="fas fa-redo-alt"></i>
                                                     </button>
                                                 @endif
 
@@ -388,14 +435,12 @@
                             <option value="resolve">Пометить как решенные</option>
                             <option value="ignore">Пометить как игнорированные</option>
                             <option value="notify">Отправить уведомления</option>
-                            <option value="replace_key">Заменить ключи (≥2 нарушений)</option>
+                            <option value="reissue_keys">Перевыпустить ключи</option>
                             <option value="delete">Удалить нарушения</option>
                         </select>
                     </div>
 
-                    <div id="actionWarning" class="alert alert-warning mt-3" style="display: none;">
-                        <!-- Предупреждения будут здесь -->
-                    </div>
+                    <div id="actionWarning" class="alert alert-warning mt-3" style="display: none;"></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
@@ -412,23 +457,28 @@
             padding: 0 5px;
             color: #6c757d;
         }
+
         .copy-key-btn:hover {
             color: #007bff;
             text-decoration: none;
         }
+
         .ip-badge {
             font-family: monospace;
             font-size: 0.75rem;
             margin: 1px;
             cursor: help;
         }
+
         .table td {
             vertical-align: middle;
         }
+
         .key-link {
             font-family: 'Courier New', monospace;
             font-weight: bold;
         }
+
         .user-link {
             font-weight: bold;
         }
@@ -439,10 +489,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.8/clipboard.min.js"></script>
     <script>
         // Инициализация Clipboard.js для кнопок копирования
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const clipboard = new ClipboardJS('.copy-key-btn');
 
-            clipboard.on('success', function(e) {
+            clipboard.on('success', function (e) {
                 const originalTitle = e.trigger.getAttribute('title');
                 e.trigger.innerHTML = '<i class="fas fa-check text-success"></i>';
                 e.trigger.setAttribute('title', 'Скопировано!');
@@ -455,13 +505,13 @@
                 e.clearSelection();
             });
 
-            clipboard.on('error', function(e) {
+            clipboard.on('error', function (e) {
                 console.error('Ошибка копирования:', e);
             });
         });
 
         // Выделение всех чекбоксов
-        document.getElementById('selectAll').addEventListener('change', function() {
+        document.getElementById('selectAll').addEventListener('change', function () {
             const checkboxes = document.querySelectorAll('.violation-checkbox');
             checkboxes.forEach(checkbox => checkbox.checked = this.checked);
             updateSelectedCount();
@@ -479,7 +529,7 @@
 
         // Быстрые действия
         document.querySelectorAll('.quick-action').forEach(button => {
-            button.addEventListener('click', function() {
+            button.addEventListener('click', function () {
                 const violationId = this.dataset.violationId;
                 const action = this.dataset.action;
 
@@ -489,7 +539,7 @@
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
                     },
-                    body: JSON.stringify({ action: action })
+                    body: JSON.stringify({action: action})
                 })
                     .then(response => response.json())
                     .then(data => {
@@ -510,7 +560,7 @@
         });
 
         // Массовые действия
-        document.getElementById('executeBulkAction').addEventListener('click', function() {
+        document.getElementById('executeBulkAction').addEventListener('click', function () {
             const selectedIds = Array.from(document.querySelectorAll('.violation-checkbox:checked'))
                 .map(checkbox => checkbox.value);
 
@@ -567,7 +617,7 @@
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': '{{ csrf_token() }}'
                 },
-                body: JSON.stringify({ action: 'send_notification' })
+                body: JSON.stringify({action: 'send_notification'})
             })
                 .then(response => response.json())
                 .then(data => {
@@ -592,7 +642,7 @@
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': '{{ csrf_token() }}'
                 },
-                body: JSON.stringify({ action: 'replace_key' })
+                body: JSON.stringify({action: 'replace_key'})
             })
                 .then(response => response.json())
                 .then(data => {
@@ -630,5 +680,65 @@
                 }
             }, 5000);
         }
+
+        function reissueKey(violationId) {
+            if (!confirm('Перевыпустить ключ? Старый ключ будет деактивирован, а пользователь получит новый ключ.')) return;
+
+            fetch(`/admin/module/connection-limit-violations/${violationId}/manage`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({action: 'reissue_key'})
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('Ключ перевыпущен: ' + data.new_key_id, 'success');
+                        location.reload();
+                    } else {
+                        showToast('Ошибка перевыпуска ключа: ' + (data.message || 'неизвестная ошибка'), 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showToast('Ошибка перевыпуска ключа', 'error');
+                });
+        }
+
+        // Обновляем быстрые действия для поддержки игнорирования
+        document.querySelectorAll('.quick-action').forEach(button => {
+            button.addEventListener('click', function () {
+                const violationId = this.dataset.violationId;
+                const action = this.dataset.action;
+
+                fetch(`/admin/module/connection-limit-violations/${violationId}/quick-action`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({action: action})
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            if (action === 'ignore') {
+                                showToast('Нарушение игнорировано', 'success');
+                            } else {
+                                showToast('Статус обновлен', 'success');
+                            }
+                            location.reload();
+                        } else {
+                            showToast('Ошибка: ' + (data.message || 'неизвестная ошибка'), 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showToast('Ошибка при выполнении действия', 'error');
+                    });
+            });
+        });
     </script>
 @endpush
