@@ -6,14 +6,20 @@ use App\Models\VPN\ConnectionLimitViolation;
 use App\Models\KeyActivate\KeyActivate;
 use App\Logging\DatabaseLogger;
 use Illuminate\Support\Facades\Log;
+use App\Services\Notification\TelegramNotificationService;
 
 class ConnectionLimitMonitorService
 {
     private DatabaseLogger $logger;
+    private TelegramNotificationService $notificationService;
 
-    public function __construct(DatabaseLogger $logger)
-    {
+
+    public function __construct(
+        DatabaseLogger $logger,
+        TelegramNotificationService $notificationService
+    ) {
         $this->logger = $logger;
+        $this->notificationService = $notificationService;
     }
 
     /**
@@ -171,5 +177,205 @@ class ConnectionLimitMonitorService
             ]);
             return false;
         }
+    }
+
+    /**
+     * Отправка уведомления пользователю о нарушении
+     */
+    public function sendViolationNotification(ConnectionLimitViolation $violation): bool
+    {
+        try {
+            $keyActivate = $violation->keyActivate;
+
+            if (!$keyActivate || !$keyActivate->user_tg_id) {
+                Log::warning('Cannot send violation notification: user not found', [
+                    'violation_id' => $violation->id,
+                    'key_activate_id' => $violation->key_activate_id
+                ]);
+                return false;
+            }
+
+            $message = $this->formatViolationMessage($violation);
+            $keyboard = $this->getViolationKeyboard($violation);
+
+            // Отправляем уведомление пользователю
+            $result = $this->notificationService->sendToUser($keyActivate, $message, $keyboard);
+
+            if ($result) {
+                $this->logger->info('Уведомление о нарушении отправлено', [
+                    'violation_id' => $violation->id,
+                    'user_tg_id' => $keyActivate->user_tg_id,
+                    'violation_count' => $violation->violation_count
+                ]);
+            }
+
+            return $result;
+
+        } catch (\Exception $e) {
+            Log::error('Failed to send violation notification', [
+                'violation_id' => $violation->id,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Отправка уведомления продавцу о нарушении его пользователя
+     */
+    public function sendViolationNotificationToSalesman(ConnectionLimitViolation $violation): bool
+    {
+        try {
+            $keyActivate = $violation->keyActivate;
+
+            if (!$keyActivate) {
+                return false;
+            }
+
+            // Определяем продавца
+            $salesman = null;
+            if (!is_null($keyActivate->module_salesman_id)) {
+                $salesman = $keyActivate->moduleSalesman;
+            } else if (!is_null($keyActivate->pack_salesman_id)) {
+                $salesman = $keyActivate->packSalesman->salesman;
+            }
+
+            if (!$salesman || !$salesman->telegram_id) {
+                return false;
+            }
+
+            $message = $this->formatSalesmanViolationMessage($violation);
+
+            return $this->notificationService->sendToSalesman($salesman, $message);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to send violation notification to salesman', [
+                'violation_id' => $violation->id,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Форматирование сообщения о нарушении для пользователя
+     */
+    private function formatViolationMessage(ConnectionLimitViolation $violation): string
+    {
+        $violationCount = $violation->violation_count;
+        $ipCount = $violation->actual_connections;
+        $allowedCount = $violation->allowed_connections;
+
+        $messages = [
+            1 => "⚠️ <b>Предупреждение о нарушении</b>\n\n"
+                . "Обнаружено превышение лимита одновременных подключений:\n"
+                . "• Разрешено: <b>{$allowedCount} подключения</b>\n"
+                . "• Обнаружено: <b>{$ipCount} подключений</b>\n\n"
+                . "Используйте VPN только на одном устройстве одновременно.\n"
+                . "Следующее нарушение приведет к смене ключа доступа.",
+
+            2 => "🚨 <b>Второе предупреждение</b>\n\n"
+                . "Повторное превышение лимита подключений!\n"
+                . "• Разрешено: <b>{$allowedCount} подключения</b>\n"
+                . "• Обнаружено: <b>{$ipCount} подключений</b>\n\n"
+                . "При следующем нарушении ваш ключ будет автоматически заменен.",
+
+            3 => "🔴 <b>Ключ заменен за нарушения</b>\n\n"
+                . "Превышен лимит нарушений правил использования.\n"
+                . "Ваш ключ доступа был автоматически заменен.\n\n"
+                . "Новый ключ: <code>{$violation->keyActivate->id}</code>\n"
+                . "🔗 Конфигурация: https://vpn-telegram.com/config/{$violation->keyActivate->id}"
+        ];
+
+        return $messages[$violationCount] ?? $messages[1];
+    }
+
+    /**
+     * Форматирование сообщения о нарушении для продавца
+     */
+    private function formatSalesmanViolationMessage(ConnectionLimitViolation $violation): string
+    {
+        $keyActivate = $violation->keyActivate;
+        $violationCount = $violation->violation_count;
+        $ipCount = $violation->actual_connections;
+
+        return "📊 <b>Уведомление о нарушении</b>\n\n"
+            . "У вашего пользователя обнаружено нарушение:\n"
+            . "• Пользователь: <code>{$keyActivate->user_tg_id}</code>\n"
+            . "• Ключ: <code>{$keyActivate->id}</code>\n"
+            . "• Нарушений: <b>{$violationCount}</b>\n"
+            . "• Подключений: <b>{$ipCount}</b>\n"
+            . "• Время: {$violation->created_at->format('d.m.Y H:i')}";
+    }
+
+    /**
+     * Получение клавиатуры для уведомления
+     */
+    private function getViolationKeyboard(ConnectionLimitViolation $violation): array
+    {
+        $keyboard = [
+            'inline_keyboard' => [
+                [
+                    [
+                        'text' => '🔗 Открыть конфигурацию',
+                        'url' => "https://vpn-telegram.com/config/{$violation->keyActivate->id}"
+                    ]
+                ]
+            ]
+        ];
+
+        // Для 3-го нарушения добавляем кнопку с новым ключом
+        if ($violation->violation_count >= 3) {
+            $keyboard['inline_keyboard'][] = [
+                [
+                    'text' => '🆕 Новый ключ',
+                    'url' => "https://vpn-telegram.com/config/{$violation->keyActivate->id}"
+                ]
+            ];
+        }
+
+        return $keyboard;
+    }
+
+
+    /**
+     * Получить расширенную статистику
+     */
+    public function getAdvancedViolationStats(): array
+    {
+        $baseStats = $this->getViolationStats();
+
+        // Статистика по дням
+        $dailyStats = ConnectionLimitViolation::selectRaw('
+            DATE(created_at) as date,
+            COUNT(*) as total,
+            SUM(CASE WHEN status = "active" THEN 1 ELSE 0 END) as active,
+            SUM(CASE WHEN violation_count >= 3 THEN 1 ELSE 0 END) as critical
+        ')
+            ->where('created_at', '>=', now()->subDays(30))
+            ->groupBy('date')
+            ->orderBy('date', 'desc')
+            ->get();
+
+        // Топ нарушителей
+        $topViolators = ConnectionLimitViolation::with('keyActivate')
+            ->select('user_tg_id')
+            ->selectRaw('COUNT(*) as violation_count, MAX(violation_count) as max_severity')
+            ->groupBy('user_tg_id')
+            ->orderBy('violation_count', 'desc')
+            ->limit(10)
+            ->get();
+
+        return array_merge($baseStats, [
+            'daily_stats' => $dailyStats,
+            'top_violators' => $topViolators,
+            'critical' => ConnectionLimitViolation::where('violation_count', '>=', 3)
+                ->where('status', ConnectionLimitViolation::STATUS_ACTIVE)
+                ->count(),
+            'resolved' => ConnectionLimitViolation::where('status', ConnectionLimitViolation::STATUS_RESOLVED)->count(),
+            'auto_resolved_today' => ConnectionLimitViolation::whereDate('resolved_at', today())
+                ->where('status', ConnectionLimitViolation::STATUS_RESOLVED)
+                ->count()
+        ]);
     }
 }
