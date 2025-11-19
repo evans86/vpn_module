@@ -103,22 +103,22 @@ class ViolationManualService
         return $count;
     }
 
-    /**
-     * Отправка уведомления пользователю
-     */
-    public function sendUserNotification(ConnectionLimitViolation $violation): bool
-    {
-        try {
-            // Используем метод из ConnectionLimitMonitorService
-            return $this->limitMonitorService->sendViolationNotification($violation);
-        } catch (\Exception $e) {
-            Log::error('Ошибка отправки уведомления', [
-                'violation_id' => $violation->id,
-                'error' => $e->getMessage()
-            ]);
-            return false;
-        }
-    }
+//    /**
+//     * Отправка уведомления пользователю
+//     */
+//    public function sendUserNotification(ConnectionLimitViolation $violation): bool
+//    {
+//        try {
+//            // Используем метод из ConnectionLimitMonitorService
+//            return $this->limitMonitorService->sendViolationNotification($violation);
+//        } catch (\Exception $e) {
+//            Log::error('Ошибка отправки уведомления', [
+//                'violation_id' => $violation->id,
+//                'error' => $e->getMessage()
+//            ]);
+//            return false;
+//        }
+//    }
 
     /**
      * Замена ключа пользователя
@@ -233,5 +233,141 @@ class ViolationManualService
         ]);
 
         return $count;
+    }
+
+    /**
+     * Отправка уведомления пользователю
+     */
+    public function sendUserNotification(ConnectionLimitViolation $violation): bool
+    {
+        try {
+            // Используем метод из ConnectionLimitMonitorService
+            $result = $this->limitMonitorService->sendViolationNotification($violation);
+
+            if ($result) {
+                // Увеличиваем счетчик уведомлений
+                $violation->incrementNotifications();
+
+                $this->logger->info('Уведомление отправлено пользователю', [
+                    'violation_id' => $violation->id,
+                    'notifications_count' => $violation->getNotificationsSentCount(),
+                    'user_tg_id' => $violation->user_tg_id
+                ]);
+            }
+
+            return $result;
+
+        } catch (\Exception $e) {
+            Log::error('Ошибка отправки уведомления', [
+                'violation_id' => $violation->id,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Игнорирование нарушения
+     */
+    public function ignoreViolation(ConnectionLimitViolation $violation): bool
+    {
+        try {
+            return $this->limitMonitorService->ignoreViolation($violation);
+        } catch (\Exception $e) {
+            Log::error('Ошибка игнорирования нарушения', [
+                'violation_id' => $violation->id,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Перевыпуск ключа (замена)
+     */
+    public function reissueKey(ConnectionLimitViolation $violation): ?KeyActivate
+    {
+        try {
+            DB::beginTransaction();
+
+            $oldKey = $violation->keyActivate;
+            $userTgId = $oldKey->user_tg_id;
+
+            if (!$userTgId) {
+                throw new \Exception('Пользователь не найден для перевыпуска ключа');
+            }
+
+            // Создаем новый ключ
+            $newKey = $this->keyActivateService->create(
+                $oldKey->traffic_limit,
+                $oldKey->pack_salesman_id,
+                $oldKey->finish_at,
+                null
+            );
+
+            // Активируем новый ключ
+            $activatedKey = $this->keyActivateService->activate($newKey, $userTgId);
+
+            if ($activatedKey) {
+                // Деактивируем старый ключ
+                $oldKey->status = KeyActivate::EXPIRED;
+                $oldKey->save();
+
+                // Обновляем информацию о замене ключа в нарушении
+                $violation->key_replaced_at = now();
+                $violation->replaced_key_id = $newKey->id;
+                $violation->violation_count = 0; // Сбрасываем счетчик нарушений
+                $violation->status = ConnectionLimitViolation::STATUS_RESOLVED;
+                $violation->resolved_at = now();
+                $violation->save();
+
+                $this->logger->warning('Ключ перевыпущен', [
+                    'old_key_id' => $oldKey->id,
+                    'new_key_id' => $newKey->id,
+                    'violation_id' => $violation->id,
+                    'user_tg_id' => $userTgId
+                ]);
+
+                // Отправляем уведомление о новом ключе
+                $this->sendKeyReplacementNotification($violation, $newKey);
+
+                DB::commit();
+                return $newKey;
+            }
+
+            DB::rollBack();
+            return null;
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Ошибка перевыпуска ключа', [
+                'violation_id' => $violation->id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Отправка уведомления о замене ключа
+     */
+    private function sendKeyReplacementNotification(ConnectionLimitViolation $violation, KeyActivate $newKey): bool
+    {
+        try {
+            $message = "🔄 <b>Ваш ключ был перевыпущен</b>\n\n";
+            $message .= "В связи с нарушениями правил использования ваш ключ был заменен на новый.\n\n";
+            $message .= "🔑 <b>Новый ключ:</b> <code>{$newKey->id}</code>\n";
+            $message .= "🔗 <b>Конфигурация:</b> https://vpn-telegram.com/config/{$newKey->id}\n\n";
+            $message .= "⚠️ Пожалуйста, используйте VPN согласно правилам.";
+
+            return $this->limitMonitorService->sendViolationNotification($violation);
+        } catch (\Exception $e) {
+            Log::error('Ошибка отправки уведомления о замене ключа', [
+                'violation_id' => $violation->id,
+                'new_key_id' => $newKey->id,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
     }
 }

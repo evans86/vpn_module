@@ -22,12 +22,18 @@ class ConnectionLimitViolation extends Model
         'ip_addresses',
         'violation_count',
         'status',
-        'resolved_at'
+        'resolved_at',
+        'notifications_sent', // Добавляем счетчик уведомлений
+        'last_notification_sent_at', // Время последнего уведомления
+        'key_replaced_at', // Когда ключ был заменен
+        'replaced_key_id' // ID нового ключа если был заменен
     ];
 
     protected $casts = [
         'ip_addresses' => 'array',
-        'resolved_at' => 'datetime'
+        'resolved_at' => 'datetime',
+        'last_notification_sent_at' => 'datetime',
+        'key_replaced_at' => 'datetime'
     ];
 
     const STATUS_ACTIVE = 'active';
@@ -123,5 +129,70 @@ class ConnectionLimitViolation extends Model
         }
 
         return round((($this->actual_connections - $this->allowed_connections) / $this->allowed_connections) * 100, 1);
+    }
+
+    /**
+     * Увеличить счетчик отправленных уведомлений
+     */
+    public function incrementNotifications(): void
+    {
+        $this->notifications_sent = ($this->notifications_sent ?? 0) + 1;
+        $this->last_notification_sent_at = now();
+        $this->save();
+    }
+
+    /**
+     * Получить количество отправленных уведомлений
+     */
+    public function getNotificationsSentCount(): int
+    {
+        return $this->notifications_sent ?? 0;
+    }
+
+    /**
+     * Получить время последнего уведомления (безопасная версия)
+     */
+    public function getLastNotificationTime(): ?string
+    {
+        return $this->last_notification_sent_at ? $this->last_notification_sent_at->format('d.m.Y H:i') : null;
+    }
+
+    /**
+     * Получить отформатированное время последнего уведомления или прочерк
+     */
+    public function getLastNotificationTimeFormatted(): string
+    {
+        return $this->getLastNotificationTime() ?? '-';
+    }
+
+    /**
+     * Проверить, был ли ключ заменен
+     */
+    public function isKeyReplaced(): bool
+    {
+        return !is_null($this->key_replaced_at);
+    }
+
+    /**
+     * Получить ID замененного ключа
+     */
+    public function getReplacedKeyId(): ?string
+    {
+        return $this->replaced_key_id;
+    }
+
+    /**
+     * Получить иконку для уведомлений (безопасная версия)
+     */
+    public function getNotificationIconAttribute(): string
+    {
+        $count = $this->getNotificationsSentCount();
+        if ($count === 0) {
+            return 'fas fa-bell-slash text-muted';
+        } elseif ($count === 1) {
+            return 'fas fa-bell text-warning';
+        } else {
+            return 'fas fa-bell text-success';
+        }
     }
 }

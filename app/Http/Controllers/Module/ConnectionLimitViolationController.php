@@ -166,24 +166,24 @@ class ConnectionLimitViolationController extends Controller
                     $message = 'Уведомление отправлено пользователю';
                     break;
 
-                case 'replace_key':
-                    $newKey = $this->manualService->replaceUserKey($violation);
-                    $message = "Ключ заменен. Новый ключ: {$newKey->id}";
+                case 'reissue_key':
+                    $newKey = $this->manualService->reissueKey($violation);
+                    $message = "Ключ перевыпущен. Новый ключ: {$newKey->id}";
                     break;
 
-                case 'reset_counter':
-                    $this->manualService->resetViolationCounter($violation);
-                    $message = 'Счетчик нарушений сброшен';
+                case 'ignore':
+                    $this->manualService->ignoreViolation($violation);
+                    $message = 'Нарушение помечено как игнорированное';
                     break;
 
                 default:
-                    return redirect()->back()->with('error', 'Неизвестное действие');
+                    return response()->json(['success' => false, 'message' => 'Неизвестное действие']);
             }
 
-            return redirect()->back()->with('success', $message);
+            return response()->json(['success' => true, 'message' => $message, 'new_key_id' => $newKey->id ?? null]);
 
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Ошибка: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Ошибка: ' . $e->getMessage()]);
         }
     }
 
