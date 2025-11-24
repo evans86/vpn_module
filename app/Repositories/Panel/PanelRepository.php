@@ -22,7 +22,7 @@ class PanelRepository extends BaseRepository
         return Panel::class;
     }
 
-    // ==================== СУЩЕСТВУЮЩИЕ МЕТОДЫ (без изменений) ====================
+    // ==================== СУЩЕСТВУЮЩИЕ МЕТОДЫ (с изменениями) ====================
 
     /**
      * Get paginated panels with relations
@@ -60,6 +60,7 @@ class PanelRepository extends BaseRepository
         $panels = $this->query()
             ->where('panel_status', Panel::PANEL_CONFIGURED)
             ->where('panel', Panel::MARZBAN)
+            ->where('id', '!=', 25) // ИСКЛЮЧАЕМ ПАНЕЛЬ С ID 25
             ->whereNotIn('id', function ($query) {
                 // Исключаем панели, которые привязаны к продавцам
                 $query->select('panel_id')
@@ -182,6 +183,7 @@ class PanelRepository extends BaseRepository
         $panels = $this->query()
             ->where('panel_status', Panel::PANEL_CONFIGURED)
             ->where('panel', Panel::MARZBAN)
+            ->where('id', '!=', 25) // ИСКЛЮЧАЕМ ПАНЕЛЬ С ID 25
             ->whereNotIn('id', function ($query) {
                 $query->select('panel_id')
                     ->from('salesman')
