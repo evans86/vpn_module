@@ -16,11 +16,14 @@ use RuntimeException;
 
 class PackSalesmanController extends Controller
 {
-    public KeyActivateService $keyActivateService;
+    private KeyActivateService $keyActivateService;
 
-    public function __construct()
+    /**
+     * @param KeyActivateService $keyActivateService
+     */
+    public function __construct(KeyActivateService $keyActivateService)
     {
-        $this->keyActivateService = app(KeyActivateService::class);
         $this->middleware('api');
+        $this->keyActivateService = $keyActivateService;
     }
 }

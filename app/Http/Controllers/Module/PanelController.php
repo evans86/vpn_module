@@ -126,13 +126,12 @@ class PanelController extends Controller
                 ]
             ]);
 
-            DB::beginTransaction();
-
-            // Создаем панель через стратегию
-            $strategy = new PanelStrategy(Panel::MARZBAN);
-            $strategy->create($validated['server_id']);
-
-            DB::commit();
+            // Используем DB::transaction() для автоматического rollback при ошибках
+            DB::transaction(function () use ($validated) {
+                // Создаем панель через стратегию
+                $strategy = new PanelStrategy(Panel::MARZBAN);
+                $strategy->create($validated['server_id']);
+            });
 
             $this->logger->info('Panel created successfully', [
                 'source' => 'panel',
@@ -143,7 +142,7 @@ class PanelController extends Controller
                 ->with('success', 'Panel created successfully');
 
         } catch (Exception $e) {
-            DB::rollBack();
+            // Rollback выполняется автоматически в DB::transaction()
             $this->logger->error('Error creating panel', [
                 'source' => 'panel',
                 'error' => $e->getMessage(),

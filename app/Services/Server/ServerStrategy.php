@@ -7,15 +7,27 @@ use App\Services\Server\strategy\ServerVdsinaStrategy;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 
+/**
+ * Strategy pattern для работы с серверами различных провайдеров
+ * 
+ * Использует паттерн Strategy для инкапсуляции алгоритмов работы с разными провайдерами серверов
+ */
 class ServerStrategy
 {
     public ServerInterface $strategy;
 
+    /**
+     * Создает стратегию для работы с указанным провайдером
+     *
+     * @param string $provider Провайдер сервера (например, Server::VDSINA)
+     * @throws \DomainException Если провайдер не найден
+     */
     public function __construct(string $provider)
     {
         switch ($provider) {
             case Server::VDSINA:
-                $this->strategy = new ServerVdsinaStrategy();
+                // Используем DI контейнер для создания стратегии с зависимостями
+                $this->strategy = app(ServerVdsinaStrategy::class);
                 break;
             default:
                 throw new \DomainException('Server strategy not found');
@@ -23,12 +35,14 @@ class ServerStrategy
     }
 
     /**
-     * @param Server $server
-     * @return bool
+     * Проверка доступности сервера
+     *
+     * @param Server $server Сервер для проверки
+     * @return bool true если сервер доступен, false в противном случае
      */
     public function ping(Server $server): bool
     {
-        $this->strategy->ping($server);
+        return $this->strategy->ping($server);
     }
 
     /**
@@ -46,10 +60,12 @@ class ServerStrategy
     }
 
     /**
-     * @param int $server_id
-     * @return string
+     * Получение пароля сервера от провайдера
+     *
+     * @param int $server_id ID сервера
+     * @return string|null Пароль сервера или null если не удалось получить
      */
-    public function getServerPassword(int $server_id): string
+    public function getServerPassword(int $server_id): ?string
     {
         return $this->strategy->getServerPassword($server_id);
     }

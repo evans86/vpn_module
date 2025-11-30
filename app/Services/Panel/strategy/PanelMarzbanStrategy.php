@@ -10,6 +10,13 @@ use GuzzleHttp\Exception\GuzzleException;
 
 class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
 {
+    private MarzbanService $marzbanService;
+
+    public function __construct(MarzbanService $marzbanService)
+    {
+        $this->marzbanService = $marzbanService;
+    }
+
     /**
      * Создание панели
      *
@@ -19,8 +26,7 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
      */
     public function create(int $server_id): void
     {
-        $marzbanServer = new MarzbanService();
-        $marzbanServer->create($server_id);
+        $this->marzbanService->create($server_id);
     }
 
     /**
@@ -28,8 +34,7 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
      */
     public function getSubscribeInfo(int $panel_id, string $user_id): array
     {
-        $marzbanServer = new MarzbanService();
-        return $marzbanServer->getUserSubscribeInfo($panel_id, $user_id);
+        return $this->marzbanService->getUserSubscribeInfo($panel_id, $user_id);
     }
 
     /**
@@ -38,8 +43,7 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
      */
     public function getServerStats(): void
     {
-        $marzbanServer = new MarzbanService();
-        $marzbanServer->getServerStats();
+        $this->marzbanService->getServerStats();
     }
 
     /**
@@ -51,8 +55,7 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
      */
     public function updateConfiguration(int $panel_id): void
     {
-        $marzbanServer = new MarzbanService();
-        $marzbanServer->updateConfiguration($panel_id);
+        $this->marzbanService->updateConfiguration($panel_id);
     }
 
     /**
@@ -68,8 +71,7 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
      */
     public function addServerUser(int $panel_id, int $userTgId, int $data_limit, int $expire, string $key_activate_id, array $options): ServerUser
     {
-        $marzbanServer = new MarzbanService();
-        return $marzbanServer->addServerUser($panel_id, $userTgId, $data_limit, $expire, $key_activate_id, $options);
+        return $this->marzbanService->addServerUser($panel_id, $userTgId, $data_limit, $expire, $key_activate_id, $options);
     }
 
     /**
@@ -82,8 +84,7 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
      */
     public function checkOnline(int $panel_id, string $user_id): void
     {
-        $marzbanServer = new MarzbanService();
-        $marzbanServer->checkOnline($panel_id, $user_id);
+        $this->marzbanService->checkOnline($panel_id, $user_id);
     }
 
     /**
@@ -96,7 +97,6 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
      */
     public function deleteServerUser(int $panel_id, string $user_id): void
     {
-        $marzbanServer = new MarzbanService();
-        $marzbanServer->deleteServerUser($panel_id, $user_id);
+        $this->marzbanService->deleteServerUser($panel_id, $user_id);
     }
 }

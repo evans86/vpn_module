@@ -44,9 +44,11 @@ class PanelRepository extends BaseRepository
     public function getAllConfiguredPanels(): Collection
     {
         // Получаем все настроенные панели Marzban
+        // Оптимизация: добавляем eager loading для сервера
         return $this->query()
             ->where('panel_status', Panel::PANEL_CONFIGURED)
             ->where('panel', Panel::MARZBAN)
+            ->with('server.location')
             ->orderBy('id', 'desc')
             ->get();
     }
@@ -67,6 +69,7 @@ class PanelRepository extends BaseRepository
                     ->from('salesman')
                     ->whereNotNull('panel_id');
             })
+            ->with('server.location')
             ->get();
 
         if ($panels->isEmpty()) {
@@ -180,6 +183,7 @@ class PanelRepository extends BaseRepository
     public function getOptimizedMarzbanPanel(): ?Panel
     {
         // Получаем панели с исключением привязанных к продавцам (как в оригинальном методе)
+        // Оптимизация: добавляем eager loading для сервера
         $panels = $this->query()
             ->where('panel_status', Panel::PANEL_CONFIGURED)
             ->where('panel', Panel::MARZBAN)
@@ -189,6 +193,7 @@ class PanelRepository extends BaseRepository
                     ->from('salesman')
                     ->whereNotNull('panel_id');
             })
+            ->with('server.location')
             ->get();
 
         if ($panels->isEmpty()) {
@@ -196,7 +201,8 @@ class PanelRepository extends BaseRepository
             return null;
         }
 
-        // Кэшируем результат на 2 минуты
+        // Кэшируем результат на 1 минуту для оптимизации
+        // Используем более короткое время кэширования для актуальности данных
         return Cache::remember('optimized_marzban_panel', 60, function () use ($panels) {
             return $this->selectOptimalPanelIntelligent($panels);
         });

@@ -3,6 +3,11 @@
 namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Throwable;
 
 class Handler extends ExceptionHandler
 {
@@ -12,7 +17,7 @@ class Handler extends ExceptionHandler
      * @var array
      */
     protected $dontReport = [
-        //
+        ValidationException::class,
     ];
 
     /**
@@ -23,6 +28,9 @@ class Handler extends ExceptionHandler
     protected $dontFlash = [
         'password',
         'password_confirmation',
+        'token',
+        'api_key',
+        'secret',
     ];
 
     /**
@@ -32,6 +40,37 @@ class Handler extends ExceptionHandler
      */
     public function register()
     {
-        //
+        $this->reportable(function (Throwable $e) {
+            // Дополнительное логирование критических ошибок
+            if ($this->shouldReport($e)) {
+                \Log::error('Unhandled exception', [
+                    'exception' => get_class($e),
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+            }
+        });
+
+        // Обработка 404 ошибок
+        $this->renderable(function (NotFoundHttpException $e, Request $request) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Resource not found',
+                    'error' => 'Not Found'
+                ], 404);
+            }
+        });
+
+        // Обработка HTTP исключений
+        $this->renderable(function (HttpException $e, Request $request) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $e->getMessage() ?: 'An error occurred',
+                    'error' => class_basename($e)
+                ], $e->getStatusCode());
+            }
+        });
     }
 }

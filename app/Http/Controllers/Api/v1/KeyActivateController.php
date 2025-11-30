@@ -83,10 +83,13 @@ class KeyActivateController extends Controller
         } catch (RuntimeException $r) {
             return ApiHelpers::error($r->getMessage());
         } catch (Exception $e) {
-            Log::error('Ошибка при покупке ключа: ' . $e->getMessage(), [
-                'exception' => $e,
+            Log::error('Ошибка при покупке ключа', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'user_tg_id' => $request->user_tg_id ?? null,
-                'product_id' => $request->product_id ?? null
+                'product_id' => $request->product_id ?? null,
+                'public_key' => $request->public_key ?? null
             ]);
             return ApiHelpers::error('Произошла ошибка при покупке ключа');
         }
@@ -111,8 +114,11 @@ class KeyActivateController extends Controller
             $currentMonth = Carbon::now()->startOfMonth();
             $nextMonth = Carbon::now()->addMonth()->startOfMonth();
 
+            // Используем константу для размера бесплатного ключа (5GB)
+            $freeKeySize = \App\Constants\ProductConstants::FREE_KEY_SIZE_GB * \App\Constants\DataConstants::BYTES_IN_GB;
+            
             $hasExistingKey = KeyActivate::where('user_tg_id', $request->user_tg_id)
-                ->where('traffic_limit', 5 * 1024 * 1024 * 1024)
+                ->where('traffic_limit', $freeKeySize)
                 ->whereBetween('created_at', [$currentMonth, $nextMonth])
                 ->whereNull('pack_salesman_id')->first();
 
@@ -121,7 +127,7 @@ class KeyActivateController extends Controller
                     'key' => $hasExistingKey->id,
                     'config_url' => "https://vpn-telegram.com/config/{$hasExistingKey->id}",
                     'traffic_limit' => $hasExistingKey->traffic_limit,
-                    'traffic_limit_gb' => 5,
+                    'traffic_limit_gb' => \App\Constants\ProductConstants::FREE_KEY_SIZE_GB,
                     'finish_at' => $hasExistingKey->finish_at,
                     'activated_at' => $hasExistingKey->activated_at,
                     'status' => $hasExistingKey->status,
@@ -130,8 +136,9 @@ class KeyActivateController extends Controller
                 ]);
             }
 
-            // Создание и активация ключа
-            $key = $this->keyActivateService->create(5 * 1024 * 1024 * 1024, null, null, null);
+            // Создание и активация ключа (5GB бесплатный ключ)
+            $freeKeySize = \App\Constants\ProductConstants::FREE_KEY_SIZE_GB * \App\Constants\DataConstants::BYTES_IN_GB;
+            $key = $this->keyActivateService->create($freeKeySize, null, null, null);
             $activatedKey = $this->keyActivateService->activate($key, $request->user_tg_id);
 
             return ApiHelpers::success([
@@ -148,9 +155,12 @@ class KeyActivateController extends Controller
         } catch (RuntimeException $e) {
             return ApiHelpers::error($e->getMessage());
         } catch (Exception $e) {
-            Log::error('Free key error', [
-                'user_tg_id' => $request->user_tg_id,
-                'error' => $e->getMessage()
+            Log::error('Ошибка при выдаче бесплатного ключа', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_tg_id' => $request->user_tg_id ?? null,
+                'public_key' => $request->public_key ?? null
             ]);
             return ApiHelpers::error('Произошла ошибка при выдаче ключа');
         }
@@ -176,7 +186,7 @@ class KeyActivateController extends Controller
                 'key' => $key->id,
                 'config_url' => "https://vpn-telegram.com/config/{$key->id}",
                 'traffic_limit' => $key->traffic_limit,
-                'traffic_limit_gb' => round($key->traffic_limit / 1024 / 1024 / 1024, 1),
+                'traffic_limit_gb' => round($key->traffic_limit / \App\Constants\DataConstants::BYTES_IN_GB, 1),
                 'finish_at' => $key->finish_at,
                 'status' => $key->status,
                 'status_text' => $key->getStatusText(),
@@ -188,7 +198,12 @@ class KeyActivateController extends Controller
         } catch (RuntimeException $e) {
             return ApiHelpers::error($e->getMessage());
         } catch (Exception $e) {
-            Log::error($e->getMessage());
+            Log::error('Ошибка при получении ключа', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'key' => $request->key ?? null
+            ]);
             return ApiHelpers::error('Ошибка при получении ключа');
         }
     }
@@ -223,7 +238,7 @@ class KeyActivateController extends Controller
                         'key' => $key->id,
                         'config_url' => "https://vpn-telegram.com/config/{$key->id}",
                         'traffic_limit' => $key->traffic_limit,
-                        'traffic_limit_gb' => round($key->traffic_limit / 1024 / 1024 / 1024, 1),
+                        'traffic_limit_gb' => round($key->traffic_limit / \App\Constants\DataConstants::BYTES_IN_GB, 1),
                         'finish_at' => $key->finish_at,
                         'status' => $key->status,
                         'status_text' => $key->getStatusText(),
@@ -249,7 +264,12 @@ class KeyActivateController extends Controller
         } catch (RuntimeException $e) {
             return ApiHelpers::error($e->getMessage());
         } catch (Exception $e) {
-            Log::error($e->getMessage());
+            Log::error('Ошибка при получении списка ключей', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_tg_id' => $request->user_tg_id ?? null
+            ]);
             return ApiHelpers::error('Ошибка при получении списка ключей');
         }
     }
@@ -274,7 +294,12 @@ class KeyActivateController extends Controller
             ]);
 
         } catch (Exception $e) {
-            Log::error('Ошибка при получении инструкций: ' . $e->getMessage());
+            Log::error('Ошибка при получении инструкций', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'public_key' => $request->public_key ?? null
+            ]);
             return ApiHelpers::error('Не удалось загрузить инструкции');
         }
     }

@@ -243,7 +243,7 @@ class MarzbanService
             if (is_null($panel->auth_token) || $panel->token_died_time <= time()) {
                 $marzbanApi = new MarzbanAPI($panel->api_address);
                 $panel->auth_token = $marzbanApi->getToken($panel->panel_login, $panel->panel_password);
-                $panel->token_died_time = time() + 85400;
+                $panel->token_died_time = time() + \App\Constants\TimeConstants::PANEL_TOKEN_LIFETIME;
                 $panel->save();
 
                 Log::info('Panel token updated', ['panel_id' => $panel_id]);

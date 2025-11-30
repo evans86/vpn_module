@@ -16,7 +16,8 @@ class PanelStrategy
     {
         switch ($provider) {
             case Panel::MARZBAN:
-                $this->strategy = new PanelMarzbanStrategy();
+                // Используем DI контейнер для создания стратегии с зависимостями
+                $this->strategy = app(PanelMarzbanStrategy::class);
                 break;
             default:
                 throw new \DomainException('panel strategy not found');

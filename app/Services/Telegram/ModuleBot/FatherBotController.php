@@ -612,31 +612,33 @@ class FatherBotController extends AbstractTelegramBot
             // Количество пакетов на страницу
             $perPage = 8;
 
-            // Получаем ВСЕ пакеты для общей статистики
-            $allPacks = PackSalesman::where('salesman_id', $salesman->id)
+            // Оптимизация: получаем пакеты один раз с нужными отношениями
+            $packs = PackSalesman::where('salesman_id', $salesman->id)
                 ->where('status', PackSalesman::PAID)
-                ->with('keyActivates')
+                ->with(['pack', 'keyActivates'])
+                ->orderBy('created_at', 'desc')
                 ->get();
 
-            // Общая статистика по ВСЕМ пакетам
+            // Общая статистика по ВСЕМ пакетам (используем уже загруженные данные)
             $totalKeys = 0;
-            $activeKeys = 0;
             $usedKeys = 0;
 
-            foreach ($allPacks as $packSalesman) {
+            foreach ($packs as $packSalesman) {
                 $totalKeys += $packSalesman->keyActivates->count();
                 $usedKeys += $packSalesman->keyActivates->whereNotNull('user_tg_id')->count();
             }
             $activeKeys = $totalKeys - $usedKeys;
 
-            // Получаем пакеты для текущей страницы (только для отображения)
-            $packs = PackSalesman::where('salesman_id', $salesman->id)
-                ->where('status', PackSalesman::PAID)
-                ->with(['pack', 'keyActivates'])
-                ->orderBy('created_at', 'desc')
-                ->paginate($perPage, ['*'], 'page', $page);
+            // Пагинация для отображения (используем коллекцию)
+            $packsPaginated = new \Illuminate\Pagination\LengthAwarePaginator(
+                $packs->forPage($page, $perPage),
+                $packs->count(),
+                $perPage,
+                $page,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
 
-            if ($packs->isEmpty()) {
+            if ($packsPaginated->isEmpty()) {
                 $message = "📦 <b>У вас пока нет активных пакетов</b>\n\n";
                 $message .= "Чтобы начать продавать VPN:\n\n";
                 $message .= "1️⃣ Пополните баланс в системе\n";
@@ -655,16 +657,16 @@ class FatherBotController extends AbstractTelegramBot
             $message .= "   • Использовано: <b>{$usedKeys}</b>\n\n";
 
             // Добавляем информацию о текущей странице
-            $currentPage = $packs->currentPage();
-            $lastPage = $packs->lastPage();
-            $totalPacks = $packs->total();
+            $currentPage = $packsPaginated->currentPage();
+            $lastPage = $packsPaginated->lastPage();
+            $totalPacks = $packsPaginated->total();
 
             $message .= "📦 <i>Пакеты на странице {$currentPage}/{$lastPage} (всего: {$totalPacks}):</i>\n\n";
 
             $keyboard = ['inline_keyboard' => []];
 
             // Добавляем пакеты с красивым оформлением
-            foreach ($packs as $packSalesman) {
+            foreach ($packsPaginated->items() as $packSalesman) {
                 $pack = $packSalesman->pack;
 
                 // Статистика по ключам в этом пакете
@@ -704,12 +706,12 @@ class FatherBotController extends AbstractTelegramBot
             }
 
             // Добавляем кнопки пагинации с эмодзи
-            if ($packs->hasPages()) {
+            if ($packsPaginated->hasPages()) {
                 $paginationButtons = [];
 
                 // Текущая страница и общее количество
-                $currentPage = $packs->currentPage();
-                $lastPage = $packs->lastPage();
+                $currentPage = $packsPaginated->currentPage();
+                $lastPage = $packsPaginated->lastPage();
 
                 // Информация о странице
                 $pageInfo = "📄 {$currentPage}/{$lastPage}";
@@ -743,7 +745,7 @@ class FatherBotController extends AbstractTelegramBot
                 ];
 
                 // Кнопка "Вперед"
-                if ($packs->hasMorePages()) {
+                if ($packsPaginated->hasMorePages()) {
                     $paginationButtons[] = [
                         'text' => '➡️',
                         'callback_data' => json_encode([

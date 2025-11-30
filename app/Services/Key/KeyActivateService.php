@@ -123,10 +123,10 @@ class KeyActivateService
         try {
             // Определение категории товара
             $categoryMap = [
-                1 => 2462416,  // 1 месяц
-                3 => 2462423,  // 3 месяца
-                6 => 2462928,  // 6 месяцев
-                12 => 2462929 // 12 месяцев
+                1 => \App\Constants\ProductConstants::CATEGORY_1_MONTH,
+                3 => \App\Constants\ProductConstants::CATEGORY_3_MONTHS,
+                6 => \App\Constants\ProductConstants::CATEGORY_6_MONTHS,
+                12 => \App\Constants\ProductConstants::CATEGORY_12_MONTHS
             ];
 
             if (!isset($categoryMap[$product_id])) {
@@ -201,6 +201,10 @@ class KeyActivateService
 
             $keyActivate = $this->keyActivateRepository->findById($keyID);
 
+            if (!$keyActivate) {
+                throw new RuntimeException("Key activate with ID {$keyID} not found");
+            }
+
             if ($salesman) {
                 $keyActivate->module_salesman_id = $salesman->id;
                 $keyActivate->save();
@@ -212,7 +216,7 @@ class KeyActivateService
                 ]);
             }
 
-            return $this->keyActivateRepository->findById($keyID);
+            return $keyActivate;
         } catch (Exception $e) {
             $this->logger->error('Ошибка при покупке ключа', [
                 'source' => 'key_activate',
@@ -253,6 +257,11 @@ class KeyActivateService
             }
 
             // Определение панели для активации
+            // Проверяем наличие связанных данных
+            if (!$key->packSalesman || !$key->packSalesman->salesman) {
+                throw new RuntimeException('Не найдена связь ключа с продавцом');
+            }
+
             $panel = $key->packSalesman->salesman->panel_id
                 ? $key->packSalesman->salesman->panel
                 : $this->panelRepository->getOptimizedMarzbanPanel();
@@ -277,7 +286,7 @@ class KeyActivateService
 //                ]);
 //            }
 
-            $finishAt = time() + ($key->packSalesman->pack->period * 24 * 60 * 60);
+            $finishAt = time() + ($key->packSalesman->pack->period * \App\Constants\TimeConstants::SECONDS_IN_DAY);
 
             // Создаем стратегию для работы с панелью
             $panelStrategy = new PanelStrategy(Panel::MARZBAN);
@@ -373,7 +382,7 @@ class KeyActivateService
             $panelStrategy = new PanelStrategy(Panel::MARZBAN);
 
             if (!is_null($key->pack_salesman_id)) {
-                $finishAt = time() + ($key->packSalesman->pack->period * 24 * 60 * 60);
+                $finishAt = time() + ($key->packSalesman->pack->period * \App\Constants\TimeConstants::SECONDS_IN_DAY);
             } else {
                 $finishAt = Carbon::now()->addMonth()->startOfMonth()->timestamp;
             }

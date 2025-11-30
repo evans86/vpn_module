@@ -271,9 +271,11 @@ class VdsinaService
             /**
              * @var Server[] $servers
              */
+            // Оптимизация: добавляем eager loading для связанных данных
             $servers = Server::query()
                 ->where('provider', Server::VDSINA)
                 ->where('server_status', Server::SERVER_CREATED)
+                ->with(['location', 'panel'])
                 ->get();
 
             Log::info('Checking status for VDSINA servers', ['count' => count($servers)]);

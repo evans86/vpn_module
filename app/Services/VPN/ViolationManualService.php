@@ -123,30 +123,40 @@ class ViolationManualService
     /**
      * Замена ключа пользователя
      */
+    /**
+     * Замена ключа пользователя при нарушении лимита подключений
+     *
+     * @param ConnectionLimitViolation $violation Нарушение лимита подключений
+     * @return KeyActivate|null Новый ключ или null если не удалось создать
+     * @throws \Exception При ошибках создания или активации ключа
+     */
     public function replaceUserKey(ConnectionLimitViolation $violation): ?KeyActivate
     {
         try {
-            DB::beginTransaction();
+            // Используем DB::transaction() для автоматического rollback при ошибках
+            return DB::transaction(function () use ($violation) {
+                $oldKey = $violation->keyActivate;
+                $userTgId = $oldKey->user_tg_id;
 
-            $oldKey = $violation->keyActivate;
-            $userTgId = $oldKey->user_tg_id;
+                if (!$userTgId) {
+                    throw new \Exception('Пользователь не найден для замены ключа');
+                }
 
-            if (!$userTgId) {
-                throw new \Exception('Пользователь не найден для замены ключа');
-            }
+                // Создаем новый ключ
+                $newKey = $this->keyActivateService->create(
+                    $oldKey->traffic_limit,
+                    $oldKey->pack_salesman_id,
+                    $oldKey->finish_at,
+                    null
+                );
 
-            // Создаем новый ключ
-            $newKey = $this->keyActivateService->create(
-                $oldKey->traffic_limit,
-                $oldKey->pack_salesman_id,
-                $oldKey->finish_at,
-                null
-            );
+                // Активируем новый ключ
+                $activatedKey = $this->keyActivateService->activate($newKey, $userTgId);
 
-            // Активируем новый ключ
-            $activatedKey = $this->keyActivateService->activate($newKey, $userTgId);
+                if (!$activatedKey) {
+                    throw new \Exception('Не удалось активировать новый ключ');
+                }
 
-            if ($activatedKey) {
                 // Деактивируем старый ключ
                 $oldKey->status = KeyActivate::EXPIRED;
                 $oldKey->save();
@@ -161,18 +171,13 @@ class ViolationManualService
                     'admin_action' => true
                 ]);
 
-                DB::commit();
                 return $newKey;
-            }
-
-            DB::rollBack();
-            return null;
-
+            });
         } catch (\Exception $e) {
-            DB::rollBack();
             Log::error('Ошибка замены ключа', [
                 'violation_id' => $violation->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             throw $e;
         }
@@ -283,32 +288,39 @@ class ViolationManualService
     }
 
     /**
-     * Перевыпуск ключа (замена)
+     * Перевыпуск ключа (замена) при нарушении лимита подключений
+     *
+     * @param ConnectionLimitViolation $violation Нарушение лимита подключений
+     * @return KeyActivate|null Новый ключ или null если не удалось создать
+     * @throws \Exception При ошибках создания или активации ключа
      */
     public function reissueKey(ConnectionLimitViolation $violation): ?KeyActivate
     {
         try {
-            DB::beginTransaction();
+            // Используем DB::transaction() для автоматического rollback при ошибках
+            return DB::transaction(function () use ($violation) {
+                $oldKey = $violation->keyActivate;
+                $userTgId = $oldKey->user_tg_id;
 
-            $oldKey = $violation->keyActivate;
-            $userTgId = $oldKey->user_tg_id;
+                if (!$userTgId) {
+                    throw new \Exception('Пользователь не найден для перевыпуска ключа');
+                }
 
-            if (!$userTgId) {
-                throw new \Exception('Пользователь не найден для перевыпуска ключа');
-            }
+                // Создаем новый ключ
+                $newKey = $this->keyActivateService->create(
+                    $oldKey->traffic_limit,
+                    $oldKey->pack_salesman_id,
+                    $oldKey->finish_at,
+                    null
+                );
 
-            // Создаем новый ключ
-            $newKey = $this->keyActivateService->create(
-                $oldKey->traffic_limit,
-                $oldKey->pack_salesman_id,
-                $oldKey->finish_at,
-                null
-            );
+                // Активируем новый ключ
+                $activatedKey = $this->keyActivateService->activate($newKey, $userTgId);
 
-            // Активируем новый ключ
-            $activatedKey = $this->keyActivateService->activate($newKey, $userTgId);
+                if (!$activatedKey) {
+                    throw new \Exception('Не удалось активировать новый ключ');
+                }
 
-            if ($activatedKey) {
                 // Деактивируем старый ключ
                 $oldKey->status = KeyActivate::EXPIRED;
                 $oldKey->save();
@@ -331,15 +343,9 @@ class ViolationManualService
                 // Отправляем уведомление о новом ключе
                 $this->sendKeyReplacementNotification($violation, $newKey);
 
-                DB::commit();
                 return $newKey;
-            }
-
-            DB::rollBack();
-            return null;
-
+            });
         } catch (\Exception $e) {
-            DB::rollBack();
             Log::error('Ошибка перевыпуска ключа', [
                 'violation_id' => $violation->id,
                 'error' => $e->getMessage()

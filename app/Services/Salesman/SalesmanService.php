@@ -8,7 +8,7 @@ use App\Models\Salesman\Salesman;
 use App\Repositories\Salesman\SalesmanRepository;
 use App\Logging\DatabaseLogger;
 use Exception;
-use http\Exception\RuntimeException;
+use RuntimeException;
 
 class SalesmanService
 {
@@ -137,18 +137,36 @@ class SalesmanService
     public function assignPanel(int $salesmanId, int $panelId): void
     {
         try {
+            $this->logger->info('Assigning panel to salesman', [
+                'source' => 'salesman',
+                'action' => 'assign_panel',
+                'salesman_id' => $salesmanId,
+                'panel_id' => $panelId
+            ]);
+
             $salesman = $this->salesmanRepository->findByIdOrFail($salesmanId);
             $salesman->panel_id = $panelId;
-            if (!$salesman->save())
-                throw new RuntimeException('Salesman dont create');
+            
+            if (!$salesman->save()) {
+                throw new RuntimeException('Failed to assign panel to salesman');
+            }
 
-            if (!$salesman->save())
-                throw new RuntimeException('Pack Salesman dont create');
-
-        } catch (RuntimeException $r) {
-            throw new RuntimeException($r->getMessage());
+            $this->logger->info('Panel assigned successfully', [
+                'source' => 'salesman',
+                'action' => 'assign_panel_success',
+                'salesman_id' => $salesmanId,
+                'panel_id' => $panelId
+            ]);
         } catch (Exception $e) {
-            throw new Exception($e->getMessage());
+            $this->logger->error('Failed to assign panel to salesman', [
+                'source' => 'salesman',
+                'action' => 'assign_panel_error',
+                'salesman_id' => $salesmanId,
+                'panel_id' => $panelId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
     }
 
@@ -158,18 +176,33 @@ class SalesmanService
     public function resetPanel(int $salesmanId): void
     {
         try {
+            $this->logger->info('Resetting panel for salesman', [
+                'source' => 'salesman',
+                'action' => 'reset_panel',
+                'salesman_id' => $salesmanId
+            ]);
+
             $salesman = $this->salesmanRepository->findByIdOrFail($salesmanId);
             $salesman->panel_id = null;
-            if (!$salesman->save())
-                throw new RuntimeException('Salesman dont create');
+            
+            if (!$salesman->save()) {
+                throw new RuntimeException('Failed to reset panel for salesman');
+            }
 
-            if (!$salesman->save())
-                throw new RuntimeException('Pack Salesman dont create');
-
-        } catch (RuntimeException $r) {
-            throw new RuntimeException($r->getMessage());
+            $this->logger->info('Panel reset successfully', [
+                'source' => 'salesman',
+                'action' => 'reset_panel_success',
+                'salesman_id' => $salesmanId
+            ]);
         } catch (Exception $e) {
-            throw new Exception($e->getMessage());
+            $this->logger->error('Failed to reset panel for salesman', [
+                'source' => 'salesman',
+                'action' => 'reset_panel_error',
+                'salesman_id' => $salesmanId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
     }
 

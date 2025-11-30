@@ -185,14 +185,22 @@ class ServerController extends Controller
     public function update(Request $request, Server $server): RedirectResponse
     {
         try {
+            // Валидация входных данных
+            $validated = $request->validate([
+                'name' => 'sometimes|string|max:255',
+                'ip' => 'sometimes|ip',
+                'host' => 'sometimes|string|max:255',
+                'location_id' => 'sometimes|integer|exists:location,id',
+            ]);
+
             $this->logger->info('Updating server', [
                 'source' => 'server',
                 'user_id' => auth()->id(),
                 'server_id' => $server->id,
-                'data' => $request->except(['_token', '_method'])
+                'data' => $validated
             ]);
 
-            $server = $this->serverRepository->updateConfiguration($server, $request->all());
+            $server = $this->serverRepository->updateConfiguration($server, $validated);
 
             $this->logger->info('Server updated successfully', [
                 'source' => 'server',

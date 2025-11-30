@@ -264,9 +264,20 @@ class SalesmanBotController extends AbstractTelegramBot
              */
             foreach ($currentPageKeys as $key) {
                 try {
-                    // Получаем информацию о трафике с панели
-                    $panelStrategy = new PanelStrategy($key->keyActivateUser->serverUser->panel->panel);
-                    $info = $panelStrategy->getSubscribeInfo($key->keyActivateUser->serverUser->panel->id, $key->keyActivateUser->serverUser->id);
+                    // Проверяем наличие связанных данных перед доступом
+                    if (!$key->keyActivateUser || 
+                        !$key->keyActivateUser->serverUser || 
+                        !$key->keyActivateUser->serverUser->panel) {
+                        Log::warning('Missing relationships for key', ['key_id' => $key->id]);
+                        $info = ['used_traffic' => null];
+                    } else {
+                        // Получаем информацию о трафике с панели
+                        $panelStrategy = new PanelStrategy($key->keyActivateUser->serverUser->panel->panel);
+                        $info = $panelStrategy->getSubscribeInfo(
+                            $key->keyActivateUser->serverUser->panel->id, 
+                            $key->keyActivateUser->serverUser->id
+                        );
+                    }
                 } catch (\Exception $e) {
                     // Логируем ошибку
                     Log::error('Failed to get subscription info for key ' . $key->id . ': ' . $e->getMessage());

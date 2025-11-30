@@ -118,13 +118,12 @@ class PersonalController extends Controller
             $moduleChartData[$date] = $moduleSalesData[$date] ?? 0;
         }
 
-        $totalEarnings = $salesman->packSales()
-            ->where('status', PackSalesman::PAID)
-            ->with('pack')
-            ->get()
-            ->sum(function ($packSales) {
-                return $packSales->pack->price ?? 0;
-            });
+        // Оптимизация: используем агрегацию БД вместо загрузки всех записей
+        $totalEarnings = DB::table('pack_salesman')
+            ->join('pack', 'pack_salesman.pack_id', '=', 'pack.id')
+            ->where('pack_salesman.salesman_id', $salesman->id)
+            ->where('pack_salesman.status', PackSalesman::PAID)
+            ->sum('pack.price');
 
         // Ключи из бота
         $botSales = $botKeysQuery

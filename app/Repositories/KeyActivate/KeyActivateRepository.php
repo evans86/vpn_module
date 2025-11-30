@@ -200,7 +200,7 @@ class KeyActivateRepository extends BaseRepository
         // Получаем период действия из связанного пакета
         if (isset($key->packSalesman->pack)){
             $pack = $key->packSalesman->pack;
-            $finishAt = time() + ($pack->period * 24 * 60 * 60);
+            $finishAt = time() + ($pack->period * \App\Constants\TimeConstants::SECONDS_IN_DAY);
         }else{
             $finishAt = \Carbon\Carbon::now()->addMonth()->startOfMonth()->timestamp; // для бесплатного ключа
         }

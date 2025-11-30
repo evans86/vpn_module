@@ -18,15 +18,12 @@ use RuntimeException;
 
 class BotModuleController extends Controller
 {
-    /**
-     * @var BotModuleService
-     */
     private BotModuleService $botModuleService;
 
-    public function __construct()
+    public function __construct(BotModuleService $botModuleService)
     {
         $this->middleware('api');
-        $this->botModuleService = new BotModuleService();
+        $this->botModuleService = $botModuleService;
     }
 
     /**
@@ -58,7 +55,13 @@ class BotModuleController extends Controller
         } catch (RuntimeException $r) {
             return ApiHelpers::error($r->getMessage());
         } catch (Exception $e) {
-            Log::error($e->getMessage());
+            Log::error('Ошибка при создании модуля', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'public_key' => $request->public_key ?? null,
+                'bot_id' => $request->bot_id ?? null
+            ]);
             return ApiHelpers::error('Module creation error');
         }
     }
@@ -73,16 +76,27 @@ class BotModuleController extends Controller
     {
         try {
             /**
-             * @var BotModule $botModule
+             * @var BotModule|null $botModule
              */
-            $botModule = BotModule::query()->where('public_key', $request->public_key)->where('private_key', $request->private_key)->first();
-            if (empty($botModule))
+            $botModule = BotModule::query()
+                ->where('public_key', $request->public_key)
+                ->where('private_key', $request->private_key)
+                ->first();
+            
+            if (!$botModule) {
                 return ApiHelpers::error('Not found module.');
+            }
+            
             return ApiHelpers::success(BotModuleFactory::fromEntity($botModule)->getArray());
         } catch (RuntimeException $r) {
             return ApiHelpers::error($r->getMessage());
         } catch (Exception $e) {
-            Log::error($e->getMessage());
+            Log::error('Ошибка при получении модуля', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'public_key' => $request->public_key ?? null
+            ]);
             return ApiHelpers::error('Module get error');
         }
     }
@@ -96,21 +110,29 @@ class BotModuleController extends Controller
     public function getSettings(Request $request)
     {
         try {
-            if (is_null($request->public_key))
-                return ApiHelpers::error('Not found params: public_key');
+            $request->validate([
+                'public_key' => 'required|string',
+            ]);
             /**
-             * @var BotModule $botModule
+             * @var BotModule|null $botModule
              */
             $botModule = BotModule::query()->where('public_key', $request->public_key)->first();
-            if (empty($botModule))
+            
+            if (!$botModule) {
                 throw new RuntimeException('Not found module.');
+            }
 
             return ApiHelpers::success(BotModuleFactory::fromEntity($botModule)->getSettings());
 
         } catch (RuntimeException $r) {
             return ApiHelpers::error($r->getMessage());
         } catch (Exception $e) {
-            Log::error($e->getMessage());
+            Log::error('Ошибка при получении настроек модуля', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'public_key' => $request->public_key ?? null
+            ]);
             return ApiHelpers::error('Module get settings error');
         }
     }
@@ -127,14 +149,27 @@ class BotModuleController extends Controller
         try {
             $botModule = $this->botModuleService->update($request->getDto());
             /**
-             * @var BotModule $botModule
+             * @var BotModule|null $botModule
              */
-            $botModule = BotModule::query()->where('public_key', $botModule->public_key)->where('private_key', $botModule->private_key)->first();
+            $botModule = BotModule::query()
+                ->where('public_key', $botModule->public_key)
+                ->where('private_key', $botModule->private_key)
+                ->first();
+            
+            if (!$botModule) {
+                return ApiHelpers::error('Module not found after update.');
+            }
+            
             return ApiHelpers::success(BotModuleFactory::fromEntity($botModule)->getArray());
         } catch (RuntimeException $r) {
             return ApiHelpers::error($r->getMessage());
         } catch (Exception $e) {
-            Log::error($e->getMessage());
+            Log::error('Ошибка при обновлении модуля', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'id' => $request->id ?? null
+            ]);
             return ApiHelpers::error('Module update error');
         }
     }
@@ -148,12 +183,22 @@ class BotModuleController extends Controller
     public function delete(Request $request)
     {
         try {
-            $this->botModuleService->delete($request->public_key, $request->private_key);
+            $validated = $request->validate([
+                'public_key' => 'required|string',
+                'private_key' => 'required|string',
+            ]);
+            
+            $this->botModuleService->delete($validated['public_key'], $validated['private_key']);
             return ApiHelpers::success('OK');
         } catch (RuntimeException $r) {
             return ApiHelpers::error($r->getMessage());
         } catch (Exception $e) {
-            Log::error($e->getMessage());
+            Log::error('Ошибка при удалении модуля', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'public_key' => $validated['public_key'] ?? null
+            ]);
             return ApiHelpers::error('Module delete error');
         }
     }

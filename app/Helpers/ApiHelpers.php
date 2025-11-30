@@ -54,6 +54,8 @@ class ApiHelpers
     }
 
     /**
+     * Generate HMAC-SHA256 signature for parameters
+     * 
      * @param array $params
      * @param string $token
      * @return string
@@ -67,8 +69,9 @@ class ApiHelpers
                 continue;
             $str .= $param . ':';
         }
-        $str .= $token;
-        return md5($str);
+        
+        // Используем HMAC-SHA256 вместо MD5 для безопасности
+        return hash_hmac('sha256', $str, $token);
     }
 
     /**

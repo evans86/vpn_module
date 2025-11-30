@@ -74,8 +74,10 @@ class ConnectionLimitViolationController extends Controller
         // Статистика для виджетов
         $stats = $this->monitorService->getViolationStats();
 
-        // Дополнительные данные для фильтров
-        $panels = \App\Models\Panel\Panel::where('panel_status', \App\Models\Panel\Panel::PANEL_CONFIGURED)->get();
+        // Дополнительные данные для фильтров (с eager loading для оптимизации)
+        $panels = \App\Models\Panel\Panel::where('panel_status', \App\Models\Panel\Panel::PANEL_CONFIGURED)
+            ->with('server.location')
+            ->get();
 
         return view('module.connection-limit-violations.index', compact('violations', 'stats', 'panels'));
     }
