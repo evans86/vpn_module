@@ -16,7 +16,7 @@ class LogRepository extends BaseRepository
         return ApplicationLog::class;
     }
 
-    public function getPaginatedWithFilters(array $filters, int $perPage = 50): LengthAwarePaginator
+    public function getPaginatedWithFilters(array $filters, int $perPage = 30): LengthAwarePaginator
     {
         $query = $this->query()
             ->select([
@@ -24,7 +24,7 @@ class LogRepository extends BaseRepository
                 'created_at',
                 'level',
                 'source',
-                DB::raw('CASE WHEN LENGTH(message) > 60 THEN CONCAT(SUBSTRING(message, 1, 60), "...") ELSE message END as message_short'),
+                DB::raw('CASE WHEN LENGTH(message) > 100 THEN CONCAT(SUBSTRING(message, 1, 100), "...") ELSE message END as message_short'),
                 'user_id'
             ]);
 
@@ -38,44 +38,74 @@ class LogRepository extends BaseRepository
             $query->bySource($filters['source']);
         }
 
-        // Фильтр по дате
+        // Фильтр по дате (обязательно ограничиваем для производительности)
         if (!empty($filters['date_from']) || !empty($filters['date_to'])) {
             $start = $filters['date_from'] ?? now()->subDays(7)->toDateString();
-            $end = $filters['date_to'] ?? null;
+            $end = $filters['date_to'] ?? now()->toDateString();
 
-            if ($end) {
-                $query->whereBetween('created_at', [
-                    $this->createDateTime($start, $filters['time_from'] ?? null),
-                    $this->createDateTime($end, $filters['time_to'] ?? '23:59:59')
-                ]);
-            } else {
-                $query->whereDate('created_at', $start);
-            }
+            $query->whereBetween('created_at', [
+                $this->createDateTime($start, '00:00:00'),
+                $this->createDateTime($end, '23:59:59')
+            ]);
+        } else {
+            // По умолчанию ограничиваем последними 7 днями для производительности
+            $query->where('created_at', '>=', now()->subDays(7)->startOfDay());
         }
 
-        // Фильтр по времени (если не указана дата)
-        if ((!empty($filters['time_from']) || !empty($filters['time_to'])) && empty($filters['date_from']) && empty($filters['date_to'])) {
-            if (!empty($filters['time_from'])) {
-                $query->whereTime('created_at', '>=', $filters['time_from']);
-            }
-            if (!empty($filters['time_to'])) {
-                $query->whereTime('created_at', '<=', $filters['time_to']);
-            }
-        }
-
-        // Поиск
-        if (!empty($filters['search'])) {
-            $searchTerm = $filters['search'];
-            if (strlen($searchTerm) > 3) {
-                $query->searchMessage($searchTerm);
-            } else {
-                $query->where('message', 'like', '%' . $searchTerm . '%');
-            }
+        // Поиск (оптимизированный - только если больше 2 символов)
+        if (!empty($filters['search']) && strlen(trim($filters['search'])) > 2) {
+            $searchTerm = trim($filters['search']);
+            // Используем индекс на created_at для оптимизации
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('message', 'like', '%' . $searchTerm . '%')
+                  ->orWhere('source', 'like', '%' . $searchTerm . '%');
+            });
         }
 
         return $query->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc') // Дополнительная сортировка для стабильности
             ->paginate($perPage)
             ->appends($filters);
+    }
+
+    /**
+     * Получить статистику по уровням логов
+     *
+     * @param array $filters
+     * @return array
+     */
+    public function getLevelStats(array $filters = []): array
+    {
+        $query = $this->query();
+
+        // Применяем те же фильтры что и для основного запроса
+        if (!empty($filters['source'])) {
+            $query->bySource($filters['source']);
+        }
+
+        if (!empty($filters['date_from']) || !empty($filters['date_to'])) {
+            $start = $filters['date_from'] ?? now()->subDays(7)->toDateString();
+            $end = $filters['date_to'] ?? now()->toDateString();
+            $query->whereBetween('created_at', [
+                $this->createDateTime($start, '00:00:00'),
+                $this->createDateTime($end, '23:59:59')
+            ]);
+        } else {
+            $query->where('created_at', '>=', now()->subDays(7)->startOfDay());
+        }
+
+        $stats = $query->select('level', DB::raw('COUNT(*) as count'))
+            ->groupBy('level')
+            ->pluck('count', 'level')
+            ->toArray();
+
+        return [
+            'error' => ($stats['error'] ?? 0) + ($stats['critical'] ?? 0) + ($stats['emergency'] ?? 0),
+            'warning' => $stats['warning'] ?? 0,
+            'info' => $stats['info'] ?? 0,
+            'debug' => $stats['debug'] ?? 0,
+            'total' => array_sum($stats)
+        ];
     }
 
     protected function createDateTime(string $date, ?string $time): string

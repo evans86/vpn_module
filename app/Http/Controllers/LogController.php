@@ -29,43 +29,48 @@ class LogController extends Controller
     public function index(Request $request): Response
     {
         try {
-            // Clean old logs (older than 30 days)
-            $deletedCount = $this->logRepository->cleanOldLogs(15);
-            if ($deletedCount > 0) {
-                Log::info('Cleaned old logs', [
-                    'source' => 'system',
-                    'deleted_count' => $deletedCount
-                ]);
-            }
-
-            // Get logs with filters and pagination
-            $logs = $this->logRepository->getPaginatedWithFilters([
+            // Получаем фильтры
+            $filters = [
                 'level' => $request->get('level'),
                 'source' => $request->get('source'),
                 'date_from' => $request->get('date_from'),
                 'date_to' => $request->get('date_to'),
                 'search' => $request->get('search'),
-            ]);
+            ];
 
-            // Get unique sources for filter with caching
-            $sources = cache()->remember('log_sources', 60, function () {
+            // Если не указана дата, ограничиваем последними 7 днями по умолчанию
+            if (empty($filters['date_from']) && empty($filters['date_to'])) {
+                $filters['date_from'] = now()->subDays(7)->format('Y-m-d');
+            }
+
+            // Get logs with filters and pagination
+            $logs = $this->logRepository->getPaginatedWithFilters($filters, 30);
+
+            // Get unique sources for filter with caching (увеличено до 5 минут)
+            $sources = cache()->remember('log_sources', 300, function () {
                 return $this->logRepository->getUniqueSources();
             });
 
+            // Получаем статистику по уровням (кэшируем на 60 секунд)
+            $stats = cache()->remember('log_stats_' . md5(json_encode($filters)), 60, function () use ($filters) {
+                return $this->logRepository->getLevelStats($filters);
+            });
+
             if ($request->ajax()) {
-                return response()->view('logs.partials.table', compact('logs'));
+                return response()->json([
+                    'html' => view('logs.partials.table', compact('logs'))->render(),
+                    'stats' => $stats,
+                    'pagination' => view('logs.partials.pagination', compact('logs'))->render(),
+                    'total' => $logs->total(),
+                    'count' => $logs->count()
+                ]);
             }
 
             return response()->view('logs.index', [
                 'logs' => $logs,
                 'sources' => $sources,
-                'filters' => [
-                    'level' => $request->get('level'),
-                    'source' => $request->get('source'),
-                    'date_from' => $request->get('date_from'),
-                    'date_to' => $request->get('date_to'),
-                    'search' => $request->get('search'),
-                ]
+                'stats' => $stats,
+                'filters' => $filters
             ]);
         } catch (Exception $e) {
             Log::error('Error displaying logs', [

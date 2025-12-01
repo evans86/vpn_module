@@ -15,6 +15,7 @@ class Kernel extends ConsoleKernel
     protected $commands = [
         \App\Console\Commands\MonitorConnectionLimits::class,
         \App\Console\Commands\ProcessViolationsCommand::class,
+        \App\Console\Commands\CleanOldLogsCommand::class,
     ];
 
     /**
@@ -43,6 +44,12 @@ class Kernel extends ConsoleKernel
             ->hourly()
             ->withoutOverlapping()
             ->appendOutputTo(storage_path('logs/violation-process.log'));
+
+        // Очистка старых логов каждый день в 3:00
+        $schedule->command('logs:clean --days=30')
+            ->dailyAt('03:00')
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/logs-cleanup.log'));
     }
 
     /**
