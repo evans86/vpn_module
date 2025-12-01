@@ -399,15 +399,30 @@
                                         </td>
                                         <td>
                                             <div class="ip-addresses">
-                                                @foreach(array_slice($violation->ip_addresses ?? [], 0, 3) as $ip)
+                                                @php
+                                                    $ipAddresses = $violation->ip_addresses ?? [];
+                                                    $displayedIps = array_slice($ipAddresses, 0, 3);
+                                                    $hiddenIps = array_slice($ipAddresses, 3);
+                                                    $totalIps = count($ipAddresses);
+                                                @endphp
+                                                
+                                                @foreach($displayedIps as $ip)
                                                     <span class="badge badge-light ip-badge"
                                                           title="{{ $ip }}">{{ $ip }}</span>
                                                 @endforeach
-                                                @if(count($violation->ip_addresses ?? []) > 3)
-                                                    <span class="badge badge-secondary"
-                                                          title="{{ implode(', ', array_slice($violation->ip_addresses ?? [], 3)) }}">
-                                                        +{{ count($violation->ip_addresses ?? []) - 3 }}
-                                                    </span>
+                                                
+                                                @if($totalIps > 3)
+                                                    <button type="button" 
+                                                            class="badge badge-secondary ip-show-more-btn"
+                                                            data-toggle="modal" 
+                                                            data-target="#ipModal{{ $violation->id }}"
+                                                            title="Показать все IP-адреса">
+                                                        +{{ $totalIps - 3 }}
+                                                    </button>
+                                                @endif
+                                                
+                                                @if($totalIps === 0)
+                                                    <span class="text-muted">-</span>
                                                 @endif
                                             </div>
                                         </td>
@@ -531,6 +546,64 @@
             </div>
         </div>
     </div>
+
+    <!-- Модальные окна для отображения всех IP-адресов -->
+    @foreach($violations as $violation)
+        @if(count($violation->ip_addresses ?? []) > 3)
+            <div class="modal fade" id="ipModal{{ $violation->id }}" tabindex="-1" role="dialog">
+                <div class="modal-dialog modal-lg" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="fas fa-network-wired"></i> Все IP-адреса нарушения #{{ $violation->id }}
+                            </h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <strong>Всего IP-адресов:</strong> {{ count($violation->ip_addresses ?? []) }}
+                            </div>
+                            <div class="ip-list-container" style="max-height: 400px; overflow-y: auto;">
+                                <div class="row">
+                                    @foreach($violation->ip_addresses ?? [] as $index => $ip)
+                                        <div class="col-md-4 col-sm-6 mb-2">
+                                            <div class="d-flex align-items-center">
+                                                <span class="badge badge-light ip-badge-full mr-2" style="font-family: monospace; font-size: 0.9rem;">
+                                                    {{ $ip }}
+                                                </span>
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-link p-0 copy-ip-btn" 
+                                                        data-clipboard-text="{{ $ip }}"
+                                                        title="Копировать IP">
+                                                    <i class="fas fa-copy text-muted"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                            
+                            @if(count($violation->ip_addresses ?? []) > 0)
+                                <div class="mt-3">
+                                    <button type="button" 
+                                            class="btn btn-sm btn-primary" 
+                                            id="copyAllIps{{ $violation->id }}"
+                                            data-ips="{{ implode(', ', $violation->ip_addresses ?? []) }}">
+                                        <i class="fas fa-copy"></i> Копировать все IP
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Закрыть</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+    @endforeach
 @endsection
 
 @push('css')
@@ -550,6 +623,37 @@
             font-size: 0.75rem;
             margin: 1px;
             cursor: help;
+        }
+
+        .ip-show-more-btn {
+            cursor: pointer;
+            border: none;
+            padding: 2px 6px;
+        }
+
+        .ip-show-more-btn:hover {
+            background-color: #6c757d !important;
+            color: white !important;
+        }
+
+        .ip-badge-full {
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }
+
+        .copy-ip-btn:hover {
+            text-decoration: none;
+        }
+
+        .copy-ip-btn:hover i {
+            color: #007bff !important;
+        }
+
+        .ip-list-container {
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            background-color: #f8f9fa;
         }
 
         .table td {
@@ -572,23 +676,63 @@
     <script>
         // Инициализация Clipboard.js для кнопок копирования
         document.addEventListener('DOMContentLoaded', function () {
+            // Копирование ID ключа
             const clipboard = new ClipboardJS('.copy-key-btn');
-
             clipboard.on('success', function (e) {
                 const originalTitle = e.trigger.getAttribute('title');
                 e.trigger.innerHTML = '<i class="fas fa-check text-success"></i>';
                 e.trigger.setAttribute('title', 'Скопировано!');
-
                 setTimeout(() => {
                     e.trigger.innerHTML = '<i class="fas fa-copy"></i>';
                     e.trigger.setAttribute('title', originalTitle);
                 }, 2000);
-
                 e.clearSelection();
             });
-
             clipboard.on('error', function (e) {
                 console.error('Ошибка копирования:', e);
+            });
+
+            // Копирование IP-адресов
+            const clipboardIp = new ClipboardJS('.copy-ip-btn');
+            clipboardIp.on('success', function (e) {
+                const icon = e.trigger.querySelector('i');
+                const originalClass = icon.className;
+                icon.className = 'fas fa-check text-success';
+                setTimeout(() => {
+                    icon.className = originalClass;
+                }, 2000);
+                e.clearSelection();
+                showToast('IP-адрес скопирован', 'success');
+            });
+
+            // Копирование всех IP-адресов
+            document.querySelectorAll('[id^="copyAllIps"]').forEach(button => {
+                button.addEventListener('click', function() {
+                    const ips = this.getAttribute('data-ips');
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(ips).then(() => {
+                            showToast('Все IP-адреса скопированы', 'success');
+                        }).catch(() => {
+                            // Fallback для старых браузеров
+                            const textarea = document.createElement('textarea');
+                            textarea.value = ips;
+                            document.body.appendChild(textarea);
+                            textarea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textarea);
+                            showToast('Все IP-адреса скопированы', 'success');
+                        });
+                    } else {
+                        // Fallback для старых браузеров
+                        const textarea = document.createElement('textarea');
+                        textarea.value = ips;
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textarea);
+                        showToast('Все IP-адреса скопированы', 'success');
+                    }
+                });
             });
         });
 
