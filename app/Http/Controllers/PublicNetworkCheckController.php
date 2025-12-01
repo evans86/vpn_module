@@ -151,14 +151,14 @@ class PublicNetworkCheckController extends Controller
                 ob_end_clean();
             }
 
-            $tz = $data['env']['tz'] ?? config('app.timezone', 'UTC');
+            $tz = $data['env']['tz'] ?? config('app.timezone', 'Europe/Moscow');
 
             try {
                 $start  = Carbon::parse($data['startedAt'])->tz($tz);
                 $finish = Carbon::parse($data['finishedAt'])->tz($tz);
             } catch (Throwable $e) {
-                $start  = Carbon::parse($data['startedAt'])->tz(config('app.timezone', 'UTC'));
-                $finish = Carbon::parse($data['finishedAt'])->tz(config('app.timezone', 'UTC'));
+                $start  = Carbon::parse($data['startedAt'])->tz(config('app.timezone', 'Europe/Moscow'));
+                $finish = Carbon::parse($data['finishedAt'])->tz(config('app.timezone', 'Europe/Moscow'));
             }
 
             $data['period_display'] = [

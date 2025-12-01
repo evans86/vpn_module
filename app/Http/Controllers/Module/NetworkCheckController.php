@@ -93,13 +93,13 @@ class NetworkCheckController extends Controller
         $salesman = Auth::guard('salesman')->user();
 
         try {
-            $tzBrowser = $data['env']['tz'] ?? config('app.timezone', 'UTC');
+            $tzBrowser = $data['env']['tz'] ?? config('app.timezone', 'Europe/Moscow');
             try {
                 $startLocal  = Carbon::parse($data['startedAt'])->tz($tzBrowser);
                 $finishLocal = Carbon::parse($data['finishedAt'])->tz($tzBrowser);
             } catch (Throwable $e) {
-                $startLocal  = Carbon::parse($data['startedAt'])->tz(config('app.timezone', 'UTC'));
-                $finishLocal = Carbon::parse($data['finishedAt'])->tz(config('app.timezone', 'UTC'));
+                $startLocal  = Carbon::parse($data['startedAt'])->tz(config('app.timezone', 'Europe/Moscow'));
+                $finishLocal = Carbon::parse($data['finishedAt'])->tz(config('app.timezone', 'Europe/Moscow'));
             }
             $data['period_display'] = [
                 'tz'     => $tzBrowser,

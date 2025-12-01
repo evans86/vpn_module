@@ -25,6 +25,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        // Устанавливаем часовой пояс приложения для PHP
+        $timezone = config('app.timezone', 'Europe/Moscow');
+        date_default_timezone_set($timezone);
+        
         if(config('app.env') === 'production') {
             \URL::forceScheme('https');
             
