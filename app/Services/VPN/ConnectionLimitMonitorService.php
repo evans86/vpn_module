@@ -24,6 +24,7 @@ class ConnectionLimitMonitorService
 
     /**
      * Запись нарушения лимита подключений
+     * Улучшенная логика: если есть активное нарушение для этого ключа, увеличиваем счетчик
      */
     public function recordViolation(
         KeyActivate $keyActivate,
@@ -39,6 +40,34 @@ class ConnectionLimitMonitorService
             if (!$panelId) {
                 $panel = $serverUser->panel;
                 $panelId = $panel->id;
+            }
+
+            // Проверяем есть ли уже активное нарушение для этого ключа
+            $existingViolation = ConnectionLimitViolation::where([
+                'key_activate_id' => $keyActivate->id,
+                'status' => ConnectionLimitViolation::STATUS_ACTIVE
+            ])->first();
+
+            if ($existingViolation) {
+                // Увеличиваем счетчик нарушений и обновляем данные
+                $existingViolation->violation_count += 1;
+                $existingViolation->actual_connections = $uniqueIpCount;
+                // Объединяем IP адреса, сохраняя уникальность
+                $existingIps = $existingViolation->ip_addresses ?? [];
+                $mergedIps = array_unique(array_merge($existingIps, $ipAddresses));
+                $existingViolation->ip_addresses = array_values($mergedIps); // Сохраняем как индексированный массив
+                $existingViolation->created_at = now(); // Обновляем время последнего нарушения
+                $existingViolation->save();
+
+                $this->logger->warning('Обновлено нарушение лимита подключений (повторное)', [
+                    'key_id' => $keyActivate->id,
+                    'user_tg_id' => $keyActivate->user_tg_id,
+                    'violation_count' => $existingViolation->violation_count,
+                    'actual_ips' => $uniqueIpCount,
+                    'violation_id' => $existingViolation->id
+                ]);
+
+                return $existingViolation;
             }
 
             // Создаем новое нарушение
@@ -108,6 +137,10 @@ class ConnectionLimitMonitorService
         $total = ConnectionLimitViolation::count();
         $active = ConnectionLimitViolation::where('status', ConnectionLimitViolation::STATUS_ACTIVE)->count();
         $today = ConnectionLimitViolation::whereDate('created_at', today())->count();
+        $critical = ConnectionLimitViolation::where('violation_count', '>=', 3)
+            ->where('status', ConnectionLimitViolation::STATUS_ACTIVE)
+            ->count();
+        $resolved = ConnectionLimitViolation::where('status', ConnectionLimitViolation::STATUS_RESOLVED)->count();
 
         $topViolators = ConnectionLimitViolation::with('keyActivate')
             ->select('key_activate_id')
@@ -121,6 +154,8 @@ class ConnectionLimitMonitorService
             'total' => $total,
             'active' => $active,
             'today' => $today,
+            'critical' => $critical,
+            'resolved' => $resolved,
             'top_violators' => $topViolators
         ];
     }
@@ -229,6 +264,9 @@ class ConnectionLimitMonitorService
             $keyActivate = $violation->keyActivate;
 
             if (!$keyActivate) {
+                Log::warning('Cannot send notification to salesman: keyActivate not found', [
+                    'violation_id' => $violation->id
+                ]);
                 return false;
             }
 
@@ -237,10 +275,23 @@ class ConnectionLimitMonitorService
             if (!is_null($keyActivate->module_salesman_id)) {
                 $salesman = $keyActivate->moduleSalesman;
             } else if (!is_null($keyActivate->pack_salesman_id)) {
-                $salesman = $keyActivate->packSalesman->salesman;
+                // Проверяем наличие packSalesman перед доступом к salesman
+                if ($keyActivate->packSalesman) {
+                    $salesman = $keyActivate->packSalesman->salesman;
+                } else {
+                    Log::warning('Cannot send notification to salesman: packSalesman not found', [
+                        'violation_id' => $violation->id,
+                        'pack_salesman_id' => $keyActivate->pack_salesman_id
+                    ]);
+                    return false;
+                }
             }
 
             if (!$salesman || !$salesman->telegram_id) {
+                Log::warning('Cannot send notification to salesman: salesman not found or no telegram_id', [
+                    'violation_id' => $violation->id,
+                    'salesman_id' => $salesman ? $salesman->id : null
+                ]);
                 return false;
             }
 
@@ -251,7 +302,8 @@ class ConnectionLimitMonitorService
         } catch (\Exception $e) {
             Log::error('Failed to send violation notification to salesman', [
                 'violation_id' => $violation->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             return false;
         }

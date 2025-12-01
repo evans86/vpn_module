@@ -259,18 +259,8 @@ class ConnectionMonitorService
                 return false;
             }
 
-            // Проверяем есть ли уже активное нарушение
-            $existingViolation = ConnectionLimitViolation::where([
-                'key_activate_id' => $keyActivate->id,
-                'status' => ConnectionLimitViolation::STATUS_ACTIVE
-            ])->first();
-
-            if ($existingViolation) {
-                Log::info('User already has active violation, skipping', ['user_id' => $userId]);
-                return false;
-            }
-
-            // Создаем нарушение
+            // Создаем или обновляем нарушение (логика в recordViolation)
+            // recordViolation автоматически увеличит счетчик если нарушение уже существует
             $this->limitMonitorService->recordViolation(
                 $keyActivate,
                 $ipCount,

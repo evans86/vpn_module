@@ -14,6 +14,7 @@ class Kernel extends ConsoleKernel
      */
     protected $commands = [
         \App\Console\Commands\MonitorConnectionLimits::class,
+        \App\Console\Commands\ProcessViolationsCommand::class,
     ];
 
     /**
@@ -35,6 +36,13 @@ class Kernel extends ConsoleKernel
             ->dailyAt('10:00')
             ->withoutOverlapping()
             ->appendOutputTo(storage_path('logs/key-notifications.log'));
+
+        // Автоматическая обработка нарушений (отправка уведомлений, авто-решение) каждый час
+        // Примечание: Проверка нарушений уже настроена в cron вручную (каждые 10 минут)
+        $schedule->command('violations:process --notify-new')
+            ->hourly()
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/violation-process.log'));
     }
 
     /**

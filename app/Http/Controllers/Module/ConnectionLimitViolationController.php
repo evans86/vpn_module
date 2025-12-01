@@ -110,12 +110,19 @@ class ConnectionLimitViolationController extends Controller
         $action = $request->input('action');
         $violationIds = $request->input('violation_ids', []);
 
+        // Если запрос через AJAX, возвращаем JSON
+        $isAjax = $request->expectsJson() || $request->ajax();
+
         if (empty($violationIds)) {
+            if ($isAjax) {
+                return response()->json(['success' => false, 'message' => 'Не выбраны нарушения']);
+            }
             return redirect()->back()->with('error', 'Не выбраны нарушения');
         }
 
         try {
             $count = 0;
+            $message = '';
 
             switch ($action) {
                 case 'resolve':
@@ -133,9 +140,9 @@ class ConnectionLimitViolationController extends Controller
                     $message = "Отправлено уведомлений: {$count}";
                     break;
 
-                case 'replace_key':
+                case 'reissue_keys':
                     $count = $this->manualService->bulkReplaceKeys($violationIds);
-                    $message = "Заменено ключей: {$count}";
+                    $message = "Перевыпущено ключей: {$count}";
                     break;
 
                 case 'delete':
@@ -144,12 +151,29 @@ class ConnectionLimitViolationController extends Controller
                     break;
 
                 default:
+                    if ($isAjax) {
+                        return response()->json(['success' => false, 'message' => 'Неизвестное действие']);
+                    }
                     return redirect()->back()->with('error', 'Неизвестное действие');
+            }
+
+            if ($isAjax) {
+                return response()->json([
+                    'success' => true,
+                    'message' => $message,
+                    'count' => $count
+                ]);
             }
 
             return redirect()->back()->with('success', $message);
 
         } catch (\Exception $e) {
+            if ($isAjax) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ошибка: ' . $e->getMessage()
+                ]);
+            }
             return redirect()->back()->with('error', 'Ошибка: ' . $e->getMessage());
         }
     }

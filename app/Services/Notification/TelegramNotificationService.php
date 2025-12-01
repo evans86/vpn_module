@@ -30,16 +30,24 @@ class TelegramNotificationService
             if (!is_null($keyActivate->module_salesman_id)) {
                 // Отправка через модуль
                 return $this->sendViaModule($keyActivate, $userTgId, $message, $keyboard);
-            } else {
+            } else if (!is_null($keyActivate->pack_salesman_id)) {
                 // Отправка через обычного бота продавца
                 return $this->sendViaSalesmanBot($keyActivate, $userTgId, $message, $keyboard);
+            } else {
+                Log::warning('Cannot determine notification channel: no salesman assigned', [
+                    'key_id' => $keyActivate->id,
+                    'module_salesman_id' => $keyActivate->module_salesman_id,
+                    'pack_salesman_id' => $keyActivate->pack_salesman_id
+                ]);
+                return false;
             }
 
         } catch (\Exception $e) {
             Log::error('Failed to send notification to user', [
                 'key_id' => $keyActivate->id,
                 'user_tg_id' => $keyActivate->user_tg_id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             return false;
         }
@@ -101,18 +109,55 @@ class TelegramNotificationService
                 return true;
             }
 
+            // Проверяем на ошибки в ответе
+            if (isset($result['error'])) {
+                $errorMessage = is_string($result['error']) ? $result['error'] : json_encode($result['error']);
+                
+                if (strpos($errorMessage, 'chat not found') !== false || 
+                    strpos($errorMessage, 'Bad Request: chat not found') !== false) {
+                    Log::warning('Chat not found - user may have blocked bot or deleted chat', [
+                        'key_id' => $keyActivate->id,
+                        'user_tg_id' => $userTgId,
+                        'error' => $errorMessage
+                    ]);
+                    return false;
+                }
+                
+                Log::warning('Error in BottApi response', [
+                    'key_id' => $keyActivate->id,
+                    'user_tg_id' => $userTgId,
+                    'error' => $errorMessage
+                ]);
+                return false;
+            }
+
             // Если структура ответа другая, логируем для отладки
             Log::warning('Unexpected response format from BottApi::senModuleMessage', [
                 'key_id' => $keyActivate->id,
+                'user_tg_id' => $userTgId,
                 'response' => $result
             ]);
 
             return false;
 
         } catch (\Exception $e) {
+            $errorMessage = $e->getMessage();
+            
+            // Обрабатываем специфичные ошибки
+            if (strpos($errorMessage, 'chat not found') !== false || 
+                strpos($errorMessage, 'Bad Request: chat not found') !== false) {
+                Log::warning('Chat not found - user may have blocked bot or deleted chat', [
+                    'key_id' => $keyActivate->id,
+                    'user_tg_id' => $userTgId,
+                    'error' => $errorMessage
+                ]);
+                return false;
+            }
+            
             Log::error('Failed to send via module', [
                 'key_id' => $keyActivate->id,
-                'error' => $e->getMessage()
+                'user_tg_id' => $userTgId,
+                'error' => $errorMessage
             ]);
             return false;
         }
@@ -123,6 +168,15 @@ class TelegramNotificationService
      */
     private function sendViaSalesmanBot(KeyActivate $keyActivate, int $userTgId, string $message, array $keyboard = null): bool
     {
+        // Проверяем наличие packSalesman
+        if (!$keyActivate->packSalesman) {
+            Log::warning('No packSalesman found for notification', [
+                'key_id' => $keyActivate->id,
+                'pack_salesman_id' => $keyActivate->pack_salesman_id
+            ]);
+            return false;
+        }
+
         $salesman = $keyActivate->packSalesman->salesman;
         if (!$salesman || !$salesman->token) {
             Log::warning('No salesman bot found for notification', [
@@ -149,9 +203,40 @@ class TelegramNotificationService
             $telegram->sendMessage($params);
             return true;
 
+        } catch (\Telegram\Bot\Exceptions\TelegramResponseException $e) {
+            $errorMessage = $e->getMessage();
+            
+            // Обрабатываем специфичные ошибки Telegram API
+            if (strpos($errorMessage, 'chat not found') !== false || 
+                strpos($errorMessage, 'Bad Request: chat not found') !== false) {
+                Log::warning('Chat not found - user may have blocked bot or deleted chat', [
+                    'key_id' => $keyActivate->id,
+                    'user_tg_id' => $userTgId,
+                    'error' => $errorMessage
+                ]);
+                return false;
+            }
+            
+            if (strpos($errorMessage, 'bot was blocked') !== false) {
+                Log::warning('Bot was blocked by user', [
+                    'key_id' => $keyActivate->id,
+                    'user_tg_id' => $userTgId,
+                    'error' => $errorMessage
+                ]);
+                return false;
+            }
+
+            Log::error('Failed to send via salesman bot', [
+                'key_id' => $keyActivate->id,
+                'user_tg_id' => $userTgId,
+                'error' => $errorMessage
+            ]);
+            return false;
+
         } catch (\Exception $e) {
             Log::error('Failed to send via salesman bot', [
                 'key_id' => $keyActivate->id,
+                'user_tg_id' => $userTgId,
                 'error' => $e->getMessage()
             ]);
             return false;
@@ -179,6 +264,33 @@ class TelegramNotificationService
 
             $telegram->sendMessage($params);
             return true;
+
+        } catch (\Telegram\Bot\Exceptions\TelegramResponseException $e) {
+            $errorMessage = $e->getMessage();
+            
+            // Обрабатываем специфичные ошибки Telegram API
+            if (strpos($errorMessage, 'chat not found') !== false || 
+                strpos($errorMessage, 'Bad Request: chat not found') !== false) {
+                Log::warning('Chat not found - user may have blocked bot or deleted chat', [
+                    'chat_id' => $chatId,
+                    'error' => $errorMessage
+                ]);
+                return false;
+            }
+            
+            if (strpos($errorMessage, 'bot was blocked') !== false) {
+                Log::warning('Bot was blocked by user', [
+                    'chat_id' => $chatId,
+                    'error' => $errorMessage
+                ]);
+                return false;
+            }
+
+            Log::error('Failed to send via FatherBot', [
+                'chat_id' => $chatId,
+                'error' => $errorMessage
+            ]);
+            return false;
 
         } catch (\Exception $e) {
             Log::error('Failed to send via FatherBot', [

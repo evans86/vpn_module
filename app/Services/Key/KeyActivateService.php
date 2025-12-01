@@ -437,6 +437,97 @@ class KeyActivateService
     }
 
     /**
+     * Активация ключа с указанным finish_at (для перевыпуска с учетом оставшегося времени)
+     *
+     * @param KeyActivate $key
+     * @param int $userTgId
+     * @param int $finishAt Unix timestamp даты окончания
+     * @return KeyActivate
+     * @throws RuntimeException|GuzzleException
+     */
+    public function activateWithFinishAt(KeyActivate $key, int $userTgId, int $finishAt): KeyActivate
+    {
+        try {
+            // Проверяем текущий статус
+            if (!$this->keyActivateRepository->hasCorrectStatusForActivation($key)) {
+                throw new RuntimeException('Ключ не может быть активирован (неверный статус)');
+            }
+
+            // Проверяем, не занят ли уже ключ другим пользователем
+            if ($this->keyActivateRepository->isUsedByAnotherUser($key, $userTgId)) {
+                throw new RuntimeException('Ключ уже используется другим пользователем');
+            }
+
+            if (!is_null($key->pack_salesman_id)) {
+                if (!is_null($key->packSalesman->salesman->panel_id)) {
+                    $panel = $key->packSalesman->salesman->panel;
+                } else {
+                    $panel = $this->panelRepository->getOptimizedMarzbanPanel();
+                }
+            } else {
+                $panel = $this->panelRepository->getOptimizedMarzbanPanel();
+            }
+
+            if (!$panel) {
+                throw new RuntimeException('Активная панель Marzban не найдена');
+            }
+
+            // Создаем стратегию для работы с панелью
+            $panelStrategy = new PanelStrategy(Panel::MARZBAN);
+
+            // Используем переданный finish_at вместо пересчета
+            // Добавляем пользователя на сервер
+            $serverUser = $panelStrategy->addServerUser(
+                $panel->id,
+                $userTgId,
+                $key->traffic_limit,
+                $finishAt,
+                $key->id,
+                ['max_connections' => 3]
+            );
+
+            // Обновляем данные активации
+            $activatedKey = $this->keyActivateRepository->updateActivationData(
+                $key,
+                $userTgId,
+                KeyActivate::ACTIVE
+            );
+
+            // Обновляем finish_at в ключе
+            $activatedKey->finish_at = $finishAt;
+            $activatedKey->save();
+
+            $this->logger->info('Ключ успешно активирован с указанным finish_at', [
+                'source' => 'key_activate',
+                'action' => 'activate_with_finish_at',
+                'key_id' => $activatedKey->id,
+                'user_tg_id' => $userTgId,
+                'server_user_id' => $serverUser->id,
+                'traffic_limit' => $key->traffic_limit,
+                'finish_at' => $finishAt
+            ]);
+
+            if (!is_null($key->pack_salesman_id)) {
+                $packSalesman = $this->packSalesmanRepository->findByIdOrFail($key->pack_salesman_id);
+                $this->notificationService->sendKeyActivatedNotification($packSalesman->salesman->telegram_id, $key->id);
+            }
+
+            return $activatedKey;
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при активации ключа с finish_at', [
+                'source' => 'key_activate',
+                'action' => 'activate_with_finish_at',
+                'key_id' => $key->id,
+                'user_tg_id' => $userTgId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            throw new RuntimeException($e->getMessage());
+        }
+    }
+
+    /**
      * Проверка и обновление статуса ключа
      *
      * @param KeyActivate $key

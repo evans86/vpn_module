@@ -3,6 +3,27 @@
 @section('content')
     <div class="container-fluid">
 
+        <!-- Flash сообщения -->
+        @if(session('success'))
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="fas fa-check-circle mr-2"></i>
+                <strong>{{ session('success') }}</strong>
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        @endif
+
+        @if(session('error'))
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="fas fa-exclamation-circle mr-2"></i>
+                <strong>{{ session('error') }}</strong>
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        @endif
+
         <!-- Панель быстрых действий -->
         <div class="row mb-4">
             <div class="col-12">
@@ -16,12 +37,13 @@
                                     @csrf
                                     <div class="form-group mr-2">
                                         <label class="mr-2">Порог:</label>
-                                        <input type="number" name="threshold" value="2" min="1" max="10"
-                                               class="form-control form-control-sm" style="width: 80px;">
+                                        <input type="number" name="threshold" value="3" min="1" max="10"
+                                               class="form-control form-control-sm" style="width: 80px;"
+                                               title="Нарушение при 4+ IP (порог 3 означает 3 и менее - не нарушение)">
                                     </div>
                                     <div class="form-group mr-2">
                                         <label class="mr-2">Окно (мин):</label>
-                                        <input type="number" name="window" value="60" min="1" max="1440"
+                                        <input type="number" name="window" value="15" min="1" max="1440"
                                                class="form-control form-control-sm" style="width: 100px;">
                                     </div>
                                     <button type="submit" class="btn btn-primary btn-sm">
@@ -39,6 +61,42 @@
                                     <i class="fas fa-sync"></i> Обновить
                                 </a>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Информационная панель о логике подсчета -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <h5 class="alert-heading"><i class="fas fa-info-circle"></i> Как работает система нарушений</h5>
+                    <hr>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <strong>Логика обнаружения:</strong>
+                            <ul class="mb-0">
+                                <li>Нарушение фиксируется при подключении с <strong>разных сетей</strong> (не из одной /24 подсети)</li>
+                                <li>Порог: <strong>4+ уникальных IP</strong> из разных сетей (3 IP - еще не нарушение)</li>
+                                <li>Окно проверки: <strong>15 минут</strong></li>
+                            </ul>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Подсчет нарушений:</strong>
+                            <ul class="mb-0">
+                                <li><strong>1 нарушение:</strong> Предупреждение пользователю</li>
+                                <li><strong>2 нарушения:</strong> Повторное предупреждение</li>
+                                <li><strong>3+ нарушений:</strong> Автоматический перевыпуск ключа</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Автоматизация:</strong>
+                            <ul class="mb-0">
+                                <li>Проверка нарушений: <strong>каждые 10 минут</strong> (cron)</li>
+                                <li>Обработка нарушений: <strong>каждый час</strong> (cron)</li>
+                                <li>Авто-решение старых: <strong>через 72 часа</strong></li>
+                            </ul>
                         </div>
                     </div>
                 </div>
@@ -300,12 +358,26 @@
                                             @endif
                                         </td>
                                         <td>
-                                            <span
-                                                class="badge badge-success">{{ $violation->allowed_connections }}</span>
-                                            <span class="text-muted">/</span>
-                                            <span class="badge badge-danger">{{ $violation->actual_connections }}</span>
-                                            <br>
-                                            <small class="text-muted">(+{{ $violation->excess_percentage }}%)</small>
+                                            <div class="d-flex align-items-center">
+                                                <span class="badge badge-success mr-1">{{ $violation->allowed_connections }}</span>
+                                                <span class="text-muted mx-1">/</span>
+                                                <span class="badge badge-danger">{{ $violation->actual_connections }}</span>
+                                            </div>
+                                            <div class="mt-1">
+                                                <small class="text-muted">
+                                                    Превышение: <strong>+{{ $violation->excess_percentage }}%</strong>
+                                                </small>
+                                            </div>
+                                            @if(count($violation->ip_addresses ?? []) > 0)
+                                                <div class="mt-1">
+                                                    <small class="text-muted">
+                                                        Сетей: <strong>{{ count(array_unique(array_map(function($ip) {
+                                                            $parts = explode('.', $ip);
+                                                            return count($parts) === 4 ? $parts[0].'.'.$parts[1].'.'.$parts[2].'.0/24' : $ip;
+                                                        }, $violation->ip_addresses ?? []))) }}</strong>
+                                                    </small>
+                                                </div>
+                                            @endif
                                         </td>
                                         <td>
                                             <div class="d-flex align-items-center"
@@ -344,6 +416,13 @@
                                                 class="badge badge-{{ $violation->violation_count >= 3 ? 'danger' : ($violation->violation_count >= 2 ? 'warning' : 'info') }}">
                                                 {{ $violation->violation_count }}
                                             </span>
+                                            @if($violation->violation_count >= 3)
+                                                <br><small class="text-danger"><i class="fas fa-exclamation-circle"></i> Критично</small>
+                                            @elseif($violation->violation_count >= 2)
+                                                <br><small class="text-warning"><i class="fas fa-exclamation-triangle"></i> Повторное</small>
+                                            @else
+                                                <br><small class="text-info"><i class="fas fa-info-circle"></i> Первое</small>
+                                            @endif
                                         </td>
                                         <td>
                                             <span class="badge badge-{{ $violation->status_color }}"
@@ -438,7 +517,7 @@
                             <option value="resolve">Пометить как решенные</option>
                             <option value="ignore">Пометить как игнорированные</option>
                             <option value="notify">Отправить уведомления</option>
-                            <option value="reissue_keys">Перевыпустить ключи</option>
+                            <option value="reissue_keys">Перевыпустить ключи (автоматически при 3+)</option>
                             <option value="delete">Удалить нарушения</option>
                         </select>
                     </div>
@@ -568,6 +647,7 @@
                 .map(checkbox => checkbox.value);
 
             const action = document.getElementById('bulkActionSelect').value;
+            const button = this;
 
             if (!action) {
                 showToast('Выберите действие', 'warning');
@@ -579,6 +659,11 @@
                 return;
             }
 
+            // Показываем индикатор загрузки
+            const originalText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Обработка...';
+
             const form = document.getElementById('bulkForm');
             const formData = new FormData(form);
             formData.append('action', action);
@@ -586,26 +671,33 @@
 
             fetch('{{ route("admin.module.connection-limit-violations.bulk-actions") }}', {
                 method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
                 body: formData
             })
-                .then(response => {
-                    if (response.redirected) {
-                        window.location.href = response.url;
-                        return;
-                    }
-                    return response.json();
-                })
+                .then(response => response.json())
                 .then(data => {
+                    button.disabled = false;
+                    button.innerHTML = originalText;
+
                     if (data && data.success) {
                         showToast(data.message, 'success');
                         $('#bulkActionsModal').modal('hide');
-                        location.reload();
-                    } else if (data) {
-                        showToast(data.message || 'Ошибка при выполнении действия', 'error');
+                        
+                        // Обновляем только таблицу без полной перезагрузки
+                        setTimeout(() => {
+                            location.reload();
+                        }, 1000);
+                    } else {
+                        showToast(data?.message || 'Ошибка при выполнении действия', 'error');
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
+                    button.disabled = false;
+                    button.innerHTML = originalText;
                     showToast('Ошибка при выполнении действия', 'error');
                 });
         });
@@ -664,22 +756,48 @@
 
         // Вспомогательная функция для уведомлений
         function showToast(message, type = 'info') {
-            // Используем существующие toast-уведомления или создаем простые
+            // Удаляем предыдущие уведомления
+            const existingToasts = document.querySelectorAll('.custom-toast');
+            existingToasts.forEach(toast => toast.remove());
+
+            // Определяем цвет и иконку
+            let alertClass = 'alert-info';
+            let icon = 'fa-info-circle';
+            
+            if (type === 'success') {
+                alertClass = 'alert-success';
+                icon = 'fa-check-circle';
+            } else if (type === 'error' || type === 'danger') {
+                alertClass = 'alert-danger';
+                icon = 'fa-exclamation-circle';
+            } else if (type === 'warning') {
+                alertClass = 'alert-warning';
+                icon = 'fa-exclamation-triangle';
+            }
+
+            // Создаем уведомление
             const toast = document.createElement('div');
-            toast.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
-            toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+            toast.className = `alert ${alertClass} alert-dismissible fade show position-fixed custom-toast`;
+            toast.style.cssText = 'top: 20px; right: 20px; z-index: 99999; min-width: 350px; max-width: 500px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
             toast.innerHTML = `
-                ${message}
-                <button type="button" class="close" data-dismiss="alert">
-                    <span>&times;</span>
+                <i class="fas ${icon} mr-2"></i>
+                <strong>${message}</strong>
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
                 </button>
             `;
 
             document.body.appendChild(toast);
 
+            // Автоматически скрываем через 5 секунд
             setTimeout(() => {
                 if (toast.parentNode) {
-                    toast.remove();
+                    toast.classList.remove('show');
+                    setTimeout(() => {
+                        if (toast.parentNode) {
+                            toast.remove();
+                        }
+                    }, 300);
                 }
             }, 5000);
         }

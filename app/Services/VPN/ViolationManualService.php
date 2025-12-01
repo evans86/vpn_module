@@ -289,6 +289,7 @@ class ViolationManualService
 
     /**
      * Перевыпуск ключа (замена) при нарушении лимита подключений
+     * Учитывает оставшееся время и трафик от старого ключа
      *
      * @param ConnectionLimitViolation $violation Нарушение лимита подключений
      * @return KeyActivate|null Новый ключ или null если не удалось создать
@@ -306,16 +307,65 @@ class ViolationManualService
                     throw new \Exception('Пользователь не найден для перевыпуска ключа');
                 }
 
-                // Создаем новый ключ
+                // Вычисляем оставшееся время от старого ключа
+                $currentTime = time();
+                $remainingTime = 0;
+                $remainingTraffic = $oldKey->traffic_limit;
+
+                if ($oldKey->finish_at && $oldKey->finish_at > $currentTime) {
+                    // Оставшееся время в секундах
+                    $remainingTime = $oldKey->finish_at - $currentTime;
+                }
+
+                // Пытаемся получить информацию об использованном трафике с панели
+                try {
+                    if ($oldKey->keyActivateUser && $oldKey->keyActivateUser->serverUser) {
+                        $serverUser = $oldKey->keyActivateUser->serverUser;
+                        if ($serverUser->panel) {
+                            $panelStrategy = new \App\Services\Panel\PanelStrategy($serverUser->panel->panel);
+                            $subscribeInfo = $panelStrategy->getSubscribeInfo(
+                                $serverUser->panel->id,
+                                $serverUser->id
+                            );
+
+                            // Вычисляем оставшийся трафик
+                            if (isset($subscribeInfo['data_limit']) && isset($subscribeInfo['used_traffic'])) {
+                                $dataLimit = (int)$subscribeInfo['data_limit'];
+                                $usedTraffic = (int)$subscribeInfo['used_traffic'];
+                                $remainingTraffic = max(0, $dataLimit - $usedTraffic);
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // Если не удалось получить информацию о трафике, используем исходный лимит
+                    Log::warning('Не удалось получить информацию о трафике при перевыпуске ключа', [
+                        'key_id' => $oldKey->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+
+                // Вычисляем новую дату окончания (текущее время + оставшееся время)
+                $newFinishAt = $currentTime + $remainingTime;
+
+                // Если оставшееся время меньше 1 дня, устанавливаем минимум 1 день
+                if ($remainingTime < 86400) {
+                    $newFinishAt = $currentTime + 86400; // Минимум 1 день
+                    Log::warning('Оставшееся время меньше 1 дня, установлен минимум', [
+                        'old_key_id' => $oldKey->id,
+                        'remaining_seconds' => $remainingTime
+                    ]);
+                }
+
+                // Создаем новый ключ с учетом оставшегося времени и трафика
                 $newKey = $this->keyActivateService->create(
-                    $oldKey->traffic_limit,
+                    $remainingTraffic,
                     $oldKey->pack_salesman_id,
-                    $oldKey->finish_at,
+                    $newFinishAt,
                     null
                 );
 
-                // Активируем новый ключ
-                $activatedKey = $this->keyActivateService->activate($newKey, $userTgId);
+                // Активируем новый ключ (передаем finish_at чтобы не пересчитывался)
+                $activatedKey = $this->keyActivateService->activateWithFinishAt($newKey, $userTgId, $newFinishAt);
 
                 if (!$activatedKey) {
                     throw new \Exception('Не удалось активировать новый ключ');
@@ -333,11 +383,16 @@ class ViolationManualService
                 $violation->resolved_at = now();
                 $violation->save();
 
-                $this->logger->warning('Ключ перевыпущен', [
+                $this->logger->warning('Ключ перевыпущен с учетом оставшегося времени и трафика', [
                     'old_key_id' => $oldKey->id,
                     'new_key_id' => $newKey->id,
                     'violation_id' => $violation->id,
-                    'user_tg_id' => $userTgId
+                    'user_tg_id' => $userTgId,
+                    'old_finish_at' => $oldKey->finish_at,
+                    'new_finish_at' => $newFinishAt,
+                    'remaining_time_days' => round($remainingTime / 86400, 2),
+                    'old_traffic_limit' => $oldKey->traffic_limit,
+                    'new_traffic_limit' => $remainingTraffic
                 ]);
 
                 // Отправляем уведомление о новом ключе
@@ -348,7 +403,8 @@ class ViolationManualService
         } catch (\Exception $e) {
             Log::error('Ошибка перевыпуска ключа', [
                 'violation_id' => $violation->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             throw $e;
         }
