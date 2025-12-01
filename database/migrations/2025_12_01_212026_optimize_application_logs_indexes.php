@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
 
 class OptimizeApplicationLogsIndexes extends Migration
 {
@@ -19,22 +20,34 @@ class OptimizeApplicationLogsIndexes extends Migration
         $idxCreatedAt = $this->indexExists('application_logs', 'idx_logs_created_at');
         $idxCleanup = $this->indexExists('application_logs', 'idx_logs_cleanup');
 
-        Schema::table('application_logs', function (Blueprint $table) use ($idxLevelCreated, $idxSourceCreated, $idxCreatedAt, $idxCleanup) {
+        $createdCount = 0;
+
+        Schema::table('application_logs', function (Blueprint $table) use ($idxLevelCreated, $idxSourceCreated, $idxCreatedAt, $idxCleanup, &$createdCount) {
             // Составной индекс для быстрого поиска по уровню и дате
             if (!$idxLevelCreated) {
                 $table->index(['level', 'created_at'], 'idx_logs_level_created');
+                $createdCount++;
             }
 
             // Составной индекс для поиска по источнику и дате
             if (!$idxSourceCreated) {
                 $table->index(['source', 'created_at'], 'idx_logs_source_created');
+                $createdCount++;
             }
 
-            // Индекс для поиска по дате (если еще не существует)
+            // Индекс для поиска по дате (если еще не существует и нет idx_logs_cleanup)
             if (!$idxCreatedAt && !$idxCleanup) {
                 $table->index('created_at', 'idx_logs_created_at');
+                $createdCount++;
             }
         });
+
+        // Логируем результат для отладки
+        if ($createdCount === 0) {
+            Log::info('Migration optimize_application_logs_indexes: все индексы уже существуют');
+        } else {
+            Log::info("Migration optimize_application_logs_indexes: создано индексов: {$createdCount}");
+        }
     }
 
     /**
@@ -81,7 +94,7 @@ class OptimizeApplicationLogsIndexes extends Migration
             return (int)$count > 0;
         } catch (\Exception $e) {
             // В случае ошибки считаем что индекс не существует
-            \Log::warning('Error checking index existence', [
+            Log::warning('Error checking index existence', [
                 'table' => $table,
                 'index' => $index,
                 'error' => $e->getMessage()
