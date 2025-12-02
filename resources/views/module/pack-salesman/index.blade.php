@@ -1,176 +1,151 @@
-@extends('layouts.app', ['page' => __('Пакеты'), 'pageSlug' => 'packs-salesmans'])
+@extends('layouts.admin')
+
+@section('title', 'Пакеты продавцов')
+@section('page-title', 'Купленные пакеты')
 
 @section('content')
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-lg-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h4 class="card-title">Купленные пакеты</h4>
-                    </div>
-                    <div class="card-body">
-                        <form method="GET" action="/admin/module/pack-salesman" class="mb-4">
-                            <div class="row">
-                                <div class="col-md-3">
-                                    <div class="form-group">
-                                        <label for="salesman_search">Продавец</label>
-                                        <input type="text" class="form-control" id="salesman_search"
-                                               name="salesman_search"
-                                               value="{{ request('salesman_search') }}"
-                                               placeholder="Поиск по ID или имени">
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="form-group">
-                                        <label for="status">Статус</label>
-                                        <select class="form-control" id="status" name="status">
-                                            <option value="">Все статусы</option>
-                                            <option value="paid" {{ request('status') == 'paid' ? 'selected' : '' }}>
-                                                Оплачен
-                                            </option>
-                                            <option
-                                                value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>
-                                                Ожидает оплаты
-                                            </option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="form-group">
-                                        <label for="created_at">Дата создания</label>
-                                        <input type="date" class="form-control" id="created_at" name="created_at"
-                                               value="{{ request('created_at') }}">
-                                    </div>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="form-group">
-                                        <label>&nbsp;</label>
-                                        <div class="btn-group btn-block">
-                                            <button type="submit" class="btn btn-primary">
-                                                <i class="fas fa-search"></i> Поиск
-                                            </button>
-                                            <a href="{{ route('admin.module.pack-salesman.index') }}"
-                                               class="btn btn-secondary">
-                                                <i class="fas fa-times"></i> Сбросить
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </form>
+    <div class="space-y-6">
+        <x-admin.card title="Купленные пакеты">
+            <!-- Filters -->
+            <x-admin.filter-form action="{{ route('admin.module.pack-salesman.index') }}">
+                <x-admin.filter-input 
+                    name="salesman_search" 
+                    label="Продавец" 
+                    value="{{ request('salesman_search') }}" 
+                    placeholder="Поиск по ID или имени" />
+                
+                <x-admin.filter-select 
+                    name="status" 
+                    label="Статус"
+                    :options="['paid' => 'Оплачен', 'pending' => 'Ожидает оплаты']"
+                    value="{{ request('status') }}" />
+                
+                <x-admin.filter-input 
+                    name="created_at" 
+                    label="Дата создания" 
+                    value="{{ request('created_at') }}" 
+                    type="date" />
+            </x-admin.filter-form>
 
-                        <div class="table-responsive">
-                            <table class="table">
-                                <thead>
-                                <tr>
-                                    <th><strong>#</strong></th>
-                                    <th><strong>Ключи</strong></th>
-                                    <th><strong>Продавец</strong></th>
-                                    <th><strong>Цена</strong></th>
-                                    <th><strong>Статус</strong></th>
-                                    <th><strong>Дата создания</strong></th>
-                                    <th><strong>Действия</strong></th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                @foreach($pack_salesmans as $pack_salesman)
-                                    <tr>
-                                        <td>{{ $pack_salesman->id }}</td>
-                                        <td>
-                                            @if($pack_salesman->pack)
-                                                <a href="{{ route('admin.module.pack.index', ['title' => $pack_salesman->pack->title]) }}"
-                                                   title="Просмотреть пакет">
-                                                    {{ $pack_salesman->pack->title }}
-                                                </a>
-                                                <small class="d-block text-muted">
-                                                    <a href="{{ route('admin.module.key-activate.index', ['pack_salesman_id' => $pack_salesman->id]) }}"
-                                                       class="text-primary"
-                                                       title="Просмотреть ключи пакета">
-                                                        Ключи пакета: {{ $pack_salesman->pack->count }}
-                                                    </a>
-                                                </small>
-                                            @else
-                                                <span class="text-danger">Пакет удален</span>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            @if($pack_salesman->salesman)
-                                                <a href="{{ route('admin.module.salesman.index', ['username' => $pack_salesman->salesman->username]) }}"
-                                                   title="Просмотреть продавца">
-                                                    {{ $pack_salesman->salesman->username }}
-                                                </a>
-                                                <small class="d-block">
-                                                    <a href="/admin/module/salesman?telegram_id={{ $pack_salesman->salesman->telegram_id }}"
-                                                       class="text-primary">
-                                                        ID: {{ $pack_salesman->salesman->telegram_id }}
-                                                    </a>
-                                                </small>
-                                            @else
-                                                <span class="text-danger">Продавец удален</span>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            @if($pack_salesman->pack)
-                                                {{ number_format($pack_salesman->pack->price, 2) }} ₽
-                                            @else
-                                                -
-                                            @endif
-                                        </td>
-                                        <td>
-                                            <span class="badge {{ $pack_salesman->getStatusBadgeClass() }}">
-                                                {{ $pack_salesman->getStatusText() }}
-                                            </span>
-                                        </td>
-                                        <td>{{ $pack_salesman->created_at->format('d.m.Y H:i') }}</td>
-                                        <td>
-                                            <div class="btn-group">
-                                                @if($pack_salesman->isPaid())
-                                                    -
-                                                @else
-                                                    <button type="button"
-                                                            class="btn btn-sm btn-success"
-                                                            onclick="markAsPaid({{ $pack_salesman->id }})">
-                                                        Отметить оплаченным
-                                                    </button>
-                                                @endif
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                                </tbody>
-                            </table>
-                        </div>
+            <!-- Table -->
+            @if($pack_salesmans->isEmpty())
+                <x-admin.empty-state 
+                    icon="fa-file-invoice" 
+                    title="Пакеты не найдены"
+                    description="Попробуйте изменить параметры фильтрации" />
+            @else
+                <x-admin.table :headers="['#', 'Ключи', 'Продавец', 'Цена', 'Статус', 'Дата создания', 'Действия']">
+                    @foreach($pack_salesmans as $pack_salesman)
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {{ $pack_salesman->id }}
+                            </td>
+                            <td class="px-6 py-4 text-sm">
+                                @if($pack_salesman->pack)
+                                    <a href="{{ route('admin.module.pack.index', ['title' => $pack_salesman->pack->title]) }}"
+                                       class="text-indigo-600 hover:text-indigo-800"
+                                       title="Просмотреть пакет">
+                                        {{ $pack_salesman->pack->title }}
+                                    </a>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        <a href="{{ route('admin.module.key-activate.index', ['pack_salesman_id' => $pack_salesman->id]) }}"
+                                           class="text-indigo-600 hover:text-indigo-800"
+                                           title="Просмотреть ключи пакета">
+                                            Ключи пакета: {{ $pack_salesman->pack->count }}
+                                        </a>
+                                    </div>
+                                @else
+                                    <span class="text-red-600">Пакет удален</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4 text-sm">
+                                @if($pack_salesman->salesman)
+                                    <a href="{{ route('admin.module.salesman.index', ['username' => $pack_salesman->salesman->username]) }}"
+                                       class="text-indigo-600 hover:text-indigo-800"
+                                       title="Просмотреть продавца">
+                                        {{ $pack_salesman->salesman->username }}
+                                    </a>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        <a href="/admin/module/salesman?telegram_id={{ $pack_salesman->salesman->telegram_id }}"
+                                           class="text-indigo-600 hover:text-indigo-800">
+                                            ID: {{ $pack_salesman->salesman->telegram_id }}
+                                        </a>
+                                    </div>
+                                @else
+                                    <span class="text-red-600">Продавец удален</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                @if($pack_salesman->pack)
+                                    {{ number_format($pack_salesman->pack->price, 2) }} ₽
+                                @else
+                                    <span class="text-gray-400">—</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                    {{ $pack_salesman->getStatusBadgeClass() === 'success' ? 'bg-green-100 text-green-800' : '' }}
+                                    {{ $pack_salesman->getStatusBadgeClass() === 'warning' ? 'bg-yellow-100 text-yellow-800' : '' }}
+                                    {{ $pack_salesman->getStatusBadgeClass() === 'danger' ? 'bg-red-100 text-red-800' : '' }}
+                                    {{ $pack_salesman->getStatusBadgeClass() === 'info' ? 'bg-blue-100 text-blue-800' : '' }}
+                                    {{ $pack_salesman->getStatusBadgeClass() === 'secondary' ? 'bg-gray-100 text-gray-800' : '' }}">
+                                    {{ $pack_salesman->getStatusText() }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ $pack_salesman->created_at->format('d.m.Y H:i') }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                @if($pack_salesman->isPaid())
+                                    <span class="text-gray-400">—</span>
+                                @else
+                                    <button type="button"
+                                            class="btn btn-sm btn-success"
+                                            onclick="markAsPaid({{ $pack_salesman->id }})">
+                                        Отметить оплаченным
+                                    </button>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                </x-admin.table>
 
-                        <div class="d-flex justify-content-center mt-4">
-                            {{ $pack_salesmans->links('vendor.pagination.bootstrap-4') }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+                <!-- Pagination -->
+                <x-admin.pagination-wrapper :paginator="$pack_salesmans" />
+            @endif
+        </x-admin.card>
     </div>
-
-    @push('js')
-        <script>
-            function markAsPaid(id) {
-                if (confirm('Вы уверены, что хотите отметить пакет как оплаченный?')) {
-                    $.ajax({
-                        url: `/admin/module/pack-salesman/${id}/mark-as-paid`,
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                        },
-                        success: function (response) {
-                            if (response.success) {
-                                location.reload();
-                            }
-                        },
-                        error: function (xhr) {
-                            alert('Произошла ошибка при обновлении статуса');
-                        }
-                    });
-                }
-            }
-        </script>
-    @endpush
 @endsection
+
+@push('js')
+    <script>
+        function markAsPaid(id) {
+            if (confirm('Вы уверены, что хотите отметить пакет как оплаченный?')) {
+                $.ajax({
+                    url: `/admin/module/pack-salesman/${id}/mark-as-paid`,
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            toastr.success('Пакет отмечен как оплаченный');
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            toastr.error(response.message || 'Произошла ошибка');
+                        }
+                    },
+                    error: function (xhr) {
+                        let errorMessage = 'Произошла ошибка при обновлении статуса';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMessage = xhr.responseJSON.message;
+                        }
+                        toastr.error(errorMessage);
+                    }
+                });
+            }
+        }
+    </script>
+@endpush

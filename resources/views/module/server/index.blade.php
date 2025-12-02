@@ -1,184 +1,185 @@
-@extends('layouts.app', ['page' => __('Серверы'), 'pageSlug' => 'servers'])
+@extends('layouts.admin')
+
+@section('title', 'Серверы')
+@section('page-title', 'Управление серверами')
 
 @php
     use App\Models\Server\Server;
 @endphp
 
-@section('styles')
-    <style>
-        .country-flag {
-            width: 24px;
-            height: 16px;
-            margin-right: 0.5rem;
-            display: inline-block;
-            vertical-align: middle;
-            object-fit: cover;
-        }
-
-        .d-flex {
-            display: flex !important;
-        }
-
-        .align-items-center {
-            align-items: center !important;
-        }
-    </style>
-@endsection
-
 @section('content')
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-lg-12">
-                <x-card title="Список серверов">
-                    <x-slot name="tools">
-                        <button type="button" class="btn btn-primary" data-toggle="modal"
-                                data-target="#createServerModal">
-                            <i class="fas fa-plus"></i> Добавить сервер
-                        </button>
-                    </x-slot>
-
-                    <form method="GET" action="/admin/module/server" class="mb-4">
-                        <div class="row">
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="name">Имя сервера</label>
-                                    <input type="text" class="form-control" id="name" name="name"
-                                           value="{{ request('name') }}" placeholder="Поиск по имени">
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="ip">IP адрес</label>
-                                    <input type="text" class="form-control" id="ip" name="ip"
-                                           value="{{ request('ip') }}" placeholder="Поиск по IP">
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="status">Статус</label>
-                                    <select class="form-control" id="status" name="status">
-                                        <option value="">Все статусы</option>
-                                        <option value="{{ \App\Models\Server\Server::SERVER_CREATED }}"
-                                            {{ request('status') == \App\Models\Server\Server::SERVER_CREATED ? 'selected' : '' }}>
-                                            Создан
-                                        </option>
-                                        <option value="{{ \App\Models\Server\Server::SERVER_CONFIGURED }}"
-                                            {{ request('status') == \App\Models\Server\Server::SERVER_CONFIGURED ? 'selected' : '' }}>
-                                            Настроен
-                                        </option>
-                                        <option value="{{ \App\Models\Server\Server::SERVER_ERROR }}"
-                                            {{ request('status') == \App\Models\Server\Server::SERVER_ERROR ? 'selected' : '' }}>
-                                            Ошибка
-                                        </option>
-                                        <option value="{{ \App\Models\Server\Server::SERVER_DELETED }}"
-                                            {{ request('status') == \App\Models\Server\Server::SERVER_DELETED ? 'selected' : '' }}>
-                                            Удален
-                                        </option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label>&nbsp;</label>
-                                    <div class="btn-group btn-block">
-                                        <button type="submit" class="btn btn-primary">
-                                            <i class="fas fa-search"></i> Поиск
-                                        </button>
-                                        <a href="{{ route('admin.module.server.index') }}" 
-                                           class="btn btn-secondary">
-                                            <i class="fas fa-times"></i> Сбросить
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </form>
-
-                    <x-table :headers="['#', 'Название', 'IP', 'Логин', 'Пароль', 'Хост', 'Локация', 'Статус', '']">
-                        @if($servers->isEmpty())
-                            <tr>
-                                <td colspan="8" class="text-center text-muted">
-                                    <i class="fas fa-info-circle"></i> Серверы не найдены
-                                </td>
-                            </tr>
-                        @else
-                            @foreach($servers as $server)
-                                <tr>
-                                    <td><strong>{{ $server->id }}</strong></td>
-                                    <td>{{ $server->name }}</td>
-                                    <td>{{ $server->ip }}</td>
-                                    <td>{{ $server->login }}</td>
-                                    <td>{{ $server->password }}</td>
-                                    <td>{{ $server->host }}</td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <img
-                                                src="https://flagcdn.com/w40/{{ strtolower($server->location->code) }}.png"
-                                                class="country-flag"
-                                                alt="{{ strtoupper($server->location->code) }}"
-                                                title="{{ strtoupper($server->location->code) }}">
-                                            <span>{{ strtoupper($server->location->code) }}</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                    <span class="badge badge-{{ $server->status_badge_class }}">
-                                        {{ $server->status_label }}
-                                    </span>
-                                    </td>
-                                    <td>
-                                        @if($server->server_status !== \App\Models\Server\Server::SERVER_DELETED)
-                                            <div class="dropdown">
-                                                <button class="btn btn-link" type="button" data-toggle="dropdown"
-                                                        aria-haspopup="true" aria-expanded="false">
-                                                    <i class="fas fa-ellipsis-v"></i>
-                                                </button>
-                                                <div class="dropdown-menu dropdown-menu-right">
-                                                    @if($server->panel)
-                                                        <a href="{{ route('admin.module.panel.index', ['panel_id' => $server->panel->id]) }}" 
-                                                           class="dropdown-item">
-                                                            <i class="fas fa-desktop"></i> Панель
-                                                        </a>
-                                                    @endif
-                                                    <a href="{{ route('admin.module.server-users.index', ['server_id' => $server->id]) }}" 
-                                                       class="dropdown-item">
-                                                        <i class="fas fa-users"></i> Пользователи
-                                                    </a>
-                                                    <button class="dropdown-item" type="button"
-                                                            onclick="deleteServer({{ $server->id }})">
-                                                        <i class="fas fa-trash"></i> Удалить
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @endforeach
-                        @endif
-                    </x-table>
-
-                    <div class="d-flex justify-content-center mt-3">
-                        {{ $servers->links() }}
-                    </div>
-                </x-card>
-            </div>
-        </div>
-    </div>
-
-    {{-- Модальное окно создания --}}
-    <x-modal id="createServerModal" title="Добавить сервер">
-        <form id="createServerForm">
-            @csrf
-            <x-form.select name="provider" id="createServerProvider" label="Провайдер" class="selectpicker"
-                           :options="[Server::VDSINA => 'VDSina']" required/>
-
-            <x-slot name="footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-primary create-server" id="createServerBtn" data-provider="vdsina"
-                        data-location="1">Создать сервер
+    <div class="space-y-6">
+        <x-admin.card title="Список серверов">
+            <x-slot name="tools">
+                <button type="button" 
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createServerModal' } }))">
+                    <i class="fas fa-plus mr-2"></i>
+                    Добавить сервер
                 </button>
             </x-slot>
+
+            <!-- Filters -->
+            <x-admin.filter-form action="{{ route('admin.module.server.index') }}">
+                <x-admin.filter-input 
+                    name="name" 
+                    label="Имя сервера" 
+                    value="{{ request('name') }}" 
+                    placeholder="Поиск по имени" />
+                
+                <x-admin.filter-input 
+                    name="ip" 
+                    label="IP адрес" 
+                    value="{{ request('ip') }}" 
+                    placeholder="Поиск по IP" />
+                
+                <x-admin.filter-select 
+                    name="status" 
+                    label="Статус"
+                    :options="[
+                        Server::SERVER_CREATED => 'Создан',
+                        Server::SERVER_CONFIGURED => 'Настроен',
+                        Server::SERVER_ERROR => 'Ошибка',
+                        Server::SERVER_DELETED => 'Удален'
+                    ]"
+                    value="{{ request('status') }}" />
+            </x-admin.filter-form>
+
+            <!-- Table -->
+            @if($servers->isEmpty())
+                <x-admin.empty-state 
+                    icon="fa-server" 
+                    title="Серверы не найдены"
+                    description="Попробуйте изменить параметры фильтрации или создать новый сервер">
+                    <x-slot name="action">
+                        <button type="button" 
+                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createServerModal' } }))">
+                            <i class="fas fa-plus mr-2"></i>
+                            Добавить сервер
+                        </button>
+                    </x-slot>
+                </x-admin.empty-state>
+            @else
+                <x-admin.table :headers="['#', 'Название', 'IP', 'Логин', 'Пароль', 'Хост', 'Локация', 'Статус', 'Действия']">
+                    @php
+                        $totalServers = $servers->count();
+                        $currentIndex = 0;
+                    @endphp
+                    @foreach($servers as $server)
+                        @php
+                            $currentIndex++;
+                            $isLastRows = $currentIndex > ($totalServers - 3);
+                        @endphp
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {{ $server->id }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {{ $server->name }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <code class="bg-gray-100 px-2 py-1 rounded text-xs">{{ $server->ip }}</code>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ $server->login }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <span class="font-mono text-xs">{{ $server->password }}</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ $server->host }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <div class="flex items-center">
+                                    <img src="https://flagcdn.com/w40/{{ strtolower($server->location->code) }}.png"
+                                         class="w-6 h-4 mr-2 rounded object-cover"
+                                         alt="{{ strtoupper($server->location->code) }}"
+                                         title="{{ strtoupper($server->location->code) }}">
+                                    <span>{{ strtoupper($server->location->code) }}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                    {{ $server->status_badge_class === 'success' ? 'bg-green-100 text-green-800' : '' }}
+                                    {{ $server->status_badge_class === 'danger' ? 'bg-red-100 text-red-800' : '' }}
+                                    {{ $server->status_badge_class === 'warning' ? 'bg-yellow-100 text-yellow-800' : '' }}
+                                    {{ $server->status_badge_class === 'info' ? 'bg-blue-100 text-blue-800' : '' }}
+                                    {{ $server->status_badge_class === 'secondary' ? 'bg-gray-100 text-gray-800' : '' }}">
+                                    {{ $server->status_label }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                @if($server->server_status !== Server::SERVER_DELETED)
+                                    <div class="relative inline-block text-left" x-data="{ open: false }">
+                                        <button @click="open = !open" 
+                                                class="text-gray-400 hover:text-gray-600 focus:outline-none">
+                                            <i class="fas fa-ellipsis-v"></i>
+                                        </button>
+                                        
+                                        <div x-show="open" 
+                                             @click.away="open = false"
+                                             x-cloak
+                                             x-transition
+                                             class="absolute right-0 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 {{ $isLastRows ? 'origin-bottom-right bottom-full mb-2' : 'origin-top-right top-full mt-2' }}">
+                                            <div class="py-1">
+                                                @if($server->panel)
+                                                    <a href="{{ route('admin.module.panel.index', ['panel_id' => $server->panel->id]) }}" 
+                                                       class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                                        <i class="fas fa-desktop mr-2"></i> Панель
+                                                    </a>
+                                                @endif
+                                                <a href="{{ route('admin.module.server-users.index', ['server_id' => $server->id]) }}" 
+                                                   class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                                    <i class="fas fa-users mr-2"></i> Пользователи
+                                                </a>
+                                                <button onclick="deleteServer({{ $server->id }})"
+                                                        class="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50">
+                                                    <i class="fas fa-trash mr-2"></i> Удалить
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                </x-admin.table>
+
+                <!-- Pagination -->
+                <x-admin.pagination-wrapper :paginator="$servers" />
+            @endif
+        </x-admin.card>
+    </div>
+
+    <!-- Modal: Create Server -->
+    <x-admin.modal id="createServerModal" title="Добавить сервер">
+        <form id="createServerForm">
+            @csrf
+            <div class="mb-4">
+                <label for="createServerProvider" class="block text-sm font-medium text-gray-700 mb-1">
+                    Провайдер
+                </label>
+                <select id="createServerProvider" name="provider" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm">
+                    <option value="{{ Server::VDSINA }}">VDSina</option>
+                </select>
+            </div>
         </form>
-    </x-modal>
+        <x-slot name="footer">
+            <button type="button" 
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 create-server" 
+                    id="createServerBtn" 
+                    data-provider="vdsina"
+                    data-location="1">
+                Создать сервер
+            </button>
+            <button type="button" 
+                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" 
+                    onclick="window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'createServerModal' } }))">
+                Отмена
+            </button>
+        </x-slot>
+    </x-admin.modal>
 
     @push('js')
         <script>
@@ -278,19 +279,4 @@
         </script>
     @endpush
 
-    @if(session('success'))
-        <x-alert type="success">
-            {{ session('success') }}
-        </x-alert>
-    @endif
-
-    @if($errors->any())
-        <x-alert type="danger">
-            <ul class="mb-0">
-                @foreach($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </x-alert>
-    @endif
 @endsection

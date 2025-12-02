@@ -43,11 +43,11 @@ class LogRepository extends BaseRepository
             $start = $filters['date_from'] ?? now()->subDays(7)->toDateString();
             $end = $filters['date_to'] ?? now()->toDateString();
 
-            $query->whereBetween('created_at', [
+                $query->whereBetween('created_at', [
                 $this->createDateTime($start, '00:00:00'),
                 $this->createDateTime($end, '23:59:59')
-            ]);
-        } else {
+                ]);
+            } else {
             // По умолчанию ограничиваем последними 7 днями для производительности
             $query->where('created_at', '>=', now()->subDays(7)->startOfDay());
         }

@@ -1,267 +1,182 @@
-@extends('layouts.app', ['page' => __('Логи приложения'), 'pageSlug' => 'logs'])
+@extends('layouts.admin')
+
+@section('title', 'Логи приложения')
+@section('page-title', 'Логи приложения')
 
 @section('content')
-    <div class="container-fluid">
+    <div class="space-y-6">
         <!-- Статистика по уровням -->
-        <div class="row mb-4">
-            <div class="col-xl-2 col-md-4">
-                <div class="card bg-danger text-white mb-4">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <div class="text-xs font-weight-bold text-uppercase mb-1">Ошибки</div>
-                                <div class="h5 mb-0" id="stats-error">{{ $stats['error'] ?? 0 }}</div>
-                            </div>
-                            <div class="col-auto">
-                                <i class="fas fa-exclamation-circle fa-2x"></i>
-                            </div>
-                        </div>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div class="bg-red-600 text-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-semibold uppercase mb-1 opacity-90">Ошибки</div>
+                        <div class="text-2xl font-bold" id="stats-error">{{ $stats['error'] ?? 0 }}</div>
                     </div>
+                    <i class="fas fa-exclamation-circle text-3xl opacity-75"></i>
                 </div>
             </div>
-            <div class="col-xl-2 col-md-4">
-                <div class="card bg-warning text-white mb-4">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <div class="text-xs font-weight-bold text-uppercase mb-1">Предупреждения</div>
-                                <div class="h5 mb-0" id="stats-warning">{{ $stats['warning'] ?? 0 }}</div>
-                            </div>
-                            <div class="col-auto">
-                                <i class="fas fa-exclamation-triangle fa-2x"></i>
-                            </div>
-                        </div>
+            <div class="bg-yellow-600 text-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-semibold uppercase mb-1 opacity-90">Предупреждения</div>
+                        <div class="text-2xl font-bold" id="stats-warning">{{ $stats['warning'] ?? 0 }}</div>
                     </div>
+                    <i class="fas fa-exclamation-triangle text-3xl opacity-75"></i>
                 </div>
             </div>
-            <div class="col-xl-2 col-md-4">
-                <div class="card bg-info text-white mb-4">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <div class="text-xs font-weight-bold text-uppercase mb-1">Информация</div>
-                                <div class="h5 mb-0" id="stats-info">{{ $stats['info'] ?? 0 }}</div>
-                            </div>
-                            <div class="col-auto">
-                                <i class="fas fa-info-circle fa-2x"></i>
-                            </div>
-                        </div>
+            <div class="bg-blue-600 text-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-semibold uppercase mb-1 opacity-90">Информация</div>
+                        <div class="text-2xl font-bold" id="stats-info">{{ $stats['info'] ?? 0 }}</div>
                     </div>
+                    <i class="fas fa-info-circle text-3xl opacity-75"></i>
                 </div>
             </div>
-            <div class="col-xl-2 col-md-4">
-                <div class="card bg-secondary text-white mb-4">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <div class="text-xs font-weight-bold text-uppercase mb-1">Отладка</div>
-                                <div class="h5 mb-0" id="stats-debug">{{ $stats['debug'] ?? 0 }}</div>
-                            </div>
-                            <div class="col-auto">
-                                <i class="fas fa-bug fa-2x"></i>
-                            </div>
-                        </div>
+            <div class="bg-gray-600 text-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-semibold uppercase mb-1 opacity-90">Отладка</div>
+                        <div class="text-2xl font-bold" id="stats-debug">{{ $stats['debug'] ?? 0 }}</div>
                     </div>
+                    <i class="fas fa-bug text-3xl opacity-75"></i>
                 </div>
             </div>
-            <div class="col-xl-2 col-md-4">
-                <div class="card bg-primary text-white mb-4">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <div class="text-xs font-weight-bold text-uppercase mb-1">Всего</div>
-                                <div class="h5 mb-0" id="stats-total">{{ $stats['total'] ?? 0 }}</div>
-                            </div>
-                            <div class="col-auto">
-                                <i class="fas fa-list fa-2x"></i>
-                            </div>
-                        </div>
+            <div class="bg-indigo-600 text-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-semibold uppercase mb-1 opacity-90">Всего</div>
+                        <div class="text-2xl font-bold" id="stats-total">{{ $stats['total'] ?? 0 }}</div>
                     </div>
+                    <i class="fas fa-list text-3xl opacity-75"></i>
                 </div>
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h4 class="card-title">Логи приложения</h4>
-                        <div class="card-tools">
-                            <span class="badge badge-light" id="logsCount">Показано: {{ $logs->count() }} из {{ $logs->total() }}</span>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <!-- Быстрые фильтры -->
-                        <div class="mb-3">
-                            <div class="btn-group" role="group">
-                                <button type="button" class="btn btn-sm btn-danger quick-filter" data-level="error">
-                                    <i class="fas fa-exclamation-circle"></i> Только ошибки
-                                </button>
-                                <button type="button" class="btn btn-sm btn-warning quick-filter" data-level="warning">
-                                    <i class="fas fa-exclamation-triangle"></i> Предупреждения
-                                </button>
-                                <button type="button" class="btn btn-sm btn-info quick-filter" data-level="critical">
-                                    <i class="fas fa-skull"></i> Критические
-                                </button>
-                                <button type="button" class="btn btn-sm btn-secondary quick-filter" data-level="">
-                                    <i class="fas fa-list"></i> Все логи
-                                </button>
-                            </div>
-                            <div class="btn-group ml-2" role="group">
-                                <button type="button" class="btn btn-sm btn-outline-primary quick-date" data-days="1">
-                                    Сегодня
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-primary quick-date" data-days="7">
-                                    7 дней
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-primary quick-date" data-days="30">
-                                    30 дней
-                                </button>
-                            </div>
-                        </div>
+        <x-admin.card>
+            <x-slot name="title">
+                Логи приложения
+            </x-slot>
+            <x-slot name="tools">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800" id="logsCount">
+                    Показано: {{ $logs->count() }} из {{ $logs->total() }}
+                </span>
+            </x-slot>
 
-                        <form action="{{ route('admin.logs.index') }}" method="GET" id="logsFilterForm">
-                            <div class="row mb-3">
-                                <div class="col-md-2">
-                                    <div class="form-group">
-                                        <label for="level">Уровень</label>
-                                        <select class="form-control" id="level" name="level">
-                                            <option value="">Все уровни</option>
-                                            <option value="error" {{ request('level') == 'error' ? 'selected' : '' }}>Ошибка</option>
-                                            <option value="critical" {{ request('level') == 'critical' ? 'selected' : '' }}>Критическая</option>
-                                            <option value="warning" {{ request('level') == 'warning' ? 'selected' : '' }}>Предупреждение</option>
-                                            <option value="info" {{ request('level') == 'info' ? 'selected' : '' }}>Информация</option>
-                                            <option value="debug" {{ request('level') == 'debug' ? 'selected' : '' }}>Отладка</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="form-group">
-                                        <label for="source">Источник</label>
-                                        <select class="form-control" id="source" name="source">
-                                            <option value="">Все источники</option>
-                                            @foreach($sources as $source)
-                                                <option value="{{ $source }}" {{ request('source') == $source ? 'selected' : '' }}>
-                                                    {{ $source }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="form-group">
-                                        <label for="date_from">Дата от</label>
-                                        <input type="date" class="form-control" id="date_from" name="date_from"
-                                               value="{{ request('date_from', now()->subDays(7)->format('Y-m-d')) }}">
-                                    </div>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="form-group">
-                                        <label for="date_to">Дата до</label>
-                                        <input type="date" class="form-control" id="date_to" name="date_to"
-                                               value="{{ request('date_to', now()->format('Y-m-d')) }}">
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="form-group">
-                                        <label for="search">Поиск (мин. 3 символа)</label>
-                                        <input type="text" class="form-control" id="search" name="search"
-                                               placeholder="Поиск по сообщению или источнику"
-                                               value="{{ request('search') }}">
-                                    </div>
-                                </div>
-                                <div class="col-md-1">
-                                    <div class="form-group">
-                                        <label>&nbsp;</label>
-                                        <button type="submit" class="btn btn-primary btn-block">
-                                            <i class="fas fa-search"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </form>
-
-                        <!-- Индикатор загрузки -->
-                        <div id="loadingIndicator" class="text-center" style="display: none;">
-                            <i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
-                            <p class="mt-2">Загрузка логов...</p>
-                        </div>
-
-                        <!-- Таблица логов -->
-                        <div class="table-responsive" id="logsTableContainer">
-                            <table class="table table-hover">
-                                <thead>
-                                <tr>
-                                    <th width="160">Время</th>
-                                    <th width="120">Уровень</th>
-                                    <th width="150">Источник</th>
-                                    <th>Сообщение</th>
-                                    <th width="100">Действия</th>
-                                </tr>
-                                </thead>
-                                <tbody id="logsTableBody">
-                                @forelse($logs as $log)
-                                    <tr class="log-row log-level-{{ $log->level }} {{ in_array($log->level, ['error', 'critical', 'emergency']) ? 'table-danger' : ($log->level === 'warning' ? 'table-warning' : '') }}">
-                                        <td>
-                                            <small>{{ $log->created_at->format('d.m.Y H:i:s') }}</small>
-                                        </td>
-                                        <td>
-                                            <span class="badge badge-{{ $log->getLevelColorClass() }}">
-                                                <i class="fas {{ $log->getLevelIcon() }} mr-1"></i>
-                                                {{ ucfirst($log->level) }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span class="badge badge-light">{{ $log->source }}</span>
-                                        </td>
-                                        <td>
-                                            <div class="log-message" title="{{ $log->message }}">
-                                                {{ $log->message_short }}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <a href="{{ route('admin.logs.show', $log) }}" 
-                                               class="btn btn-sm btn-info"
-                                               title="Подробнее">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="5" class="text-center text-muted py-4">
-                                            <i class="fas fa-info-circle fa-3x mb-3"></i>
-                                            <p>Логи не найдены</p>
-                                        </td>
-                                    </tr>
-                                @endforelse
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <!-- Пагинация -->
-                        <div id="paginationContainer">
-                            @include('logs.partials.pagination')
-                        </div>
-                    </div>
+            <!-- Быстрые фильтры -->
+            <div class="mb-4 flex flex-wrap gap-2">
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 quick-filter" data-level="error">
+                        <i class="fas fa-exclamation-circle mr-1"></i> Только ошибки
+                    </button>
+                    <button type="button" class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 quick-filter" data-level="warning">
+                        <i class="fas fa-exclamation-triangle mr-1"></i> Предупреждения
+                    </button>
+                    <button type="button" class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 quick-filter" data-level="critical">
+                        <i class="fas fa-skull mr-1"></i> Критические
+                    </button>
+                    <button type="button" class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 quick-filter" data-level="">
+                        <i class="fas fa-list mr-1"></i> Все логи
+                    </button>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" class="inline-flex items-center px-3 py-2 border border-indigo-300 text-sm font-medium rounded-md shadow-sm text-indigo-700 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 quick-date" data-days="1">
+                        Сегодня
+                    </button>
+                    <button type="button" class="inline-flex items-center px-3 py-2 border border-indigo-300 text-sm font-medium rounded-md shadow-sm text-indigo-700 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 quick-date" data-days="7">
+                        7 дней
+                    </button>
+                    <button type="button" class="inline-flex items-center px-3 py-2 border border-indigo-300 text-sm font-medium rounded-md shadow-sm text-indigo-700 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 quick-date" data-days="30">
+                        30 дней
+                    </button>
                 </div>
             </div>
-        </div>
+
+            <x-admin.filter-form action="{{ route('admin.logs.index') }}" id="logsFilterForm">
+                <x-admin.filter-select 
+                    name="level" 
+                    label="Уровень"
+                    :options="[
+                        'error' => 'Ошибка',
+                        'critical' => 'Критическая',
+                        'warning' => 'Предупреждение',
+                        'info' => 'Информация',
+                        'debug' => 'Отладка'
+                    ]"
+                    value="{{ request('level') }}"
+                    placeholder="Все уровни" />
+                
+                <x-admin.filter-select 
+                    name="source" 
+                    label="Источник"
+                    :options="collect($sources)->mapWithKeys(function($source) {
+                        return [$source => $source];
+                    })->toArray()"
+                    value="{{ request('source') }}"
+                    placeholder="Все источники" />
+                
+                <x-admin.filter-input 
+                    name="date_from" 
+                    label="Дата от" 
+                    value="{{ request('date_from', now()->subDays(7)->format('Y-m-d')) }}" 
+                    type="date" />
+                
+                <x-admin.filter-input 
+                    name="date_to" 
+                    label="Дата до" 
+                    value="{{ request('date_to', now()->format('Y-m-d')) }}" 
+                    type="date" />
+                
+                <x-admin.filter-input 
+                    name="search" 
+                    label="Поиск (мин. 3 символа)" 
+                    value="{{ request('search') }}" 
+                    placeholder="Поиск по сообщению или источнику" />
+            </x-admin.filter-form>
+
+            <!-- Индикатор загрузки -->
+            <div id="loadingIndicator" class="text-center py-8 hidden">
+                <i class="fas fa-spinner fa-spin fa-2x text-indigo-600"></i>
+                <p class="mt-2 text-gray-600">Загрузка логов...</p>
+            </div>
+
+            <!-- Таблица логов -->
+            <div id="logsTableContainer">
+                @if($logs->isEmpty())
+                    <x-admin.empty-state 
+                        icon="fa-file-alt" 
+                        title="Логи не найдены"
+                        description="Попробуйте изменить параметры фильтрации" />
+                @else
+                    <x-admin.table :headers="['Время', 'Уровень', 'Источник', 'Сообщение', 'Действия']" :responsive="true">
+                        <tbody class="bg-white divide-y divide-gray-200" id="logsTableBody">
+                            @include('logs.partials.table', ['logs' => $logs])
+                        </tbody>
+                    </x-admin.table>
+                @endif
+            </div>
+
+            <!-- Пагинация -->
+            <div id="paginationContainer" class="mt-4">
+                @include('logs.partials.pagination')
+            </div>
+        </x-admin.card>
     </div>
 @endsection
 
-@push('css')
+@push('styles')
     <style>
         .log-row.table-danger {
-            background-color: #f8d7da !important;
+            background-color: #fee2e2 !important;
         }
 
         .log-row.table-warning {
-            background-color: #fff3cd !important;
+            background-color: #fef3c7 !important;
         }
 
         .log-row:hover {
-            background-color: #f8f9fa !important;
+            background-color: #f9fafb !important;
         }
 
         .log-message {
@@ -272,18 +187,12 @@
         }
 
         .quick-filter.active {
-            box-shadow: 0 0 0 2px rgba(0,123,255,.5);
-        }
-
-        .table th {
-            background-color: #f8f9fa;
-            font-weight: 600;
-            border-bottom: 2px solid #dee2e6;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.5);
         }
     </style>
 @endpush
 
-@push('scripts')
+@push('js')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const form = document.getElementById('logsFilterForm');
@@ -351,7 +260,7 @@
                 const params = new URLSearchParams(formData);
                 
                 // Показываем индикатор загрузки
-                loadingIndicator.style.display = 'block';
+                loadingIndicator.classList.remove('hidden');
                 tableContainer.style.opacity = '0.5';
                 
                 fetch(`${form.action}?${params.toString()}`, {
@@ -364,25 +273,40 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.html) {
-                        tableBody.innerHTML = data.html;
+                        // Обновляем tbody таблицы
+                        if (tableBody) {
+                            tableBody.innerHTML = data.html;
+                        }
                         
                         // Обновляем пагинацию
                         if (data.pagination) {
-                            document.getElementById('paginationContainer').innerHTML = data.pagination;
+                            const paginationContainer = document.getElementById('paginationContainer');
+                            if (paginationContainer) {
+                                paginationContainer.innerHTML = data.pagination;
+                            }
                         }
                         
                         // Обновляем статистику
                         if (data.stats) {
-                            document.getElementById('stats-error').textContent = data.stats.error || 0;
-                            document.getElementById('stats-warning').textContent = data.stats.warning || 0;
-                            document.getElementById('stats-info').textContent = data.stats.info || 0;
-                            document.getElementById('stats-debug').textContent = data.stats.debug || 0;
-                            document.getElementById('stats-total').textContent = data.stats.total || 0;
+                            const statsError = document.getElementById('stats-error');
+                            const statsWarning = document.getElementById('stats-warning');
+                            const statsInfo = document.getElementById('stats-info');
+                            const statsDebug = document.getElementById('stats-debug');
+                            const statsTotal = document.getElementById('stats-total');
+                            
+                            if (statsError) statsError.textContent = data.stats.error || 0;
+                            if (statsWarning) statsWarning.textContent = data.stats.warning || 0;
+                            if (statsInfo) statsInfo.textContent = data.stats.info || 0;
+                            if (statsDebug) statsDebug.textContent = data.stats.debug || 0;
+                            if (statsTotal) statsTotal.textContent = data.stats.total || 0;
                         }
                         
                         // Обновляем счетчик
                         if (data.count !== undefined && data.total !== undefined) {
-                            document.getElementById('logsCount').textContent = `Показано: ${data.count} из ${data.total}`;
+                            const logsCount = document.getElementById('logsCount');
+                            if (logsCount) {
+                                logsCount.textContent = `Показано: ${data.count} из ${data.total}`;
+                            }
                         }
                         
                         // Обновляем URL без перезагрузки
@@ -396,7 +320,7 @@
                     showToast('Ошибка загрузки логов', 'error');
                 })
                 .finally(() => {
-                    loadingIndicator.style.display = 'none';
+                    loadingIndicator.classList.add('hidden');
                     tableContainer.style.opacity = '1';
                 });
             }
@@ -410,7 +334,7 @@
                     const params = url.searchParams;
                     
                     // Загружаем страницу через AJAX
-                    loadingIndicator.style.display = 'block';
+                    loadingIndicator.classList.remove('hidden');
                     tableContainer.style.opacity = '0.5';
                     
                     fetch(url.href, {
@@ -423,16 +347,33 @@
                     .then(response => response.json())
                     .then(data => {
                         if (data.html) {
-                            tableBody.innerHTML = data.html;
+                            if (tableBody) {
+                                tableBody.innerHTML = data.html;
+                            }
                             if (data.pagination) {
-                                document.getElementById('paginationContainer').innerHTML = data.pagination;
+                                const paginationContainer = document.getElementById('paginationContainer');
+                                if (paginationContainer) {
+                                    paginationContainer.innerHTML = data.pagination;
+                                }
                             }
                             if (data.stats) {
-                                document.getElementById('stats-error').textContent = data.stats.error || 0;
-                                document.getElementById('stats-warning').textContent = data.stats.warning || 0;
-                                document.getElementById('stats-info').textContent = data.stats.info || 0;
-                                document.getElementById('stats-debug').textContent = data.stats.debug || 0;
-                                document.getElementById('stats-total').textContent = data.stats.total || 0;
+                                const statsError = document.getElementById('stats-error');
+                                const statsWarning = document.getElementById('stats-warning');
+                                const statsInfo = document.getElementById('stats-info');
+                                const statsDebug = document.getElementById('stats-debug');
+                                const statsTotal = document.getElementById('stats-total');
+                                
+                                if (statsError) statsError.textContent = data.stats.error || 0;
+                                if (statsWarning) statsWarning.textContent = data.stats.warning || 0;
+                                if (statsInfo) statsInfo.textContent = data.stats.info || 0;
+                                if (statsDebug) statsDebug.textContent = data.stats.debug || 0;
+                                if (statsTotal) statsTotal.textContent = data.stats.total || 0;
+                            }
+                            if (data.count !== undefined && data.total !== undefined) {
+                                const logsCount = document.getElementById('logsCount');
+                                if (logsCount) {
+                                    logsCount.textContent = `Показано: ${data.count} из ${data.total}`;
+                                }
                             }
                             window.history.pushState({}, '', url.href);
                         }
@@ -442,31 +383,23 @@
                         showToast('Ошибка загрузки страницы', 'error');
                     })
                     .finally(() => {
-                        loadingIndicator.style.display = 'none';
+                        loadingIndicator.classList.add('hidden');
                         tableContainer.style.opacity = '1';
                     });
                 }
             });
 
-            // Функция для уведомлений
+            // Функция для уведомлений (используем toastr)
             function showToast(message, type = 'info') {
-                const toast = document.createElement('div');
-                toast.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
-                toast.style.cssText = 'top: 20px; right: 20px; z-index: 99999; min-width: 300px;';
-                toast.innerHTML = `
-                    <i class="fas fa-${type === 'error' ? 'exclamation-circle' : 'info-circle'} mr-2"></i>
-                    <strong>${message}</strong>
-                    <button type="button" class="close" data-dismiss="alert">
-                        <span>&times;</span>
-                    </button>
-                `;
-                document.body.appendChild(toast);
-                setTimeout(() => {
-                    if (toast.parentNode) {
-                        toast.classList.remove('show');
-                        setTimeout(() => toast.remove(), 300);
-                    }
-                }, 3000);
+                if (type === 'error') {
+                    toastr.error(message);
+                } else if (type === 'warning') {
+                    toastr.warning(message);
+                } else if (type === 'success') {
+                    toastr.success(message);
+                } else {
+                    toastr.info(message);
+                }
             }
 
             // Выделяем активный быстрый фильтр

@@ -255,4 +255,19 @@ class ConnectionLimitViolationController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Показать детальную информацию о нарушении
+     */
+    public function show(ConnectionLimitViolation $violation): View
+    {
+        $violation->load([
+            'keyActivate.packSalesman.salesman',
+            'keyActivate.moduleSalesman',
+            'serverUser',
+            'panel.server'
+        ]);
+
+        return view('module.connection-limit-violations.show', compact('violation'));
+    }
 }

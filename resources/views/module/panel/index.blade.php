@@ -1,220 +1,201 @@
-@extends('layouts.app', ['page' => __('Панели'), 'pageSlug' => 'panels'])
+@extends('layouts.admin')
+
+@section('title', 'Панели управления')
+@section('page-title', 'Панели управления')
 
 @php
     use App\Models\Panel\Panel;
 @endphp
 
 @section('content')
-    <div class="container-fluid">
-        @if(session('error'))
-            <x-alert type="danger">{{ session('error') }}</x-alert>
-        @endif
+    <div class="space-y-6">
+        <x-admin.card title="Список панелей">
+            <x-slot name="tools">
+                <button type="button" 
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createPanelModal' } }))">
+                    <i class="fas fa-plus mr-2"></i>
+                    Добавить панель
+                </button>
+            </x-slot>
 
-        @if(session('success'))
-            <x-alert type="success">{{ session('success') }}</x-alert>
-        @endif
+            <!-- Filters -->
+            <x-admin.filter-form action="{{ route('admin.module.panel.index') }}">
+                <x-admin.filter-input 
+                    name="server" 
+                    label="Сервер" 
+                    value="{{ request('server') }}" 
+                    placeholder="Поиск по имени или IP сервера" />
+                
+                <x-admin.filter-input 
+                    name="panel_adress" 
+                    label="Адрес панели" 
+                    value="{{ request('panel_adress') }}" 
+                    placeholder="Поиск по адресу панели" />
+            </x-admin.filter-form>
 
-        <div class="row">
-            <div class="col-lg-12">
-                <x-card title="Список панелей">
-                    <x-slot name="tools">
-                        <button type="button" class="btn btn-primary" data-toggle="modal"
-                                data-target="#createPanelModal">
-                            <i class="fas fa-plus"></i> Добавить панель
+            <!-- Table -->
+            @if($panels->isEmpty())
+                <x-admin.empty-state 
+                    icon="fa-desktop" 
+                    title="Панели не найдены"
+                    description="Попробуйте изменить параметры фильтрации или создать новую панель">
+                    <x-slot name="action">
+                        <button type="button" 
+                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createPanelModal' } }))">
+                            <i class="fas fa-plus mr-2"></i>
+                            Добавить панель
                         </button>
                     </x-slot>
-
-                    <form method="GET" action="{{ route('admin.module.panel.index') }}" class="mb-4">
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="form-group">
-                                    <label for="server">Сервер</label>
-                                    <input type="text" class="form-control" id="server" name="server"
-                                           value="{{ request('server') }}"
-                                           placeholder="Поиск по имени или IP сервера">
+                </x-admin.empty-state>
+            @else
+                <x-admin.table :headers="['#', 'Адрес панели', 'Тип', 'Логин', 'Пароль', 'Сервер', 'Статус', 'Действия']">
+                    @php
+                        $totalPanels = $panels->count();
+                        $currentIndex = 0;
+                    @endphp
+                    @foreach($panels as $panel)
+                        @php
+                            $currentIndex++;
+                            $isLastRows = $currentIndex > ($totalPanels - 3);
+                        @endphp
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {{ $panel->id }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                <a href="{{ $panel->panel_adress }}" target="_blank" class="text-indigo-600 hover:text-indigo-800 flex items-center">
+                                    {{ $panel->formatted_address }}
+                                    <i class="fas fa-external-link-alt ml-1 text-xs"></i>
+                                </a>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ $panel->panel_type_label }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <div class="flex items-center">
+                                    <span class="font-mono text-xs">{{ $panel->panel_login }}</span>
+                                    <button class="ml-2 text-gray-400 hover:text-gray-600"
+                                            data-clipboard-text="{{ $panel->panel_login }}"
+                                            title="Копировать логин">
+                                        <i class="fas fa-copy text-xs"></i>
+                                    </button>
                                 </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="form-group">
-                                    <label for="panel_adress">Адрес панели</label>
-                                    <input type="text" class="form-control" id="panel_adress" name="panel_adress"
-                                           value="{{ request('panel_adress') }}"
-                                           placeholder="Поиск по адресу панели">
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <div class="flex items-center">
+                                    <span class="font-mono text-xs">{{ $panel->panel_password }}</span>
+                                    <button class="ml-2 text-gray-400 hover:text-gray-600"
+                                            data-clipboard-text="{{ $panel->panel_password }}"
+                                            title="Копировать пароль">
+                                        <i class="fas fa-copy text-xs"></i>
+                                    </button>
                                 </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="form-group">
-                                    <label>&nbsp;</label>
-                                    <div class="btn-group btn-block">
-                                        <button type="submit" class="btn btn-primary">
-                                            <i class="fas fa-search"></i> Поиск
-                                        </button>
-                                        <a href="{{ route('admin.module.panel.index') }}"
-                                           class="btn btn-secondary">
-                                            <i class="fas fa-times"></i> Сбросить
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </form>
-
-                    <x-table :headers="['#', 'Адрес панели', 'Тип', 'Логин', 'Пароль', 'Сервер', 'Статус', '']">
-                        @forelse($panels as $panel)
-                            <tr>
-                                <td><strong>{{ $panel->id }}</strong></td>
-                                <td>
-                                    <a href="{{ $panel->panel_adress }}" target="_blank" class="text-primary">
-                                        {{ $panel->formatted_address }}
-                                        <i class="fas fa-external-link-alt fa-sm"></i>
-                                    </a>
-                                </td>
-                                <td>{{ $panel->panel_type_label }}</td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <span>{{ $panel->panel_login }}</span>
-                                        <button class="btn btn-sm btn-link ml-2"
-                                                data-clipboard-text="{{ $panel->panel_login }}"
-                                                title="Копировать логин">
-                                            <i class="fas fa-copy"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <span>{{ $panel->panel_password }}</span>
-                                        <button class="btn btn-sm btn-link ml-2"
-                                                data-clipboard-text="{{ $panel->panel_password }}"
-                                                title="Копировать пароль">
-                                            <i class="fas fa-copy"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                                <td>
-                                    @if($panel->server)
-                                        <a href="{{ route('admin.module.server.index', ['id' => $panel->server_id]) }}"
-                                           class="text-primary"
-                                           title="Перейти к серверу">
-                                            {{ $panel->server->name }}
-                                            <small class="d-block text-muted">
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                @if($panel->server && isset($panel->server->id))
+                                    <a href="{{ route('admin.module.server.index', ['id' => $panel->server_id]) }}"
+                                       class="text-indigo-600 hover:text-indigo-800"
+                                       title="Перейти к серверу">
+                                        {{ $panel->server->name ?? 'N/A' }}
+                                        @if(isset($panel->server->host) && $panel->server->host)
+                                            <div class="text-xs text-gray-500 mt-1">
                                                 {{ $panel->server->host }}
-                                            </small>
-                                        </a>
-                                    @else
-                                        <span class="text-danger">Сервер удален</span>
-                                    @endif
-                                </td>
-                                <td>
-                                <span class="badge badge-{{ $panel->status_badge_class }}">
+                                            </div>
+                                        @endif
+                                    </a>
+                                @else
+                                    <span class="text-red-600">Сервер удален</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                    {{ $panel->status_badge_class === 'success' ? 'bg-green-100 text-green-800' : '' }}
+                                    {{ $panel->status_badge_class === 'danger' ? 'bg-red-100 text-red-800' : '' }}
+                                    {{ $panel->status_badge_class === 'warning' ? 'bg-yellow-100 text-yellow-800' : '' }}
+                                    {{ $panel->status_badge_class === 'info' ? 'bg-blue-100 text-blue-800' : '' }}
+                                    {{ $panel->status_badge_class === 'secondary' ? 'bg-gray-100 text-gray-800' : '' }}">
                                     {{ $panel->status_label }}
                                 </span>
-                                </td>
-                                <td class="text-right">
-                                    <div class="dropdown">
-                                        <button class="btn btn-link" type="button" data-toggle="dropdown">
-                                            <i class="fas fa-ellipsis-v"></i>
-                                        </button>
-                                        <div class="dropdown-menu dropdown-menu-right">
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <div class="relative inline-block text-left" x-data="{ open: false }">
+                                    <button @click="open = !open" 
+                                            class="text-gray-400 hover:text-gray-600 focus:outline-none">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                    
+                                    <div x-show="open" 
+                                         @click.away="open = false"
+                                         x-cloak
+                                         x-transition
+                                         class="absolute right-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 {{ $isLastRows ? 'origin-bottom-right bottom-full mb-2' : 'origin-top-right top-full mt-2' }}">
+                                        <div class="py-1">
                                             <a href="{{ route('admin.module.server-users.index', ['panel_id' => $panel->id]) }}"
-                                               class="dropdown-item">
-                                                <i class="fas fa-users"></i> Пользователи
+                                               class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                                <i class="fas fa-users mr-2"></i> Пользователи
                                             </a>
-                                            <form action="{{ route('admin.module.panel.update-config', $panel) }}" method="POST" class="d-inline">
+                                            <form action="{{ route('admin.module.panel.update-config', $panel) }}" method="POST" class="block">
                                                 @csrf
-                                                <button type="submit" class="dropdown-item">
-                                                    <i class="fas fa-sync"></i> Обновить конфигурацию
+                                                <button type="submit" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                                    <i class="fas fa-sync mr-2"></i> Обновить конфигурацию
                                                 </button>
                                             </form>
-                                            <!-- Кнопка "Статистика" для настроенных панелей -->
-                                            @if($panel->panel_status === \App\Models\Panel\Panel::PANEL_CONFIGURED)
+                                            @if($panel->panel_status === Panel::PANEL_CONFIGURED)
                                                 <a href="{{ route('admin.module.server-monitoring.index', ['panel_id' => $panel->id]) }}"
-                                                   class="dropdown-item">
-                                                    <i class="fas fa-chart-line"></i> Статистика
+                                                   class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                                    <i class="fas fa-chart-line mr-2"></i> Статистика
                                                 </a>
                                             @endif
-                                            <button type="button" class="dropdown-item text-danger"
-                                                    onclick="deletePanel({{ $panel->id }})">
-                                                <i class="fas fa-trash"></i> Удалить
+                                            <button type="button" 
+                                                    onclick="deletePanel({{ $panel->id }})"
+                                                    class="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50">
+                                                <i class="fas fa-trash mr-2"></i> Удалить
                                             </button>
                                         </div>
                                     </div>
-                                </td>
-                            </tr>
+                                </div>
+                            </td>
+                        </tr>
+                    @endforeach
+                </x-admin.table>
 
-                            {{-- Модальное окно редактирования --}}
-                            <x-modal id="editPanelModal{{ $panel->id }}" title="Редактировать панель">
-                                <form action="{{ route('admin.module.panel.update', $panel) }}" method="POST">
-                                    @csrf
-                                    <div class="row">
-                                        <div class="col-md-12">
-                                            <div class="form-group">
-                                                <label for="username">Логин</label>
-                                                <input type="text" name="username" id="username" class="form-control" value="{{ $panel->panel_login }}" minlength="3" maxlength="255">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-12">
-                                            <div class="form-group">
-                                                <label for="password">Пароль</label>
-                                                <input type="password" name="password" id="password" class="form-control" minlength="6" maxlength="255">
-                                                <small class="form-text text-muted">Оставьте поле пустым, если не хотите менять пароль</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="text-right">
-                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
-                                        <button type="submit" class="btn btn-primary">Сохранить</button>
-                                    </div>
-                                </form>
-                            </x-modal>
-                        @empty
-                            <tr>
-                                <td colspan="7" class="text-center text-muted">
-                                    <i class="fas fa-info-circle"></i> Панели не найдены
-                                </td>
-                            </tr>
-                        @endforelse
-                    </x-table>
-
-                    {{ $panels->links() }}
-                </x-card>
-            </div>
-        </div>
+                <!-- Pagination -->
+                <x-admin.pagination-wrapper :paginator="$panels" />
+            @endif
+        </x-admin.card>
     </div>
 
-    {{-- Модальное окно создания --}}
-    <x-modal id="createPanelModal" title="Добавить панель">
-        <form action="{{ route('admin.module.panel.store') }}" method="POST">
+    <!-- Modal: Create Panel -->
+    <x-admin.modal id="createPanelModal" title="Добавить панель">
+        <form id="createPanelForm" action="{{ route('admin.module.panel.store') }}" method="POST">
             @csrf
-
-            <x-select name="server_id"
-                      label="Выберите сервер"
-                      :options="$servers"
-                      required
-                      help="Будет создана панель Marzban на выбранном сервере"/>
-
-            <div class="text-right">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">
-                    Отмена
-                </button>
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Создать
-                </button>
+            <div class="mb-4">
+                <label for="server_id" class="block text-sm font-medium text-gray-700 mb-1">
+                    Выберите сервер
+                </label>
+                <select id="server_id" name="server_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" required>
+                    <option value="">Выберите сервер...</option>
+                    @foreach($servers as $serverId => $serverName)
+                        <option value="{{ $serverId }}">{{ $serverName }}</option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-sm text-gray-500">Будет создана панель Marzban на выбранном сервере</p>
             </div>
         </form>
-    </x-modal>
+        <x-slot name="footer">
+            <button type="submit" form="createPanelForm" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <i class="fas fa-plus mr-2"></i> Создать
+            </button>
+            <button type="button" 
+                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" 
+                    onclick="window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'createPanelModal' } }))">
+                Отмена
+            </button>
+        </x-slot>
+    </x-admin.modal>
 @endsection
-
-@push('css')
-    <style>
-        .btn-link {
-            padding: 0 5px;
-        }
-
-        .btn-link:hover {
-            text-decoration: none;
-        }
-    </style>
-@endpush
 
 @push('js')
     <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.8/clipboard.min.js"></script>
@@ -230,6 +211,32 @@
             clipboard.on('error', function (e) {
                 toastr.error('Ошибка копирования');
             });
+
+            function deletePanel(id) {
+                if (confirm('Вы уверены, что хотите удалить эту панель?')) {
+                    $.ajax({
+                        url: '{{ route('admin.module.panel.destroy', ['panel' => ':id']) }}'.replace(':id', id),
+                        method: 'DELETE',
+                        data: {
+                            _token: '{{ csrf_token() }}'
+                        },
+                        success: function (response) {
+                            toastr.success('Панель успешно удалена');
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1000);
+                        },
+                        error: function (xhr) {
+                            let errorMessage = 'Произошла ошибка при удалении панели';
+                            if (xhr.responseJSON) {
+                                errorMessage = xhr.responseJSON.message || errorMessage;
+                            }
+                            toastr.error(errorMessage);
+                        }
+                    });
+                }
+            }
+            window.deletePanel = deletePanel;
         });
     </script>
 @endpush

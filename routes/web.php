@@ -136,6 +136,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/', [PanelController::class, 'store'])->name('store');
                 Route::get('/{panel}/edit', [PanelController::class, 'edit'])->name('edit');
                 Route::put('/{panel}', [PanelController::class, 'update'])->name('update');
+                Route::delete('/{panel}', [PanelController::class, 'destroy'])->name('destroy');
                 Route::post('/{panel}/configure', [PanelController::class, 'configure'])->name('configure');
                 Route::post('/{panel}/update-config', [PanelController::class, 'updateConfig'])->name('update-config');
             });

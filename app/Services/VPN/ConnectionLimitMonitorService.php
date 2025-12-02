@@ -277,7 +277,7 @@ class ConnectionLimitMonitorService
             } else if (!is_null($keyActivate->pack_salesman_id)) {
                 // Проверяем наличие packSalesman перед доступом к salesman
                 if ($keyActivate->packSalesman) {
-                    $salesman = $keyActivate->packSalesman->salesman;
+                $salesman = $keyActivate->packSalesman->salesman;
                 } else {
                     Log::warning('Cannot send notification to salesman: packSalesman not found', [
                         'violation_id' => $violation->id,

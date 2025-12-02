@@ -1,0 +1,265 @@
+/* Admin Panel Custom Styles */
+
+/* Smooth transitions */
+* {
+    transition-property: color, background-color, border-color, transform;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0;
+}
+
+/* Table improvements */
+.table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Loading spinner */
+.spinner {
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #3498db;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Badge improvements */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 0.375rem;
+}
+
+/* Card improvements */
+.card {
+    background: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+/* Form improvements */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+.form-control {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: #1f2937;
+    background-color: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* Button improvements */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 0.375rem;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background-color: #6366f1;
+    color: white;
+    border-color: #6366f1;
+}
+
+.btn-primary:hover {
+    background-color: #4f46e5;
+    border-color: #4f46e5;
+}
+
+.btn-secondary {
+    background-color: #6b7280;
+    color: white;
+    border-color: #6b7280;
+}
+
+.btn-secondary:hover {
+    background-color: #4b5563;
+    border-color: #4b5563;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+    .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+}
+
+/* Ensure content takes full width */
+main {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1;
+    box-sizing: border-box;
+}
+
+/* Основной контент занимает всю доступную ширину */
+body > div.flex.h-full > div.flex-1 {
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+}
+
+/* На мобильных - контент на всю ширину */
+@media (max-width: 1023px) {
+    body > div.flex.h-full > div.flex-1 {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+    
+    main {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    
+    /* Sidebar на мобильных - скрыт по умолчанию, но показывается через Alpine.js */
+    aside.fixed {
+        position: fixed !important;
+    }
+    
+    /* Убираем конфликтующие правила для translate-x, Alpine.js управляет через x-show */
+    aside.fixed.translate-x-0 {
+        transform: translateX(0) !important;
+    }
+    
+    aside.fixed.-translate-x-full {
+        transform: translateX(-100%) !important;
+    }
+}
+
+/* На десктопе - контент занимает оставшееся место после sidebar */
+@media (min-width: 1024px) {
+    body > div.flex.h-full > div.flex-1 {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        width: auto !important;
+    }
+    
+    main {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+/* Ensure tables take full width */
+table {
+    width: 100%;
+    table-layout: auto;
+}
+
+/* Ensure cards take full width */
+.bg-white.rounded-lg.shadow-sm {
+    width: 100%;
+}
+
+/* Sidebar mobile behavior - ensure it's hidden by default */
+@media (max-width: 1023px) {
+    aside.fixed {
+        position: fixed !important;
+    }
+    
+    /* Убираем конфликтующие правила - Alpine.js и Tailwind управляют через классы */
+    aside.fixed.translate-x-0 {
+        transform: translateX(0) !important;
+    }
+    
+    aside.fixed.-translate-x-full {
+        transform: translateX(-100%) !important;
+    }
+    
+    /* Ensure sidebar doesn't block content when hidden */
+    aside.fixed.-translate-x-full {
+        pointer-events: none;
+    }
+}
+
+/* Print styles */
+@media print {
+    .sidebar,
+    .header,
+    .btn,
+    .dropdown {
+        display: none !important;
+    }
+}
+

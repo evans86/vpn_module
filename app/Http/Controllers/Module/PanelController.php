@@ -51,7 +51,7 @@ class PanelController extends Controller
 
             // Фильтр по серверу
             if ($request->filled('server')) {
-                $search = $request->server;
+                $search = $request->input('server');
                 $query->whereHas('server', function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
                         ->orWhere('ip', 'like', "%{$search}%");
@@ -60,7 +60,7 @@ class PanelController extends Controller
 
             // Фильтр по адресу панели
             if ($request->filled('panel_adress')) {
-                $query->where('panel_adress', 'like', "%{$request->panel_adress}%");
+                $query->where('panel_adress', 'like', "%{$request->input('panel_adress')}%");
             }
 
             // Фильтр по статусу
@@ -225,6 +225,47 @@ class PanelController extends Controller
 
             return redirect()->route('admin.module.panel.index')
                 ->with('error', 'Ошибка при обновлении конфигурации панели: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param Panel $panel
+     * @return RedirectResponse
+     */
+    public function destroy(Panel $panel): RedirectResponse
+    {
+        try {
+            $this->logger->info('Удаление панели', [
+                'source' => 'panel',
+                'action' => 'destroy',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id
+            ]);
+
+            $panel->delete();
+
+            $this->logger->info('Панель успешно удалена', [
+                'source' => 'panel',
+                'action' => 'destroy',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'Панель успешно удалена');
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при удалении панели', [
+                'source' => 'panel',
+                'action' => 'destroy',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Ошибка при удалении панели: ' . $e->getMessage());
         }
     }
 }
