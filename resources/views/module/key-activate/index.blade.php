@@ -48,7 +48,17 @@
                     description="Попробуйте изменить параметры фильтрации" />
             @else
                 <x-admin.table :headers="['ID', 'Трафик', 'Пакет продавца', 'Пакет модуля', 'Продавец', 'Дата окончания', 'Telegram ID', 'Пользователь сервера', 'Статус', 'Действия']">
+                    @php
+                        $totalKeys = $activate_keys->count();
+                        $currentIndex = 0;
+                    @endphp
                     @foreach($activate_keys as $key)
+                        @php
+                            $currentIndex++;
+                            // Если записей 3 или меньше, все меню открываются сверху
+                            // Если записей больше 3, последние 3 открываются сверху
+                            $isLastRows = $totalKeys <= 3 || $currentIndex > ($totalKeys - 3);
+                        @endphp
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 whitespace-nowrap text-sm">
                                 <div class="flex items-center">
@@ -131,12 +141,7 @@
                                 @endif
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                    {{ $key->getStatusBadgeClass() === 'success' ? 'bg-green-100 text-green-800' : '' }}
-                                    {{ $key->getStatusBadgeClass() === 'danger' ? 'bg-red-100 text-red-800' : '' }}
-                                    {{ $key->getStatusBadgeClass() === 'warning' ? 'bg-yellow-100 text-yellow-800' : '' }}
-                                    {{ $key->getStatusBadgeClass() === 'info' ? 'bg-blue-100 text-blue-800' : '' }}
-                                    {{ $key->getStatusBadgeClass() === 'secondary' ? 'bg-gray-100 text-gray-800' : '' }}">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $key->getStatusBadgeClassSalesman() }}">
                                     {{ $key->getStatusText() }}
                                 </span>
                             </td>
@@ -151,7 +156,7 @@
                                          @click.away="open = false"
                                          x-cloak
                                          x-transition
-                                         class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                                         class="absolute right-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 @if($isLastRows)origin-bottom-right bottom-full mb-2 @elseorigin-top-right top-full mt-2 @endif">
                                         <div class="py-1">
                                             @if($key->user_tg_id)
                                                 <button type="button"

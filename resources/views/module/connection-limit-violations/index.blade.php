@@ -226,7 +226,9 @@
                             @foreach($violations as $violation)
                                 @php
                                     $currentIndex++;
-                                    $isLastRows = $currentIndex > ($totalViolations - 3);
+                                    // Если записей 3 или меньше, все меню открываются сверху
+                                    // Если записей больше 3, последние 3 открываются сверху
+                                    $isLastRows = $totalViolations <= 3 || $currentIndex > ($totalViolations - 3);
                                 @endphp
                                 <tr class="hover:bg-gray-50">
                                     <td class="px-6 py-4 whitespace-nowrap">
@@ -420,7 +422,7 @@
                                                  x-transition:leave-start="transform opacity-100 scale-100"
                                                  x-transition:leave-end="transform opacity-0 scale-95"
                                                  @click.away="open = false"
-                                                 class="absolute right-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50 @if($isLastRows)origin-bottom-right bottom-full mb-2 @elseorigin-top-right top-full mt-2 @endif"
+                                                 class="absolute right-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50 @if($isLastRows)origin-bottom-right bottom-full mb-2 @else origin-top-right top-full mt-2 @endif"
                                                  style="display: none;">
                                                 <div class="py-1" role="menu">
                                                     <button type="button" 
@@ -655,34 +657,25 @@
                 }
             }
 
-            // Выделение всех чекбоксов
-            function initSelectAll() {
-                const selectAllCheckbox = document.getElementById('selectAll');
-                if (!selectAllCheckbox) return;
-                
-                // Удаляем все старые обработчики
-                const newCheckbox = selectAllCheckbox.cloneNode(true);
-                selectAllCheckbox.parentNode.replaceChild(newCheckbox, selectAllCheckbox);
-                
-                newCheckbox.addEventListener('change', function(e) {
-                    e.stopPropagation();
+            // Выделение всех чекбоксов - используем простой подход
+            const selectAllCheckbox = document.getElementById('selectAll');
+            if (selectAllCheckbox) {
+                selectAllCheckbox.onchange = function() {
                     const checkboxes = document.querySelectorAll('.violation-checkbox');
                     const isChecked = this.checked;
                     checkboxes.forEach(function(checkbox) {
                         checkbox.checked = isChecked;
                     });
                     updateSelectedCount();
-                });
+                };
             }
 
-            // Инициализация чекбокса "выбрать все"
-            initSelectAll();
-
-            // Обновление счетчика при изменении чекбоксов - используем делегирование
-            document.addEventListener('change', function(e) {
-                if (e.target && e.target.classList.contains('violation-checkbox')) {
+            // Обновление счетчика при изменении чекбоксов
+            const violationCheckboxes = document.querySelectorAll('.violation-checkbox');
+            violationCheckboxes.forEach(function(checkbox) {
+                checkbox.onchange = function() {
                     updateSelectedCount();
-                }
+                };
             });
 
             // Инициализация
@@ -743,31 +736,32 @@
         const executeBulkActionBtn = document.getElementById('executeBulkAction');
         if (executeBulkActionBtn) {
             executeBulkActionBtn.addEventListener('click', function () {
-            const selectedIds = Array.from(document.querySelectorAll('.violation-checkbox:checked'))
-                .map(checkbox => checkbox.value);
+                const selectedIds = Array.from(document.querySelectorAll('.violation-checkbox:checked'))
+                    .map(checkbox => checkbox.value);
 
-            const action = document.getElementById('bulkActionSelect').value;
-            const button = this;
+                const action = document.getElementById('bulkActionSelect');
+                const actionValue = action ? action.value : '';
+                const button = this;
 
-            if (!action) {
-                showToast('Выберите действие', 'warning');
-                return;
-            }
+                if (!actionValue) {
+                    toastr.warning('Выберите действие');
+                    return;
+                }
 
-            if (selectedIds.length === 0) {
-                showToast('Выберите нарушения', 'warning');
-                return;
-            }
+                if (selectedIds.length === 0) {
+                    toastr.warning('Выберите нарушения');
+                    return;
+                }
 
-            // Показываем индикатор загрузки
-            const originalText = button.innerHTML;
-            button.disabled = true;
-            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Обработка...';
+                // Показываем индикатор загрузки
+                const originalText = button.innerHTML;
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Обработка...';
 
-            const form = document.getElementById('bulkForm');
-            const formData = new FormData(form);
-            formData.append('action', action);
-            selectedIds.forEach(id => formData.append('violation_ids[]', id));
+                const formData = new FormData();
+                formData.append('action', actionValue);
+                formData.append('_token', document.querySelector('meta[name="csrf-token"]').getAttribute('content'));
+                selectedIds.forEach(id => formData.append('violation_ids[]', id));
 
             fetch('{{ route("admin.module.connection-limit-violations.bulk-actions") }}', {
                 method: 'POST',

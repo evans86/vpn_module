@@ -58,7 +58,9 @@
                     @foreach($panels as $panel)
                         @php
                             $currentIndex++;
-                            $isLastRows = $currentIndex > ($totalPanels - 3);
+                            // Если записей 3 или меньше, все меню открываются сверху
+                            // Если записей больше 3, последние 3 открываются сверху
+                            $isLastRows = $totalPanels <= 3 || $currentIndex > ($totalPanels - 3);
                         @endphp
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
