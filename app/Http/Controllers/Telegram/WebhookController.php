@@ -44,7 +44,7 @@ class WebhookController extends Controller
 
             return response()->json(['status' => 'success']);
         } catch (Exception $e) {
-            Log::error('Error processing father bot webhook', [
+            Log::warning('Error processing father bot webhook', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'request_body' => $request->getContent()
