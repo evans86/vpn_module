@@ -12,8 +12,7 @@ class ProcessViolationsCommand extends Command
 {
     protected $signature = 'violations:process
                             {--auto-resolve-hours=72 : Автоматически решать нарушения старше N часов}
-                            {--auto-reissue-threshold=3 : Автоматически перевыпускать ключи при N+ нарушениях}
-                            {--notify-new : Отправлять уведомления для новых нарушений (по умолчанию false)}';
+                            {--auto-reissue-threshold=3 : Автоматически перевыпускать ключи при N+ нарушениях}';
 
     protected $description = 'Автоматическая обработка нарушений лимитов подключений';
 
@@ -35,7 +34,6 @@ class ProcessViolationsCommand extends Command
 
         $autoResolveHours = (int) $this->option('auto-resolve-hours');
         $autoReissueThreshold = (int) $this->option('auto-reissue-threshold');
-        $notifyNew = $this->option('notify-new'); // true только если явно указан флаг
 
         $stats = [
             'notifications_sent' => 0,
@@ -45,17 +43,13 @@ class ProcessViolationsCommand extends Command
         ];
 
         try {
-            // 1. Отправка уведомлений для новых нарушений
-            if ($notifyNew) {
-                $this->info('📧 Отправка уведомлений для новых нарушений...');
-                $stats['notifications_sent'] = $this->processNewViolations();
-            }
+            // 1. Обработка нарушений: отправка уведомлений и перевыпуск ключей
+            $this->info('📧 Обработка нарушений (уведомления и перевыпуск ключей)...');
+            $result = $this->processViolations();
+            $stats['notifications_sent'] = $result['notifications_sent'];
+            $stats['keys_reissued'] = $result['keys_reissued'];
 
-            // 2. Автоматический перевыпуск ключей при критических нарушениях
-            $this->info("🔑 Проверка критических нарушений (≥{$autoReissueThreshold})...");
-            $stats['keys_reissued'] = $this->processCriticalViolations($autoReissueThreshold);
-
-            // 3. Автоматическое решение старых нарушений
+            // 2. Автоматическое решение старых нарушений
             $this->info("⏰ Автоматическое решение нарушений старше {$autoResolveHours} часов...");
             $stats['auto_resolved'] = $this->autoResolveOldViolations($autoResolveHours);
 
@@ -80,18 +74,18 @@ class ProcessViolationsCommand extends Command
     }
 
     /**
-     * Обработка новых нарушений - отправка уведомлений
+     * Обработка нарушений: отправка уведомлений и перевыпуск ключей
+     * Логика: при каждом нарушении (1, 2, 3) отправляем уведомление, при 3-м - перевыпускаем ключ
      */
-    private function processNewViolations(): int
+    private function processViolations(): array
     {
-        $count = 0;
+        $notificationsSent = 0;
+        $keysReissued = 0;
 
-        // Находим активные нарушения без уведомлений или с последним уведомлением старше 24 часов
+        // Находим активные нарушения, которые требуют обработки
+        // Обрабатываем нарушения, где уведомление еще не отправлено для текущего количества нарушений
         $violations = ConnectionLimitViolation::where('status', ConnectionLimitViolation::STATUS_ACTIVE)
-            ->where(function ($query) {
-                $query->whereNull('last_notification_sent_at')
-                    ->orWhere('last_notification_sent_at', '<', now()->subHours(24));
-            })
+            ->whereNull('key_replaced_at') // Ключ еще не был заменен
             ->where('created_at', '>=', now()->subDays(7)) // Только за последнюю неделю
             ->with('keyActivate')
             ->get();
@@ -103,64 +97,41 @@ class ProcessViolationsCommand extends Command
                     continue;
                 }
 
-                // Отправляем уведомление
-                if ($this->manualService->sendUserNotification($violation)) {
-                    $count++;
-                    $this->line("   ✓ Уведомление отправлено для нарушения #{$violation->id}");
+                $violationCount = $violation->violation_count;
+                $notificationsCount = $violation->getNotificationsSentCount();
+
+                // Отправляем уведомление если еще не отправлено для текущего количества нарушений
+                // Логика: при 1-м нарушении отправляем 1 уведомление, при 2-м - 2-е, при 3-м - 3-е
+                if ($notificationsCount < $violationCount) {
+                    if ($this->manualService->sendUserNotification($violation)) {
+                        $notificationsSent++;
+                        $this->line("   ✓ Уведомление отправлено для нарушения #{$violation->id} (нарушение #{$violationCount})");
+                    }
+                }
+
+                // При 3-м нарушении перевыпускаем ключ
+                if ($violationCount >= 3 && is_null($violation->key_replaced_at)) {
+                    $newKey = $this->manualService->reissueKey($violation);
+                    if ($newKey) {
+                        $keysReissued++;
+                        $this->line("   ✓ Ключ перевыпущен для нарушения #{$violation->id} (новый ключ: {$newKey->id})");
+                    }
                 }
 
             } catch (\Exception $e) {
-                Log::error('Ошибка отправки уведомления при автоматической обработке', [
+                Log::error('Ошибка обработки нарушения', [
                     'violation_id' => $violation->id,
                     'error' => $e->getMessage()
                 ]);
             }
         }
 
-        return $count;
+        return [
+            'notifications_sent' => $notificationsSent,
+            'keys_reissued' => $keysReissued
+        ];
     }
 
-    /**
-     * Обработка критических нарушений - автоматический перевыпуск ключей
-     */
-    private function processCriticalViolations(int $threshold): int
-    {
-        $count = 0;
-
-        // Находим активные нарушения с количеством >= threshold, которые еще не были перевыпущены
-        $violations = ConnectionLimitViolation::where('status', ConnectionLimitViolation::STATUS_ACTIVE)
-            ->where('violation_count', '>=', $threshold)
-            ->whereNull('key_replaced_at') // Ключ еще не был заменен
-            ->where('created_at', '>=', now()->subDays(30)) // Только за последний месяц
-            ->with('keyActivate')
-            ->get();
-
-        foreach ($violations as $violation) {
-            try {
-                // Проверяем что ключ еще существует и активен
-                if (!$violation->keyActivate || $violation->keyActivate->status !== \App\Models\KeyActivate\KeyActivate::ACTIVE) {
-                    // Помечаем нарушение как решенное если ключ уже неактивен
-                    $this->monitorService->resolveViolation($violation);
-                    continue;
-                }
-
-                // Перевыпускаем ключ
-                $newKey = $this->manualService->reissueKey($violation);
-                if ($newKey) {
-                    $count++;
-                    $this->line("   ✓ Ключ перевыпущен для нарушения #{$violation->id} (новый ключ: {$newKey->id})");
-                }
-
-            } catch (\Exception $e) {
-                Log::error('Ошибка перевыпуска ключа при автоматической обработке', [
-                    'violation_id' => $violation->id,
-                    'error' => $e->getMessage()
-                ]);
-            }
-        }
-
-        return $count;
-    }
 
     /**
      * Автоматическое решение старых нарушений

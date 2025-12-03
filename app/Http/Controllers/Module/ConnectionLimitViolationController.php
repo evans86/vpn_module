@@ -88,8 +88,8 @@ class ConnectionLimitViolationController extends Controller
     public function manualCheck(Request $request)
     {
         try {
-            $threshold = $request->get('threshold', 2);
-            $windowMinutes = $request->get('window', 60);
+            $threshold = $request->get('threshold', 3);
+            $windowMinutes = $request->get('window', 15);
 
             $results = $this->manualService->manualViolationCheck($threshold, $windowMinutes);
 

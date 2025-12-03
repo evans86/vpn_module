@@ -25,7 +25,7 @@ class ConnectionMonitorService
     /**
      * ИСПРАВЛЕННЫЙ мониторинг с новой логикой нарушений
      */
-    public function monitorFixed(int $threshold = 2, int $windowMinutes = 60): array
+    public function monitorFixed(int $threshold = 3, int $windowMinutes = 15): array
     {
         $servers = Server::where('server_status', Server::SERVER_CONFIGURED)->get();
 

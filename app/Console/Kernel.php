@@ -38,9 +38,14 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->appendOutputTo(storage_path('logs/key-notifications.log'));
 
-        // Автоматическая обработка нарушений (отправка уведомлений, авто-решение) каждый час
-        // Примечание: Проверка нарушений уже настроена в cron вручную (каждые 10 минут)
-        $schedule->command('violations:process --notify-new')
+        // Проверка нарушений лимитов подключений каждые 10 минут с окном 15 минут
+        $schedule->command('vpn:monitor-fixed --threshold=3 --window=15')
+            ->everyTenMinutes()
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/vpn-monitor.log'));
+
+        // Автоматическая обработка нарушений (отправка уведомлений, перевыпуск ключей, авто-решение) каждый час
+        $schedule->command('violations:process')
             ->hourly()
             ->withoutOverlapping()
             ->appendOutputTo(storage_path('logs/violation-process.log'));

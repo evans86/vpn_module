@@ -32,7 +32,8 @@
                                    value="15" 
                                    min="1" 
                                    max="1440"
-                                   class="mt-1 block w-24 rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm">
+                                   class="mt-1 block w-24 rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm"
+                                   title="Окно проверки в минутах (по умолчанию 15 минут)">
                         </div>
                         <button type="submit" class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                             <i class="fas fa-search mr-1"></i> Проверить
@@ -795,7 +796,8 @@
                     button.innerHTML = originalText;
                     showToast('Ошибка при выполнении действия', 'error');
                 });
-        });
+            });
+        }
 
         // Функции для отдельных действий
         function sendNotification(violationId) {

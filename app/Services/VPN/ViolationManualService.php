@@ -28,7 +28,7 @@ class ViolationManualService
     /**
      * Ручная проверка нарушений
      */
-    public function manualViolationCheck(int $threshold = 2, int $windowMinutes = 60): array
+    public function manualViolationCheck(int $threshold = 3, int $windowMinutes = 15): array
     {
         $this->logger->info('Запущена ручная проверка нарушений', [
             'threshold' => $threshold,
@@ -416,13 +416,44 @@ class ViolationManualService
     private function sendKeyReplacementNotification(ConnectionLimitViolation $violation, KeyActivate $newKey): bool
     {
         try {
-            $message = "🔄 <b>Ваш ключ был перевыпущен</b>\n\n";
-            $message .= "В связи с нарушениями правил использования ваш ключ был заменен на новый.\n\n";
-            $message .= "🔑 <b>Новый ключ:</b> <code>{$newKey->id}</code>\n";
-            $message .= "🔗 <b>Конфигурация:</b> https://vpn-telegram.com/config/{$newKey->id}\n\n";
-            $message .= "⚠️ Пожалуйста, используйте VPN согласно правилам.";
+            // Используем форматирование из ConnectionLimitMonitorService, но с новым ключом
+            $message = "🔴 <b>Ключ заменен за нарушения</b>\n\n";
+            $message .= "Превышен лимит нарушений правил использования.\n";
+            $message .= "Ваш ключ доступа был автоматически заменен.\n\n";
+            $message .= "Новый ключ: <code>{$newKey->id}</code>\n";
+            $message .= "🔗 Конфигурация: https://vpn-telegram.com/config/{$newKey->id}";
 
-            return $this->limitMonitorService->sendViolationNotification($violation);
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        [
+                            'text' => '🔗 Открыть конфигурацию',
+                            'url' => "https://vpn-telegram.com/config/{$newKey->id}"
+                        ]
+                    ],
+                    [
+                        [
+                            'text' => '🆕 Новый ключ',
+                            'url' => "https://vpn-telegram.com/config/{$newKey->id}"
+                        ]
+                    ]
+                ]
+            ];
+
+            // Отправляем уведомление напрямую через notificationService
+            $notificationService = app(\App\Services\Notification\TelegramNotificationService::class);
+            $result = $notificationService->sendToUser($newKey, $message, $keyboard);
+
+            if ($result) {
+                $this->logger->info('Уведомление о замене ключа отправлено', [
+                    'violation_id' => $violation->id,
+                    'old_key_id' => $violation->key_activate_id,
+                    'new_key_id' => $newKey->id,
+                    'user_tg_id' => $newKey->user_tg_id
+                ]);
+            }
+
+            return $result;
         } catch (\Exception $e) {
             Log::error('Ошибка отправки уведомления о замене ключа', [
                 'violation_id' => $violation->id,

@@ -8,8 +8,8 @@ use App\Services\VPN\ConnectionMonitorService;
 class MonitorConnectionLimits extends Command
 {
     protected $signature = 'vpn:monitor-fixed
-                            {--threshold=2 : Maximum allowed unique IPs}
-                            {--window=60 : Time window in minutes}';
+                            {--threshold=3 : Maximum allowed unique IPs (violation at 4+ IPs)}
+                            {--window=15 : Time window in minutes}';
 
     protected $description = 'Fixed VPN connection monitoring with proper parsing';
 
