@@ -83,10 +83,21 @@ class ProcessViolationsCommand extends Command
         $keysReissued = 0;
 
         // Находим активные нарушения, которые требуют обработки
-        // Обрабатываем нарушения, где уведомление еще не отправлено для текущего количества нарушений
+        // 1. Нарушения, где уведомление еще не отправлено для текущего количества нарушений
+        // 2. Нарушения с техническими ошибками для повторной попытки (не более 3 попыток)
         $violations = ConnectionLimitViolation::where('status', ConnectionLimitViolation::STATUS_ACTIVE)
             ->whereNull('key_replaced_at') // Ключ еще не был заменен
             ->where('created_at', '>=', now()->subDays(7)) // Только за последнюю неделю
+            ->where(function($query) {
+                // Либо уведомление еще не отправлено для текущего количества нарушений
+                $query->whereRaw('notifications_sent < violation_count')
+                    // Либо есть техническая ошибка и попыток меньше 3
+                    ->orWhere(function($q) {
+                        $q->where('last_notification_status', 'technical_error')
+                          ->where('notification_retry_count', '<', 3)
+                          ->where('last_notification_sent_at', '<=', now()->subMinutes(30)); // Повторная попытка через 30 минут
+                    });
+            })
             ->with('keyActivate')
             ->get();
 
@@ -103,13 +114,24 @@ class ProcessViolationsCommand extends Command
                 // Отправляем уведомление если еще не отправлено для текущего количества нарушений
                 // Логика: при 1-м нарушении отправляем 1 уведомление, при 2-м - 2-е, при 3-м - 3-е
                 if ($notificationsCount < $violationCount) {
-                    if ($this->manualService->sendUserNotification($violation)) {
+                    $result = $this->manualService->sendUserNotification($violation);
+                    if ($result) {
                         $notificationsSent++;
-                        $this->line("   ✓ Уведомление отправлено для нарушения #{$violation->id} (нарушение #{$violationCount})");
+                        $status = $violation->last_notification_status ?? 'unknown';
+                        $statusText = $status === 'blocked' ? ' (пользователь заблокировал бота)' : '';
+                        $this->line("   ✓ Уведомление засчитано для нарушения #{$violation->id} (нарушение #{$violationCount}){$statusText}");
+                    } else {
+                        // Техническая ошибка - логируем для повторной попытки
+                        $retryCount = $violation->notification_retry_count ?? 0;
+                        if ($retryCount < 3) {
+                            $this->line("   ⚠ Техническая ошибка отправки для нарушения #{$violation->id} (попытка {$retryCount}/3)");
+                        } else {
+                            $this->line("   ❌ Не удалось отправить уведомление для нарушения #{$violation->id} после 3 попыток");
+                        }
                     }
                 }
 
-                // При 3-м нарушении перевыпускаем ключ
+                // При 3-м нарушении перевыпускаем ключ (независимо от статуса отправки уведомления)
                 if ($violationCount >= 3 && is_null($violation->key_replaced_at)) {
                     $newKey = $this->manualService->reissueKey($violation);
                     if ($newKey) {

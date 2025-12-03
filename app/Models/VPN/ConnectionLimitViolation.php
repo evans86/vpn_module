@@ -25,6 +25,9 @@ class ConnectionLimitViolation extends Model
         'resolved_at',
         'notifications_sent', // Добавляем счетчик уведомлений
         'last_notification_sent_at', // Время последнего уведомления
+        'last_notification_status', // Статус последней отправки (success, blocked, technical_error)
+        'last_notification_error', // Текст последней ошибки
+        'notification_retry_count', // Счетчик попыток при технических ошибках
         'key_replaced_at', // Когда ключ был заменен
         'replaced_key_id' // ID нового ключа если был заменен
     ];

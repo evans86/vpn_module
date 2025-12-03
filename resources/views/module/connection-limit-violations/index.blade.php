@@ -332,8 +332,20 @@
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        @php
+                                            $tooltipText = 'Отправлено уведомлений: ' . $violation->getNotificationsSentCount();
+                                            if ($violation->getLastNotificationTime()) {
+                                                $tooltipText .= "\nПоследнее: " . $violation->getLastNotificationTimeFormatted();
+                                            }
+                                            if ($violation->last_notification_status) {
+                                                $tooltipText .= "\nСтатус: " . $violation->last_notification_status;
+                                            }
+                                            if ($violation->last_notification_error) {
+                                                $tooltipText .= "\nОшибка: " . $violation->last_notification_error;
+                                            }
+                                        @endphp
                                         <div class="flex items-center"
-                                             title="Отправлено уведомлений: {{ $violation->getNotificationsSentCount() }}@if($violation->getLastNotificationTime())&#10;Последнее: {{ $violation->getLastNotificationTimeFormatted() }}@endif">
+                                             title="{{ $tooltipText }}">
                                             <i class="{{ $violation->notification_icon }} mr-1 text-gray-400"></i>
                                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
                                                 {{ $violation->getNotificationsSentCount() }}
@@ -344,6 +356,35 @@
                                                 </small>
                                             @else
                                                 <small class="text-gray-400 ml-1 text-xs">—</small>
+                                            @endif
+                                            @if($violation->last_notification_status)
+                                                @php
+                                                    $statusColors = [
+                                                        'success' => 'text-green-600',
+                                                        'blocked' => 'text-orange-600',
+                                                        'technical_error' => 'text-red-600',
+                                                        'user_not_found' => 'text-gray-600'
+                                                    ];
+                                                    $statusIcons = [
+                                                        'success' => 'fa-check-circle',
+                                                        'blocked' => 'fa-ban',
+                                                        'technical_error' => 'fa-exclamation-triangle',
+                                                        'user_not_found' => 'fa-user-slash'
+                                                    ];
+                                                    $color = $statusColors[$violation->last_notification_status] ?? 'text-gray-600';
+                                                    $icon = $statusIcons[$violation->last_notification_status] ?? 'fa-info-circle';
+                                                    $iconTooltip = 'Статус: ' . $violation->last_notification_status;
+                                                    if ($violation->last_notification_error) {
+                                                        $iconTooltip .= "\nОшибка: " . $violation->last_notification_error;
+                                                    }
+                                                @endphp
+                                                <i class="fas {{ $icon }} ml-2 {{ $color }}" 
+                                                   title="{{ $iconTooltip }}"></i>
+                                            @endif
+                                            @if(($violation->notification_retry_count ?? 0) > 0)
+                                                <span class="ml-1 text-xs text-yellow-600" title="Попыток повторной отправки: {{ $violation->notification_retry_count }}">
+                                                    ({{ $violation->notification_retry_count }})
+                                                </span>
                                             @endif
                                         </div>
                                     </td>

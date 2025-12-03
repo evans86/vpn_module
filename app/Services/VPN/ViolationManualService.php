@@ -246,21 +246,45 @@ class ViolationManualService
     public function sendUserNotification(ConnectionLimitViolation $violation): bool
     {
         try {
-            // Используем метод из ConnectionLimitMonitorService
-            $result = $this->limitMonitorService->sendViolationNotification($violation);
+            // Используем новый метод с детальным результатом
+            $result = $this->limitMonitorService->sendViolationNotificationWithResult($violation);
 
-            if ($result) {
+            // Если уведомление должно считаться отправленным (успешно или заблокирован)
+            if ($result->shouldCountAsSent) {
                 // Увеличиваем счетчик уведомлений
                 $violation->incrementNotifications();
 
-                $this->logger->info('Уведомление отправлено пользователю', [
+                // Сохраняем информацию о статусе отправки
+                $violation->last_notification_status = $result->status;
+                $violation->last_notification_error = $result->errorMessage;
+                $violation->save();
+
+                $this->logger->info('Уведомление засчитано как отправленное', [
                     'violation_id' => $violation->id,
+                    'status' => $result->status,
                     'notifications_count' => $violation->getNotificationsSentCount(),
+                    'user_tg_id' => $violation->user_tg_id,
+                    'is_blocked' => $result->isBlocked()
+                ]);
+
+                return true;
+            } else {
+                // Техническая ошибка - сохраняем для повторной попытки
+                $violation->last_notification_status = $result->status;
+                $violation->last_notification_error = $result->errorMessage;
+                $violation->notification_retry_count = ($violation->notification_retry_count ?? 0) + 1;
+                $violation->save();
+
+                $this->logger->warning('Уведомление не доставлено (техническая ошибка)', [
+                    'violation_id' => $violation->id,
+                    'status' => $result->status,
+                    'error' => $result->errorMessage,
+                    'retry_count' => $violation->notification_retry_count,
                     'user_tg_id' => $violation->user_tg_id
                 ]);
-            }
 
-            return $result;
+                return false;
+            }
 
         } catch (\Exception $e) {
             Log::error('Ошибка отправки уведомления', [

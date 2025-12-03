@@ -203,42 +203,248 @@
         </x-admin.card>
         @endif
 
-        <!-- История действий -->
-        <x-admin.card title="История действий">
-            <div class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Отправлено уведомлений</label>
-                        <p class="text-sm text-gray-900">
-                            <i class="{{ $violation->notification_icon }} mr-1"></i>
-                            {{ $violation->getNotificationsSentCount() }}
-                        </p>
-                    </div>
+        <!-- Информация о логике работы -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h5 class="font-semibold text-blue-900 mb-2 flex items-center">
+                <i class="fas fa-info-circle mr-2"></i> Как работает система уведомлений
+            </h5>
+            <div class="text-sm text-blue-800 space-y-1">
+                <p><strong>1-е нарушение:</strong> Отправляется уведомление-предупреждение</p>
+                <p><strong>2-е нарушение:</strong> Отправляется повторное уведомление-предупреждение</p>
+                <p><strong>3-е нарушение:</strong> Отправляется уведомление и автоматически перевыпускается ключ</p>
+                <p class="mt-2 text-xs text-blue-700">
+                    <i class="fas fa-shield-alt mr-1"></i>
+                    <strong>Важно:</strong> Если пользователь заблокировал бота, уведомление все равно засчитывается как отправленное, и система продолжает работать по той же логике.
+                </p>
+            </div>
+        </div>
 
-                    @if($violation->last_notification_sent_at)
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Последнее уведомление</label>
-                        <p class="text-sm text-gray-900">{{ $violation->getLastNotificationTimeFormatted() }}</p>
+        <!-- Детальная информация об уведомлениях -->
+        <x-admin.card title="Детальная информация об уведомлениях">
+            <div class="space-y-6">
+                <!-- Общая статистика -->
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h5 class="text-sm font-semibold text-blue-900 mb-3">Общая статистика</h5>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-blue-700 mb-1">Отправлено уведомлений</label>
+                            <p class="text-lg font-bold text-blue-900">
+                                <i class="{{ $violation->notification_icon }} mr-1"></i>
+                                {{ $violation->getNotificationsSentCount() }} из {{ $violation->violation_count }}
+                            </p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-blue-700 mb-1">Ожидается уведомлений</label>
+                            <p class="text-lg font-bold text-blue-900">
+                                @php
+                                    $expected = $violation->violation_count - $violation->getNotificationsSentCount();
+                                @endphp
+                                @if($expected > 0)
+                                    <span class="text-orange-600">{{ $expected }}</span>
+                                @else
+                                    <span class="text-green-600">0 (все отправлены)</span>
+                                @endif
+                            </p>
+                        </div>
+                        @if(($violation->notification_retry_count ?? 0) > 0)
+                        <div>
+                            <label class="block text-xs font-medium text-blue-700 mb-1">Попыток повторной отправки</label>
+                            <p class="text-lg font-bold text-yellow-600">
+                                <i class="fas fa-redo mr-1"></i>
+                                {{ $violation->notification_retry_count }}
+                            </p>
+                        </div>
+                        @endif
                     </div>
-                    @endif
-
-                    @if($violation->isKeyReplaced())
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Ключ заменен</label>
-                        <p class="text-sm text-gray-900">
-                            <i class="fas fa-check-circle text-green-600 mr-1"></i>
-                            {{ $violation->key_replaced_at->format('d.m.Y H:i:s') }}
-                        </p>
-                    </div>
-
-                    @if($violation->getReplacedKeyId())
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Новый ключ</label>
-                        <p class="text-sm text-gray-900 font-mono break-all">{{ $violation->getReplacedKeyId() }}</p>
-                    </div>
-                    @endif
-                    @endif
                 </div>
+
+                <!-- Статус последней отправки -->
+                @if($violation->last_notification_sent_at || $violation->last_notification_status)
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <h5 class="text-sm font-semibold text-gray-900 mb-3">Последняя попытка отправки</h5>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        @if($violation->last_notification_sent_at)
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Время отправки</label>
+                            <p class="text-sm text-gray-900 font-semibold">
+                                {{ $violation->last_notification_sent_at->format('d.m.Y H:i:s') }}
+                                <span class="text-gray-500 ml-2">({{ $violation->last_notification_sent_at->diffForHumans() }})</span>
+                            </p>
+                        </div>
+                        @endif
+
+                        @if($violation->last_notification_status)
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Статус отправки</label>
+                            @php
+                                $statusConfig = [
+                                    'success' => [
+                                        'label' => 'Успешно отправлено',
+                                        'color' => 'green',
+                                        'icon' => 'fa-check-circle',
+                                        'bg' => 'bg-green-100',
+                                        'text' => 'text-green-800'
+                                    ],
+                                    'blocked' => [
+                                        'label' => 'Пользователь заблокировал бота',
+                                        'color' => 'orange',
+                                        'icon' => 'fa-ban',
+                                        'bg' => 'bg-orange-100',
+                                        'text' => 'text-orange-800',
+                                        'note' => 'Уведомление засчитано как отправленное'
+                                    ],
+                                    'technical_error' => [
+                                        'label' => 'Техническая ошибка',
+                                        'color' => 'red',
+                                        'icon' => 'fa-exclamation-triangle',
+                                        'bg' => 'bg-red-100',
+                                        'text' => 'text-red-800',
+                                        'note' => 'Будет повторная попытка'
+                                    ],
+                                    'user_not_found' => [
+                                        'label' => 'Пользователь не найден',
+                                        'color' => 'gray',
+                                        'icon' => 'fa-user-slash',
+                                        'bg' => 'bg-gray-100',
+                                        'text' => 'text-gray-800'
+                                    ]
+                                ];
+                                $status = $statusConfig[$violation->last_notification_status] ?? [
+                                    'label' => $violation->last_notification_status,
+                                    'color' => 'gray',
+                                    'icon' => 'fa-info-circle',
+                                    'bg' => 'bg-gray-100',
+                                    'text' => 'text-gray-800'
+                                ];
+                            @endphp
+                            <div>
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ $status['bg'] }} {{ $status['text'] }}">
+                                    <i class="fas {{ $status['icon'] }} mr-1"></i>
+                                    {{ $status['label'] }}
+                                </span>
+                                @if(isset($status['note']))
+                                <p class="text-xs text-gray-500 mt-1">{{ $status['note'] }}</p>
+                                @endif
+                            </div>
+                        </div>
+                        @endif
+
+                        @if($violation->last_notification_error)
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Текст ошибки</label>
+                            <div class="bg-red-50 border border-red-200 rounded p-3">
+                                <p class="text-xs font-mono text-red-800 break-all">{{ $violation->last_notification_error }}</p>
+                            </div>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+                @else
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <p class="text-sm text-gray-600">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        Уведомления еще не отправлялись
+                    </p>
+                </div>
+                @endif
+
+                <!-- История нарушений и уведомлений -->
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <h5 class="text-sm font-semibold text-gray-900 mb-3">История нарушений</h5>
+                    <div class="space-y-3">
+                        @for($i = 1; $i <= $violation->violation_count; $i++)
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
+                                    @if($i <= $violation->getNotificationsSentCount())
+                                        bg-green-100 text-green-800
+                                    @elseif($i == $violation->violation_count && $violation->last_notification_status === 'technical_error')
+                                        bg-yellow-100 text-yellow-800
+                                    @else
+                                        bg-gray-100 text-gray-400
+                                    @endif">
+                                    <i class="fas 
+                                        @if($i <= $violation->getNotificationsSentCount())
+                                            fa-check
+                                        @elseif($i == $violation->violation_count && $violation->last_notification_status === 'technical_error')
+                                            fa-clock
+                                        @else
+                                            fa-hourglass-half
+                                        @endif text-xs"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm font-medium text-gray-900">
+                                        Нарушение #{{ $i }}
+                                        @if($i == 1)
+                                            <span class="text-xs text-gray-500">(Первое предупреждение)</span>
+                                        @elseif($i == 2)
+                                            <span class="text-xs text-gray-500">(Второе предупреждение)</span>
+                                        @elseif($i == 3)
+                                            <span class="text-xs text-gray-500">(Третье - перевыпуск ключа)</span>
+                                        @endif
+                                    </p>
+                                    @if($i <= $violation->getNotificationsSentCount())
+                                        <p class="text-xs text-green-600">
+                                            <i class="fas fa-check-circle mr-1"></i>
+                                            Уведомление отправлено
+                                            @if($i == $violation->getNotificationsSentCount() && $violation->last_notification_status === 'blocked')
+                                                <span class="text-orange-600">(пользователь заблокировал бота)</span>
+                                            @endif
+                                        </p>
+                                    @elseif($i == $violation->violation_count && $violation->last_notification_status === 'technical_error')
+                                        <p class="text-xs text-yellow-600">
+                                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                                            Техническая ошибка - ожидается повторная попытка
+                                        </p>
+                                    @else
+                                        <p class="text-xs text-gray-500">
+                                            <i class="fas fa-clock mr-1"></i>
+                                            Ожидается отправка уведомления
+                                        </p>
+                                    @endif
+                                </div>
+                            </div>
+                            @if($i == 3 && $violation->isKeyReplaced())
+                            <div class="ml-4">
+                                <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                                    <i class="fas fa-key mr-1"></i>
+                                    Ключ перевыпущен
+                                </span>
+                            </div>
+                            @endif
+                        </div>
+                        @endfor
+                    </div>
+                </div>
+
+                <!-- Информация о замене ключа -->
+                @if($violation->isKeyReplaced())
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <h5 class="text-sm font-semibold text-green-900 mb-3">
+                        <i class="fas fa-key mr-2"></i>
+                        Информация о замене ключа
+                    </h5>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-green-700 mb-1">Дата замены</label>
+                            <p class="text-sm text-green-900 font-semibold">
+                                {{ $violation->key_replaced_at->format('d.m.Y H:i:s') }}
+                            </p>
+                        </div>
+                        @if($violation->getReplacedKeyId())
+                        <div>
+                            <label class="block text-xs font-medium text-green-700 mb-1">Новый ключ</label>
+                            <p class="text-sm text-green-900 font-mono break-all">
+                                <a href="{{ route('admin.module.key-activate.index', ['id' => $violation->getReplacedKeyId()]) }}" 
+                                   class="text-green-700 hover:text-green-900 underline">
+                                    {{ $violation->getReplacedKeyId() }}
+                                </a>
+                            </p>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+                @endif
             </div>
         </x-admin.card>
 

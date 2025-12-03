@@ -5,6 +5,7 @@ namespace App\Services\VPN;
 use App\Models\VPN\ConnectionLimitViolation;
 use App\Models\KeyActivate\KeyActivate;
 use App\Logging\DatabaseLogger;
+use App\Dto\Notification\NotificationResult;
 use Illuminate\Support\Facades\Log;
 use App\Services\Notification\TelegramNotificationService;
 
@@ -242,9 +243,18 @@ class ConnectionLimitMonitorService
     }
 
     /**
-     * Отправка уведомления пользователю о нарушении
+     * Отправка уведомления пользователю о нарушении (старый метод для обратной совместимости)
      */
     public function sendViolationNotification(ConnectionLimitViolation $violation): bool
+    {
+        $result = $this->sendViolationNotificationWithResult($violation);
+        return $result->shouldCountAsSent;
+    }
+
+    /**
+     * Отправка уведомления пользователю о нарушении с детальным результатом
+     */
+    public function sendViolationNotificationWithResult(ConnectionLimitViolation $violation): NotificationResult
     {
         try {
             $keyActivate = $violation->keyActivate;
@@ -254,20 +264,34 @@ class ConnectionLimitMonitorService
                     'violation_id' => $violation->id,
                     'key_activate_id' => $violation->key_activate_id
                 ]);
-                return false;
+                return NotificationResult::userNotFound();
             }
 
             $message = $this->formatViolationMessage($violation);
             $keyboard = $this->getViolationKeyboard($violation);
 
-            // Отправляем уведомление пользователю
-            $result = $this->notificationService->sendToUser($keyActivate, $message, $keyboard);
+            // Отправляем уведомление пользователю с детальным результатом
+            $result = $this->notificationService->sendToUserWithResult($keyActivate, $message, $keyboard);
 
-            if ($result) {
-                $this->logger->info('Уведомление о нарушении отправлено', [
+            if ($result->isSuccess()) {
+                $this->logger->info('Уведомление о нарушении отправлено успешно', [
                     'violation_id' => $violation->id,
                     'user_tg_id' => $keyActivate->user_tg_id,
                     'violation_count' => $violation->violation_count
+                ]);
+            } elseif ($result->isBlocked()) {
+                $this->logger->warning('Уведомление не доставлено: пользователь заблокировал бота', [
+                    'violation_id' => $violation->id,
+                    'user_tg_id' => $keyActivate->user_tg_id,
+                    'violation_count' => $violation->violation_count,
+                    'error' => $result->errorMessage
+                ]);
+            } else {
+                $this->logger->error('Уведомление не доставлено: техническая ошибка', [
+                    'violation_id' => $violation->id,
+                    'user_tg_id' => $keyActivate->user_tg_id,
+                    'violation_count' => $violation->violation_count,
+                    'error' => $result->errorMessage
                 ]);
             }
 
@@ -278,7 +302,7 @@ class ConnectionLimitMonitorService
                 'violation_id' => $violation->id,
                 'error' => $e->getMessage()
             ]);
-            return false;
+            return NotificationResult::technicalError($e->getMessage());
         }
     }
 
