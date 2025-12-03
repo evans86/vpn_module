@@ -43,34 +43,34 @@ class ConnectionLimitMonitorService
                     'key_status' => $keyActivate->status,
                     'user_tg_id' => $keyActivate->user_tg_id
                 ]);
-                
+
                 // Если есть активное нарушение для этого ключа, помечаем его как решенное
                 // так как ключ больше не активен и нарушения не должны фиксироваться
                 $existingViolation = ConnectionLimitViolation::where([
                     'key_activate_id' => $keyActivate->id,
                     'status' => ConnectionLimitViolation::STATUS_ACTIVE
                 ])->first();
-                
+
                 if ($existingViolation) {
                     // Помечаем нарушение как решенное, так как ключ больше не активен
                     $existingViolation->status = ConnectionLimitViolation::STATUS_RESOLVED;
                     $existingViolation->resolved_at = now();
                     $existingViolation->save();
-                    
+
                     $this->logger->info('Нарушение помечено как решенное - ключ не активен', [
                         'violation_id' => $existingViolation->id,
                         'key_id' => $keyActivate->id,
                         'key_status' => $keyActivate->status
                     ]);
-                    
+
                     return $existingViolation;
                 }
-                
+
                 // Если нарушения нет, выбрасываем исключение
                 // Вызывающий код должен обработать это и не фиксировать нарушение
                 throw new \Exception('Ключ не активен (статус: ' . $keyActivate->status . '), нарушение не может быть зафиксировано');
             }
-            
+
             $allowedConnections = 3; // Лимит подключений
             $serverUser = $keyActivate->keyActivateUser->serverUser;
 
@@ -94,24 +94,24 @@ class ConnectionLimitMonitorService
                 // Проверяем, изменились ли IP адреса - если те же, это дубликат, пропускаем
                 $existingIps = $existingViolation->ip_addresses ?? [];
                 $currentIps = array_values(array_unique($ipAddresses));
-                
+
                 // Сортируем для сравнения
                 sort($existingIps);
                 sort($currentIps);
-                
+
                 // Если IP адреса идентичны и нарушение создано недавно (менее 15 минут назад), это дубликат
                 // ДОПОЛНИТЕЛЬНО: если уведомление было отправлено недавно (менее 2 минут назад), это тоже дубликат
                 $isDuplicateIps = $existingIps === $currentIps;
                 $isRecentViolation = $existingViolation->created_at->diffInMinutes(now()) < 15;
-                $isRecentNotification = $existingViolation->last_notification_sent_at && 
+                $isRecentNotification = $existingViolation->last_notification_sent_at &&
                                        $existingViolation->last_notification_sent_at->diffInSeconds(now()) < 120;
-                
+
                 if (($isDuplicateIps && $isRecentViolation) || $isRecentNotification) {
                     // Это дубликат из-за перекрытия окон или недавней отправки - просто обновляем время, но не увеличиваем счетчик
                     $existingViolation->actual_connections = $uniqueIpCount; // Обновляем количество на случай изменений
                     $existingViolation->created_at = now(); // Обновляем время последней проверки
                     $existingViolation->save();
-                    
+
                     $this->logger->info('Пропущено дублирующее нарушение (перекрытие окон или недавняя отправка)', [
                         'key_id' => $keyActivate->id,
                         'violation_id' => $existingViolation->id,
@@ -120,10 +120,10 @@ class ConnectionLimitMonitorService
                         'is_duplicate_ips' => $isDuplicateIps,
                         'is_recent_notification' => $isRecentNotification
                     ]);
-                    
+
                     return $existingViolation;
                 }
-                
+
                 // IP изменились или прошло достаточно времени - это новое нарушение
                 // Увеличиваем счетчик нарушений и обновляем данные
                 $existingViolation->violation_count += 1;
@@ -149,7 +149,7 @@ class ConnectionLimitMonitorService
                 if ($notificationsSent < $newViolationCount) {
                     // Дополнительная проверка: если уведомление было отправлено недавно (менее 1 минуты назад),
                     // и violation_count не изменился, не отправляем повторно (защита от гонок)
-                    if ($existingViolation->last_notification_sent_at && 
+                    if ($existingViolation->last_notification_sent_at &&
                         $existingViolation->last_notification_sent_at->diffInSeconds(now()) < 60 &&
                         $notificationsSent >= ($newViolationCount - 1)) {
                         $this->logger->info('Пропущена отправка уведомления - недавно уже было отправлено', [
@@ -160,7 +160,7 @@ class ConnectionLimitMonitorService
                         ]);
                         return $existingViolation;
                     }
-                    
+
                     try {
                         $result = $this->sendViolationNotificationWithResult($existingViolation);
                         if ($result->shouldCountAsSent) {
@@ -168,13 +168,13 @@ class ConnectionLimitMonitorService
                             $existingViolation->last_notification_status = $result->status;
                             $existingViolation->last_notification_error = $result->errorMessage;
                             $existingViolation->save();
-                            
+
                             $this->logger->info('Уведомление отправлено сразу при фиксации нарушения', [
                                 'violation_id' => $existingViolation->id,
                                 'violation_count' => $newViolationCount,
                                 'status' => $result->status
                             ]);
-                            
+
                             // При 3-м нарушении сразу перевыпускаем ключ
                             if ($newViolationCount >= 3 && is_null($existingViolation->key_replaced_at)) {
                                 try {
@@ -200,7 +200,7 @@ class ConnectionLimitMonitorService
                             $existingViolation->last_notification_error = $result->errorMessage;
                             $existingViolation->notification_retry_count = ($existingViolation->notification_retry_count ?? 0) + 1;
                             $existingViolation->save();
-                            
+
                             $this->logger->warning('Не удалось отправить уведомление при фиксации нарушения (будет повторная попытка)', [
                                 'violation_id' => $existingViolation->id,
                                 'violation_count' => $newViolationCount,
@@ -250,12 +250,12 @@ class ConnectionLimitMonitorService
                     $violation->last_notification_status = $result->status;
                     $violation->last_notification_error = $result->errorMessage;
                     $violation->save();
-                    
+
                     $this->logger->info('Уведомление отправлено сразу при фиксации первого нарушения', [
                         'violation_id' => $violation->id,
                         'status' => $result->status
                     ]);
-                    
+
                     // При 3-м нарушении сразу перевыпускаем ключ (хотя для первого нарушения это маловероятно)
                     if ($violation->violation_count >= 3 && is_null($violation->key_replaced_at)) {
                         try {
@@ -281,7 +281,7 @@ class ConnectionLimitMonitorService
                     $violation->last_notification_error = $result->errorMessage;
                     $violation->notification_retry_count = 1;
                     $violation->save();
-                    
+
                     $this->logger->warning('Не удалось отправить уведомление при фиксации первого нарушения (будет повторная попытка)', [
                         'violation_id' => $violation->id,
                         'status' => $result->status,
@@ -550,7 +550,7 @@ class ConnectionLimitMonitorService
                 . "Обнаружено превышение лимита одновременных подключений:\n"
                 . "• Разрешено: <b>{$allowedCount} подключения</b>\n"
                 . "• Обнаружено: <b>{$ipCount} подключений</b>\n\n"
-                . "Следующее нарушение приведет к смене ключа доступа.",
+                . "Следующие нарушения приведут к смене ключа доступа.",
 
             2 => "🚨 <b>Второе предупреждение</b>\n\n"
                 . "Повторное превышение лимита подключений!\n"
