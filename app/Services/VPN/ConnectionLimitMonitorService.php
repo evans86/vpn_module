@@ -35,6 +35,42 @@ class ConnectionLimitMonitorService
         ?int $panelId = null
     ): ConnectionLimitViolation {
         try {
+            // ВАЖНО: Не фиксируем нарушения для просроченных или неактивных ключей
+            // Если ключ был перевыпущен или деактивирован, нарушения не должны фиксироваться
+            if ($keyActivate->status !== KeyActivate::ACTIVE) {
+                $this->logger->info('Пропущена фиксация нарушения - ключ не активен', [
+                    'key_id' => $keyActivate->id,
+                    'key_status' => $keyActivate->status,
+                    'user_tg_id' => $keyActivate->user_tg_id
+                ]);
+                
+                // Если есть активное нарушение для этого ключа, помечаем его как решенное
+                // так как ключ больше не активен и нарушения не должны фиксироваться
+                $existingViolation = ConnectionLimitViolation::where([
+                    'key_activate_id' => $keyActivate->id,
+                    'status' => ConnectionLimitViolation::STATUS_ACTIVE
+                ])->first();
+                
+                if ($existingViolation) {
+                    // Помечаем нарушение как решенное, так как ключ больше не активен
+                    $existingViolation->status = ConnectionLimitViolation::STATUS_RESOLVED;
+                    $existingViolation->resolved_at = now();
+                    $existingViolation->save();
+                    
+                    $this->logger->info('Нарушение помечено как решенное - ключ не активен', [
+                        'violation_id' => $existingViolation->id,
+                        'key_id' => $keyActivate->id,
+                        'key_status' => $keyActivate->status
+                    ]);
+                    
+                    return $existingViolation;
+                }
+                
+                // Если нарушения нет, выбрасываем исключение
+                // Вызывающий код должен обработать это и не фиксировать нарушение
+                throw new \Exception('Ключ не активен (статус: ' . $keyActivate->status . '), нарушение не может быть зафиксировано');
+            }
+            
             $allowedConnections = 3; // Лимит подключений
             $serverUser = $keyActivate->keyActivateUser->serverUser;
 

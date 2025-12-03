@@ -259,6 +259,17 @@ class ConnectionMonitorService
                 return false;
             }
 
+            // ВАЖНО: Проверяем, что ключ активен перед фиксацией нарушения
+            // Если ключ был перевыпущен (статус EXPIRED), нарушения не должны фиксироваться
+            if ($keyActivate->status !== \App\Models\KeyActivate\KeyActivate::ACTIVE) {
+                Log::info('Пропущена фиксация нарушения - ключ не активен', [
+                    'key_id' => $keyActivate->id,
+                    'key_status' => $keyActivate->status,
+                    'user_id' => $userId
+                ]);
+                return false;
+            }
+
             // Создаем или обновляем нарушение (логика в recordViolation)
             // recordViolation автоматически увеличит счетчик если нарушение уже существует
             $this->limitMonitorService->recordViolation(
