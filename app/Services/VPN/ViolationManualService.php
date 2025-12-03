@@ -399,6 +399,41 @@ class ViolationManualService
                 $oldKey->status = KeyActivate::EXPIRED;
                 $oldKey->save();
 
+                // Удаляем пользователя из панели Marzban для старого ключа
+                // ВАЖНО: Удаляем только из панели, не из БД (чтобы сохранить историю)
+                try {
+                    if ($oldKey->keyActivateUser && $oldKey->keyActivateUser->serverUser) {
+                        $serverUser = $oldKey->keyActivateUser->serverUser;
+                        if ($serverUser->panel && $serverUser->panel->panel === \App\Models\Panel\Panel::MARZBAN) {
+                            // Удаляем пользователя из панели через API
+                            // Используем прямой вызов API, чтобы не удалять из БД
+                            $panel = $serverUser->panel;
+                            $marzbanService = app(\App\Services\Panel\marzban\MarzbanService::class);
+                            $panel = $marzbanService->updateMarzbanToken($panel->id);
+                            
+                            $marzbanApi = new \App\Services\External\MarzbanAPI($panel->api_address);
+                            $deleteResult = $marzbanApi->deleteUser($panel->auth_token, $serverUser->id);
+                            
+                            $this->logger->info('Пользователь удален из панели Marzban при перевыпуске ключа', [
+                                'old_key_id' => $oldKey->id,
+                                'new_key_id' => $newKey->id,
+                                'server_user_id' => $serverUser->id,
+                                'panel_id' => $panel->id,
+                                'delete_result' => $deleteResult
+                            ]);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // Логируем ошибку, но не прерываем процесс перевыпуска
+                    Log::error('Ошибка при удалении пользователя из панели Marzban при перевыпуске ключа', [
+                        'old_key_id' => $oldKey->id,
+                        'new_key_id' => $newKey->id,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ]);
+                    // Не выбрасываем исключение - перевыпуск ключа должен продолжиться
+                }
+
                 // Обновляем информацию о замене ключа в нарушении
                 // НЕ сбрасываем violation_count - сохраняем историю для отображения
                 $violation->key_replaced_at = now();
