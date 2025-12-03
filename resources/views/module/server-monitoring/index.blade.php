@@ -85,17 +85,46 @@
                     $lastStats = $panelData['data']->last()['statistics'] ?? [];
                     $cpuUsage = $lastStats['cpu_usage'] ?? 0;
                     $memoryUsage = ($lastStats['mem_used'] ?? 0) / max($lastStats['mem_total'] ?? 1, 1) * 100;
-                    $load = max($cpuUsage, $memoryUsage);
+                    $onlineUsers = $lastStats['online_users'] ?? 0;
+                    $totalUsers = $lastStats['total_user'] ?? 0;
                     
+                    // Нормализуем нагрузку от пользователей
+                    // Используем процент онлайн пользователей от общего количества
+                    // Если онлайн > 80% от общего - это высокая нагрузка
+                    $userLoad = 0;
+                    if ($totalUsers > 0) {
+                        $userPercentage = ($onlineUsers / $totalUsers) * 100;
+                        // Если онлайн пользователей больше 80% от общего - это нагрузка
+                        if ($userPercentage > 80) {
+                            $userLoad = min(100, 60 + (($userPercentage - 80) * 2));
+                        } elseif ($userPercentage > 60) {
+                            $userLoad = 40 + (($userPercentage - 60) * 1);
+                        } else {
+                            $userLoad = ($userPercentage / 60) * 40;
+                        }
+                    }
+                    
+                    // Взвешенная формула нагрузки:
+                    // CPU: 40%, Память: 40%, Пользователи: 20%
+                    $load = ($cpuUsage * 0.4) + ($memoryUsage * 0.4) + ($userLoad * 0.2);
+                    
+                    // Определяем уровень нагрузки
                     if ($load < 30) {
                         $loadLevel = 'Низкая';
                         $loadColor = 'green';
-                    } elseif ($load < 70) {
+                        $loadIcon = 'fa-check-circle';
+                    } elseif ($load < 60) {
                         $loadLevel = 'Средняя';
                         $loadColor = 'yellow';
-                    } else {
+                        $loadIcon = 'fa-exclamation-triangle';
+                    } elseif ($load < 80) {
                         $loadLevel = 'Высокая';
+                        $loadColor = 'orange';
+                        $loadIcon = 'fa-exclamation-circle';
+                    } else {
+                        $loadLevel = 'Критическая';
                         $loadColor = 'red';
+                        $loadIcon = 'fa-times-circle';
                     }
                 @endphp
 
@@ -149,16 +178,48 @@
 
                 <!-- Анализ нагрузки -->
                 <div class="mb-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <h5 class="text-sm font-semibold text-gray-700 mb-2">Анализ нагрузки</h5>
-                    <div class="flex items-center space-x-4">
-                        <span class="text-sm text-gray-600">Нагрузка:</span>
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
-                            {{ $loadColor === 'green' ? 'bg-green-100 text-green-800' : '' }}
-                            {{ $loadColor === 'yellow' ? 'bg-yellow-100 text-yellow-800' : '' }}
-                            {{ $loadColor === 'red' ? 'bg-red-100 text-red-800' : '' }}">
-                            {{ $loadLevel }}
-                        </span>
-                        <span class="text-sm text-gray-500">({{ number_format($load, 2) }}%)</span>
+                    <h5 class="text-sm font-semibold text-gray-700 mb-3">Анализ нагрузки сервера</h5>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm text-gray-600">Общая нагрузка:</span>
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                    {{ $loadColor === 'green' ? 'bg-green-100 text-green-800' : '' }}
+                                    {{ $loadColor === 'yellow' ? 'bg-yellow-100 text-yellow-800' : '' }}
+                                    {{ $loadColor === 'orange' ? 'bg-orange-100 text-orange-800' : '' }}
+                                    {{ $loadColor === 'red' ? 'bg-red-100 text-red-800' : '' }}">
+                                    <i class="fas {{ $loadIcon }} mr-1"></i>
+                                    {{ $loadLevel }}
+                                </span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-3">
+                                <div class="h-3 rounded-full transition-all duration-300
+                                    {{ $loadColor === 'green' ? 'bg-green-500' : '' }}
+                                    {{ $loadColor === 'yellow' ? 'bg-yellow-500' : '' }}
+                                    {{ $loadColor === 'orange' ? 'bg-orange-500' : '' }}
+                                    {{ $loadColor === 'red' ? 'bg-red-500' : '' }}"
+                                     style="width: {{ min($load, 100) }}%"></div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">{{ number_format($load, 1) }}% (CPU: 40%, Память: 40%, Пользователи: 20%)</div>
+                        </div>
+                        <div class="text-sm text-gray-600 space-y-1">
+                            <div class="flex justify-between">
+                                <span>CPU:</span>
+                                <span class="font-semibold {{ $cpuUsage > 80 ? 'text-red-600' : ($cpuUsage > 60 ? 'text-yellow-600' : 'text-gray-800') }}">
+                                    {{ number_format($cpuUsage, 1) }}%
+                                </span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Память:</span>
+                                <span class="font-semibold {{ $memoryUsage > 80 ? 'text-red-600' : ($memoryUsage > 60 ? 'text-yellow-600' : 'text-gray-800') }}">
+                                    {{ number_format($memoryUsage, 1) }}%
+                                </span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Онлайн пользователей:</span>
+                                <span class="font-semibold">{{ $onlineUsers }} / {{ $totalUsers }}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -193,6 +254,12 @@
         .chart-container {
             height: 400px;
             position: relative;
+            width: 100%;
+            overflow: hidden;
+        }
+        .chart-container .js-plotly-plot {
+            width: 100% !important;
+            height: 100% !important;
         }
     </style>
 @endpush
@@ -233,20 +300,39 @@
                 mode: 'lines+markers',
                 name: 'Использование CPU (%)',
                 line: { color: 'rgba(75, 192, 192, 1)', width: 2 },
-                marker: { size: 3 },
+                marker: { size: 4, opacity: 0.7 },
+                hovertemplate: '<b>CPU: %{y:.1f}%</b><br>Время: %{x}<extra></extra>',
             }], {
-                title: 'Использование CPU (%)',
+                title: {
+                    text: 'Использование CPU (%)',
+                    font: { size: 14 }
+                },
                 xaxis: {
                     title: 'Время',
                     type: 'date',
+                    showgrid: true,
+                    gridcolor: 'rgba(0,0,0,0.1)',
                 },
                 yaxis: { 
                     title: 'Процент (%)',
-                    range: [0, 100]
+                    range: [0, 100],
+                    showgrid: true,
+                    gridcolor: 'rgba(0,0,0,0.1)',
                 },
                 showlegend: true,
+                hovermode: 'x unified',
                 responsive: true,
+                autosize: true,
                 displayModeBar: true,
+                displaylogo: false,
+                modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+                layout: {
+                    autosize: true,
+                    margin: { l: 60, r: 30, t: 50, b: 60 },
+                }
+            }, {
+                responsive: true,
+                displayModeBar: true
             });
 
             // График памяти
@@ -257,19 +343,38 @@
                 mode: 'lines+markers',
                 name: 'Использование памяти (ГБ)',
                 line: { color: 'rgba(153, 102, 255, 1)', width: 2 },
-                marker: { size: 3 },
+                marker: { size: 4, opacity: 0.7 },
+                hovertemplate: '<b>Память: %{y:.2f} ГБ</b><br>Время: %{x}<extra></extra>',
             }], {
-                title: 'Использование памяти (ГБ)',
+                title: {
+                    text: 'Использование памяти (ГБ)',
+                    font: { size: 14 }
+                },
                 xaxis: {
                     title: 'Время',
                     type: 'date',
+                    showgrid: true,
+                    gridcolor: 'rgba(0,0,0,0.1)',
                 },
                 yaxis: { 
                     title: 'Гигабайты (ГБ)',
+                    showgrid: true,
+                    gridcolor: 'rgba(0,0,0,0.1)',
                 },
                 showlegend: true,
+                hovermode: 'x unified',
                 responsive: true,
+                autosize: true,
                 displayModeBar: true,
+                displaylogo: false,
+                modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+                layout: {
+                    autosize: true,
+                    margin: { l: 60, r: 30, t: 50, b: 60 },
+                }
+            }, {
+                responsive: true,
+                displayModeBar: true
             });
 
             // График онлайн-пользователей
@@ -280,19 +385,45 @@
                 mode: 'lines+markers',
                 name: 'Онлайн-пользователи',
                 line: { color: 'rgba(255, 159, 64, 1)', width: 2 },
-                marker: { size: 3 },
+                marker: { size: 4, opacity: 0.7 },
+                hovertemplate: '<b>Онлайн: %{y} пользователей</b><br>Время: %{x}<extra></extra>',
             }], {
-                title: 'Онлайн-пользователи',
+                title: {
+                    text: 'Онлайн-пользователи',
+                    font: { size: 14 }
+                },
                 xaxis: {
                     title: 'Время',
                     type: 'date',
+                    showgrid: true,
+                    gridcolor: 'rgba(0,0,0,0.1)',
                 },
                 yaxis: { 
                     title: 'Количество пользователей',
+                    showgrid: true,
+                    gridcolor: 'rgba(0,0,0,0.1)',
                 },
                 showlegend: true,
+                hovermode: 'x unified',
                 responsive: true,
+                autosize: true,
                 displayModeBar: true,
+                displaylogo: false,
+                modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+                layout: {
+                    autosize: true,
+                    margin: { l: 60, r: 30, t: 50, b: 60 },
+                }
+            }, {
+                responsive: true,
+                displayModeBar: true
+            });
+            
+            // Обработка изменения размера окна
+            window.addEventListener('resize', function() {
+                Plotly.Plots.resize(`chart-cpu-{{ $panelId }}`);
+                Plotly.Plots.resize(`chart-memory-{{ $panelId }}`);
+                Plotly.Plots.resize(`chart-users-{{ $panelId }}`);
             });
         }
         @endforeach
