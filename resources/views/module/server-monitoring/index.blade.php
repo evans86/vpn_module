@@ -5,7 +5,72 @@
 
 @section('content')
     <div class="space-y-6">
-        @foreach($statistics as $panelId => $panelData)
+        <!-- Фильтры -->
+        <x-admin.card>
+            <x-slot name="title">
+                Фильтры и настройки
+            </x-slot>
+            <form action="{{ route('admin.module.server-monitoring.index') }}" method="GET" class="flex flex-wrap items-end gap-4">
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Период (дни)</label>
+                    <select name="days" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm">
+                        <option value="1" {{ $days == 1 ? 'selected' : '' }}>1 день</option>
+                        <option value="2" {{ $days == 2 ? 'selected' : '' }}>2 дня</option>
+                        <option value="3" {{ $days == 3 ? 'selected' : '' }}>3 дня</option>
+                        <option value="7" {{ $days == 7 ? 'selected' : '' }}>7 дней</option>
+                    </select>
+                </div>
+                
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Панель</label>
+                    <select name="panel_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm">
+                        <option value="">Все панели</option>
+                        @foreach($allPanels as $panel)
+                            <option value="{{ $panel->id }}" {{ $panelId == $panel->id ? 'selected' : '' }}>
+                                Панель #{{ $panel->id }} ({{ parse_url($panel->panel_adress, PHP_URL_HOST) ?: $panel->panel_adress }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                
+                <div class="flex-1 min-w-[150px]">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Лимит точек</label>
+                    <select name="limit" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm">
+                        <option value="200" {{ $limit == 200 ? 'selected' : '' }}>200 точек</option>
+                        <option value="500" {{ $limit == 500 ? 'selected' : '' }}>500 точек</option>
+                        <option value="1000" {{ $limit == 1000 ? 'selected' : '' }}>1000 точек</option>
+                    </select>
+                </div>
+                
+                <div class="flex gap-2">
+                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        <i class="fas fa-filter mr-2"></i> Применить
+                    </button>
+                    <a href="{{ route('admin.module.server-monitoring.index') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        <i class="fas fa-redo mr-2"></i> Сбросить
+                    </a>
+                </div>
+            </form>
+            
+            @if(isset($statistics) && count($statistics) > 0)
+                <div class="mt-4 text-sm text-gray-600">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Загружено записей: 
+                    @foreach($statistics as $pId => $pData)
+                        Панель #{{ $pId }}: {{ $pData['data']->count() }} из {{ $pData['total_records'] ?? 0 }}
+                        @if(!$loop->last), @endif
+                    @endforeach
+                </div>
+            @endif
+        </x-admin.card>
+
+        @if(empty($statistics))
+            <x-admin.empty-state 
+                icon="fa-chart-line" 
+                title="Данные не найдены"
+                description="Выберите другой период или панель" />
+        @else
+            @foreach($statistics as $panelId => $panelData)
             <x-admin.card>
                 <x-slot name="title">
                     <a href="{{ $panelData['panel']->panel_adress }}" 
@@ -118,7 +183,8 @@
                     </div>
                 </div>
             </x-admin.card>
-        @endforeach
+            @endforeach
+        @endif
     </div>
 @endsection
 
@@ -137,69 +203,98 @@
 
     <script>
         @foreach($statistics as $panelId => $panelData)
-        // Данные для графиков
-        const labels{{ $panelId }} = {!! json_encode($panelData['data']->pluck('created_at')) !!};
-        const cpuData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.cpu_usage')) !!};
-        const memoryData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.mem_used_gb')) !!};
-        const usersData{{ $panelId }} = {!! json_encode($panelData['data']->pluck('statistics.online_users')) !!};
+        // Оптимизированная загрузка данных - извлекаем только нужные поля
+        const chartData{{ $panelId }} = {!! json_encode($panelData['data']->map(function($item) {
+            return [
+                'time' => $item['created_at'],
+                'cpu' => $item['statistics']['cpu_usage'] ?? 0,
+                'memory' => $item['statistics']['mem_used_gb'] ?? 0,
+                'users' => $item['statistics']['online_users'] ?? 0,
+            ];
+        })) !!};
+        
+        // Извлекаем данные для графиков
+        const labels{{ $panelId }} = chartData{{ $panelId }}.map(item => item.time);
+        const cpuData{{ $panelId }} = chartData{{ $panelId }}.map(item => item.cpu);
+        const memoryData{{ $panelId }} = chartData{{ $panelId }}.map(item => item.memory);
+        const usersData{{ $panelId }} = chartData{{ $panelId }}.map(item => item.users);
 
-        // Вычисляем диапазон для последних 12 часов
-        const lastTimestamp{{ $panelId }} = new Date(labels{{ $panelId }}[labels{{ $panelId }}.length - 1]);
-        const startTimestamp{{ $panelId }} = new Date(lastTimestamp{{ $panelId }}.getTime() - 12 * 60 * 60 * 1000);
+        // Проверяем наличие данных
+        if (labels{{ $panelId }}.length === 0) {
+            document.getElementById(`chart-cpu-{{ $panelId }}`).innerHTML = '<div class="text-center text-gray-500 py-8">Нет данных для отображения</div>';
+            document.getElementById(`chart-memory-{{ $panelId }}`).innerHTML = '<div class="text-center text-gray-500 py-8">Нет данных для отображения</div>';
+            document.getElementById(`chart-users-{{ $panelId }}`).innerHTML = '<div class="text-center text-gray-500 py-8">Нет данных для отображения</div>';
+        } else {
+            // График CPU
+            Plotly.newPlot(`chart-cpu-{{ $panelId }}`, [{
+                x: labels{{ $panelId }},
+                y: cpuData{{ $panelId }},
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Использование CPU (%)',
+                line: { color: 'rgba(75, 192, 192, 1)', width: 2 },
+                marker: { size: 3 },
+            }], {
+                title: 'Использование CPU (%)',
+                xaxis: {
+                    title: 'Время',
+                    type: 'date',
+                },
+                yaxis: { 
+                    title: 'Процент (%)',
+                    range: [0, 100]
+                },
+                showlegend: true,
+                responsive: true,
+                displayModeBar: true,
+            });
 
-        // График CPU
-        Plotly.newPlot(`chart-cpu-{{ $panelId }}`, [{
-            x: labels{{ $panelId }},
-            y: cpuData{{ $panelId }},
-            type: 'scatter',
-            mode: 'lines',
-            name: 'Использование CPU (%)',
-            line: { color: 'rgba(75, 192, 192, 1)' },
-        }], {
-            title: 'Использование CPU (%)',
-            xaxis: {
-                title: 'Время',
-                range: [startTimestamp{{ $panelId }}, lastTimestamp{{ $panelId }}],
-            },
-            yaxis: { title: 'Значение' },
-            showlegend: true,
-        });
+            // График памяти
+            Plotly.newPlot(`chart-memory-{{ $panelId }}`, [{
+                x: labels{{ $panelId }},
+                y: memoryData{{ $panelId }},
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Использование памяти (ГБ)',
+                line: { color: 'rgba(153, 102, 255, 1)', width: 2 },
+                marker: { size: 3 },
+            }], {
+                title: 'Использование памяти (ГБ)',
+                xaxis: {
+                    title: 'Время',
+                    type: 'date',
+                },
+                yaxis: { 
+                    title: 'Гигабайты (ГБ)',
+                },
+                showlegend: true,
+                responsive: true,
+                displayModeBar: true,
+            });
 
-        // График памяти
-        Plotly.newPlot(`chart-memory-{{ $panelId }}`, [{
-            x: labels{{ $panelId }},
-            y: memoryData{{ $panelId }},
-            type: 'scatter',
-            mode: 'lines',
-            name: 'Использование памяти (ГБ)',
-            line: { color: 'rgba(153, 102, 255, 1)' },
-        }], {
-            title: 'Использование памяти (ГБ)',
-            xaxis: {
-                title: 'Время',
-                range: [startTimestamp{{ $panelId }}, lastTimestamp{{ $panelId }}],
-            },
-            yaxis: { title: 'Значение' },
-            showlegend: true,
-        });
-
-        // График онлайн-пользователей
-        Plotly.newPlot(`chart-users-{{ $panelId }}`, [{
-            x: labels{{ $panelId }},
-            y: usersData{{ $panelId }},
-            type: 'scatter',
-            mode: 'lines',
-            name: 'Онлайн-пользователи',
-            line: { color: 'rgba(255, 159, 64, 1)' },
-        }], {
-            title: 'Онлайн-пользователи',
-            xaxis: {
-                title: 'Время',
-                range: [startTimestamp{{ $panelId }}, lastTimestamp{{ $panelId }}],
-            },
-            yaxis: { title: 'Значение' },
-            showlegend: true,
-        });
+            // График онлайн-пользователей
+            Plotly.newPlot(`chart-users-{{ $panelId }}`, [{
+                x: labels{{ $panelId }},
+                y: usersData{{ $panelId }},
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Онлайн-пользователи',
+                line: { color: 'rgba(255, 159, 64, 1)', width: 2 },
+                marker: { size: 3 },
+            }], {
+                title: 'Онлайн-пользователи',
+                xaxis: {
+                    title: 'Время',
+                    type: 'date',
+                },
+                yaxis: { 
+                    title: 'Количество пользователей',
+                },
+                showlegend: true,
+                responsive: true,
+                displayModeBar: true,
+            });
+        }
         @endforeach
     </script>
 @endpush
