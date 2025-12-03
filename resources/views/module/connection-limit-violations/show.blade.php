@@ -343,6 +343,34 @@
                         @endif
                     </div>
                 </div>
+
+                <!-- Текст отправленного уведомления -->
+                @if($violation->getNotificationsSentCount() > 0)
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <h5 class="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                        <i class="fas fa-envelope mr-2"></i>
+                        Текст отправленного уведомления
+                    </h5>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        @php
+                            $messageText = $violation->getNotificationMessageText();
+                            // Telegram использует HTML форматирование, конвертируем для отображения
+                            // Заменяем <b> на <strong>, <code> на <code class="bg-gray-200 px-1 rounded">
+                            $messageText = str_replace('<b>', '<strong class="font-bold">', $messageText);
+                            $messageText = str_replace('</b>', '</strong>', $messageText);
+                            $messageText = str_replace('<code>', '<code class="bg-gray-200 px-1 py-0.5 rounded text-xs font-mono">', $messageText);
+                            $messageText = str_replace('</code>', '</code>', $messageText);
+                        @endphp
+                        <div class="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{!! $messageText !!}</div>
+                        <div class="mt-3 pt-3 border-t border-blue-200">
+                            <p class="text-xs text-blue-700">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Это текст уведомления, которое было отправлено пользователю при нарушении #{{ $violation->violation_count }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                @endif
                 @else
                 <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
                     <p class="text-sm text-gray-600">
@@ -395,6 +423,35 @@
                                                 <span class="text-orange-600">(пользователь заблокировал бота)</span>
                                             @endif
                                         </p>
+                                        @php
+                                            // Получаем текст уведомления для конкретного нарушения
+                                            $notificationText = $violation->getNotificationMessageText($i);
+                                            // Форматируем для отображения
+                                            $notificationText = str_replace('<b>', '<strong class="font-bold">', $notificationText);
+                                            $notificationText = str_replace('</b>', '</strong>', $notificationText);
+                                            $notificationText = str_replace('<code>', '<code class="bg-gray-200 px-1 py-0.5 rounded text-xs font-mono">', $notificationText);
+                                            $notificationText = str_replace('</code>', '</code>', $notificationText);
+                                            // Получаем первые 2 строки для предпросмотра (убираем HTML теги для подсчета строк)
+                                            $plainText = strip_tags($notificationText);
+                                            $lines = explode("\n", $plainText);
+                                            $previewLines = array_slice($lines, 0, 2);
+                                            $previewText = implode("\n", $previewLines);
+                                            // Если текст длиннее 2 строк, добавляем многоточие
+                                            if (count($lines) > 2) {
+                                                $previewText .= "\n...";
+                                            }
+                                            $fullText = $notificationText;
+                                        @endphp
+                                        <div class="mt-2 p-2 bg-white border border-gray-200 rounded text-xs text-gray-700 notification-text-container" data-violation-id="{{ $violation->id }}" data-violation-number="{{ $i }}">
+                                            <div class="notification-text-preview whitespace-pre-wrap leading-relaxed text-gray-600">{!! nl2br(htmlspecialchars($previewText)) !!}</div>
+                                            <div class="notification-text-full whitespace-pre-wrap leading-relaxed hidden">{!! $fullText !!}</div>
+                                            @if(count($lines) > 2)
+                                            <button type="button" class="mt-2 text-blue-600 hover:text-blue-800 text-xs font-medium notification-toggle-btn flex items-center" onclick="toggleNotificationText({{ $violation->id }}, {{ $i }})">
+                                                <i class="fas fa-chevron-down notification-icon mr-1"></i>
+                                                <span class="notification-toggle-text">Развернуть</span>
+                                            </button>
+                                            @endif
+                                        </div>
                                     @elseif($i == $violation->violation_count && $violation->last_notification_status === 'technical_error')
                                         <p class="text-xs text-yellow-600">
                                             <i class="fas fa-exclamation-triangle mr-1"></i>
@@ -594,6 +651,33 @@
                 }
             })
             .catch(() => toastr.error('Ошибка при выполнении действия'));
+        }
+
+        function toggleNotificationText(violationId, violationNumber) {
+            const container = document.querySelector(`.notification-text-container[data-violation-id="${violationId}"][data-violation-number="${violationNumber}"]`);
+            if (!container) return;
+
+            const preview = container.querySelector('.notification-text-preview');
+            const full = container.querySelector('.notification-text-full');
+            const btn = container.querySelector('.notification-toggle-btn');
+            const icon = container.querySelector('.notification-icon');
+            const text = container.querySelector('.notification-toggle-text');
+
+            if (full.classList.contains('hidden')) {
+                // Разворачиваем
+                preview.classList.add('hidden');
+                full.classList.remove('hidden');
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+                text.textContent = 'Свернуть';
+            } else {
+                // Сворачиваем
+                preview.classList.remove('hidden');
+                full.classList.add('hidden');
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+                text.textContent = 'Развернуть';
+            }
         }
 
         function activateViolation(violationId) {
