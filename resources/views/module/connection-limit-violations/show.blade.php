@@ -230,7 +230,11 @@
                             <label class="block text-xs font-medium text-blue-700 mb-1">Отправлено уведомлений</label>
                             <p class="text-lg font-bold text-blue-900">
                                 <i class="{{ $violation->notification_icon }} mr-1"></i>
-                                {{ $violation->getNotificationsSentCount() }} из {{ $violation->violation_count }}
+                                @php
+                                    $sentCount = $violation->getNotificationsSentCount();
+                                    $violationCount = max($violation->violation_count, $sentCount); // Используем максимум чтобы избежать "1 из 0"
+                                @endphp
+                                {{ $sentCount }} из {{ $violationCount }}
                             </p>
                         </div>
                         <div>

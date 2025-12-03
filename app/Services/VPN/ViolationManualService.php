@@ -400,9 +400,10 @@ class ViolationManualService
                 $oldKey->save();
 
                 // Обновляем информацию о замене ключа в нарушении
+                // НЕ сбрасываем violation_count - сохраняем историю для отображения
                 $violation->key_replaced_at = now();
                 $violation->replaced_key_id = $newKey->id;
-                $violation->violation_count = 0; // Сбрасываем счетчик нарушений
+                // violation_count остается как есть - это история нарушений
                 $violation->status = ConnectionLimitViolation::STATUS_RESOLVED;
                 $violation->resolved_at = now();
                 $violation->save();
