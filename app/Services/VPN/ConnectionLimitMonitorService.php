@@ -8,6 +8,7 @@ use App\Logging\DatabaseLogger;
 use App\Dto\Notification\NotificationResult;
 use Illuminate\Support\Facades\Log;
 use App\Services\Notification\TelegramNotificationService;
+use App\Services\VPN\ViolationManualService;
 
 class ConnectionLimitMonitorService
 {
@@ -81,6 +82,7 @@ class ConnectionLimitMonitorService
                 // IP изменились или прошло достаточно времени - это новое нарушение
                 // Увеличиваем счетчик нарушений и обновляем данные
                 $existingViolation->violation_count += 1;
+                $newViolationCount = $existingViolation->violation_count;
                 $existingViolation->actual_connections = $uniqueIpCount;
                 // Храним только IP текущего нарушения, не объединяем с предыдущими
                 $existingViolation->ip_addresses = $currentIps; // Сохраняем только IP текущего нарушения
@@ -90,10 +92,69 @@ class ConnectionLimitMonitorService
                 $this->logger->warning('Обновлено нарушение лимита подключений (повторное)', [
                     'key_id' => $keyActivate->id,
                     'user_tg_id' => $keyActivate->user_tg_id,
-                    'violation_count' => $existingViolation->violation_count,
+                    'violation_count' => $newViolationCount,
                     'actual_ips' => $uniqueIpCount,
                     'violation_id' => $existingViolation->id
                 ]);
+
+                // Отправляем уведомление сразу при увеличении счетчика нарушений
+                // Проверяем, что уведомление еще не отправлено для текущего количества нарушений
+                if ($existingViolation->getNotificationsSentCount() < $newViolationCount) {
+                    try {
+                        $result = $this->sendViolationNotificationWithResult($existingViolation);
+                        if ($result->shouldCountAsSent) {
+                            $existingViolation->incrementNotifications();
+                            $existingViolation->last_notification_status = $result->status;
+                            $existingViolation->last_notification_error = $result->errorMessage;
+                            $existingViolation->save();
+                            
+                            $this->logger->info('Уведомление отправлено сразу при фиксации нарушения', [
+                                'violation_id' => $existingViolation->id,
+                                'violation_count' => $newViolationCount,
+                                'status' => $result->status
+                            ]);
+                            
+                            // При 3-м нарушении сразу перевыпускаем ключ
+                            if ($newViolationCount >= 3 && is_null($existingViolation->key_replaced_at)) {
+                                try {
+                                    $manualService = app(ViolationManualService::class);
+                                    $newKey = $manualService->reissueKey($existingViolation->fresh());
+                                    if ($newKey) {
+                                        $this->logger->warning('Ключ автоматически перевыпущен при 3-м нарушении', [
+                                            'violation_id' => $existingViolation->id,
+                                            'old_key_id' => $existingViolation->key_activate_id,
+                                            'new_key_id' => $newKey->id
+                                        ]);
+                                    }
+                                } catch (\Exception $e) {
+                                    Log::error('Ошибка автоматического перевыпуска ключа при 3-м нарушении', [
+                                        'violation_id' => $existingViolation->id,
+                                        'error' => $e->getMessage()
+                                    ]);
+                                }
+                            }
+                        } else {
+                            // Техническая ошибка - сохраняем для повторной попытки через ProcessViolationsCommand
+                            $existingViolation->last_notification_status = $result->status;
+                            $existingViolation->last_notification_error = $result->errorMessage;
+                            $existingViolation->notification_retry_count = ($existingViolation->notification_retry_count ?? 0) + 1;
+                            $existingViolation->save();
+                            
+                            $this->logger->warning('Не удалось отправить уведомление при фиксации нарушения (будет повторная попытка)', [
+                                'violation_id' => $existingViolation->id,
+                                'violation_count' => $newViolationCount,
+                                'status' => $result->status,
+                                'error' => $result->errorMessage
+                            ]);
+                        }
+                    } catch (\Exception $e) {
+                        // Логируем ошибку, но не прерываем процесс
+                        Log::error('Ошибка отправки уведомления при фиксации нарушения', [
+                            'violation_id' => $existingViolation->id,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
 
                 return $existingViolation;
             }
@@ -119,6 +180,60 @@ class ConnectionLimitMonitorService
                 'ip_addresses' => $ipAddresses,
                 'violation_id' => $violation->id
             ]);
+
+            // Отправляем уведомление сразу при создании первого нарушения
+            try {
+                $result = $this->sendViolationNotificationWithResult($violation);
+                if ($result->shouldCountAsSent) {
+                    $violation->incrementNotifications();
+                    $violation->last_notification_status = $result->status;
+                    $violation->last_notification_error = $result->errorMessage;
+                    $violation->save();
+                    
+                    $this->logger->info('Уведомление отправлено сразу при фиксации первого нарушения', [
+                        'violation_id' => $violation->id,
+                        'status' => $result->status
+                    ]);
+                    
+                    // При 3-м нарушении сразу перевыпускаем ключ (хотя для первого нарушения это маловероятно)
+                    if ($violation->violation_count >= 3 && is_null($violation->key_replaced_at)) {
+                        try {
+                            $manualService = app(ViolationManualService::class);
+                            $newKey = $manualService->reissueKey($violation->fresh());
+                            if ($newKey) {
+                                $this->logger->warning('Ключ автоматически перевыпущен при 3-м нарушении', [
+                                    'violation_id' => $violation->id,
+                                    'old_key_id' => $violation->key_activate_id,
+                                    'new_key_id' => $newKey->id
+                                ]);
+                            }
+                        } catch (\Exception $e) {
+                            Log::error('Ошибка автоматического перевыпуска ключа при 3-м нарушении', [
+                                'violation_id' => $violation->id,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
+                } else {
+                    // Техническая ошибка - сохраняем для повторной попытки через ProcessViolationsCommand
+                    $violation->last_notification_status = $result->status;
+                    $violation->last_notification_error = $result->errorMessage;
+                    $violation->notification_retry_count = 1;
+                    $violation->save();
+                    
+                    $this->logger->warning('Не удалось отправить уведомление при фиксации первого нарушения (будет повторная попытка)', [
+                        'violation_id' => $violation->id,
+                        'status' => $result->status,
+                        'error' => $result->errorMessage
+                    ]);
+                }
+            } catch (\Exception $e) {
+                // Логируем ошибку, но не прерываем процесс
+                Log::error('Ошибка отправки уведомления при фиксации первого нарушения', [
+                    'violation_id' => $violation->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
 
             return $violation;
 

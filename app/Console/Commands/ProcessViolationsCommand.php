@@ -83,19 +83,24 @@ class ProcessViolationsCommand extends Command
         $keysReissued = 0;
 
         // Находим активные нарушения, которые требуют обработки
-        // 1. Нарушения, где уведомление еще не отправлено для текущего количества нарушений
+        // 1. Старые нарушения, где уведомление еще не отправлено (созданные до внедрения автоматической отправки)
         // 2. Нарушения с техническими ошибками для повторной попытки (не более 3 попыток)
         $violations = ConnectionLimitViolation::where('status', ConnectionLimitViolation::STATUS_ACTIVE)
             ->whereNull('key_replaced_at') // Ключ еще не был заменен
             ->where('created_at', '>=', now()->subDays(7)) // Только за последнюю неделю
             ->where(function($query) {
-                // Либо уведомление еще не отправлено для текущего количества нарушений
+                // Либо уведомление еще не отправлено для текущего количества нарушений (старые нарушения)
                 $query->whereRaw('notifications_sent < violation_count')
-                    // Либо есть техническая ошибка и попыток меньше 3
+                    // Либо есть техническая ошибка и попыток меньше 3, и прошло 30 минут с последней попытки
                     ->orWhere(function($q) {
                         $q->where('last_notification_status', 'technical_error')
                           ->where('notification_retry_count', '<', 3)
-                          ->where('last_notification_sent_at', '<=', now()->subMinutes(30)); // Повторная попытка через 30 минут
+                          ->where(function($subQ) {
+                              // Если last_notification_sent_at есть, проверяем что прошло 30 минут
+                              // Если нет, значит это первая попытка после технической ошибки
+                              $subQ->whereNull('last_notification_sent_at')
+                                   ->orWhere('last_notification_sent_at', '<=', now()->subMinutes(30));
+                          });
                     });
             })
             ->with('keyActivate')
@@ -110,21 +115,26 @@ class ProcessViolationsCommand extends Command
 
                 $violationCount = $violation->violation_count;
                 $notificationsCount = $violation->getNotificationsSentCount();
+                $isTechnicalError = $violation->last_notification_status === 'technical_error';
+                $retryCount = $violation->notification_retry_count ?? 0;
 
-                // Отправляем уведомление если еще не отправлено для текущего количества нарушений
-                // Логика: при 1-м нарушении отправляем 1 уведомление, при 2-м - 2-е, при 3-м - 3-е
-                if ($notificationsCount < $violationCount) {
+                // Обрабатываем только если:
+                // 1. Уведомление еще не отправлено для текущего количества нарушений (старые нарушения)
+                // 2. ИЛИ есть техническая ошибка и попыток меньше 3
+                if ($notificationsCount < $violationCount || ($isTechnicalError && $retryCount < 3)) {
+                    // Отправляем только ОДНО уведомление за раз, чтобы не спамить
+                    // Если уведомлений не хватает, отправляем только следующее недостающее
                     $result = $this->manualService->sendUserNotification($violation);
                     if ($result) {
                         $notificationsSent++;
-                        $status = $violation->last_notification_status ?? 'unknown';
+                        $status = $violation->fresh()->last_notification_status ?? 'unknown';
                         $statusText = $status === 'blocked' ? ' (пользователь заблокировал бота)' : '';
                         $this->line("   ✓ Уведомление засчитано для нарушения #{$violation->id} (нарушение #{$violationCount}){$statusText}");
                     } else {
                         // Техническая ошибка - логируем для повторной попытки
-                        $retryCount = $violation->notification_retry_count ?? 0;
-                        if ($retryCount < 3) {
-                            $this->line("   ⚠ Техническая ошибка отправки для нарушения #{$violation->id} (попытка {$retryCount}/3)");
+                        $newRetryCount = $violation->fresh()->notification_retry_count ?? 0;
+                        if ($newRetryCount < 3) {
+                            $this->line("   ⚠ Техническая ошибка отправки для нарушения #{$violation->id} (попытка {$newRetryCount}/3)");
                         } else {
                             $this->line("   ❌ Не удалось отправить уведомление для нарушения #{$violation->id} после 3 попыток");
                         }
