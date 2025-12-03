@@ -64,16 +64,25 @@ class ConnectionLimitMonitorService
                 sort($currentIps);
                 
                 // Если IP адреса идентичны и нарушение создано недавно (менее 15 минут назад), это дубликат
-                if ($existingIps === $currentIps && $existingViolation->created_at->diffInMinutes(now()) < 15) {
-                    // Это дубликат из-за перекрытия окон - просто обновляем время, но не увеличиваем счетчик
+                // ДОПОЛНИТЕЛЬНО: если уведомление было отправлено недавно (менее 2 минут назад), это тоже дубликат
+                $isDuplicateIps = $existingIps === $currentIps;
+                $isRecentViolation = $existingViolation->created_at->diffInMinutes(now()) < 15;
+                $isRecentNotification = $existingViolation->last_notification_sent_at && 
+                                       $existingViolation->last_notification_sent_at->diffInSeconds(now()) < 120;
+                
+                if (($isDuplicateIps && $isRecentViolation) || $isRecentNotification) {
+                    // Это дубликат из-за перекрытия окон или недавней отправки - просто обновляем время, но не увеличиваем счетчик
                     $existingViolation->actual_connections = $uniqueIpCount; // Обновляем количество на случай изменений
                     $existingViolation->created_at = now(); // Обновляем время последней проверки
                     $existingViolation->save();
                     
-                    $this->logger->info('Пропущено дублирующее нарушение (перекрытие окон)', [
+                    $this->logger->info('Пропущено дублирующее нарушение (перекрытие окон или недавняя отправка)', [
                         'key_id' => $keyActivate->id,
                         'violation_id' => $existingViolation->id,
-                        'created_at' => $existingViolation->created_at->format('Y-m-d H:i:s')
+                        'created_at' => $existingViolation->created_at->format('Y-m-d H:i:s'),
+                        'last_notification_sent_at' => $existingViolation->last_notification_sent_at ? $existingViolation->last_notification_sent_at->format('Y-m-d H:i:s') : null,
+                        'is_duplicate_ips' => $isDuplicateIps,
+                        'is_recent_notification' => $isRecentNotification
                     ]);
                     
                     return $existingViolation;
@@ -99,7 +108,23 @@ class ConnectionLimitMonitorService
 
                 // Отправляем уведомление сразу при увеличении счетчика нарушений
                 // Проверяем, что уведомление еще не отправлено для текущего количества нарушений
-                if ($existingViolation->getNotificationsSentCount() < $newViolationCount) {
+                // ВАЖНО: Проверяем ПЕРЕД отправкой, чтобы избежать дублирования
+                $notificationsSent = $existingViolation->getNotificationsSentCount();
+                if ($notificationsSent < $newViolationCount) {
+                    // Дополнительная проверка: если уведомление было отправлено недавно (менее 1 минуты назад),
+                    // и violation_count не изменился, не отправляем повторно (защита от гонок)
+                    if ($existingViolation->last_notification_sent_at && 
+                        $existingViolation->last_notification_sent_at->diffInSeconds(now()) < 60 &&
+                        $notificationsSent >= ($newViolationCount - 1)) {
+                        $this->logger->info('Пропущена отправка уведомления - недавно уже было отправлено', [
+                            'violation_id' => $existingViolation->id,
+                            'violation_count' => $newViolationCount,
+                            'notifications_sent' => $notificationsSent,
+                            'last_sent_at' => $existingViolation->last_notification_sent_at->format('Y-m-d H:i:s')
+                        ]);
+                        return $existingViolation;
+                    }
+                    
                     try {
                         $result = $this->sendViolationNotificationWithResult($existingViolation);
                         if ($result->shouldCountAsSent) {
