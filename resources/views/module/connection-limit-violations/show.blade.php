@@ -391,9 +391,29 @@
                                         <div class="mt-1">
                                             <p class="text-xs text-green-600 mb-2">
                                                 <i class="fas fa-check-circle mr-1"></i>
-                                                <strong>Уведомление отправлено:</strong>
+                                                <strong>Уведомление отправлено</strong>
+                                                @php
+                                                    // Определяем время отправки уведомления
+                                                    // Для последнего уведомления используем last_notification_sent_at
+                                                    // Для предыдущих - используем created_at (так как уведомление отправляется сразу при фиксации)
+                                                    if ($i == $violation->getNotificationsSentCount() && $violation->last_notification_sent_at) {
+                                                        $sentTime = $violation->last_notification_sent_at;
+                                                        $timeText = $sentTime->format('d.m.Y H:i:s');
+                                                        $timeRelative = $sentTime->diffForHumans();
+                                                    } else {
+                                                        // Для предыдущих уведомлений используем created_at
+                                                        $sentTime = $violation->created_at;
+                                                        $timeText = $sentTime->format('d.m.Y H:i:s');
+                                                        $timeRelative = $sentTime->diffForHumans();
+                                                    }
+                                                @endphp
+                                                <span class="text-gray-600 ml-2">
+                                                    <i class="fas fa-clock mr-1"></i>
+                                                    {{ $timeText }}
+                                                    <span class="text-gray-500">({{ $timeRelative }})</span>
+                                                </span>
                                                 @if($i == $violation->getNotificationsSentCount() && $violation->last_notification_status === 'blocked')
-                                                    <span class="text-orange-600">(пользователь заблокировал бота)</span>
+                                                    <span class="text-orange-600 ml-2">(пользователь заблокировал бота)</span>
                                                 @endif
                                             </p>
                                             @php
