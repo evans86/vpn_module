@@ -171,6 +171,8 @@ class ConnectionLimitMonitorService
                 }
                 
                 // Для обоих случаев (вне окна или новое в пределах окна) продолжаем с отправкой уведомления
+                // Перезагружаем нарушение из БД, чтобы получить актуальные данные
+                $existingViolation->refresh();
                 $newViolationCount = $existingViolation->violation_count;
 
                 // Отправляем уведомление сразу при увеличении счетчика нарушений
