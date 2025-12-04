@@ -27,6 +27,11 @@ class ConnectionMonitorService
      */
     public function monitorFixed(int $threshold = 3, int $windowMinutes = 15): array
     {
+        Log::info('Начало мониторинга нарушений лимитов подключений', [
+            'threshold' => $threshold,
+            'window_minutes' => $windowMinutes
+        ]);
+
         $servers = Server::where('server_status', Server::SERVER_CONFIGURED)->get();
 
         $results = [
@@ -35,6 +40,10 @@ class ConnectionMonitorService
             'servers_checked' => [],
             'errors' => []
         ];
+
+        Log::info('Найдено серверов для проверки', [
+            'servers_count' => $results['total_servers']
+        ]);
 
         // Собираем данные со всех серверов сначала
         $allUsersData = [];
@@ -54,12 +63,29 @@ class ConnectionMonitorService
             } catch (\Exception $e) {
                 $errorMsg = "Server {$server->host}: {$e->getMessage()}";
                 $results['errors'][] = $errorMsg;
+                Log::error('Ошибка при получении данных с сервера', [
+                    'server_host' => $server->host,
+                    'server_id' => $server->id,
+                    'error' => $e->getMessage()
+                ]);
             }
         }
+
+        Log::info('Сбор данных с серверов завершен', [
+            'total_users_found' => count($allUsersData),
+            'servers_checked' => count($results['servers_checked']),
+            'errors_count' => count($results['errors'])
+        ]);
 
         // Теперь анализируем собранные данные с новой логикой
         $violationsCount = $this->analyzeUsersWithNewLogic($allUsersData, $threshold);
         $results['violations_found'] = $violationsCount;
+
+        Log::info('Мониторинг нарушений лимитов подключений завершен', [
+            'violations_found' => $violationsCount,
+            'total_users_checked' => count($allUsersData),
+            'threshold' => $threshold
+        ]);
 
         return $results;
     }

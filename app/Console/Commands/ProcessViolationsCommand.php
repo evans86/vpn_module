@@ -35,12 +35,21 @@ class ProcessViolationsCommand extends Command
         $autoResolveHours = (int) $this->option('auto-resolve-hours');
         $autoReissueThreshold = (int) $this->option('auto-reissue-threshold');
 
+        // Логируем начало обработки
+        Log::info('🚀 Запуск автоматической обработки нарушений', [
+            'auto_resolve_hours' => $autoResolveHours,
+            'auto_reissue_threshold' => $autoReissueThreshold,
+            'started_at' => now()->format('Y-m-d H:i:s')
+        ]);
+
         $stats = [
             'notifications_sent' => 0,
             'keys_reissued' => 0,
             'auto_resolved' => 0,
             'errors' => 0
         ];
+
+        $startTime = microtime(true);
 
         try {
             // 1. Обработка нарушений: отправка уведомлений и перевыпуск ключей
@@ -53,6 +62,8 @@ class ProcessViolationsCommand extends Command
             $this->info("⏰ Автоматическое решение нарушений старше {$autoResolveHours} часов...");
             $stats['auto_resolved'] = $this->autoResolveOldViolations($autoResolveHours);
 
+            $executionTime = round(microtime(true) - $startTime, 2);
+
             // Вывод статистики
             $this->info("\n✅ Обработка завершена:");
             $this->line("   📧 Уведомлений отправлено: {$stats['notifications_sent']}");
@@ -60,12 +71,26 @@ class ProcessViolationsCommand extends Command
             $this->line("   ✅ Автоматически решено: {$stats['auto_resolved']}");
             $this->line("   ❌ Ошибок: {$stats['errors']}");
 
+            // Логируем успешное завершение обработки
+            Log::info('✅ Автоматическая обработка нарушений завершена', [
+                'notifications_sent' => $stats['notifications_sent'],
+                'keys_reissued' => $stats['keys_reissued'],
+                'auto_resolved' => $stats['auto_resolved'],
+                'errors' => $stats['errors'],
+                'execution_time_seconds' => $executionTime,
+                'completed_at' => now()->format('Y-m-d H:i:s')
+            ]);
+
             return 0;
 
         } catch (\Exception $e) {
-            Log::error('Ошибка при автоматической обработке нарушений', [
+            $executionTime = round(microtime(true) - $startTime, 2);
+
+            Log::error('❌ Ошибка при автоматической обработке нарушений', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'execution_time_seconds' => $executionTime,
+                'failed_at' => now()->format('Y-m-d H:i:s')
             ]);
 
             $this->error("❌ Ошибка: {$e->getMessage()}");
@@ -94,13 +119,13 @@ class ProcessViolationsCommand extends Command
                     // Либо есть техническая ошибка и попыток меньше 3, и прошло 30 минут с последней попытки
                     ->orWhere(function($q) {
                         $q->where('last_notification_status', 'technical_error')
-                          ->where('notification_retry_count', '<', 3)
-                          ->where(function($subQ) {
-                              // Если last_notification_sent_at есть, проверяем что прошло 30 минут
-                              // Если нет, значит это первая попытка после технической ошибки
-                              $subQ->whereNull('last_notification_sent_at')
-                                   ->orWhere('last_notification_sent_at', '<=', now()->subMinutes(30));
-                          });
+                            ->where('notification_retry_count', '<', 3)
+                            ->where(function($subQ) {
+                                // Если last_notification_sent_at есть, проверяем что прошло 30 минут
+                                // Если нет, значит это первая попытка после технической ошибки
+                                $subQ->whereNull('last_notification_sent_at')
+                                    ->orWhere('last_notification_sent_at', '<=', now()->subMinutes(30));
+                            });
                     });
             })
             ->with('keyActivate')
