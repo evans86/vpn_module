@@ -50,7 +50,41 @@ class ConnectionMonitorService
         foreach ($servers as $server) {
             try {
                 $serverUsersData = $this->getServerUsersData($server, $windowMinutes);
-                $allUsersData = array_merge_recursive($allUsersData, $serverUsersData);
+                
+                // Правильное объединение данных пользователей с разных серверов
+                foreach ($serverUsersData as $userId => $userData) {
+                    if (!isset($allUsersData[$userId])) {
+                        $allUsersData[$userId] = [
+                            'unique_ips' => [],
+                            'servers' => [],
+                            'ip_networks' => []
+                        ];
+                    }
+                    
+                    // Объединяем уникальные IP
+                    if (isset($userData['unique_ips'])) {
+                        $allUsersData[$userId]['unique_ips'] = array_merge(
+                            $allUsersData[$userId]['unique_ips'],
+                            $userData['unique_ips']
+                        );
+                    }
+                    
+                    // Объединяем серверы
+                    if (isset($userData['servers'])) {
+                        $allUsersData[$userId]['servers'] = array_merge(
+                            $allUsersData[$userId]['servers'],
+                            $userData['servers']
+                        );
+                    }
+                    
+                    // Объединяем сети IP
+                    if (isset($userData['ip_networks'])) {
+                        $allUsersData[$userId]['ip_networks'] = array_merge(
+                            $allUsersData[$userId]['ip_networks'],
+                            $userData['ip_networks']
+                        );
+                    }
+                }
 
                 $results['servers_checked'][] = [
                     'server_id' => $server->id,
@@ -168,20 +202,27 @@ class ConnectionMonitorService
     private function analyzeUsersWithNewLogic(array $allUsersData, int $threshold): int
     {
         $violationsCount = 0;
+        $usersChecked = 0;
+        $usersWithMultipleIPs = 0;
 
         foreach ($allUsersData as $userId => $userData) {
+            $usersChecked++;
             $uniqueIps = array_keys($userData['unique_ips']);
             $ipCount = count($uniqueIps);
             $networkCount = count($userData['ip_networks']);
             $serverCount = count($userData['servers']);
 
-            Log::info("User analysis", [
-                'user_id' => $userId,
-                'unique_ips_count' => $ipCount,
-                'unique_networks_count' => $networkCount,
-                'servers_count' => $serverCount,
-                'ip_addresses' => $uniqueIps
-            ]);
+            // Логируем только пользователей с множественными IP (потенциальные нарушения)
+            if ($ipCount > $threshold) {
+                $usersWithMultipleIPs++;
+                Log::debug("User with multiple IPs detected", [
+                    'user_id' => $userId,
+                    'unique_ips_count' => $ipCount,
+                    'unique_networks_count' => $networkCount,
+                    'servers_count' => $serverCount,
+                    'ip_addresses' => $uniqueIps
+                ]);
+            }
 
             // НОВАЯ ЛОГИКА: Нарушение только если разные сети И превышен порог
             $isViolation = $this->isRealViolation($uniqueIps, $ipCount, $threshold);
@@ -199,14 +240,16 @@ class ConnectionMonitorService
                 if ($violationCreated) {
                     $violationsCount++;
                 }
-            } else {
-                Log::info("User within limits (same network)", [
-                    'user_id' => $userId,
-                    'unique_ips_count' => $ipCount,
-                    'networks' => array_keys($userData['ip_networks'])
-                ]);
             }
         }
+
+        // Логируем общую статистику анализа
+        Log::info('Анализ пользователей завершен', [
+            'total_users_checked' => $usersChecked,
+            'users_with_multiple_ips' => $usersWithMultipleIPs,
+            'violations_found' => $violationsCount,
+            'threshold' => $threshold
+        ]);
 
         return $violationsCount;
     }
@@ -230,12 +273,15 @@ class ConnectionMonitorService
 
         $networkCount = count($networks);
 
-        Log::info("Network analysis", [
-            'ip_count' => $ipCount,
-            'network_count' => $networkCount,
-            'networks' => array_keys($networks),
-            'ips' => $ipAddresses
-        ]);
+        // Логируем анализ сетей только если обнаружено потенциальное нарушение
+        if ($networkCount > 1) {
+            Log::debug("Network analysis - multiple networks detected", [
+                'ip_count' => $ipCount,
+                'network_count' => $networkCount,
+                'networks' => array_keys($networks),
+                'ips' => $ipAddresses
+            ]);
+        }
 
         // НАША НОВАЯ ЛОГИКА:
         // Нарушение только если есть IP из РАЗНЫХ сетей

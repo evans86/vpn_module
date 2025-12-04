@@ -84,7 +84,7 @@ class MonitorConnectionLimits extends Command
 
         } catch (\Exception $e) {
             $totalTime = round(microtime(true) - $startTime, 2);
-
+            
             Log::error('❌ Ошибка при проверке нарушений лимитов подключений', [
                 'threshold' => $threshold,
                 'window_minutes' => $window,

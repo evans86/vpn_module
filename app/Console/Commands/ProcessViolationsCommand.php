@@ -85,7 +85,7 @@ class ProcessViolationsCommand extends Command
 
         } catch (\Exception $e) {
             $executionTime = round(microtime(true) - $startTime, 2);
-
+            
             Log::error('❌ Ошибка при автоматической обработке нарушений', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -119,13 +119,13 @@ class ProcessViolationsCommand extends Command
                     // Либо есть техническая ошибка и попыток меньше 3, и прошло 30 минут с последней попытки
                     ->orWhere(function($q) {
                         $q->where('last_notification_status', 'technical_error')
-                            ->where('notification_retry_count', '<', 3)
-                            ->where(function($subQ) {
-                                // Если last_notification_sent_at есть, проверяем что прошло 30 минут
-                                // Если нет, значит это первая попытка после технической ошибки
-                                $subQ->whereNull('last_notification_sent_at')
-                                    ->orWhere('last_notification_sent_at', '<=', now()->subMinutes(30));
-                            });
+                          ->where('notification_retry_count', '<', 3)
+                          ->where(function($subQ) {
+                              // Если last_notification_sent_at есть, проверяем что прошло 30 минут
+                              // Если нет, значит это первая попытка после технической ошибки
+                              $subQ->whereNull('last_notification_sent_at')
+                                   ->orWhere('last_notification_sent_at', '<=', now()->subMinutes(30));
+                          });
                     });
             })
             ->with('keyActivate')
