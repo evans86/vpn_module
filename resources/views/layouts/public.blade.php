@@ -98,6 +98,16 @@
         .text-gray-700 { color: #374151; }
         .disabled { opacity: 0.5; cursor: not-allowed; }
         .opacity-50 { opacity: 0.5; }
+        .fixed { position: fixed; }
+        .bottom-4 { bottom: 1rem; }
+        .right-4 { right: 1rem; }
+        .bg-green-500 { background-color: #22c55e; }
+        .max-w-sm { max-width: 24rem; }
+        .mr-3 { margin-right: 0.75rem; }
+        .ml-4 { margin-left: 1rem; }
+        .hover\:text-gray-200:hover { color: #e5e7eb; }
+        .mt-1 { margin-top: 0.25rem; }
+        .z-50 { z-index: 50; }
     </style>
     <style>[x-cloak]{display:none!important}</style>
     @stack('head')

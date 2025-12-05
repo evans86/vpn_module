@@ -11,6 +11,19 @@
             <p class="text-xl text-gray-600 mb-6">Узнайте качество вашего подключения и доступность популярных
                 сайтов</p>
 
+            <!-- Информация об офлайн режиме -->
+            <div id="offlineInfo" class="hidden mb-4 bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg text-left max-w-2xl mx-auto">
+                <div class="flex items-start">
+                    <span class="text-2xl mr-3">ℹ️</span>
+                    <div>
+                        <h3 class="font-semibold text-blue-800 mb-1">Офлайн режим</h3>
+                        <p class="text-sm text-blue-700">
+                            Страница работает в офлайн режиме. Для полной функциональности рекомендуется посетить страницу с интернетом хотя бы один раз для кэширования.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             <button id="runTest"
                     class="bg-blue-600 hover:bg-blue-700 text-white px-12 py-6 rounded-2xl text-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg">
                 🚀 Запустить проверку
@@ -1023,6 +1036,93 @@
         // Инициализация при загрузке страницы
         document.addEventListener('DOMContentLoaded', () => {
             new SimpleNetworkTester();
+            
+            // Регистрация Service Worker для офлайн работы
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/sw-netcheck.js')
+                        .then((registration) => {
+                            console.log('ServiceWorker registered:', registration.scope);
+                            
+                            // Проверяем, обновился ли Service Worker
+                            registration.addEventListener('updatefound', () => {
+                                const newWorker = registration.installing;
+                                newWorker.addEventListener('statechange', () => {
+                                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                        console.log('New Service Worker available');
+                                    }
+                                });
+                            });
+                            
+                            // Показываем уведомление о готовности к офлайн работе
+                            if (registration.active) {
+                                showOfflineReadyNotification();
+                            }
+                            
+                            // Проверяем, работает ли страница в офлайн режиме
+                            if (!navigator.onLine) {
+                                document.getElementById('offlineInfo')?.classList.remove('hidden');
+                            }
+                        })
+                        .catch((error) => {
+                            console.log('ServiceWorker registration failed:', error);
+                            // Service Worker может не работать на HTTP (только HTTPS или localhost)
+                            if (location.protocol === 'http:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+                                console.log('Service Worker requires HTTPS or localhost');
+                                // Показываем информацию об офлайн режиме
+                                if (!navigator.onLine) {
+                                    document.getElementById('offlineInfo')?.classList.remove('hidden');
+                                }
+                            }
+                        });
+                });
+            } else {
+                console.log('Service Worker not supported');
+                // Если Service Worker не поддерживается, показываем информацию
+                if (!navigator.onLine) {
+                    document.getElementById('offlineInfo')?.classList.remove('hidden');
+                }
+            }
+            
+            // Отслеживаем изменения статуса сети
+            window.addEventListener('online', () => {
+                document.getElementById('offlineInfo')?.classList.add('hidden');
+            });
+            
+            window.addEventListener('offline', () => {
+                document.getElementById('offlineInfo')?.classList.remove('hidden');
+            });
         });
+        
+        // Показ уведомления о готовности к офлайн работе
+        function showOfflineReadyNotification() {
+            // Проверяем, не показывали ли уже уведомление
+            if (sessionStorage.getItem('offline-ready-shown')) {
+                return;
+            }
+            
+            const notification = document.createElement('div');
+            notification.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-sm';
+            notification.innerHTML = `
+                <div class="flex items-center">
+                    <span class="text-2xl mr-3">✅</span>
+                    <div>
+                        <div class="font-semibold">Страница готова к офлайн работе</div>
+                        <div class="text-sm mt-1">Страница сохранена в кэш и будет доступна без интернета</div>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">✕</button>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            sessionStorage.setItem('offline-ready-shown', 'true');
+            
+            // Автоматически скрываем через 5 секунд
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
     </script>
 @endsection
