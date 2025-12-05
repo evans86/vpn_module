@@ -152,7 +152,7 @@
                 this.reportUrl = @json(route('netcheck.report'));
                 this.isRunning = false;
                 this.currentResults = null;
-                this.hasInternetConnection = null; // null - неизвестно, true/false - известно
+                this.internetStatus = null; // null - неизвестно, 'full' - полный доступ, 'limited' - белый список, 'none' - нет интернета
                 this.noInternetBanner = null;
 
                 this.bindEvents();
@@ -167,19 +167,14 @@
 
             // Проверка соединения при загрузке страницы
             async checkInitialConnection() {
-                const hasInternet = await this.checkInternetConnection();
-                if (!hasInternet) {
-                    this.showNoInternetBanner();
+                const status = await this.checkInternetConnection();
+                if (status === 'limited' || status === 'none') {
+                    this.showLimitedAccessWarning(status);
                 }
             }
 
             async runFullTest() {
                 if (this.isRunning) return;
-
-                // Если уже знаем, что нет интернета - не запускаем проверку
-                if (this.hasInternetConnection === false) {
-                    return;
-                }
 
                 this.isRunning = true;
                 this.showProgress();
@@ -187,23 +182,30 @@
                 this.showConnectionInfo();
 
                 try {
-                    // 0. Проверка базового интернет-соединения
+                    // 0. Проверка уровня доступа к интернету
                     await this.updateProgress(5, 'Проверка интернет-соединения...');
-                    const hasInternet = await this.checkInternetConnection();
+                    const internetStatus = await this.checkInternetConnection();
 
-                    if (!hasInternet) {
-                        this.showNoInternetBanner();
-                        return;
+                    if (internetStatus === 'limited' || internetStatus === 'none') {
+                        this.showLimitedAccessWarning(internetStatus);
+                    } else {
+                        // Убираем предупреждение если полный доступ появился
+                        this.hideLimitedAccessWarning();
                     }
 
-                    // Убираем баннер если он был
-                    this.hideNoInternetBanner();
-
-                    // 1. Определение IP и геолокации
+                    // 1. Определение IP и геолокации (пробуем всегда, но не блокируем при ошибке)
+                    let ipInfo = {ip: null, country: null, isp: null};
                     await this.updateProgress(10, 'Определение IP-адреса...');
-                    const ipInfo = await this.detectIP();
+                    try {
+                        ipInfo = await this.detectIP();
+                    } catch (e) {
+                        console.log('IP detection failed:', e);
+                        document.getElementById('ipAddress').textContent = 'Недоступно';
+                        document.getElementById('countryInfo').textContent = '—';
+                        document.getElementById('providerInfo').textContent = '—';
+                    }
 
-                    // 2. Базовые тесты
+                    // 2. Базовые тесты (работают даже без интернета, так как используют локальный сервер)
                     await this.updateProgress(20, 'Проверка пинга...');
                     const ping = await this.testPing();
 
@@ -211,6 +213,7 @@
                     const speed = await this.testSpeed();
 
                     // 3. Проверка доступности сайтов (параллельно для скорости)
+                    // Эти тесты могут не работать без интернета, но мы их все равно запускаем
                     await this.updateProgress(60, 'Проверка сервисов...');
                     const [localResults, globalResults, networkHealthResults] = await Promise.all([
                         this.testCategory('local_services', 'localResults'),
@@ -235,141 +238,197 @@
 
                 } catch (error) {
                     console.error('Test failed:', error);
-                    // При ошибке проверяем соединение
-                    const hasInternet = await this.checkInternetConnection();
-                    if (!hasInternet) {
-                        this.showNoInternetBanner();
-                    } else {
-                        this.showError('Произошла ошибка при проверке: ' + error.message);
+                    // При ошибке проверяем соединение, но не блокируем работу
+                    const status = await this.checkInternetConnection();
+                    if (status === 'limited' || status === 'none') {
+                        this.showLimitedAccessWarning(status);
                     }
+                    this.showError('Произошла ошибка при проверке: ' + error.message);
                 } finally {
                     this.isRunning = false;
                     this.hideProgress();
                 }
             }
 
-            // Функция проверки интернет-соединения
+            // Функция проверки уровня доступа к интернету
+            // Возвращает: 'full' - полный доступ, 'limited' - белый список/ограниченный доступ, 'none' - нет интернета
             async checkInternetConnection() {
                 try {
-                    // Пробуем несколько надежных endpoints для проверки
+                    // Сначала проверяем доступность локального сервера (должен работать всегда)
+                    let localServerAvailable = false;
+                    try {
+                        const localResponse = await fetch(this.pingUrl + '?t=' + Date.now(), {
+                            cache: 'no-store',
+                            signal: AbortSignal.timeout(2000)
+                        });
+                        if (localResponse.ok) {
+                            localServerAvailable = true;
+                        }
+                    } catch (e) {
+                        // Локальный сервер недоступен - это критично
+                        this.internetStatus = 'none';
+                        return 'none';
+                    }
+
+                    // Теперь проверяем доступность внешних ресурсов
                     const testEndpoints = [
-                        'https://www.google.com/favicon.ico',
-                        'https://www.yandex.ru/favicon.ico',
-                        'https://www.gstatic.com/generate_204'
+                        {url: 'https://www.yandex.ru/favicon.ico', name: 'Яндекс'},
+                        {url: 'https://www.google.com/favicon.ico', name: 'Google'},
+                        {url: 'https://www.gstatic.com/generate_204', name: 'Google Static'}
                     ];
 
+                    let accessibleCount = 0;
                     for (const endpoint of testEndpoints) {
                         try {
-                            const response = await fetch(endpoint, {
+                            const response = await fetch(endpoint.url, {
                                 method: 'HEAD',
                                 mode: 'no-cors',
                                 signal: AbortSignal.timeout(3000),
                                 cache: 'no-store'
                             });
-                            // Если хотя бы один запрос прошел успешно - есть интернет
-                            this.hasInternetConnection = true;
-                            return true;
+                            accessibleCount++;
                         } catch (e) {
                             continue; // Пробуем следующий endpoint
                         }
                     }
 
-                    // Если все endpoints не ответили - нет интернета
-                    this.hasInternetConnection = false;
-                    return false;
+                    // Определяем уровень доступа
+                    if (accessibleCount === 0) {
+                        // Локальный сервер работает, но внешние ресурсы недоступны
+                        // Это может быть белый список или полное отсутствие интернета
+                        // Проверяем через попытку доступа к DNS
+                        this.internetStatus = 'limited';
+                        return 'limited';
+                    } else if (accessibleCount < testEndpoints.length) {
+                        // Частичный доступ - вероятно белый список
+                        this.internetStatus = 'limited';
+                        return 'limited';
+                    } else {
+                        // Полный доступ
+                        this.internetStatus = 'full';
+                        return 'full';
+                    }
 
                 } catch (error) {
-                    this.hasInternetConnection = false;
-                    return false;
+                    this.internetStatus = 'limited';
+                    return 'limited'; // В случае ошибки считаем ограниченным доступом
                 }
             }
 
-            // Показ баннера при отсутствии интернета
-            showNoInternetBanner() {
-                // Если баннер уже показан - не создаем новый
+            // Показ предупреждения при ограниченном доступе (не блокирует работу)
+            showLimitedAccessWarning(status) {
+                // Если предупреждение уже показано - обновляем его
                 if (this.noInternetBanner && document.body.contains(this.noInternetBanner)) {
+                    this.updateLimitedAccessWarning(status);
                     return;
                 }
 
-                // Скрываем основной контент
-                this.hideMainContent();
-
-                // Создаем баннер
+                // Создаем предупреждение (не скрывает контент)
                 this.noInternetBanner = document.createElement('div');
-                this.noInternetBanner.className = 'fixed inset-0 bg-white z-50 flex items-center justify-center p-4';
-                this.noInternetBanner.innerHTML = `
-                <div class="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 text-center border border-red-200">
-                    <div class="text-6xl mb-4">🚫</div>
-                    <h1 class="text-2xl font-bold text-gray-900 mb-4">Отсутствует интернет-соединение</h1>
-                    <p class="text-gray-600 mb-6">Проверьте подключение к сети и попробуйте снова</p>
+                this.noInternetBanner.id = 'limitedAccessWarning';
+                this.updateLimitedAccessWarning(status);
 
-                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-left">
-                        <h3 class="font-semibold text-red-800 mb-2">Что проверить:</h3>
-                        <ul class="text-sm text-red-700 space-y-1">
-                            <li>• Подключение к Wi-Fi или Ethernet</li>
-                            <li>• Работу роутера/модема</li>
-                            <li>• Сетевой кабель</li>
-                            <li>• Наличие интернета у провайдера</li>
-                        </ul>
-                    </div>
-
-                    <div class="space-y-3">
-                        <button id="retryConnection"
-                                class="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors font-semibold">
-                            🔄 Проверить соединение
-                        </button>
-                        <button onclick="location.reload()"
-                                class="w-full bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg transition-colors font-semibold">
-                            📄 Обновить страницу
-                        </button>
-                    </div>
-                </div>
-            `;
-
-                document.body.appendChild(this.noInternetBanner);
+                // Вставляем предупреждение в начало контента
+                const container = document.querySelector('.max-w-6xl');
+                if (container) {
+                    container.insertBefore(this.noInternetBanner, container.firstChild);
+                } else {
+                    document.body.appendChild(this.noInternetBanner);
+                }
 
                 // Добавляем обработчик для кнопки повторной проверки
-                document.getElementById('retryConnection').addEventListener('click', () => {
-                    this.retryConnectionCheck();
-                });
+                const retryBtn = document.getElementById('retryConnection');
+                if (retryBtn) {
+                    retryBtn.addEventListener('click', () => {
+                        this.retryConnectionCheck();
+                    });
+                }
 
                 // Запускаем периодическую проверку соединения
                 this.startConnectionMonitoring();
             }
 
-            // Скрытие баннера
-            hideNoInternetBanner() {
+            // Обновление содержимого предупреждения
+            updateLimitedAccessWarning(status) {
+                if (!this.noInternetBanner) return;
+
+                let title, message, bgColor, borderColor, textColor, textColorDark;
+                
+                if (status === 'limited') {
+                    title = 'Ограниченный доступ к интернету (белый список)';
+                    message = 'Обнаружен режим белого списка или ограниченного доступа. Локальные тесты (ping, скорость) работают нормально. Проверка доступности внешних сайтов покажет результаты только для разрешенных ресурсов.';
+                    bgColor = 'bg-blue-50';
+                    borderColor = 'border-blue-400';
+                    textColor = 'text-blue-800';
+                    textColorDark = 'text-blue-700';
+                } else {
+                    title = 'Отсутствует интернет-соединение';
+                    message = 'Страница работает в офлайн-режиме. Локальные тесты (ping, скорость) будут выполняться, но проверка доступности внешних сайтов может не работать.';
+                    bgColor = 'bg-yellow-50';
+                    borderColor = 'border-yellow-400';
+                    textColor = 'text-yellow-800';
+                    textColorDark = 'text-yellow-700';
+                }
+
+                this.noInternetBanner.className = `mb-6 ${bgColor} border-l-4 ${borderColor} p-4 rounded-lg`;
+                this.noInternetBanner.innerHTML = `
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <span class="text-2xl">${status === 'limited' ? '🔒' : '⚠️'}</span>
+                    </div>
+                    <div class="ml-3 flex-1">
+                        <h3 class="text-sm font-medium ${textColor} mb-2">
+                            ${title}
+                        </h3>
+                        <p class="text-sm ${textColorDark} mb-3">
+                            ${message}
+                        </p>
+                        <div class="flex gap-2">
+                            <button id="retryConnection"
+                                    class="text-sm ${status === 'limited' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-yellow-600 hover:bg-yellow-700'} text-white px-4 py-2 rounded transition-colors font-medium">
+                                🔄 Проверить соединение
+                            </button>
+                            <button onclick="document.getElementById('limitedAccessWarning')?.remove()"
+                                    class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded transition-colors font-medium">
+                                ✕ Скрыть
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+                // Добавляем обработчик для кнопки повторной проверки
+                const retryBtn = document.getElementById('retryConnection');
+                if (retryBtn) {
+                    retryBtn.addEventListener('click', () => {
+                        this.retryConnectionCheck();
+                    });
+                }
+            }
+
+            // Скрытие предупреждения
+            hideLimitedAccessWarning() {
                 if (this.noInternetBanner && document.body.contains(this.noInternetBanner)) {
                     this.noInternetBanner.remove();
                     this.noInternetBanner = null;
                 }
-                this.showMainContent();
                 this.stopConnectionMonitoring();
-            }
-
-            // Скрытие основного контента
-            hideMainContent() {
-                const mainContent = document.querySelector('.max-w-6xl');
-                if (mainContent) {
-                    mainContent.style.display = 'none';
-                }
-            }
-
-            // Показ основного контента
-            showMainContent() {
-                const mainContent = document.querySelector('.max-w-6xl');
-                if (mainContent) {
-                    mainContent.style.display = 'block';
-                }
             }
 
             // Периодическая проверка соединения
             startConnectionMonitoring() {
                 this.connectionMonitor = setInterval(async () => {
-                    const hasInternet = await this.checkInternetConnection();
-                    if (hasInternet) {
-                        this.hideNoInternetBanner();
+                    const status = await this.checkInternetConnection();
+                    if (status === 'full') {
+                        this.hideLimitedAccessWarning();
                         this.showReconnectedMessage();
+                    } else if (status === 'limited' || status === 'none') {
+                        // Обновляем предупреждение если статус изменился
+                        if (this.noInternetBanner && document.body.contains(this.noInternetBanner)) {
+                            this.updateLimitedAccessWarning(status);
+                        } else {
+                            this.showLimitedAccessWarning(status);
+                        }
                     }
                 }, 5000); // Проверяем каждые 5 секунд
             }
@@ -406,20 +465,24 @@
             // Ручная проверка соединения
             async retryConnectionCheck() {
                 const retryBtn = document.getElementById('retryConnection');
+                if (!retryBtn) return;
+                
                 const originalText = retryBtn.textContent;
 
                 retryBtn.disabled = true;
                 retryBtn.textContent = 'Проверка...';
                 retryBtn.classList.add('opacity-50');
 
-                const hasInternet = await this.checkInternetConnection();
+                const status = await this.checkInternetConnection();
 
-                if (hasInternet) {
-                    this.hideNoInternetBanner();
+                if (status === 'full') {
+                    this.hideLimitedAccessWarning();
                     this.showReconnectedMessage();
                 } else {
-                    // Показываем, что проверка прошла, но интернета нет
-                    retryBtn.textContent = 'Интернета нет';
+                    // Обновляем предупреждение с текущим статусом
+                    this.updateLimitedAccessWarning(status);
+                    // Показываем, что проверка прошла
+                    retryBtn.textContent = status === 'limited' ? 'Ограниченный доступ' : 'Интернета нет';
                     setTimeout(() => {
                         retryBtn.disabled = false;
                         retryBtn.textContent = originalText;
@@ -458,7 +521,8 @@
 
                     return {ip: data.ip, country, isp};
                 } catch (error) {
-                    document.getElementById('ipAddress').textContent = 'Ошибка';
+                    // Если нет интернета, просто возвращаем null значения
+                    document.getElementById('ipAddress').textContent = 'Недоступно';
                     document.getElementById('countryInfo').textContent = '—';
                     document.getElementById('providerInfo').textContent = '—';
                     return {ip: null, country: null, isp: null};
