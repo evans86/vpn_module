@@ -156,7 +156,10 @@
                 this.noInternetBanner = null;
 
                 this.bindEvents();
-                this.checkInitialConnection();
+                // Проверка интернета делается в фоне, не блокирует работу
+                this.checkInitialConnection().catch(() => {
+                    // Игнорируем ошибки проверки - страница должна работать всегда
+                });
             }
 
             bindEvents() {
@@ -165,11 +168,21 @@
                 document.getElementById('retryTest').addEventListener('click', () => this.retryTest());
             }
 
-            // Проверка соединения при загрузке страницы
+            // Проверка соединения при загрузке страницы (неблокирующая)
             async checkInitialConnection() {
-                const status = await this.checkInternetConnection();
-                if (status === 'limited' || status === 'none') {
-                    this.showLimitedAccessWarning(status);
+                try {
+                    // Делаем проверку с коротким таймаутом, чтобы не блокировать загрузку
+                    const status = await Promise.race([
+                        this.checkInternetConnection(),
+                        new Promise((resolve) => setTimeout(() => resolve('unknown'), 2000))
+                    ]);
+                    
+                    if (status === 'limited' || status === 'none') {
+                        this.showLimitedAccessWarning(status);
+                    }
+                } catch (error) {
+                    // Игнорируем ошибки - страница должна работать всегда
+                    console.log('Connection check failed, continuing anyway:', error);
                 }
             }
 
@@ -182,16 +195,20 @@
                 this.showConnectionInfo();
 
                 try {
-                    // 0. Проверка уровня доступа к интернету
+                    // 0. Проверка уровня доступа к интернету (неблокирующая)
                     await this.updateProgress(5, 'Проверка интернет-соединения...');
-                    const internetStatus = await this.checkInternetConnection();
-
-                    if (internetStatus === 'limited' || internetStatus === 'none') {
-                        this.showLimitedAccessWarning(internetStatus);
-                    } else {
-                        // Убираем предупреждение если полный доступ появился
-                        this.hideLimitedAccessWarning();
-                    }
+                    
+                    // Проверяем интернет в фоне, не блокируя выполнение тестов
+                    this.checkInternetConnection().then(status => {
+                        if (status === 'limited' || status === 'none') {
+                            this.showLimitedAccessWarning(status);
+                        } else {
+                            // Убираем предупреждение если полный доступ появился
+                            this.hideLimitedAccessWarning();
+                        }
+                    }).catch(() => {
+                        // Игнорируем ошибки проверки
+                    });
 
                     // 1. Определение IP и геолокации (пробуем всегда, но не блокируем при ошибке)
                     let ipInfo = {ip: null, country: null, isp: null};
@@ -238,11 +255,14 @@
 
                 } catch (error) {
                     console.error('Test failed:', error);
-                    // При ошибке проверяем соединение, но не блокируем работу
-                    const status = await this.checkInternetConnection();
-                    if (status === 'limited' || status === 'none') {
-                        this.showLimitedAccessWarning(status);
-                    }
+                    // При ошибке проверяем соединение в фоне, но не блокируем работу
+                    this.checkInternetConnection().then(status => {
+                        if (status === 'limited' || status === 'none') {
+                            this.showLimitedAccessWarning(status);
+                        }
+                    }).catch(() => {
+                        // Игнорируем ошибки проверки
+                    });
                     this.showError('Произошла ошибка при проверке: ' + error.message);
                 } finally {
                     this.isRunning = false;
@@ -250,7 +270,7 @@
                 }
             }
 
-            // Функция проверки уровня доступа к интернету
+            // Функция проверки уровня доступа к интернету (неблокирующая)
             // Возвращает: 'full' - полный доступ, 'limited' - белый список/ограниченный доступ, 'none' - нет интернета
             async checkInternetConnection() {
                 try {
@@ -265,38 +285,36 @@
                             localServerAvailable = true;
                         }
                     } catch (e) {
-                        // Локальный сервер недоступен - это критично
+                        // Локальный сервер недоступен - возможно, страница работает полностью офлайн
+                        // Не блокируем работу, просто считаем что нет интернета
                         this.internetStatus = 'none';
                         return 'none';
                     }
 
-                    // Теперь проверяем доступность внешних ресурсов
+                    // Теперь проверяем доступность внешних ресурсов (неблокирующе)
                     const testEndpoints = [
                         {url: 'https://www.yandex.ru/favicon.ico', name: 'Яндекс'},
                         {url: 'https://www.google.com/favicon.ico', name: 'Google'},
                         {url: 'https://www.gstatic.com/generate_204', name: 'Google Static'}
                     ];
 
-                    let accessibleCount = 0;
-                    for (const endpoint of testEndpoints) {
-                        try {
-                            const response = await fetch(endpoint.url, {
-                                method: 'HEAD',
-                                mode: 'no-cors',
-                                signal: AbortSignal.timeout(3000),
-                                cache: 'no-store'
-                            });
-                            accessibleCount++;
-                        } catch (e) {
-                            continue; // Пробуем следующий endpoint
-                        }
-                    }
+                    // Запускаем все проверки параллельно с коротким таймаутом
+                    const checkPromises = testEndpoints.map(endpoint => 
+                        fetch(endpoint.url, {
+                            method: 'HEAD',
+                            mode: 'no-cors',
+                            signal: AbortSignal.timeout(2000),
+                            cache: 'no-store'
+                        }).then(() => true).catch(() => false)
+                    );
+
+                    const results = await Promise.allSettled(checkPromises);
+                    const accessibleCount = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
 
                     // Определяем уровень доступа
                     if (accessibleCount === 0) {
                         // Локальный сервер работает, но внешние ресурсы недоступны
                         // Это может быть белый список или полное отсутствие интернета
-                        // Проверяем через попытку доступа к DNS
                         this.internetStatus = 'limited';
                         return 'limited';
                     } else if (accessibleCount < testEndpoints.length) {
@@ -310,8 +328,9 @@
                     }
 
                 } catch (error) {
+                    // В случае любой ошибки считаем ограниченным доступом, но не блокируем работу
                     this.internetStatus = 'limited';
-                    return 'limited'; // В случае ошибки считаем ограниченным доступом
+                    return 'limited';
                 }
             }
 
@@ -415,22 +434,30 @@
                 this.stopConnectionMonitoring();
             }
 
-            // Периодическая проверка соединения
+            // Периодическая проверка соединения (неблокирующая)
             startConnectionMonitoring() {
                 this.connectionMonitor = setInterval(async () => {
-                    const status = await this.checkInternetConnection();
-                    if (status === 'full') {
-                        this.hideLimitedAccessWarning();
-                        this.showReconnectedMessage();
-                    } else if (status === 'limited' || status === 'none') {
-                        // Обновляем предупреждение если статус изменился
-                        if (this.noInternetBanner && document.body.contains(this.noInternetBanner)) {
-                            this.updateLimitedAccessWarning(status);
-                        } else {
-                            this.showLimitedAccessWarning(status);
+                    try {
+                        const status = await Promise.race([
+                            this.checkInternetConnection(),
+                            new Promise((resolve) => setTimeout(() => resolve('unknown'), 3000))
+                        ]);
+                        
+                        if (status === 'full') {
+                            this.hideLimitedAccessWarning();
+                            this.showReconnectedMessage();
+                        } else if (status === 'limited' || status === 'none') {
+                            // Обновляем предупреждение если статус изменился
+                            if (this.noInternetBanner && document.body.contains(this.noInternetBanner)) {
+                                this.updateLimitedAccessWarning(status);
+                            } else {
+                                this.showLimitedAccessWarning(status);
+                            }
                         }
+                    } catch (error) {
+                        // Игнорируем ошибки мониторинга
                     }
-                }, 5000); // Проверяем каждые 5 секунд
+                }, 10000); // Проверяем каждые 10 секунд (реже, чтобы не нагружать)
             }
 
             // Остановка мониторинга
