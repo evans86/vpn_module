@@ -13,12 +13,9 @@
                     <p class="text-sm text-gray-600 mt-1">
                         Сравнение: {{ $statistics[0]['period']['last']['name'] ?? 'Прошлый месяц' }} → {{ $statistics[0]['period']['current']['name'] ?? 'Текущий месяц' }}
                     </p>
-                    <p class="text-xs text-gray-500 mt-1">
-                        API предоставляет данные только за текущий и прошлый месяц
-                    </p>
                 </div>
                 <div>
-                    <a href="{{ route('admin.module.panel-statistics.export-pdf') }}" 
+                    <a href="{{ route('admin.module.panel-statistics.export-pdf') }}"
                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
                         <i class="fas fa-file-pdf mr-2"></i>
                         Экспорт в PDF
