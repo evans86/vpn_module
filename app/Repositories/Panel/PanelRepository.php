@@ -45,12 +45,12 @@ class PanelRepository extends BaseRepository
      */
     public function getAllConfiguredPanels(): Collection
     {
-        // Получаем все настроенные панели Marzban
+        // Получаем все настроенные панели Marzban (исключаем панели с ошибками)
         // Оптимизация: добавляем eager loading для сервера
         return $this->query()
             ->where('panel_status', Panel::PANEL_CONFIGURED)
             ->where('panel', Panel::MARZBAN)
-            ->where('id', '!=', 26) // ВРЕМЕННО ИСКЛЮЧАЕМ ПАНЕЛЬ С ID 26
+            ->where('has_error', false) // Исключаем панели с ошибками
             ->with('server.location')
             ->orderBy('id', 'desc')
             ->get();
@@ -61,11 +61,11 @@ class PanelRepository extends BaseRepository
      */
     public function getConfiguredMarzbanPanel(): ?Panel
     {
-        // Получаем все настроенные панели Marzban
+        // Получаем все настроенные панели Marzban (исключаем панели с ошибками)
         $panels = $this->query()
             ->where('panel_status', Panel::PANEL_CONFIGURED)
             ->where('panel', Panel::MARZBAN)
-            ->where('id', '!=', 26) // ВРЕМЕННО ИСКЛЮЧАЕМ ПАНЕЛЬ С ID 26
+            ->where('has_error', false) // Исключаем панели с ошибками
             ->whereNotIn('id', function ($query) {
                 // Исключаем панели, которые привязаны к продавцам
                 $query->select('panel_id')
@@ -190,7 +190,7 @@ class PanelRepository extends BaseRepository
         $panels = $this->query()
             ->where('panel_status', Panel::PANEL_CONFIGURED)
             ->where('panel', Panel::MARZBAN)
-            ->where('id', '!=', 26) // ВРЕМЕННО ИСКЛЮЧАЕМ ПАНЕЛЬ С ID 26
+            ->where('has_error', false) // Исключаем панели с ошибками
             ->whereNotIn('id', function ($query) {
                 $query->select('panel_id')
                     ->from('salesman')
@@ -296,7 +296,7 @@ class PanelRepository extends BaseRepository
             $panels = $this->query()
                 ->where('panel_status', Panel::PANEL_CONFIGURED)
                 ->where('panel', Panel::MARZBAN)
-                ->where('id', '!=', 26) // ВРЕМЕННО ИСКЛЮЧАЕМ ПАНЕЛЬ С ID 26
+                ->where('has_error', false) // Исключаем панели с ошибками
                 ->whereNotIn('id', function ($query) {
                     $query->select('panel_id')
                         ->from('salesman')
@@ -1176,5 +1176,59 @@ class PanelRepository extends BaseRepository
         }
         
         return $historicalData;
+    }
+
+    /**
+     * Пометить панель как имеющую ошибку
+     * 
+     * @param int $panelId
+     * @param string $errorMessage
+     * @return void
+     */
+    public function markPanelWithError(int $panelId, string $errorMessage): void
+    {
+        $panel = $this->findOrFail($panelId);
+        $panel->has_error = true;
+        $panel->error_message = $errorMessage;
+        $panel->error_at = now();
+        $panel->save();
+
+        Log::warning('Panel marked with error', [
+            'panel_id' => $panelId,
+            'error_message' => $errorMessage,
+        ]);
+    }
+
+    /**
+     * Снять пометку об ошибке с панели
+     * 
+     * @param int $panelId
+     * @return void
+     */
+    public function clearPanelError(int $panelId): void
+    {
+        $panel = $this->findOrFail($panelId);
+        $panel->has_error = false;
+        $panel->error_message = null;
+        $panel->error_at = null;
+        $panel->save();
+
+        Log::info('Panel error cleared', [
+            'panel_id' => $panelId,
+        ]);
+    }
+
+    /**
+     * Получить все панели с ошибками
+     * 
+     * @return Collection
+     */
+    public function getPanelsWithErrors(): Collection
+    {
+        return $this->query()
+            ->where('has_error', true)
+            ->with('server.location')
+            ->orderBy('error_at', 'desc')
+            ->get();
     }
 }

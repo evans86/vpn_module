@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
+use App\Repositories\Panel\PanelRepository;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -37,8 +38,11 @@ class PanelSettingsController extends Controller
         // Получаем статистику и сравнение стратегий
         $panelRepository = app(\App\Repositories\Panel\PanelRepository::class);
         $comparison = $panelRepository->compareAllStrategies();
+        
+        // Получаем панели с ошибками
+        $panelsWithErrors = $panelRepository->getPanelsWithErrors();
 
-        return view('module.panel-settings.index', compact('currentStrategy', 'strategies', 'comparison'));
+        return view('module.panel-settings.index', compact('currentStrategy', 'strategies', 'comparison', 'panelsWithErrors'));
     }
 
     /**
@@ -98,6 +102,38 @@ class PanelSettingsController extends Controller
 
             return redirect()->route('admin.module.panel-settings.index')
                 ->with('error', 'Ошибка при обновлении настройки: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Снять пометку об ошибке с панели
+     */
+    public function clearPanelError(Request $request, PanelRepository $panelRepository): RedirectResponse
+    {
+        $validated = $request->validate([
+            'panel_id' => 'required|integer|exists:panel,id'
+        ]);
+
+        try {
+            $panelRepository->clearPanelError($validated['panel_id']);
+
+            Log::info('Panel error cleared by admin', [
+                'panel_id' => $validated['panel_id'],
+                'user_id' => auth()->id()
+            ]);
+
+            return redirect()->route('admin.module.panel-settings.index')
+                ->with('success', 'Ошибка с панели снята. Панель возвращена в ротацию.');
+
+        } catch (\Exception $e) {
+            Log::error('Failed to clear panel error', [
+                'panel_id' => $validated['panel_id'],
+                'error' => $e->getMessage(),
+                'user_id' => auth()->id()
+            ]);
+
+            return redirect()->route('admin.module.panel-settings.index')
+                ->with('error', 'Ошибка при снятии пометки: ' . $e->getMessage());
         }
     }
 }

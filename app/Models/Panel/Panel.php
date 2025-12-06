@@ -67,7 +67,10 @@ class Panel extends Model
         'panel_status',
         'server_id',
         'auth_token',
-        'token_died_time'
+        'token_died_time',
+        'has_error',
+        'error_message',
+        'error_at'
     ];
 
     protected $hidden = [
@@ -78,7 +81,9 @@ class Panel extends Model
     protected $casts = [
         'panel_status' => 'integer',
         'token_died_time' => 'integer',
-        'server_id' => 'integer'
+        'server_id' => 'integer',
+        'has_error' => 'boolean',
+        'error_at' => 'datetime'
     ];
 
     /**
