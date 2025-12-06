@@ -56,6 +56,12 @@ class Kernel extends ConsoleKernel
             ->dailyAt('03:00')
             ->withoutOverlapping()
             ->appendOutputTo(storage_path('logs/logs-cleanup.log'));
+
+        // Проверка панелей с ошибками каждые 15 минут
+        $schedule->command('panels:check-errors')
+            ->everyFifteenMinutes()
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/panel-error-check.log'));
     }
 
     /**

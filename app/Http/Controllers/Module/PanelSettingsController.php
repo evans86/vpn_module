@@ -41,8 +41,17 @@ class PanelSettingsController extends Controller
         
         // Получаем панели с ошибками
         $panelsWithErrors = $panelRepository->getPanelsWithErrors();
+        
+        // Получаем историю ошибок для каждой панели
+        $errorHistory = [];
+        foreach ($panelsWithErrors as $panel) {
+            $errorHistory[$panel->id] = \App\Models\Panel\PanelErrorHistory::where('panel_id', $panel->id)
+                ->orderBy('error_occurred_at', 'desc')
+                ->limit(10) // Последние 10 записей
+                ->get();
+        }
 
-        return view('module.panel-settings.index', compact('currentStrategy', 'strategies', 'comparison', 'panelsWithErrors'));
+        return view('module.panel-settings.index', compact('currentStrategy', 'strategies', 'comparison', 'panelsWithErrors', 'errorHistory'));
     }
 
     /**
@@ -115,7 +124,7 @@ class PanelSettingsController extends Controller
         ]);
 
         try {
-            $panelRepository->clearPanelError($validated['panel_id']);
+            $panelRepository->clearPanelError($validated['panel_id'], 'manual', 'Проблема решена администратором');
 
             Log::info('Panel error cleared by admin', [
                 'panel_id' => $validated['panel_id'],

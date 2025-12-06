@@ -3,6 +3,7 @@
 namespace App\Repositories\Panel;
 
 use App\Models\Panel\Panel;
+use App\Models\Panel\PanelErrorHistory;
 use App\Models\Panel\PanelMonthlyStatistics;
 use App\Models\Server\Server;
 use App\Models\ServerMonitoring\ServerMonitoring;
@@ -1188,34 +1189,69 @@ class PanelRepository extends BaseRepository
     public function markPanelWithError(int $panelId, string $errorMessage): void
     {
         $panel = $this->findOrFail($panelId);
-        $panel->has_error = true;
-        $panel->error_message = $errorMessage;
-        $panel->error_at = now();
-        $panel->save();
+        
+        // Проверяем, не помечена ли уже панель как проблемная
+        if (!$panel->has_error) {
+            $panel->has_error = true;
+            $panel->error_message = $errorMessage;
+            $panel->error_at = now();
+            $panel->save();
 
-        Log::warning('Panel marked with error', [
-            'panel_id' => $panelId,
-            'error_message' => $errorMessage,
-        ]);
+            // Создаем запись в истории ошибок
+            PanelErrorHistory::create([
+                'panel_id' => $panelId,
+                'error_message' => $errorMessage,
+                'error_occurred_at' => now(),
+            ]);
+
+            Log::warning('Panel marked with error', [
+                'panel_id' => $panelId,
+                'error_message' => $errorMessage,
+            ]);
+        } else {
+            // Если панель уже помечена, обновляем только сообщение об ошибке
+            $panel->error_message = $errorMessage;
+            $panel->error_at = now();
+            $panel->save();
+        }
     }
 
     /**
      * Снять пометку об ошибке с панели
      * 
      * @param int $panelId
+     * @param string $resolutionType 'manual' или 'automatic'
+     * @param string|null $resolutionNote Примечание о решении проблемы
      * @return void
      */
-    public function clearPanelError(int $panelId): void
+    public function clearPanelError(int $panelId, string $resolutionType = 'manual', ?string $resolutionNote = null): void
     {
         $panel = $this->findOrFail($panelId);
-        $panel->has_error = false;
-        $panel->error_message = null;
-        $panel->error_at = null;
-        $panel->save();
+        
+        if ($panel->has_error) {
+            // Обновляем последнюю нерешенную запись в истории
+            $lastError = PanelErrorHistory::where('panel_id', $panelId)
+                ->whereNull('resolved_at')
+                ->orderBy('error_occurred_at', 'desc')
+                ->first();
 
-        Log::info('Panel error cleared', [
-            'panel_id' => $panelId,
-        ]);
+            if ($lastError) {
+                $lastError->resolved_at = now();
+                $lastError->resolution_type = $resolutionType;
+                $lastError->resolution_note = $resolutionNote ?? ($resolutionType === 'automatic' ? 'Проблема решена автоматической системой проверки' : 'Проблема решена администратором');
+                $lastError->save();
+            }
+
+            $panel->has_error = false;
+            $panel->error_message = null;
+            $panel->error_at = null;
+            $panel->save();
+
+            Log::info('Panel error cleared', [
+                'panel_id' => $panelId,
+                'resolution_type' => $resolutionType,
+            ]);
+        }
     }
 
     /**

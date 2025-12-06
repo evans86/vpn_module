@@ -301,6 +301,41 @@
                                         <div class="text-sm font-medium text-gray-700 mb-1">Сообщение об ошибке:</div>
                                         <div class="text-sm text-gray-800 whitespace-pre-wrap">{{ $panel->error_message }}</div>
                                     </div>
+                                    
+                                    @if(isset($errorHistory[$panel->id]) && $errorHistory[$panel->id]->isNotEmpty())
+                                        <div class="mt-3">
+                                            <div class="text-sm font-medium text-gray-700 mb-2">История ошибок:</div>
+                                            <div class="space-y-2">
+                                                @foreach($errorHistory[$panel->id] as $history)
+                                                    <div class="text-xs p-2 bg-gray-50 rounded border">
+                                                        <div class="flex justify-between items-start mb-1">
+                                                            <span class="font-medium text-gray-700">
+                                                                {{ $history->error_occurred_at->format('d.m.Y H:i') }}
+                                                            </span>
+                                                            @if($history->resolved_at)
+                                                                <span class="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">
+                                                                    {{ $history->resolution_type === 'automatic' ? 'Автоматически' : 'Вручную' }}
+                                                                </span>
+                                                            @else
+                                                                <span class="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">
+                                                                    Активна
+                                                                </span>
+                                                            @endif
+                                                        </div>
+                                                        <div class="text-gray-600 mb-1">{{ $history->error_message }}</div>
+                                                        @if($history->resolved_at)
+                                                            <div class="text-gray-500 text-xs">
+                                                                Решено: {{ $history->resolved_at->format('d.m.Y H:i') }}
+                                                                @if($history->resolution_note)
+                                                                    - {{ $history->resolution_note }}
+                                                                @endif
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endif
                                 </div>
                                 <div class="ml-4">
                                     <form action="{{ route('admin.module.panel-settings.clear-error') }}" method="POST" 

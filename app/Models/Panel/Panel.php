@@ -6,6 +6,7 @@ use App\Models\Server\Server;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -94,6 +95,16 @@ class Panel extends Model
     public function server()
     {
         return $this->belongsTo(Server::class);
+    }
+
+    /**
+     * Get the error history for the panel.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function errorHistory()
+    {
+        return $this->hasMany(PanelErrorHistory::class);
     }
 
     /**
