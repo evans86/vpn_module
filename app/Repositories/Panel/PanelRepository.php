@@ -816,29 +816,21 @@ class PanelRepository extends BaseRepository
 
     /**
      * Получить статистику по панелям за текущий и прошлый месяц
+     * API предоставляет данные только за текущий и прошлый месяц
      * 
-     * @param int|null $year Год (по умолчанию текущий)
-     * @param int|null $month Месяц (по умолчанию текущий)
      * @return array
      */
-    public function getMonthlyStatistics(?int $year = null, ?int $month = null): array
+    public function getMonthlyStatistics(): array
     {
         $now = Carbon::now();
-        $selectedYear = $year ?? $now->year;
-        $selectedMonth = $month ?? $now->month;
         
-        // Определяем период выбранного месяца
-        $selectedMonthStart = Carbon::create($selectedYear, $selectedMonth, 1)->startOfMonth();
-        $selectedMonthEnd = Carbon::create($selectedYear, $selectedMonth, 1)->endOfMonth();
+        // Определяем период текущего месяца
+        $currentMonthStart = $now->copy()->startOfMonth();
+        $currentMonthEnd = $now->copy()->endOfMonth();
         
-        // Определяем период предыдущего месяца (для сравнения)
-        $previousMonthStart = $selectedMonthStart->copy()->subMonth()->startOfMonth();
-        $previousMonthEnd = $selectedMonthStart->copy()->subMonth()->endOfMonth();
-        
-        // Проверяем, является ли выбранный месяц текущим месяцем
-        $isCurrentMonth = ($selectedYear == $now->year && $selectedMonth == $now->month);
-        // Проверяем, является ли выбранный месяц прошлым месяцем
-        $isLastMonth = ($selectedYear == $now->copy()->subMonth()->year && $selectedMonth == $now->copy()->subMonth()->month);
+        // Определяем период прошлого месяца (для сравнения)
+        $lastMonthStart = $now->copy()->subMonth()->startOfMonth();
+        $lastMonthEnd = $now->copy()->subMonth()->endOfMonth();
         
         // Получаем все настроенные панели
         $panels = $this->getAllConfiguredPanels();
@@ -846,74 +838,55 @@ class PanelRepository extends BaseRepository
         $statistics = [];
         
         foreach ($panels as $panel) {
-            // Получаем статистику за выбранный месяц
-            $selectedMonthStats = $this->getPanelStatsForPeriod($panel, $selectedMonthStart, $selectedMonthEnd);
+            // Получаем статистику за текущий месяц
+            $currentMonthStats = $this->getPanelStatsForPeriod($panel, $currentMonthStart, $currentMonthEnd);
             
-            // Получаем статистику за предыдущий месяц (для сравнения)
-            $previousMonthStats = $this->getPanelStatsForPeriod($panel, $previousMonthStart, $previousMonthEnd);
+            // Получаем статистику за прошлый месяц
+            $lastMonthStats = $this->getPanelStatsForPeriod($panel, $lastMonthStart, $lastMonthEnd);
             
             // Получаем данные о трафике из API
             $trafficData = $this->getServerTrafficData($panel);
             
-            // Определяем трафик за выбранный месяц
-            $selectedTraffic = null;
-            if ($trafficData) {
+            // Трафик за текущий месяц (из API current_month)
+            $currentTraffic = null;
+            if ($trafficData && isset($trafficData['current_month'])) {
                 $limitBytes = $trafficData['limit'];
+                $currentTrafficBytes = $trafficData['current_month'];
                 
-                if ($isCurrentMonth) {
-                    // Если выбран текущий месяц - используем current_month
-                    $trafficBytes = $trafficData['current_month'] ?? $trafficData['used'] ?? 0;
-                } elseif ($isLastMonth) {
-                    // Если выбран прошлый месяц - используем last_month
-                    $trafficBytes = $trafficData['last_month'] ?? 0;
-                } else {
-                    // Для более старых месяцев данных нет в API
-                    $trafficBytes = null;
-                }
-                
-                if ($trafficBytes !== null) {
-                    $selectedTraffic = [
-                        'used_tb' => round($trafficBytes / (1024 * 1024 * 1024 * 1024), 2),
-                        'limit_tb' => round($limitBytes / (1024 * 1024 * 1024 * 1024), 2),
-                        'used_percent' => $limitBytes > 0 ? round(($trafficBytes / $limitBytes) * 100, 2) : 0,
-                    ];
-                }
+                $currentTraffic = [
+                    'used_tb' => round($currentTrafficBytes / (1024 * 1024 * 1024 * 1024), 2),
+                    'limit_tb' => round($limitBytes / (1024 * 1024 * 1024 * 1024), 2),
+                    'used_percent' => $limitBytes > 0 ? round(($currentTrafficBytes / $limitBytes) * 100, 2) : 0,
+                ];
             }
             
-            // Определяем трафик за предыдущий месяц (для сравнения)
-            $previousTraffic = null;
-            if ($trafficData) {
+            // Трафик за прошлый месяц (из API last_month)
+            $lastTraffic = null;
+            if ($trafficData && isset($trafficData['last_month'])) {
                 $limitBytes = $trafficData['limit'];
+                $lastTrafficBytes = $trafficData['last_month'];
                 
-                // Для предыдущего месяца используем last_month, если выбранный месяц - текущий
-                // Или используем данные из API если они доступны
-                if ($isCurrentMonth && isset($trafficData['last_month'])) {
-                    $previousTrafficBytes = $trafficData['last_month'];
-                    $previousTraffic = [
-                        'used_tb' => round($previousTrafficBytes / (1024 * 1024 * 1024 * 1024), 2),
-                        'limit_tb' => round($limitBytes / (1024 * 1024 * 1024 * 1024), 2),
-                        'used_percent' => $limitBytes > 0 ? round(($previousTrafficBytes / $limitBytes) * 100, 2) : 0,
-                    ];
-                }
-                // Если выбран прошлый месяц, то предыдущий - это месяц до прошлого
-                // Но API дает только current_month и last_month, так что данных может не быть
-                // В этом случае previousTraffic останется null
+                $lastTraffic = [
+                    'used_tb' => round($lastTrafficBytes / (1024 * 1024 * 1024 * 1024), 2),
+                    'limit_tb' => round($limitBytes / (1024 * 1024 * 1024 * 1024), 2),
+                    'used_percent' => $limitBytes > 0 ? round(($lastTrafficBytes / $limitBytes) * 100, 2) : 0,
+                ];
             }
             
             // Вычисляем динамику
             $trafficChange = null;
-            if ($selectedTraffic && $previousTraffic) {
-                $trafficChange = round($selectedTraffic['used_percent'] - $previousTraffic['used_percent'], 2);
+            if ($currentTraffic && $lastTraffic) {
+                $trafficChange = round($currentTraffic['used_percent'] - $lastTraffic['used_percent'], 2);
             }
             
             $activeUsersChange = null;
-            if ($selectedMonthStats['active_users'] !== null && $previousMonthStats['active_users'] !== null) {
-                $activeUsersChange = $selectedMonthStats['active_users'] - $previousMonthStats['active_users'];
+            if ($currentMonthStats['active_users'] !== null && $lastMonthStats['active_users'] !== null) {
+                $activeUsersChange = $currentMonthStats['active_users'] - $lastMonthStats['active_users'];
             }
             
             $onlineUsersChange = null;
-            if ($selectedMonthStats['online_users'] !== null && $previousMonthStats['online_users'] !== null) {
-                $onlineUsersChange = $selectedMonthStats['online_users'] - $previousMonthStats['online_users'];
+            if ($currentMonthStats['online_users'] !== null && $lastMonthStats['online_users'] !== null) {
+                $onlineUsersChange = $currentMonthStats['online_users'] - $lastMonthStats['online_users'];
             }
             
             $statistics[] = [
@@ -921,14 +894,14 @@ class PanelRepository extends BaseRepository
                 'panel_address' => $panel->panel_adress,
                 'server_name' => $panel->server->name ?? 'N/A',
                 'current_month' => [
-                    'active_users' => $selectedMonthStats['active_users'],
-                    'online_users' => $selectedMonthStats['online_users'],
-                    'traffic' => $selectedTraffic,
+                    'active_users' => $currentMonthStats['active_users'],
+                    'online_users' => $currentMonthStats['online_users'],
+                    'traffic' => $currentTraffic,
                 ],
                 'last_month' => [
-                    'active_users' => $previousMonthStats['active_users'],
-                    'online_users' => $previousMonthStats['online_users'],
-                    'traffic' => $previousTraffic,
+                    'active_users' => $lastMonthStats['active_users'],
+                    'online_users' => $lastMonthStats['online_users'],
+                    'traffic' => $lastTraffic,
                 ],
                 'changes' => [
                     'active_users' => $activeUsersChange,
@@ -937,14 +910,14 @@ class PanelRepository extends BaseRepository
                 ],
                 'period' => [
                     'current' => [
-                        'year' => $selectedYear,
-                        'month' => $selectedMonth,
-                        'name' => $selectedMonthStart->locale('ru')->monthName,
+                        'year' => $now->year,
+                        'month' => $now->month,
+                        'name' => $currentMonthStart->locale('ru')->monthName,
                     ],
                     'last' => [
-                        'year' => $previousMonthStart->year,
-                        'month' => $previousMonthStart->month,
-                        'name' => $previousMonthStart->locale('ru')->monthName,
+                        'year' => $lastMonthStart->year,
+                        'month' => $lastMonthStart->month,
+                        'name' => $lastMonthStart->locale('ru')->monthName,
                     ],
                 ],
             ];

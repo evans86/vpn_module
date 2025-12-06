@@ -21,16 +21,9 @@ class PanelStatisticsController extends Controller
     /**
      * Отображение статистики по панелям
      */
-    public function index(Request $request)
+    public function index()
     {
-        $year = $request->get('year', Carbon::now()->year);
-        $month = $request->get('month', Carbon::now()->month);
-        
-        // Валидация
-        $year = max(2020, min(2100, (int)$year));
-        $month = max(1, min(12, (int)$month));
-        
-        $statistics = $this->panelRepository->getMonthlyStatistics($year, $month);
+        $statistics = $this->panelRepository->getMonthlyStatistics();
         
         // Сортируем по ID панели
         usort($statistics, function($a, $b) {
@@ -43,26 +36,15 @@ class PanelStatisticsController extends Controller
         return view('module.panel-statistics.index', [
             'statistics' => $statistics,
             'summary' => $summary,
-            'selectedYear' => $year,
-            'selectedMonth' => $month,
-            'currentYear' => Carbon::now()->year,
-            'currentMonth' => Carbon::now()->month,
         ]);
     }
 
     /**
      * Экспорт статистики в PDF
      */
-    public function exportPdf(Request $request)
+    public function exportPdf()
     {
-        $year = $request->get('year', Carbon::now()->year);
-        $month = $request->get('month', Carbon::now()->month);
-        
-        // Валидация
-        $year = max(2020, min(2100, (int)$year));
-        $month = max(1, min(12, (int)$month));
-        
-        $statistics = $this->panelRepository->getMonthlyStatistics($year, $month);
+        $statistics = $this->panelRepository->getMonthlyStatistics();
         
         // Сортируем по ID панели
         usort($statistics, function($a, $b) {
@@ -72,18 +54,18 @@ class PanelStatisticsController extends Controller
         // Вычисляем общие итоги
         $summary = $this->calculateSummary($statistics);
         
-        $currentDate = Carbon::create($year, $month, 1);
-        $lastMonthDate = $currentDate->copy()->subMonth();
+        $now = Carbon::now();
+        $lastMonth = $now->copy()->subMonth();
         
         $pdf = Pdf::loadView('module.panel-statistics.pdf', [
             'statistics' => $statistics,
             'summary' => $summary,
-            'currentMonth' => $currentDate->locale('ru')->monthName . ' ' . $year,
-            'lastMonth' => $lastMonthDate->locale('ru')->monthName . ' ' . $lastMonthDate->year,
+            'currentMonth' => $now->locale('ru')->monthName . ' ' . $now->year,
+            'lastMonth' => $lastMonth->locale('ru')->monthName . ' ' . $lastMonth->year,
             'generatedAt' => Carbon::now()->format('d.m.Y H:i'),
         ])->setPaper('a4', 'landscape');
         
-        $filename = 'panel_statistics_' . $year . '_' . str_pad($month, 2, '0', STR_PAD_LEFT) . '.pdf';
+        $filename = 'panel_statistics_' . $now->format('Y_m') . '.pdf';
         
         return $pdf->download($filename);
     }

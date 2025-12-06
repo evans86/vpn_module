@@ -5,41 +5,26 @@
 
 @section('content')
     <div class="space-y-6">
-        <!-- Фильтр по месяцу -->
+        <!-- Информация о периоде -->
         <div class="bg-white shadow rounded-lg p-6">
-            <form method="GET" action="{{ route('admin.module.panel-statistics.index') }}" class="flex items-end gap-4">
-                <div class="flex-1">
-                    <label for="year" class="block text-sm font-medium text-gray-700 mb-1">Год</label>
-                    <select name="year" id="year" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                        @for($y = $currentYear; $y >= 2020; $y--)
-                            <option value="{{ $y }}" {{ $selectedYear == $y ? 'selected' : '' }}>{{ $y }}</option>
-                        @endfor
-                    </select>
-                </div>
-                <div class="flex-1">
-                    <label for="month" class="block text-sm font-medium text-gray-700 mb-1">Месяц</label>
-                    <select name="month" id="month" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                        @foreach(range(1, 12) as $m)
-                            <option value="{{ $m }}" {{ $selectedMonth == $m ? 'selected' : '' }}>
-                                {{ Carbon\Carbon::create(null, $m, 1)->locale('ru')->monthName }}
-                            </option>
-                        @endforeach
-                    </select>
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Статистика использования панелей</h3>
+                    <p class="text-sm text-gray-600 mt-1">
+                        Сравнение: {{ $statistics[0]['period']['last']['name'] ?? 'Прошлый месяц' }} → {{ $statistics[0]['period']['current']['name'] ?? 'Текущий месяц' }}
+                    </p>
+                    <p class="text-xs text-gray-500 mt-1">
+                        API предоставляет данные только за текущий и прошлый месяц
+                    </p>
                 </div>
                 <div>
-                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        <i class="fas fa-search mr-2"></i>
-                        Показать
-                    </button>
-                </div>
-                <div>
-                    <a href="{{ route('admin.module.panel-statistics.export-pdf', ['year' => $selectedYear, 'month' => $selectedMonth]) }}" 
+                    <a href="{{ route('admin.module.panel-statistics.export-pdf') }}" 
                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
                         <i class="fas fa-file-pdf mr-2"></i>
                         Экспорт в PDF
                     </a>
                 </div>
-            </form>
+            </div>
         </div>
 
         <!-- Общие итоги -->
