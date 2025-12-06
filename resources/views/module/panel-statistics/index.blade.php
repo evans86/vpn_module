@@ -129,24 +129,45 @@
                                     @endif
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    @if($current['traffic'])
-                                        <div class="text-sm text-gray-900">
-                                            <strong>{{ number_format($current['traffic']['used_tb'], 2) }} ТБ</strong> / {{ number_format($current['traffic']['limit_tb'], 2) }} ТБ
-                                        </div>
-                                        <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
-                                            <div class="bg-indigo-600 h-2 rounded-full" style="width: {{ min(100, $current['traffic']['used_percent']) }}%"></div>
-                                        </div>
-                                        <div class="text-xs text-gray-500 mt-1">
-                                            {{ number_format($current['traffic']['used_percent'], 2) }}%
-                                        </div>
-                                        @if($last['traffic'])
-                                            <div class="text-xs text-gray-500">
-                                                {{ $stat['period']['last']['name'] }}: {{ number_format($last['traffic']['used_percent'], 2) }}%
+                                    <div class="space-y-2">
+                                        <!-- Текущий месяц -->
+                                        @if($current['traffic'])
+                                            <div>
+                                                <div class="text-sm text-gray-900">
+                                                    <strong>{{ $stat['period']['current']['name'] }}:</strong> {{ number_format($current['traffic']['used_tb'], 2) }} ТБ / {{ number_format($current['traffic']['limit_tb'], 2) }} ТБ
+                                                </div>
+                                                <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
+                                                    <div class="bg-indigo-600 h-2 rounded-full" style="width: {{ min(100, $current['traffic']['used_percent']) }}%"></div>
+                                                </div>
+                                                <div class="text-xs text-gray-500 mt-1">
+                                                    {{ number_format($current['traffic']['used_percent'], 2) }}%
+                                                </div>
+                                            </div>
+                                        @else
+                                            <div class="text-sm text-gray-400">
+                                                {{ $stat['period']['current']['name'] }}: N/A
                                             </div>
                                         @endif
-                                    @else
-                                        <div class="text-sm text-gray-400">N/A</div>
-                                    @endif
+                                        
+                                        <!-- Прошлый месяц -->
+                                        @if($last['traffic'])
+                                            <div class="pt-2 border-t border-gray-200">
+                                                <div class="text-sm text-gray-900">
+                                                    <strong>{{ $stat['period']['last']['name'] }}:</strong> {{ number_format($last['traffic']['used_tb'], 2) }} ТБ / {{ number_format($last['traffic']['limit_tb'], 2) }} ТБ
+                                                </div>
+                                                <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
+                                                    <div class="bg-gray-400 h-2 rounded-full" style="width: {{ min(100, $last['traffic']['used_percent']) }}%"></div>
+                                                </div>
+                                                <div class="text-xs text-gray-500 mt-1">
+                                                    {{ number_format($last['traffic']['used_percent'], 2) }}%
+                                                </div>
+                                            </div>
+                                        @else
+                                            <div class="pt-2 border-t border-gray-200 text-sm text-gray-400">
+                                                {{ $stat['period']['last']['name'] }}: N/A
+                                            </div>
+                                        @endif
+                                    </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     @if($changes['traffic_percent'] !== null)

@@ -1036,14 +1036,37 @@ class PanelRepository extends BaseRepository
             // Получаем данные о трафике из API (для текущего и прошлого месяца)
             $trafficData = $this->getServerTrafficData($panel);
             
-            // Получаем данные за последние N месяцев
+            // Определяем текущий и прошлый месяц один раз
+            $currentYear = $now->year;
+            $currentMonth = $now->month;
+            $lastMonthDate = $now->copy()->subMonth();
+            $lastYear = $lastMonthDate->year;
+            $lastMonth = $lastMonthDate->month;
+            
+            // Получаем данные за последние N месяцев (от самого старого к текущему)
+            // $i = 5 означает 5 месяцев назад, $i = 0 означает текущий месяц
             for ($i = $months - 1; $i >= 0; $i--) {
                 $monthDate = $now->copy()->subMonths($i);
                 $year = $monthDate->year;
                 $month = $monthDate->month;
                 
-                $isCurrentMonth = ($year == $now->year && $month == $now->month);
-                $isLastMonth = ($year == $now->copy()->subMonth()->year && $month == $now->copy()->subMonth()->month);
+                $isCurrentMonth = ($year == $currentYear && $month == $currentMonth);
+                $isLastMonth = ($year == $lastYear && $month == $lastMonth);
+                
+                // Отладочная информация
+                Log::debug('Historical statistics month check', [
+                    'panel_id' => $panel->id,
+                    'i' => $i,
+                    'year' => $year,
+                    'month' => $month,
+                    'month_name' => $monthDate->locale('ru')->monthName,
+                    'is_current' => $isCurrentMonth,
+                    'is_last' => $isLastMonth,
+                    'current_year' => $currentYear,
+                    'current_month' => $currentMonth,
+                    'last_year' => $lastYear,
+                    'last_month' => $lastMonth,
+                ]);
                 
                 $monthData = [
                     'year' => $year,
@@ -1072,16 +1095,36 @@ class PanelRepository extends BaseRepository
                         $trafficLimitTb = round($limitBytes / (1024 * 1024 * 1024 * 1024), 2);
                         $monthData['traffic_limit_tb'] = $trafficLimitTb;
                         
-                        if ($isCurrentMonth && isset($trafficData['current_month'])) {
+                        if ($isCurrentMonth) {
                             // Текущий месяц
-                            $trafficBytes = $trafficData['current_month'];
-                            $monthData['traffic_used_tb'] = round($trafficBytes / (1024 * 1024 * 1024 * 1024), 2);
-                            $monthData['traffic_used_percent'] = $limitBytes > 0 ? round(($trafficBytes / $limitBytes) * 100, 2) : 0;
-                        } elseif ($isLastMonth && isset($trafficData['last_month'])) {
+                            if (isset($trafficData['current_month']) && $trafficData['current_month'] !== null) {
+                                $trafficBytes = $trafficData['current_month'];
+                                $monthData['traffic_used_tb'] = round($trafficBytes / (1024 * 1024 * 1024 * 1024), 2);
+                                $monthData['traffic_used_percent'] = $limitBytes > 0 ? round(($trafficBytes / $limitBytes) * 100, 2) : 0;
+                            }
+                        } elseif ($isLastMonth) {
                             // Прошлый месяц
-                            $trafficBytes = $trafficData['last_month'];
-                            $monthData['traffic_used_tb'] = round($trafficBytes / (1024 * 1024 * 1024 * 1024), 2);
-                            $monthData['traffic_used_percent'] = $limitBytes > 0 ? round(($trafficBytes / $limitBytes) * 100, 2) : 0;
+                            if (isset($trafficData['last_month']) && $trafficData['last_month'] !== null) {
+                                $trafficBytes = $trafficData['last_month'];
+                                $monthData['traffic_used_tb'] = round($trafficBytes / (1024 * 1024 * 1024 * 1024), 2);
+                                $monthData['traffic_used_percent'] = $limitBytes > 0 ? round(($trafficBytes / $limitBytes) * 100, 2) : 0;
+                                
+                                Log::debug('Last month traffic data retrieved', [
+                                    'panel_id' => $panel->id,
+                                    'year' => $year,
+                                    'month' => $month,
+                                    'traffic_bytes' => $trafficBytes,
+                                    'traffic_tb' => $monthData['traffic_used_tb'],
+                                    'traffic_percent' => $monthData['traffic_used_percent'],
+                                ]);
+                            } else {
+                                Log::warning('Last month traffic data not available from API', [
+                                    'panel_id' => $panel->id,
+                                    'year' => $year,
+                                    'month' => $month,
+                                    'traffic_data_keys' => $trafficData ? array_keys($trafficData) : null,
+                                ]);
+                            }
                         }
                     }
                 } else {
