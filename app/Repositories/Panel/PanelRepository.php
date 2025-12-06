@@ -1013,6 +1013,7 @@ class PanelRepository extends BaseRepository
 
     /**
      * Получить исторические данные для графиков
+     * Использует данные из API для текущего и прошлого месяца, сохраненные данные для более старых месяцев
      * 
      * @param int $months Количество месяцев для отображения (по умолчанию 6)
      * @return array
@@ -1032,42 +1033,74 @@ class PanelRepository extends BaseRepository
                 'months' => [],
             ];
             
+            // Получаем данные о трафике из API (для текущего и прошлого месяца)
+            $trafficData = $this->getServerTrafficData($panel);
+            
             // Получаем данные за последние N месяцев
             for ($i = $months - 1; $i >= 0; $i--) {
                 $monthDate = $now->copy()->subMonths($i);
                 $year = $monthDate->year;
                 $month = $monthDate->month;
                 
-                // Пытаемся получить из сохраненных данных
-                $savedStats = PanelMonthlyStatistics::where('panel_id', $panel->id)
-                    ->where('year', $year)
-                    ->where('month', $month)
-                    ->first();
+                $isCurrentMonth = ($year == $now->year && $month == $now->month);
+                $isLastMonth = ($year == $now->copy()->subMonth()->year && $month == $now->copy()->subMonth()->month);
                 
-                if ($savedStats) {
-                    $panelData['months'][] = [
-                        'year' => $year,
-                        'month' => $month,
-                        'month_name' => $monthDate->locale('ru')->monthName,
-                        'active_users' => $savedStats->active_users,
-                        'online_users' => $savedStats->online_users,
-                        'traffic_used_tb' => $savedStats->traffic_used_bytes ? round($savedStats->traffic_used_bytes / (1024 * 1024 * 1024 * 1024), 2) : null,
-                        'traffic_limit_tb' => $savedStats->traffic_limit_bytes ? round($savedStats->traffic_limit_bytes / (1024 * 1024 * 1024 * 1024), 2) : null,
-                        'traffic_used_percent' => $savedStats->traffic_used_percent,
-                    ];
+                $monthData = [
+                    'year' => $year,
+                    'month' => $month,
+                    'month_name' => $monthDate->locale('ru')->monthName,
+                    'active_users' => null,
+                    'online_users' => null,
+                    'traffic_used_tb' => null,
+                    'traffic_limit_tb' => null,
+                    'traffic_used_percent' => null,
+                ];
+                
+                // Для текущего и прошлого месяца используем данные из API
+                if ($isCurrentMonth || $isLastMonth) {
+                    // Получаем статистику пользователей за период
+                    $monthStart = $monthDate->copy()->startOfMonth();
+                    $monthEnd = $monthDate->copy()->endOfMonth();
+                    $stats = $this->getPanelStatsForPeriod($panel, $monthStart, $monthEnd);
+                    
+                    $monthData['active_users'] = $stats['active_users'];
+                    $monthData['online_users'] = $stats['online_users'];
+                    
+                    // Получаем данные о трафике из API
+                    if ($trafficData) {
+                        $limitBytes = $trafficData['limit'];
+                        $trafficLimitTb = round($limitBytes / (1024 * 1024 * 1024 * 1024), 2);
+                        $monthData['traffic_limit_tb'] = $trafficLimitTb;
+                        
+                        if ($isCurrentMonth && isset($trafficData['current_month'])) {
+                            // Текущий месяц
+                            $trafficBytes = $trafficData['current_month'];
+                            $monthData['traffic_used_tb'] = round($trafficBytes / (1024 * 1024 * 1024 * 1024), 2);
+                            $monthData['traffic_used_percent'] = $limitBytes > 0 ? round(($trafficBytes / $limitBytes) * 100, 2) : 0;
+                        } elseif ($isLastMonth && isset($trafficData['last_month'])) {
+                            // Прошлый месяц
+                            $trafficBytes = $trafficData['last_month'];
+                            $monthData['traffic_used_tb'] = round($trafficBytes / (1024 * 1024 * 1024 * 1024), 2);
+                            $monthData['traffic_used_percent'] = $limitBytes > 0 ? round(($trafficBytes / $limitBytes) * 100, 2) : 0;
+                        }
+                    }
                 } else {
-                    // Если данных нет, добавляем null значения
-                    $panelData['months'][] = [
-                        'year' => $year,
-                        'month' => $month,
-                        'month_name' => $monthDate->locale('ru')->monthName,
-                        'active_users' => null,
-                        'online_users' => null,
-                        'traffic_used_tb' => null,
-                        'traffic_limit_tb' => null,
-                        'traffic_used_percent' => null,
-                    ];
+                    // Для более старых месяцев используем сохраненные данные
+                    $savedStats = PanelMonthlyStatistics::where('panel_id', $panel->id)
+                        ->where('year', $year)
+                        ->where('month', $month)
+                        ->first();
+                    
+                    if ($savedStats) {
+                        $monthData['active_users'] = $savedStats->active_users;
+                        $monthData['online_users'] = $savedStats->online_users;
+                        $monthData['traffic_used_tb'] = $savedStats->traffic_used_bytes ? round($savedStats->traffic_used_bytes / (1024 * 1024 * 1024 * 1024), 2) : null;
+                        $monthData['traffic_limit_tb'] = $savedStats->traffic_limit_bytes ? round($savedStats->traffic_limit_bytes / (1024 * 1024 * 1024 * 1024), 2) : null;
+                        $monthData['traffic_used_percent'] = $savedStats->traffic_used_percent;
+                    }
                 }
+                
+                $panelData['months'][] = $monthData;
             }
             
             $historicalData[] = $panelData;
