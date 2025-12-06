@@ -49,6 +49,7 @@ class PanelRepository extends BaseRepository
         return $this->query()
             ->where('panel_status', Panel::PANEL_CONFIGURED)
             ->where('panel', Panel::MARZBAN)
+            ->where('id', '!=', 26) // ВРЕМЕННО ИСКЛЮЧАЕМ ПАНЕЛЬ С ID 26
             ->with('server.location')
             ->orderBy('id', 'desc')
             ->get();
@@ -63,7 +64,7 @@ class PanelRepository extends BaseRepository
         $panels = $this->query()
             ->where('panel_status', Panel::PANEL_CONFIGURED)
             ->where('panel', Panel::MARZBAN)
-//            ->where('id', '!=', 25) // ИСКЛЮЧАЕМ ПАНЕЛЬ С ID 25
+            ->where('id', '!=', 26) // ВРЕМЕННО ИСКЛЮЧАЕМ ПАНЕЛЬ С ID 26
             ->whereNotIn('id', function ($query) {
                 // Исключаем панели, которые привязаны к продавцам
                 $query->select('panel_id')
@@ -188,7 +189,7 @@ class PanelRepository extends BaseRepository
         $panels = $this->query()
             ->where('panel_status', Panel::PANEL_CONFIGURED)
             ->where('panel', Panel::MARZBAN)
-//            ->where('id', '!=', 25) // ИСКЛЮЧАЕМ ПАНЕЛЬ С ID 25
+            ->where('id', '!=', 26) // ВРЕМЕННО ИСКЛЮЧАЕМ ПАНЕЛЬ С ID 26
             ->whereNotIn('id', function ($query) {
                 $query->select('panel_id')
                     ->from('salesman')
@@ -294,6 +295,7 @@ class PanelRepository extends BaseRepository
             $panels = $this->query()
                 ->where('panel_status', Panel::PANEL_CONFIGURED)
                 ->where('panel', Panel::MARZBAN)
+                ->where('id', '!=', 26) // ВРЕМЕННО ИСКЛЮЧАЕМ ПАНЕЛЬ С ID 26
                 ->whereNotIn('id', function ($query) {
                     $query->select('panel_id')
                         ->from('salesman')
