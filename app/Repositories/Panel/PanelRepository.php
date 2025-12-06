@@ -824,16 +824,21 @@ class PanelRepository extends BaseRepository
     public function getMonthlyStatistics(?int $year = null, ?int $month = null): array
     {
         $now = Carbon::now();
-        $currentYear = $year ?? $now->year;
-        $currentMonth = $month ?? $now->month;
+        $selectedYear = $year ?? $now->year;
+        $selectedMonth = $month ?? $now->month;
         
-        // Определяем период текущего месяца
-        $currentMonthStart = Carbon::create($currentYear, $currentMonth, 1)->startOfMonth();
-        $currentMonthEnd = Carbon::create($currentYear, $currentMonth, 1)->endOfMonth();
+        // Определяем период выбранного месяца
+        $selectedMonthStart = Carbon::create($selectedYear, $selectedMonth, 1)->startOfMonth();
+        $selectedMonthEnd = Carbon::create($selectedYear, $selectedMonth, 1)->endOfMonth();
         
-        // Определяем период прошлого месяца
-        $lastMonthStart = $currentMonthStart->copy()->subMonth()->startOfMonth();
-        $lastMonthEnd = $currentMonthStart->copy()->subMonth()->endOfMonth();
+        // Определяем период предыдущего месяца (для сравнения)
+        $previousMonthStart = $selectedMonthStart->copy()->subMonth()->startOfMonth();
+        $previousMonthEnd = $selectedMonthStart->copy()->subMonth()->endOfMonth();
+        
+        // Проверяем, является ли выбранный месяц текущим месяцем
+        $isCurrentMonth = ($selectedYear == $now->year && $selectedMonth == $now->month);
+        // Проверяем, является ли выбранный месяц прошлым месяцем
+        $isLastMonth = ($selectedYear == $now->copy()->subMonth()->year && $selectedMonth == $now->copy()->subMonth()->month);
         
         // Получаем все настроенные панели
         $panels = $this->getAllConfiguredPanels();
@@ -841,48 +846,74 @@ class PanelRepository extends BaseRepository
         $statistics = [];
         
         foreach ($panels as $panel) {
-            // Получаем статистику за текущий месяц
-            $currentMonthStats = $this->getPanelStatsForPeriod($panel, $currentMonthStart, $currentMonthEnd);
+            // Получаем статистику за выбранный месяц
+            $selectedMonthStats = $this->getPanelStatsForPeriod($panel, $selectedMonthStart, $selectedMonthEnd);
             
-            // Получаем статистику за прошлый месяц
-            $lastMonthStats = $this->getPanelStatsForPeriod($panel, $lastMonthStart, $lastMonthEnd);
+            // Получаем статистику за предыдущий месяц (для сравнения)
+            $previousMonthStats = $this->getPanelStatsForPeriod($panel, $previousMonthStart, $previousMonthEnd);
             
-            // Получаем данные о трафике
+            // Получаем данные о трафике из API
             $trafficData = $this->getServerTrafficData($panel);
             
-            // Трафик за текущий месяц
-            $currentTraffic = $trafficData ? [
-                'used_tb' => round($trafficData['used'] / (1024 * 1024 * 1024 * 1024), 2),
-                'limit_tb' => round($trafficData['limit'] / (1024 * 1024 * 1024 * 1024), 2),
-                'used_percent' => $trafficData['used_percent'],
-            ] : null;
-            
-            // Трафик за прошлый месяц (из API)
-            $lastTraffic = null;
-            if ($trafficData && isset($trafficData['last_month'])) {
-                $lastMonthTrafficBytes = $trafficData['last_month'];
+            // Определяем трафик за выбранный месяц
+            $selectedTraffic = null;
+            if ($trafficData) {
                 $limitBytes = $trafficData['limit'];
-                $lastTraffic = [
-                    'used_tb' => round($lastMonthTrafficBytes / (1024 * 1024 * 1024 * 1024), 2),
-                    'limit_tb' => round($limitBytes / (1024 * 1024 * 1024 * 1024), 2),
-                    'used_percent' => $limitBytes > 0 ? round(($lastMonthTrafficBytes / $limitBytes) * 100, 2) : 0,
-                ];
+                
+                if ($isCurrentMonth) {
+                    // Если выбран текущий месяц - используем current_month
+                    $trafficBytes = $trafficData['current_month'] ?? $trafficData['used'] ?? 0;
+                } elseif ($isLastMonth) {
+                    // Если выбран прошлый месяц - используем last_month
+                    $trafficBytes = $trafficData['last_month'] ?? 0;
+                } else {
+                    // Для более старых месяцев данных нет в API
+                    $trafficBytes = null;
+                }
+                
+                if ($trafficBytes !== null) {
+                    $selectedTraffic = [
+                        'used_tb' => round($trafficBytes / (1024 * 1024 * 1024 * 1024), 2),
+                        'limit_tb' => round($limitBytes / (1024 * 1024 * 1024 * 1024), 2),
+                        'used_percent' => $limitBytes > 0 ? round(($trafficBytes / $limitBytes) * 100, 2) : 0,
+                    ];
+                }
+            }
+            
+            // Определяем трафик за предыдущий месяц (для сравнения)
+            $previousTraffic = null;
+            if ($trafficData) {
+                $limitBytes = $trafficData['limit'];
+                
+                // Для предыдущего месяца используем last_month, если выбранный месяц - текущий
+                // Или используем данные из API если они доступны
+                if ($isCurrentMonth && isset($trafficData['last_month'])) {
+                    $previousTrafficBytes = $trafficData['last_month'];
+                    $previousTraffic = [
+                        'used_tb' => round($previousTrafficBytes / (1024 * 1024 * 1024 * 1024), 2),
+                        'limit_tb' => round($limitBytes / (1024 * 1024 * 1024 * 1024), 2),
+                        'used_percent' => $limitBytes > 0 ? round(($previousTrafficBytes / $limitBytes) * 100, 2) : 0,
+                    ];
+                }
+                // Если выбран прошлый месяц, то предыдущий - это месяц до прошлого
+                // Но API дает только current_month и last_month, так что данных может не быть
+                // В этом случае previousTraffic останется null
             }
             
             // Вычисляем динамику
             $trafficChange = null;
-            if ($currentTraffic && $lastTraffic) {
-                $trafficChange = round($currentTraffic['used_percent'] - $lastTraffic['used_percent'], 2);
+            if ($selectedTraffic && $previousTraffic) {
+                $trafficChange = round($selectedTraffic['used_percent'] - $previousTraffic['used_percent'], 2);
             }
             
             $activeUsersChange = null;
-            if ($currentMonthStats['active_users'] !== null && $lastMonthStats['active_users'] !== null) {
-                $activeUsersChange = $currentMonthStats['active_users'] - $lastMonthStats['active_users'];
+            if ($selectedMonthStats['active_users'] !== null && $previousMonthStats['active_users'] !== null) {
+                $activeUsersChange = $selectedMonthStats['active_users'] - $previousMonthStats['active_users'];
             }
             
             $onlineUsersChange = null;
-            if ($currentMonthStats['online_users'] !== null && $lastMonthStats['online_users'] !== null) {
-                $onlineUsersChange = $currentMonthStats['online_users'] - $lastMonthStats['online_users'];
+            if ($selectedMonthStats['online_users'] !== null && $previousMonthStats['online_users'] !== null) {
+                $onlineUsersChange = $selectedMonthStats['online_users'] - $previousMonthStats['online_users'];
             }
             
             $statistics[] = [
@@ -890,14 +921,14 @@ class PanelRepository extends BaseRepository
                 'panel_address' => $panel->panel_adress,
                 'server_name' => $panel->server->name ?? 'N/A',
                 'current_month' => [
-                    'active_users' => $currentMonthStats['active_users'],
-                    'online_users' => $currentMonthStats['online_users'],
-                    'traffic' => $currentTraffic,
+                    'active_users' => $selectedMonthStats['active_users'],
+                    'online_users' => $selectedMonthStats['online_users'],
+                    'traffic' => $selectedTraffic,
                 ],
                 'last_month' => [
-                    'active_users' => $lastMonthStats['active_users'],
-                    'online_users' => $lastMonthStats['online_users'],
-                    'traffic' => $lastTraffic,
+                    'active_users' => $previousMonthStats['active_users'],
+                    'online_users' => $previousMonthStats['online_users'],
+                    'traffic' => $previousTraffic,
                 ],
                 'changes' => [
                     'active_users' => $activeUsersChange,
@@ -906,14 +937,14 @@ class PanelRepository extends BaseRepository
                 ],
                 'period' => [
                     'current' => [
-                        'year' => $currentYear,
-                        'month' => $currentMonth,
-                        'name' => $currentMonthStart->locale('ru')->monthName,
+                        'year' => $selectedYear,
+                        'month' => $selectedMonth,
+                        'name' => $selectedMonthStart->locale('ru')->monthName,
                     ],
                     'last' => [
-                        'year' => $lastMonthStart->year,
-                        'month' => $lastMonthStart->month,
-                        'name' => $lastMonthStart->locale('ru')->monthName,
+                        'year' => $previousMonthStart->year,
+                        'month' => $previousMonthStart->month,
+                        'name' => $previousMonthStart->locale('ru')->monthName,
                     ],
                 ],
             ];
