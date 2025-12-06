@@ -331,14 +331,26 @@ class VdsinaAPI
                 'used_percent' => round($usedPercent, 2)
             ]);
             
+            $currentMonthBytes = isset($data['bandwidth']['current_month']) ? (int)$data['bandwidth']['current_month'] : null;
+            $lastMonthBytes = isset($data['bandwidth']['last_month']) ? (int)$data['bandwidth']['last_month'] : null;
+            
+            Log::debug('VDSINA API: Bandwidth data from API', [
+                'server_id' => $serverId,
+                'bandwidth_raw' => $data['bandwidth'] ?? 'not set',
+                'current_month_raw' => $data['bandwidth']['current_month'] ?? 'not set',
+                'last_month_raw' => $data['bandwidth']['last_month'] ?? 'not set',
+                'current_month_processed' => $currentMonthBytes,
+                'last_month_processed' => $lastMonthBytes,
+            ]);
+            
             return [
                 'used' => $usedTraffic,
                 'limit' => $trafficLimit,
                 'used_percent' => round($usedPercent, 2),
                 'remaining' => $remaining,
                 'remaining_percent' => round($remainingPercent, 2),
-                'current_month' => isset($data['bandwidth']['current_month']) ? (int)$data['bandwidth']['current_month'] : null,
-                'last_month' => isset($data['bandwidth']['last_month']) ? (int)$data['bandwidth']['last_month'] : null,
+                'current_month' => $currentMonthBytes,
+                'last_month' => $lastMonthBytes,
             ];
             
         } catch (Exception $e) {

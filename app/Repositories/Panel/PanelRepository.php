@@ -1053,20 +1053,22 @@ class PanelRepository extends BaseRepository
                 $isCurrentMonth = ($year == $currentYear && $month == $currentMonth);
                 $isLastMonth = ($year == $lastYear && $month == $lastMonth);
                 
-                // Отладочная информация
-                Log::debug('Historical statistics month check', [
-                    'panel_id' => $panel->id,
-                    'i' => $i,
-                    'year' => $year,
-                    'month' => $month,
-                    'month_name' => $monthDate->locale('ru')->monthName,
-                    'is_current' => $isCurrentMonth,
-                    'is_last' => $isLastMonth,
-                    'current_year' => $currentYear,
-                    'current_month' => $currentMonth,
-                    'last_year' => $lastYear,
-                    'last_month' => $lastMonth,
-                ]);
+                // Отладочная информация только для текущего и прошлого месяца
+                if ($isCurrentMonth || $isLastMonth) {
+                    Log::debug('Historical statistics month check', [
+                        'panel_id' => $panel->id,
+                        'i' => $i,
+                        'year' => $year,
+                        'month' => $month,
+                        'month_name' => $monthDate->locale('ru')->monthName,
+                        'is_current' => $isCurrentMonth,
+                        'is_last' => $isLastMonth,
+                        'current_year' => $currentYear,
+                        'current_month' => $currentMonth,
+                        'last_year' => $lastYear,
+                        'last_month' => $lastMonth,
+                    ]);
+                }
                 
                 $monthData = [
                     'year' => $year,
@@ -1104,7 +1106,7 @@ class PanelRepository extends BaseRepository
                             }
                         } elseif ($isLastMonth) {
                             // Прошлый месяц
-                            if (isset($trafficData['last_month']) && $trafficData['last_month'] !== null) {
+                            if (isset($trafficData['last_month']) && $trafficData['last_month'] !== null && $trafficData['last_month'] !== 0) {
                                 $trafficBytes = $trafficData['last_month'];
                                 $monthData['traffic_used_tb'] = round($trafficBytes / (1024 * 1024 * 1024 * 1024), 2);
                                 $monthData['traffic_used_percent'] = $limitBytes > 0 ? round(($trafficBytes / $limitBytes) * 100, 2) : 0;
@@ -1122,7 +1124,9 @@ class PanelRepository extends BaseRepository
                                     'panel_id' => $panel->id,
                                     'year' => $year,
                                     'month' => $month,
-                                    'traffic_data_keys' => $trafficData ? array_keys($trafficData) : null,
+                                    'traffic_data' => $trafficData,
+                                    'last_month_value' => $trafficData['last_month'] ?? 'not set',
+                                    'last_month_type' => isset($trafficData['last_month']) ? gettype($trafficData['last_month']) : 'not set',
                                 ]);
                             }
                         }
