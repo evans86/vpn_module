@@ -20,6 +20,7 @@ use Carbon\Carbon;
 use DomainException;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -372,9 +373,9 @@ class KeyActivateService
             // Создаем стратегию для работы с панелью
             $panelStrategy = new PanelStrategy(Panel::MARZBAN);
 
-            // Список панелей для попыток (максимум 3 попытки)
-            $attemptedPanels = [];
-            $maxAttempts = 3;
+            // Список ID панелей, которые уже пробовали (чтобы не повторяться)
+            $attemptedPanelIds = [];
+            $maxAttempts = 10; // Максимум попыток на разных панелях
             $serverUser = null;
             $lastError = null;
 
@@ -402,11 +403,12 @@ class KeyActivateService
                     }
 
                     // Проверяем, не пытались ли мы уже использовать эту панель
-                    if (in_array($panel->id, $attemptedPanels)) {
-                        continue; // Пропускаем, если уже пробовали
+                    if (in_array($panel->id, $attemptedPanelIds)) {
+                        // Если все панели уже пробовали, выбрасываем ошибку
+                        throw new RuntimeException('Все доступные панели уже были опробованы');
                     }
 
-                    $attemptedPanels[] = $panel->id;
+                    $attemptedPanelIds[] = $panel->id;
 
                     // Добавляем пользователя на сервер
                     $serverUser = $panelStrategy->addServerUser(
@@ -424,24 +426,29 @@ class KeyActivateService
                 } catch (Exception $e) {
                     $lastError = $e;
                     
-                    // Помечаем панель как имеющую ошибку
+                    // Сразу помечаем панель как имеющую ошибку и убираем из ротации
                     if (isset($panel) && $panel) {
                         $this->panelRepository->markPanelWithError(
                             $panel->id,
                             'Ошибка при создании пользователя: ' . $e->getMessage()
                         );
+                        
+                        Log::warning('Panel marked with error and removed from rotation', [
+                            'panel_id' => $panel->id,
+                            'error' => $e->getMessage(),
+                            'attempt' => $attempt + 1,
+                        ]);
                     }
 
-                    Log::warning('Failed to create user on panel, trying another', [
-                        'panel_id' => $panel->id ?? null,
-                        'attempt' => $attempt + 1,
-                        'max_attempts' => $maxAttempts,
-                        'error' => $e->getMessage(),
-                    ]);
+                    // Очищаем кэш выбора панелей, чтобы исключенная панель не выбиралась снова
+                    Cache::forget('optimized_marzban_panel_balanced');
+                    Cache::forget('optimized_marzban_panel_traffic_based');
+                    Cache::forget('optimized_marzban_panel_intelligent');
 
+                    // Продолжаем попытки на другой панели
                     // Если это последняя попытка, выбрасываем исключение
                     if ($attempt === $maxAttempts - 1) {
-                        throw new RuntimeException('Не удалось создать пользователя после ' . $maxAttempts . ' попыток. Последняя ошибка: ' . $e->getMessage());
+                        throw new RuntimeException('Не удалось создать пользователя после попыток на ' . count($attemptedPanelIds) . ' панелях. Последняя ошибка: ' . $e->getMessage());
                     }
                 }
             }
@@ -514,9 +521,9 @@ class KeyActivateService
             // Создаем стратегию для работы с панелью
             $panelStrategy = new PanelStrategy(Panel::MARZBAN);
 
-            // Список панелей для попыток (максимум 3 попытки)
-            $attemptedPanels = [];
-            $maxAttempts = 3;
+            // Список ID панелей, которые уже пробовали (чтобы не повторяться)
+            $attemptedPanelIds = [];
+            $maxAttempts = 10; // Максимум попыток на разных панелях
             $serverUser = null;
             $lastError = null;
 
@@ -544,11 +551,12 @@ class KeyActivateService
                     }
 
                     // Проверяем, не пытались ли мы уже использовать эту панель
-                    if (in_array($panel->id, $attemptedPanels)) {
-                        continue; // Пропускаем, если уже пробовали
+                    if (in_array($panel->id, $attemptedPanelIds)) {
+                        // Если все панели уже пробовали, выбрасываем ошибку
+                        throw new RuntimeException('Все доступные панели уже были опробованы');
                     }
 
-                    $attemptedPanels[] = $panel->id;
+                    $attemptedPanelIds[] = $panel->id;
 
                     // Используем переданный finish_at вместо пересчета
                     // Добавляем пользователя на сервер
@@ -567,24 +575,29 @@ class KeyActivateService
                 } catch (Exception $e) {
                     $lastError = $e;
                     
-                    // Помечаем панель как имеющую ошибку
+                    // Сразу помечаем панель как имеющую ошибку и убираем из ротации
                     if (isset($panel) && $panel) {
                         $this->panelRepository->markPanelWithError(
                             $panel->id,
                             'Ошибка при создании пользователя: ' . $e->getMessage()
                         );
+                        
+                        Log::warning('Panel marked with error and removed from rotation', [
+                            'panel_id' => $panel->id,
+                            'error' => $e->getMessage(),
+                            'attempt' => $attempt + 1,
+                        ]);
                     }
 
-                    Log::warning('Failed to create user on panel, trying another', [
-                        'panel_id' => $panel->id ?? null,
-                        'attempt' => $attempt + 1,
-                        'max_attempts' => $maxAttempts,
-                        'error' => $e->getMessage(),
-                    ]);
+                    // Очищаем кэш выбора панелей, чтобы исключенная панель не выбиралась снова
+                    Cache::forget('optimized_marzban_panel_balanced');
+                    Cache::forget('optimized_marzban_panel_traffic_based');
+                    Cache::forget('optimized_marzban_panel_intelligent');
 
+                    // Продолжаем попытки на другой панели
                     // Если это последняя попытка, выбрасываем исключение
                     if ($attempt === $maxAttempts - 1) {
-                        throw new RuntimeException('Не удалось создать пользователя после ' . $maxAttempts . ' попыток. Последняя ошибка: ' . $e->getMessage());
+                        throw new RuntimeException('Не удалось создать пользователя после попыток на ' . count($attemptedPanelIds) . ' панелях. Последняя ошибка: ' . $e->getMessage());
                     }
                 }
             }
