@@ -121,6 +121,12 @@
                     'routes' => ['admin.module.panel.*']
                 ])
                 @include('layouts.admin.nav-item', [
+                    'route' => 'admin.module.panel-settings.index',
+                    'icon' => 'fa-cog',
+                    'label' => 'Настройки распределения',
+                    'routes' => ['admin.module.panel-settings.*']
+                ])
+                @include('layouts.admin.nav-item', [
                     'route' => 'admin.module.server-users.index',
                     'icon' => 'fa-users',
                     'label' => 'Пользователи сервера',
@@ -279,6 +285,7 @@
 
             @yield('content')
         </main>
+        </div>
     </div>
 
     <script>

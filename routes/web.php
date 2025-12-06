@@ -141,6 +141,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/{panel}/update-config', [PanelController::class, 'updateConfig'])->name('update-config');
             });
 
+            // Настройки распределения панелей
+            Route::prefix('panel-settings')->name('panel-settings.')->group(function () {
+                Route::get('/', [\App\Http\Controllers\Module\PanelSettingsController::class, 'index'])->name('index');
+                Route::put('/strategy', [\App\Http\Controllers\Module\PanelSettingsController::class, 'updateStrategy'])->name('update-strategy');
+            });
+
             // Salesman
             Route::prefix('salesman')->name('salesman.')->group(function () {
                 Route::get('/', [SalesmanController::class, 'index'])->name('index');

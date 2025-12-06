@@ -8,6 +8,7 @@ use App\Models\ServerMonitoring\ServerMonitoring;
 use App\Models\ServerUser\ServerUser;
 use App\Models\KeyActivate\KeyActivate;
 use App\Repositories\BaseRepository;
+use App\Services\External\VdsinaAPI;
 use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -197,15 +198,49 @@ class PanelRepository extends BaseRepository
             ->get();
 
         if ($panels->isEmpty()) {
-            Log::warning('PANEL_SELECTION [NEW]: No available panels after filtering');
+            Log::warning('PANEL_SELECTION: No available panels after filtering');
             return null;
         }
 
-        // Кэшируем результат на 1 минуту для оптимизации
-        // Используем более короткое время кэширования для актуальности данных
-        return Cache::remember('optimized_marzban_panel', 60, function () use ($panels) {
-            return $this->selectOptimalPanelIntelligent($panels);
+        // Получаем стратегию выбора из конфига
+        $strategy = config('panel.selection_strategy', 'intelligent');
+
+        // Уменьшено время кэширования до 15 секунд для лучшей актуальности
+        $cacheKey = "optimized_marzban_panel_{$strategy}";
+        return Cache::remember($cacheKey, 15, function () use ($panels, $strategy) {
+            return $this->selectPanelByStrategy($panels, $strategy);
         });
+    }
+
+    /**
+     * Выбор панели в зависимости от стратегии
+     */
+    private function selectPanelByStrategy(Collection $panels, string $strategy): ?Panel
+    {
+        switch ($strategy) {
+            case 'balanced':
+                // Старая система - равномерное распределение
+                return $this->getConfiguredMarzbanPanel();
+                
+            case 'traffic_based':
+                // Новая система - на основе трафика сервера
+                return $this->selectPanelByTraffic($panels);
+                
+            case 'intelligent':
+            default:
+                // Интеллектуальная система - комплексный анализ
+                $panel = $this->selectOptimalPanelIntelligent($panels);
+                
+                // Если статистика устарела или отсутствует - используем fallback
+                if ($panel && !$this->isStatsFresh($panel->id)) {
+                    Log::warning('PANEL_SELECTION [INTELLIGENT]: Statistics outdated, falling back to balanced', [
+                        'panel_id' => $panel->id
+                    ]);
+                    return $this->getConfiguredMarzbanPanel();
+                }
+                
+                return $panel;
+        }
     }
 
     /**
@@ -249,24 +284,156 @@ class PanelRepository extends BaseRepository
         ];
     }
 
+    /**
+     * Сравнение всех стратегий выбора панели
+     * @return array
+     */
+    public function compareAllStrategies(): array
+    {
+        try {
+            $panels = $this->query()
+                ->where('panel_status', Panel::PANEL_CONFIGURED)
+                ->where('panel', Panel::MARZBAN)
+                ->whereNotIn('id', function ($query) {
+                    $query->select('panel_id')
+                        ->from('salesman')
+                        ->whereNotNull('panel_id');
+                })
+                ->with('server.location')
+                ->get();
+
+            if ($panels->isEmpty()) {
+                return ['error' => 'Нет доступных панелей'];
+            }
+
+            // Получаем выбор каждой стратегии (без кэширования для актуальности)
+            $balancedPanel = $this->getConfiguredMarzbanPanel();
+            
+            // Для traffic_based получаем панели напрямую, минуя кэш
+            $trafficPanel = $this->selectPanelByTraffic($panels);
+            
+            // Для intelligent также получаем напрямую
+            $intelligentPanel = $this->selectOptimalPanelIntelligent($panels);
+
+            // Собираем детальную информацию по каждой панели
+            $panelsInfo = $panels->map(function ($panel) use ($balancedPanel, $trafficPanel, $intelligentPanel) {
+            $totalUsers = $this->getTotalUsersCount($panel->id);
+            $activeUsers = $this->getActiveUsersFromStats($panel->id);
+            $latestStats = $this->getLatestPanelStats($panel->id);
+            $trafficData = $this->getServerTrafficData($panel);
+            
+            $cpuUsage = $latestStats['cpu_usage'] ?? 0;
+            $memoryUsed = $latestStats['mem_used'] ?? 0;
+            $memoryTotal = $latestStats['mem_total'] ?? 1;
+            $memoryUsage = ($memoryTotal > 0) ? ($memoryUsed / $memoryTotal) * 100 : 0;
+
+            // Score для интеллектуальной системы
+            $intelligentScore = $this->calculatePanelScore($panel, $activeUsers, $latestStats);
+
+            return [
+                'id' => $panel->id,
+                'address' => $panel->panel_adress,
+                'server_name' => $panel->server->name ?? 'N/A',
+                'server_id' => $panel->server_id,
+                'total_users' => $totalUsers,
+                'active_users' => $activeUsers,
+                'cpu_usage' => round($cpuUsage, 1),
+                'memory_usage' => round($memoryUsage, 1),
+                'traffic_used_percent' => $trafficData['used_percent'] ?? null,
+                'traffic_used_gb' => $trafficData ? round($trafficData['used'] / (1024 * 1024 * 1024), 2) : null,
+                'traffic_limit_gb' => $trafficData ? round($trafficData['limit'] / (1024 * 1024 * 1024), 2) : null,
+                'traffic_remaining_percent' => $trafficData['remaining_percent'] ?? null,
+                'intelligent_score' => round($intelligentScore, 1),
+                'last_activity' => $this->getLastUserCreationTime($panel->id),
+                'is_balanced_selected' => $balancedPanel && $balancedPanel->id === $panel->id,
+                'is_traffic_selected' => $trafficPanel && $trafficPanel->id === $panel->id,
+                'is_intelligent_selected' => $intelligentPanel && $intelligentPanel->id === $panel->id,
+                'has_fresh_stats' => $this->isStatsFresh($panel->id),
+                'has_traffic_data' => $trafficData !== null,
+            ];
+            });
+
+            // Статистика по стратегиям
+            $strategyStats = [
+                'balanced' => [
+                    'selected_panel_id' => $balancedPanel ? $balancedPanel->id : null,
+                    'selected_panel_info' => $balancedPanel ? $panelsInfo->firstWhere('id', $balancedPanel->id) : null,
+                ],
+                'traffic_based' => [
+                    'selected_panel_id' => $trafficPanel ? $trafficPanel->id : null,
+                    'selected_panel_info' => $trafficPanel ? $panelsInfo->firstWhere('id', $trafficPanel->id) : null,
+                ],
+                'intelligent' => [
+                    'selected_panel_id' => $intelligentPanel ? $intelligentPanel->id : null,
+                    'selected_panel_info' => $intelligentPanel ? $panelsInfo->firstWhere('id', $intelligentPanel->id) : null,
+                ],
+            ];
+
+            return [
+                'strategies' => $strategyStats,
+                'panels' => $panelsInfo->values(),
+                'summary' => [
+                    'total_panels' => $panels->count(),
+                    'panels_with_stats' => $panelsInfo->where('has_fresh_stats', true)->count(),
+                    'panels_with_traffic' => $panelsInfo->where('has_traffic_data', true)->count(),
+                    'avg_users' => round($panelsInfo->avg('total_users'), 1),
+                    'avg_active_users' => round($panelsInfo->where('active_users', '>', 0)->avg('active_users') ?: 0, 1),
+                    'avg_cpu' => round($panelsInfo->where('cpu_usage', '>', 0)->avg('cpu_usage') ?: 0, 1),
+                    'avg_memory' => round($panelsInfo->where('memory_usage', '>', 0)->avg('memory_usage') ?: 0, 1),
+                    'avg_traffic' => round($panelsInfo->where('traffic_used_percent', '>', 0)->avg('traffic_used_percent') ?: 0, 1),
+                ],
+                'timestamp' => now()->toDateTimeString(),
+            ];
+        } catch (\Exception $e) {
+            Log::error('Failed to compare strategies', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return ['error' => 'Ошибка при получении данных: ' . $e->getMessage()];
+        }
+    }
+
     // ==================== ПРИВАТНЫЕ МЕТОДЫ НОВОЙ СИСТЕМЫ ====================
 
     /**
      * Интеллектуальный выбор панели
      */
-    private function selectOptimalPanelIntelligent(Collection $panels): Panel
+    private function selectOptimalPanelIntelligent(Collection $panels): ?Panel
     {
         $scoredPanels = $panels->map(function ($panel) {
-            $activeUsers = $this->getActiveUsersFromStats($panel->id);
-            $score = $this->calculatePanelScore($panel, $activeUsers);
+            // Проверяем наличие актуальной статистики
+            $latestStats = $this->getLatestPanelStats($panel->id);
+            
+            // Если статистики нет или она устарела, используем данные из БД
+            if (!$latestStats || !$this->isStatsFresh($panel->id)) {
+                // Fallback: используем количество пользователей из БД
+                $activeUsers = $this->getActiveUsersCount($panel->id);
+                Log::debug('PANEL_SELECTION: Using DB data for panel', [
+                    'panel_id' => $panel->id,
+                    'active_users' => $activeUsers
+                ]);
+            } else {
+                $activeUsers = $this->getActiveUsersFromStats($panel->id);
+            }
+            
+            $score = $this->calculatePanelScore($panel, $activeUsers, $latestStats);
 
             return [
                 'panel' => $panel,
                 'score' => $score,
                 'active_users' => $activeUsers,
+                'has_fresh_stats' => $latestStats && $this->isStatsFresh($panel->id),
                 'details' => $this->getPanelSelectionDetails($panel, $activeUsers, $score)
             ];
+        })->filter(function ($item) {
+            // Фильтруем панели с валидным score
+            return $item['score'] >= 0;
         });
+
+        if ($scoredPanels->isEmpty()) {
+            Log::warning('PANEL_SELECTION [NEW]: No panels with valid scores');
+            return null;
+        }
 
         $selectedPanelData = $scoredPanels->sortByDesc('score')->first();
         $selectedPanel = $selectedPanelData['panel'];
@@ -285,13 +452,16 @@ class PanelRepository extends BaseRepository
         $panel = $selectedPanelData['panel'];
         $score = $selectedPanelData['score'];
         $activeUsers = $selectedPanelData['active_users'];
+        $hasFreshStats = $selectedPanelData['has_fresh_stats'] ?? false;
         $details = $selectedPanelData['details'];
 
+        $statsStatus = $hasFreshStats ? 'FRESH' : 'STALE/DB';
         $logMessage = sprintf(
-            "PANEL_SELECTION [NEW]: Selected Panel ID: %d | Score: %.1f | Active Users: %d | CPU: %.1f%% | Memory: %.1f%% | Last Activity: %s",
+            "PANEL_SELECTION [NEW]: Selected Panel ID: %d | Score: %.1f | Active Users: %d | Stats: %s | CPU: %.1f%% | Memory: %.1f%% | Last Activity: %s",
             $panel->id,
             $score,
             $activeUsers,
+            $statsStatus,
             $details['cpu_usage'],
             $details['memory_usage'],
             $details['last_activity_human']
@@ -303,6 +473,7 @@ class PanelRepository extends BaseRepository
             'score' => $score,
             'active_users' => $activeUsers,
             'total_users' => $this->getTotalUsersCount($panel->id),
+            'has_fresh_stats' => $hasFreshStats,
             'cpu_usage' => $details['cpu_usage'],
             'memory_usage' => $details['memory_usage'],
             'last_activity' => $details['last_activity'],
@@ -368,7 +539,7 @@ class PanelRepository extends BaseRepository
     /**
      * Расчет комплексного score для панели
      */
-    private function calculatePanelScore(Panel $panel, int $activeUsers): float
+    private function calculatePanelScore(Panel $panel, int $activeUsers, ?array $latestStats = null): float
     {
         $score = 100.0;
 
@@ -377,39 +548,50 @@ class PanelRepository extends BaseRepository
         $score += $userScore * 50;
 
         // 2. Score на основе нагрузки сервера (40% веса)
-        $loadScore = $this->calculateLoadBasedScore($panel);
+        // Используем переданную статистику или получаем заново
+        $loadScore = $this->calculateLoadBasedScore($panel, $latestStats);
         $score += $loadScore * 40;
 
-        // 3. Score на основе времени последней активности (10% веса)
+        // 3. Score на основе времени последней активности (5% веса - уменьшено с 10%)
         $timeScore = $this->calculateTimeBasedScore($panel);
-        $score += $timeScore * 10;
+        $score += $timeScore * 5;
 
         return max($score, 0);
     }
 
     /**
-     * Score на основе количества пользователей (используем реальные данные из статистики)
+     * Score на основе количества пользователей (плавная функция вместо жестких порогов)
      */
     private function calculateUserBasedScore(int $activeUsersCount): float
     {
-        // Используем реальные цифры из вашей статистики: 465-520 активных пользователей
-        if ($activeUsersCount < 400) return 1.0;      // Очень мало
-        if ($activeUsersCount < 450) return 0.8;      // Мало
-        if ($activeUsersCount < 480) return 0.6;      // Средне
-        if ($activeUsersCount < 500) return 0.4;      // Много
-        if ($activeUsersCount < 530) return 0.2;      // Очень много
-        return 0.0;                                   // Перегружена
+        // Плавная функция вместо жестких порогов
+        // Используем реальные цифры из статистики: 465-520 активных пользователей
+        $maxExpectedUsers = 530; // Максимальное ожидаемое количество пользователей
+        
+        // Нормализуем количество пользователей (0-1)
+        $normalized = min(1.0, $activeUsersCount / $maxExpectedUsers);
+        
+        // Обратная зависимость: чем меньше пользователей, тем выше score
+        // Используем квадратичную функцию для более плавного перехода
+        $score = 1.0 - ($normalized * $normalized);
+        
+        // Обеспечиваем минимальный score даже при большом количестве пользователей
+        return max(0.0, $score);
     }
 
     /**
-     * Score на основе нагрузки сервера
+     * Score на основе нагрузки сервера (плавная функция)
      */
-    private function calculateLoadBasedScore(Panel $panel): float
+    private function calculateLoadBasedScore(Panel $panel, ?array $latestStats = null): float
     {
-        $latestStats = $this->getLatestPanelStats($panel->id);
+        // Используем переданную статистику или получаем заново
+        if (!$latestStats) {
+            $latestStats = $this->getLatestPanelStats($panel->id);
+        }
 
         if (!$latestStats) {
-            return 0.5;
+            // Если статистики нет, используем средний score, но с понижением
+            return 0.3; // Понижен с 0.5, чтобы панели без статистики были менее приоритетными
         }
 
         $cpuUsage = $latestStats['cpu_usage'] ?? 100;
@@ -417,15 +599,16 @@ class PanelRepository extends BaseRepository
         $memoryTotal = $latestStats['mem_total'] ?? 1;
         $memoryUsage = ($memoryTotal > 0) ? ($memoryUsed / $memoryTotal) * 100 : 100;
 
-        // Берем максимальную нагрузку из CPU и памяти
-        $combinedLoad = max($cpuUsage, $memoryUsage);
+        // Берем среднее значение CPU и памяти (более справедливо, чем максимум)
+        $combinedLoad = ($cpuUsage + $memoryUsage) / 2;
 
-        if ($combinedLoad < 20) return 1.0;    // Отлично
-        if ($combinedLoad < 40) return 0.8;    // Хорошо
-        if ($combinedLoad < 60) return 0.6;    // Нормально
-        if ($combinedLoad < 80) return 0.4;    // Повышенная
-        if ($combinedLoad < 90) return 0.2;    // Высокая
-        return 0.0;                            // Критическая
+        // Плавная функция вместо жестких порогов
+        // Чем меньше нагрузка, тем выше score
+        // Используем обратную квадратичную функцию для плавного перехода
+        $normalizedLoad = min(1.0, $combinedLoad / 100);
+        $score = 1.0 - ($normalizedLoad * $normalizedLoad);
+        
+        return max(0.0, $score);
     }
 
     /**
@@ -501,5 +684,129 @@ class PanelRepository extends BaseRepository
             ->first();
 
         return $latestStats ? json_decode($latestStats->statistics, true) : null;
+    }
+
+    /**
+     * Проверка актуальности статистики панели
+     * Статистика считается актуальной, если она не старше 5 минут
+     * 
+     * @param int $panelId
+     * @return bool
+     */
+    private function isStatsFresh(int $panelId): bool
+    {
+        $latestStats = ServerMonitoring::where('panel_id', $panelId)
+            ->latest()
+            ->first();
+
+        if (!$latestStats) {
+            return false;
+        }
+
+        // Статистика считается актуальной, если она не старше 5 минут
+        $maxAgeMinutes = 5;
+        $ageMinutes = Carbon::now()->diffInMinutes($latestStats->created_at);
+        
+        return $ageMinutes <= $maxAgeMinutes;
+    }
+
+    /**
+     * Проверка, есть ли хотя бы одна панель с актуальной статистикой
+     * 
+     * @param Collection $panels
+     * @return bool
+     */
+    private function hasAnyFreshStats(Collection $panels): bool
+    {
+        return $panels->contains(function ($panel) {
+            return $this->isStatsFresh($panel->id);
+        });
+    }
+
+    /**
+     * Выбор панели на основе нагрузки трафика сервера
+     * Выбирает панель на сервере с наименьшим процентом использования трафика
+     * 
+     * @param Collection $panels
+     * @return Panel|null
+     */
+    private function selectPanelByTraffic(Collection $panels): ?Panel
+    {
+        $panelsWithTraffic = $panels->map(function ($panel) {
+            $trafficData = $this->getServerTrafficData($panel);
+            
+            return [
+                'panel' => $panel,
+                'traffic_used_percent' => $trafficData['used_percent'] ?? 100,
+                'traffic_remaining_percent' => $trafficData['remaining_percent'] ?? 0,
+                'traffic_data' => $trafficData
+            ];
+        })->filter(function ($item) {
+            // Исключаем панели без данных о трафике или с критической загрузкой (>95%)
+            return isset($item['traffic_data']) && $item['traffic_used_percent'] < 95;
+        });
+
+        if ($panelsWithTraffic->isEmpty()) {
+            Log::warning('PANEL_SELECTION [TRAFFIC]: No panels with valid traffic data, falling back to balanced');
+            return $this->getConfiguredMarzbanPanel();
+        }
+
+        // Выбираем панель с наименьшим процентом использования трафика
+        $selectedPanelData = $panelsWithTraffic->sortBy('traffic_used_percent')->first();
+        $selectedPanel = $selectedPanelData['panel'];
+
+        Log::info('PANEL_SELECTION [TRAFFIC]: Selected panel based on traffic load', [
+            'panel_id' => $selectedPanel->id,
+            'traffic_used_percent' => $selectedPanelData['traffic_used_percent'],
+            'traffic_remaining_percent' => $selectedPanelData['traffic_remaining_percent'],
+            'server_id' => $selectedPanel->server_id,
+            'server_name' => $selectedPanel->server->name ?? 'N/A'
+        ]);
+
+        return $selectedPanel;
+    }
+
+    /**
+     * Получение данных о трафике сервера
+     * 
+     * @param Panel $panel
+     * @return array|null
+     */
+    private function getServerTrafficData(Panel $panel): ?array
+    {
+        if (!$panel->server || $panel->server->provider !== Server::VDSINA) {
+            return null;
+        }
+
+        if (!$panel->server->provider_id) {
+            return null;
+        }
+
+        $cacheKey = "server_traffic_{$panel->server->provider_id}";
+        $cacheTtl = config('panel.traffic_cache_ttl', 300);
+
+        return Cache::remember($cacheKey, $cacheTtl, function () use ($panel) {
+            try {
+                $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
+                $trafficData = $vdsinaApi->getServerTraffic((int)$panel->server->provider_id);
+
+                if ($trafficData) {
+                    Log::debug('PANEL_SELECTION [TRAFFIC]: Retrieved traffic data from VDSINA', [
+                        'server_id' => $panel->server->id,
+                        'provider_id' => $panel->server->provider_id,
+                        'used_percent' => $trafficData['used_percent']
+                    ]);
+                }
+
+                return $trafficData;
+            } catch (\Exception $e) {
+                Log::error('PANEL_SELECTION [TRAFFIC]: Failed to get traffic data', [
+                    'server_id' => $panel->server->id,
+                    'provider_id' => $panel->server->provider_id,
+                    'error' => $e->getMessage()
+                ]);
+                return null;
+            }
+        });
     }
 }

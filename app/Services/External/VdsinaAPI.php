@@ -260,6 +260,98 @@ class VdsinaAPI
     }
 
     /**
+     * Получить информацию о трафике сервера
+     * Возвращает использованный трафик и лимит
+     * 
+     * Согласно документации VDSINA API:
+     * - bandwidth.current_month - использованный трафик за текущий месяц (в байтах)
+     * - bandwidth.last_month - использованный трафик за прошлый месяц (в байтах)
+     * - data.traff.bytes - лимит трафика включенный в тариф (в байтах)
+     * 
+     * @param int $serverId ID сервера в VDSINA
+     * @return array|null Массив с данными о трафике или null при ошибке
+     */
+    public function getServerTraffic(int $serverId): ?array
+    {
+        try {
+            $serverData = $this->getServerById($serverId);
+            
+            if (!isset($serverData['data'])) {
+                Log::warning('VDSINA API: No data in server response', ['server_id' => $serverId]);
+                return null;
+            }
+            
+            $data = $serverData['data'];
+            
+            // Получаем использованный трафик за текущий месяц
+            // Согласно документации: bandwidth.current_month - Total traffic in bytes for current month
+            $usedTraffic = null;
+            if (isset($data['bandwidth']['current_month'])) {
+                $usedTraffic = (int)$data['bandwidth']['current_month'];
+            } elseif (isset($data['bandwidth']['last_month'])) {
+                // Если текущего месяца нет, используем прошлый месяц
+                $usedTraffic = (int)$data['bandwidth']['last_month'];
+            }
+            
+            // Получаем лимит трафика из тарифа
+            // Согласно документации: data.traff.bytes - Amount of network bandwidth in bytes
+            $trafficLimit = null;
+            if (isset($data['data']['traff']['bytes'])) {
+                $trafficLimit = (int)$data['data']['traff']['bytes'];
+            } elseif (isset($data['data']['traff']['value'])) {
+                // Если bytes нет, но есть value, конвертируем из TB в байты
+                // value обычно в TB согласно документации (for: "Tb")
+                $valueInTb = (int)$data['data']['traff']['value'];
+                $trafficLimit = $valueInTb * 1024 * 1024 * 1024 * 1024; // TB в байты
+            }
+            
+            // Если лимит не указан, используем значение из конфига (по умолчанию 32TB)
+            if ($trafficLimit === null || $trafficLimit === 0) {
+                $trafficLimit = config('panel.server_traffic_limit', 32 * 1024 * 1024 * 1024 * 1024);
+                Log::debug('VDSINA API: Using default traffic limit from config', [
+                    'server_id' => $serverId,
+                    'limit' => $trafficLimit
+                ]);
+            }
+            
+            // Если использованный трафик не указан, считаем что 0
+            if ($usedTraffic === null) {
+                $usedTraffic = 0;
+                Log::debug('VDSINA API: No traffic usage data, assuming 0', ['server_id' => $serverId]);
+            }
+            
+            $usedPercent = $trafficLimit > 0 ? (($usedTraffic / $trafficLimit) * 100) : 0;
+            $remaining = max(0, $trafficLimit - $usedTraffic);
+            $remainingPercent = $trafficLimit > 0 ? (($remaining / $trafficLimit) * 100) : 0;
+            
+            Log::debug('VDSINA API: Server traffic data retrieved', [
+                'server_id' => $serverId,
+                'used_bytes' => $usedTraffic,
+                'limit_bytes' => $trafficLimit,
+                'used_percent' => round($usedPercent, 2)
+            ]);
+            
+            return [
+                'used' => $usedTraffic,
+                'limit' => $trafficLimit,
+                'used_percent' => round($usedPercent, 2),
+                'remaining' => $remaining,
+                'remaining_percent' => round($remainingPercent, 2),
+                'current_month' => isset($data['bandwidth']['current_month']) ? (int)$data['bandwidth']['current_month'] : null,
+                'last_month' => isset($data['bandwidth']['last_month']) ? (int)$data['bandwidth']['last_month'] : null,
+            ];
+            
+        } catch (Exception $e) {
+            Log::error('Failed to get server traffic from VDSINA', [
+                'server_id' => $serverId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return null;
+        }
+    }
+
+    /**
      * Тестирование подключения
      */
     public function testConnection(): array
