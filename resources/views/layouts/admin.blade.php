@@ -127,6 +127,12 @@
                     'routes' => ['admin.module.panel-settings.*']
                 ])
                 @include('layouts.admin.nav-item', [
+                    'route' => 'admin.module.panel-statistics.index',
+                    'icon' => 'fa-chart-bar',
+                    'label' => 'Статистика панелей',
+                    'routes' => ['admin.module.panel-statistics.*']
+                ])
+                @include('layouts.admin.nav-item', [
                     'route' => 'admin.module.server-users.index',
                     'icon' => 'fa-users',
                     'label' => 'Пользователи сервера',

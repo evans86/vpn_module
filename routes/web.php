@@ -142,6 +142,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
             });
 
             // Настройки распределения панелей
+            Route::prefix('panel-statistics')->name('panel-statistics.')->group(function () {
+                Route::get('/', [\App\Http\Controllers\Module\PanelStatisticsController::class, 'index'])->name('index');
+                Route::get('/export-pdf', [\App\Http\Controllers\Module\PanelStatisticsController::class, 'exportPdf'])->name('export-pdf');
+            });
+
             Route::prefix('panel-settings')->name('panel-settings.')->group(function () {
                 Route::get('/', [\App\Http\Controllers\Module\PanelSettingsController::class, 'index'])->name('index');
                 Route::put('/strategy', [\App\Http\Controllers\Module\PanelSettingsController::class, 'updateStrategy'])->name('update-strategy');

@@ -811,4 +811,183 @@ class PanelRepository extends BaseRepository
             }
         });
     }
+
+    // ==================== МЕТОДЫ ДЛЯ СТАТИСТИКИ ПО МЕСЯЦАМ ====================
+
+    /**
+     * Получить статистику по панелям за текущий и прошлый месяц
+     * 
+     * @param int|null $year Год (по умолчанию текущий)
+     * @param int|null $month Месяц (по умолчанию текущий)
+     * @return array
+     */
+    public function getMonthlyStatistics(?int $year = null, ?int $month = null): array
+    {
+        $now = Carbon::now();
+        $currentYear = $year ?? $now->year;
+        $currentMonth = $month ?? $now->month;
+        
+        // Определяем период текущего месяца
+        $currentMonthStart = Carbon::create($currentYear, $currentMonth, 1)->startOfMonth();
+        $currentMonthEnd = Carbon::create($currentYear, $currentMonth, 1)->endOfMonth();
+        
+        // Определяем период прошлого месяца
+        $lastMonthStart = $currentMonthStart->copy()->subMonth()->startOfMonth();
+        $lastMonthEnd = $currentMonthStart->copy()->subMonth()->endOfMonth();
+        
+        // Получаем все настроенные панели
+        $panels = $this->getAllConfiguredPanels();
+        
+        $statistics = [];
+        
+        foreach ($panels as $panel) {
+            // Получаем статистику за текущий месяц
+            $currentMonthStats = $this->getPanelStatsForPeriod($panel, $currentMonthStart, $currentMonthEnd);
+            
+            // Получаем статистику за прошлый месяц
+            $lastMonthStats = $this->getPanelStatsForPeriod($panel, $lastMonthStart, $lastMonthEnd);
+            
+            // Получаем данные о трафике
+            $trafficData = $this->getServerTrafficData($panel);
+            
+            // Трафик за текущий месяц
+            $currentTraffic = $trafficData ? [
+                'used_tb' => round($trafficData['used'] / (1024 * 1024 * 1024 * 1024), 2),
+                'limit_tb' => round($trafficData['limit'] / (1024 * 1024 * 1024 * 1024), 2),
+                'used_percent' => $trafficData['used_percent'],
+            ] : null;
+            
+            // Трафик за прошлый месяц (из API)
+            $lastTraffic = null;
+            if ($trafficData && isset($trafficData['last_month'])) {
+                $lastMonthTrafficBytes = $trafficData['last_month'];
+                $limitBytes = $trafficData['limit'];
+                $lastTraffic = [
+                    'used_tb' => round($lastMonthTrafficBytes / (1024 * 1024 * 1024 * 1024), 2),
+                    'limit_tb' => round($limitBytes / (1024 * 1024 * 1024 * 1024), 2),
+                    'used_percent' => $limitBytes > 0 ? round(($lastMonthTrafficBytes / $limitBytes) * 100, 2) : 0,
+                ];
+            }
+            
+            // Вычисляем динамику
+            $trafficChange = null;
+            if ($currentTraffic && $lastTraffic) {
+                $trafficChange = round($currentTraffic['used_percent'] - $lastTraffic['used_percent'], 2);
+            }
+            
+            $activeUsersChange = null;
+            if ($currentMonthStats['active_users'] !== null && $lastMonthStats['active_users'] !== null) {
+                $activeUsersChange = $currentMonthStats['active_users'] - $lastMonthStats['active_users'];
+            }
+            
+            $onlineUsersChange = null;
+            if ($currentMonthStats['online_users'] !== null && $lastMonthStats['online_users'] !== null) {
+                $onlineUsersChange = $currentMonthStats['online_users'] - $lastMonthStats['online_users'];
+            }
+            
+            $statistics[] = [
+                'panel_id' => $panel->id,
+                'panel_address' => $panel->panel_adress,
+                'server_name' => $panel->server->name ?? 'N/A',
+                'current_month' => [
+                    'active_users' => $currentMonthStats['active_users'],
+                    'online_users' => $currentMonthStats['online_users'],
+                    'traffic' => $currentTraffic,
+                ],
+                'last_month' => [
+                    'active_users' => $lastMonthStats['active_users'],
+                    'online_users' => $lastMonthStats['online_users'],
+                    'traffic' => $lastTraffic,
+                ],
+                'changes' => [
+                    'active_users' => $activeUsersChange,
+                    'online_users' => $onlineUsersChange,
+                    'traffic_percent' => $trafficChange,
+                ],
+                'period' => [
+                    'current' => [
+                        'year' => $currentYear,
+                        'month' => $currentMonth,
+                        'name' => $currentMonthStart->locale('ru')->monthName,
+                    ],
+                    'last' => [
+                        'year' => $lastMonthStart->year,
+                        'month' => $lastMonthStart->month,
+                        'name' => $lastMonthStart->locale('ru')->monthName,
+                    ],
+                ],
+            ];
+        }
+        
+        return $statistics;
+    }
+
+    /**
+     * Получить статистику панели за определенный период
+     * Берет среднее значение за последние 7 дней периода или последнее значение
+     * 
+     * @param Panel $panel
+     * @param Carbon $startDate
+     * @param Carbon $endDate
+     * @return array
+     */
+    private function getPanelStatsForPeriod(Panel $panel, Carbon $startDate, Carbon $endDate): array
+    {
+        // Получаем статистики за период, но для более точной оценки берем последние 7 дней месяца
+        $periodEnd = min($endDate, Carbon::now());
+        $periodStart = max($startDate, $periodEnd->copy()->subDays(7));
+        
+        $stats = ServerMonitoring::where('panel_id', $panel->id)
+            ->whereBetween('created_at', [$periodStart, $periodEnd])
+            ->orderBy('created_at', 'desc')
+            ->get();
+        
+        // Если за последние 7 дней нет данных, берем все данные за период
+        if ($stats->isEmpty()) {
+            $stats = ServerMonitoring::where('panel_id', $panel->id)
+                ->whereBetween('created_at', [$startDate, $endDate])
+                ->orderBy('created_at', 'desc')
+                ->get();
+        }
+        
+        if ($stats->isEmpty()) {
+            return [
+                'active_users' => null,
+                'online_users' => null,
+            ];
+        }
+        
+        // Берем средние значения за период
+        $activeUsers = [];
+        $onlineUsers = [];
+        
+        foreach ($stats as $stat) {
+            $data = json_decode($stat->statistics, true);
+            if ($data) {
+                if (isset($data['users_active'])) {
+                    $activeUsers[] = (int)$data['users_active'];
+                }
+                if (isset($data['online_users'])) {
+                    $onlineUsers[] = (int)$data['online_users'];
+                }
+            }
+        }
+        
+        // Возвращаем среднее значение или последнее значение
+        $avgActiveUsers = !empty($activeUsers) ? (int)round(array_sum($activeUsers) / count($activeUsers)) : null;
+        $avgOnlineUsers = !empty($onlineUsers) ? (int)round(array_sum($onlineUsers) / count($onlineUsers)) : null;
+        
+        // Если среднее не получилось, берем последнее значение
+        if ($avgActiveUsers === null && !empty($activeUsers)) {
+            $avgActiveUsers = end($activeUsers);
+        }
+        if ($avgOnlineUsers === null && !empty($onlineUsers)) {
+            $avgOnlineUsers = end($onlineUsers);
+        }
+        
+        return [
+            'active_users' => $avgActiveUsers,
+            'online_users' => $avgOnlineUsers,
+        ];
+    }
 }
