@@ -863,7 +863,8 @@ class PanelRepository extends BaseRepository
             
             // Трафик за прошлый месяц (из API last_month или из сохраненных данных)
             $lastTraffic = null;
-            if ($trafficData && isset($trafficData['last_month'])) {
+            if ($trafficData && isset($trafficData['last_month']) && $trafficData['last_month'] !== null && $trafficData['last_month'] > 0) {
+                // Используем данные из API
                 $limitBytes = $trafficData['limit'];
                 $lastTrafficBytes = $trafficData['last_month'];
                 
@@ -1106,12 +1107,13 @@ class PanelRepository extends BaseRepository
                             }
                         } elseif ($isLastMonth) {
                             // Прошлый месяц
-                            if (isset($trafficData['last_month']) && $trafficData['last_month'] !== null && $trafficData['last_month'] !== 0) {
+                            if (isset($trafficData['last_month']) && $trafficData['last_month'] !== null && $trafficData['last_month'] > 0) {
+                                // Используем данные из API
                                 $trafficBytes = $trafficData['last_month'];
                                 $monthData['traffic_used_tb'] = round($trafficBytes / (1024 * 1024 * 1024 * 1024), 2);
                                 $monthData['traffic_used_percent'] = $limitBytes > 0 ? round(($trafficBytes / $limitBytes) * 100, 2) : 0;
                                 
-                                Log::debug('Last month traffic data retrieved', [
+                                Log::debug('Last month traffic data retrieved from API', [
                                     'panel_id' => $panel->id,
                                     'year' => $year,
                                     'month' => $month,
@@ -1120,14 +1122,34 @@ class PanelRepository extends BaseRepository
                                     'traffic_percent' => $monthData['traffic_used_percent'],
                                 ]);
                             } else {
-                                Log::warning('Last month traffic data not available from API', [
-                                    'panel_id' => $panel->id,
-                                    'year' => $year,
-                                    'month' => $month,
-                                    'traffic_data' => $trafficData,
-                                    'last_month_value' => $trafficData['last_month'] ?? 'not set',
-                                    'last_month_type' => isset($trafficData['last_month']) ? gettype($trafficData['last_month']) : 'not set',
-                                ]);
+                                // Если API не предоставляет данные, пытаемся получить из сохраненных
+                                $savedStats = PanelMonthlyStatistics::where('panel_id', $panel->id)
+                                    ->where('year', $year)
+                                    ->where('month', $month)
+                                    ->first();
+                                
+                                if ($savedStats && $savedStats->traffic_used_bytes !== null) {
+                                    $savedLimitBytes = $savedStats->traffic_limit_bytes ?? $limitBytes;
+                                    $monthData['traffic_used_tb'] = round($savedStats->traffic_used_bytes / (1024 * 1024 * 1024 * 1024), 2);
+                                    $monthData['traffic_limit_tb'] = round($savedLimitBytes / (1024 * 1024 * 1024 * 1024), 2);
+                                    $monthData['traffic_used_percent'] = $savedStats->traffic_used_percent ?? ($savedLimitBytes > 0 ? round(($savedStats->traffic_used_bytes / $savedLimitBytes) * 100, 2) : 0);
+                                    
+                                    Log::debug('Last month traffic data retrieved from saved statistics', [
+                                        'panel_id' => $panel->id,
+                                        'year' => $year,
+                                        'month' => $month,
+                                        'traffic_tb' => $monthData['traffic_used_tb'],
+                                        'traffic_percent' => $monthData['traffic_used_percent'],
+                                    ]);
+                                } else {
+                                    Log::warning('Last month traffic data not available from API or saved statistics', [
+                                        'panel_id' => $panel->id,
+                                        'year' => $year,
+                                        'month' => $month,
+                                        'api_last_month' => $trafficData['last_month'] ?? 'not set',
+                                        'saved_stats_exists' => $savedStats !== null,
+                                    ]);
+                                }
                             }
                         }
                     }
