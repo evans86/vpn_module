@@ -166,6 +166,170 @@
                 </table>
             </div>
         </div>
+
+        <!-- Графики -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Графики использования за последние 6 месяцев</h3>
+            
+            <!-- Chart.js -->
+            <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+            
+            <div class="space-y-6">
+                @foreach($historicalData as $panelData)
+                    <div class="border rounded-lg p-4">
+                        <h4 class="text-md font-semibold text-gray-800 mb-4">
+                            ID-{{ $panelData['panel_id'] }} - {{ $panelData['panel_address'] }}
+                        </h4>
+                        
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                            <!-- График трафика -->
+                            <div class="h-64">
+                                <h5 class="text-sm font-medium text-gray-700 mb-2">Использование трафика (%)</h5>
+                                <div class="h-52">
+                                    <canvas id="traffic-chart-{{ $panelData['panel_id'] }}"></canvas>
+                                </div>
+                            </div>
+                            
+                            <!-- График активных пользователей -->
+                            <div class="h-64">
+                                <h5 class="text-sm font-medium text-gray-700 mb-2">Активные пользователи</h5>
+                                <div class="h-52">
+                                    <canvas id="active-users-chart-{{ $panelData['panel_id'] }}"></canvas>
+                                </div>
+                            </div>
+                            
+                            <!-- График онлайн пользователей -->
+                            <div class="h-64">
+                                <h5 class="text-sm font-medium text-gray-700 mb-2">Онлайн пользователей</h5>
+                                <div class="h-52">
+                                    <canvas id="online-users-chart-{{ $panelData['panel_id'] }}"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            @foreach($historicalData as $panelData)
+                @php
+                    $labels = array_map(function($m) { return $m['month_name']; }, $panelData['months']);
+                    $trafficData = array_map(function($m) { return $m['traffic_used_percent']; }, $panelData['months']);
+                    $activeUsersData = array_map(function($m) { return $m['active_users']; }, $panelData['months']);
+                    $onlineUsersData = array_map(function($m) { return $m['online_users']; }, $panelData['months']);
+                @endphp
+
+                // График трафика
+                new Chart(document.getElementById('traffic-chart-{{ $panelData['panel_id'] }}'), {
+                    type: 'line',
+                    data: {
+                        labels: @json($labels),
+                        datasets: [{
+                            label: 'Использование трафика (%)',
+                            data: @json($trafficData),
+                            borderColor: 'rgb(99, 102, 241)',
+                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100
+                            }
+                        }
+                    }
+                });
+
+                // График активных пользователей
+                new Chart(document.getElementById('active-users-chart-{{ $panelData['panel_id'] }}'), {
+                    type: 'line',
+                    data: {
+                        labels: @json($labels),
+                        datasets: [{
+                            label: 'Активные пользователи',
+                            data: @json($activeUsersData),
+                            borderColor: 'rgb(34, 197, 94)',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        layout: {
+                            padding: {
+                                top: 5,
+                                bottom: 5,
+                                left: 5,
+                                right: 5
+                            }
+                        }
+                    }
+                });
+
+                // График онлайн пользователей
+                new Chart(document.getElementById('online-users-chart-{{ $panelData['panel_id'] }}'), {
+                    type: 'line',
+                    data: {
+                        labels: @json($labels),
+                        datasets: [{
+                            label: 'Онлайн пользователей',
+                            data: @json($onlineUsersData),
+                            borderColor: 'rgb(239, 68, 68)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        layout: {
+                            padding: {
+                                top: 5,
+                                bottom: 5,
+                                left: 5,
+                                right: 5
+                            }
+                        }
+                    }
+                });
+            @endforeach
+        });
+    </script>
 @endsection
 

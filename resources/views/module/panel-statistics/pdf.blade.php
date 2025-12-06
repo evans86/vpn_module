@@ -228,6 +228,57 @@
         </tbody>
     </table>
 
+    @if(isset($historicalData) && !empty($historicalData))
+        <div style="page-break-before: always;">
+            <h2 style="font-size: 16px; margin-bottom: 15px; border-bottom: 2px solid #333; padding-bottom: 5px;">
+                Исторические данные за последние 6 месяцев
+            </h2>
+            
+            @foreach($historicalData as $panelData)
+                <div style="margin-bottom: 20px; page-break-inside: avoid;">
+                    <h3 style="font-size: 12px; font-weight: bold; margin-bottom: 10px;">
+                        ID-{{ $panelData['panel_id'] }} - {{ $panelData['panel_address'] }}
+                    </h3>
+                    
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 8px;">
+                        <thead>
+                            <tr style="background-color: #4b5563; color: white;">
+                                <th style="padding: 5px; border: 1px solid #ddd; text-align: left;">Месяц</th>
+                                <th style="padding: 5px; border: 1px solid #ddd; text-align: right;">Активные</th>
+                                <th style="padding: 5px; border: 1px solid #ddd; text-align: right;">Онлайн</th>
+                                <th style="padding: 5px; border: 1px solid #ddd; text-align: right;">Трафик (ТБ)</th>
+                                <th style="padding: 5px; border: 1px solid #ddd; text-align: right;">% использования</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($panelData['months'] as $month)
+                                <tr>
+                                    <td style="padding: 4px; border: 1px solid #ddd;">{{ $month['month_name'] }} {{ $month['year'] }}</td>
+                                    <td style="padding: 4px; border: 1px solid #ddd; text-align: right;">{{ $month['active_users'] ?? 'N/A' }}</td>
+                                    <td style="padding: 4px; border: 1px solid #ddd; text-align: right;">{{ $month['online_users'] ?? 'N/A' }}</td>
+                                    <td style="padding: 4px; border: 1px solid #ddd; text-align: right;">
+                                        @if($month['traffic_used_tb'] !== null)
+                                            {{ number_format($month['traffic_used_tb'], 2) }} / {{ $month['traffic_limit_tb'] ? number_format($month['traffic_limit_tb'], 2) : 'N/A' }}
+                                        @else
+                                            N/A
+                                        @endif
+                                    </td>
+                                    <td style="padding: 4px; border: 1px solid #ddd; text-align: right;">
+                                        @if($month['traffic_used_percent'] !== null)
+                                            {{ number_format($month['traffic_used_percent'], 2) }}%
+                                        @else
+                                            N/A
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endforeach
+        </div>
+    @endif
+
     <div class="footer">
         <p>Данные автоматически сформированы системой управления VPN панелями</p>
     </div>

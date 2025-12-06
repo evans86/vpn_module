@@ -3,6 +3,7 @@
 namespace App\Repositories\Panel;
 
 use App\Models\Panel\Panel;
+use App\Models\Panel\PanelMonthlyStatistics;
 use App\Models\Server\Server;
 use App\Models\ServerMonitoring\ServerMonitoring;
 use App\Models\ServerUser\ServerUser;
@@ -774,7 +775,7 @@ class PanelRepository extends BaseRepository
      * @param Panel $panel
      * @return array|null
      */
-    private function getServerTrafficData(Panel $panel): ?array
+    public function getServerTrafficData(Panel $panel): ?array
     {
         if (!$panel->server || $panel->server->provider !== Server::VDSINA) {
             return null;
@@ -860,7 +861,7 @@ class PanelRepository extends BaseRepository
                 ];
             }
             
-            // Трафик за прошлый месяц (из API last_month)
+            // Трафик за прошлый месяц (из API last_month или из сохраненных данных)
             $lastTraffic = null;
             if ($trafficData && isset($trafficData['last_month'])) {
                 $limitBytes = $trafficData['limit'];
@@ -871,6 +872,21 @@ class PanelRepository extends BaseRepository
                     'limit_tb' => round($limitBytes / (1024 * 1024 * 1024 * 1024), 2),
                     'used_percent' => $limitBytes > 0 ? round(($lastTrafficBytes / $limitBytes) * 100, 2) : 0,
                 ];
+            } else {
+                // Если API не предоставляет данные, пытаемся получить из сохраненных
+                $savedStats = PanelMonthlyStatistics::where('panel_id', $panel->id)
+                    ->where('year', $lastMonthStart->year)
+                    ->where('month', $lastMonthStart->month)
+                    ->first();
+                
+                if ($savedStats && $savedStats->traffic_used_bytes !== null) {
+                    $limitBytes = $savedStats->traffic_limit_bytes ?? ($trafficData['limit'] ?? 0);
+                    $lastTraffic = [
+                        'used_tb' => round($savedStats->traffic_used_bytes / (1024 * 1024 * 1024 * 1024), 2),
+                        'limit_tb' => round($limitBytes / (1024 * 1024 * 1024 * 1024), 2),
+                        'used_percent' => $savedStats->traffic_used_percent ?? ($limitBytes > 0 ? round(($savedStats->traffic_used_bytes / $limitBytes) * 100, 2) : 0),
+                    ];
+                }
             }
             
             // Вычисляем динамику
@@ -935,7 +951,7 @@ class PanelRepository extends BaseRepository
      * @param Carbon $endDate
      * @return array
      */
-    private function getPanelStatsForPeriod(Panel $panel, Carbon $startDate, Carbon $endDate): array
+    public function getPanelStatsForPeriod(Panel $panel, Carbon $startDate, Carbon $endDate): array
     {
         // Получаем статистики за период, но для более точной оценки берем последние 7 дней месяца
         $periodEnd = min($endDate, Carbon::now());
@@ -993,5 +1009,70 @@ class PanelRepository extends BaseRepository
             'active_users' => $avgActiveUsers,
             'online_users' => $avgOnlineUsers,
         ];
+    }
+
+    /**
+     * Получить исторические данные для графиков
+     * 
+     * @param int $months Количество месяцев для отображения (по умолчанию 6)
+     * @return array
+     */
+    public function getHistoricalStatistics(int $months = 6): array
+    {
+        $now = Carbon::now();
+        $panels = $this->getAllConfiguredPanels();
+        
+        $historicalData = [];
+        
+        foreach ($panels as $panel) {
+            $panelData = [
+                'panel_id' => $panel->id,
+                'panel_address' => $panel->panel_adress,
+                'server_name' => $panel->server->name ?? 'N/A',
+                'months' => [],
+            ];
+            
+            // Получаем данные за последние N месяцев
+            for ($i = $months - 1; $i >= 0; $i--) {
+                $monthDate = $now->copy()->subMonths($i);
+                $year = $monthDate->year;
+                $month = $monthDate->month;
+                
+                // Пытаемся получить из сохраненных данных
+                $savedStats = PanelMonthlyStatistics::where('panel_id', $panel->id)
+                    ->where('year', $year)
+                    ->where('month', $month)
+                    ->first();
+                
+                if ($savedStats) {
+                    $panelData['months'][] = [
+                        'year' => $year,
+                        'month' => $month,
+                        'month_name' => $monthDate->locale('ru')->monthName,
+                        'active_users' => $savedStats->active_users,
+                        'online_users' => $savedStats->online_users,
+                        'traffic_used_tb' => $savedStats->traffic_used_bytes ? round($savedStats->traffic_used_bytes / (1024 * 1024 * 1024 * 1024), 2) : null,
+                        'traffic_limit_tb' => $savedStats->traffic_limit_bytes ? round($savedStats->traffic_limit_bytes / (1024 * 1024 * 1024 * 1024), 2) : null,
+                        'traffic_used_percent' => $savedStats->traffic_used_percent,
+                    ];
+                } else {
+                    // Если данных нет, добавляем null значения
+                    $panelData['months'][] = [
+                        'year' => $year,
+                        'month' => $month,
+                        'month_name' => $monthDate->locale('ru')->monthName,
+                        'active_users' => null,
+                        'online_users' => null,
+                        'traffic_used_tb' => null,
+                        'traffic_limit_tb' => null,
+                        'traffic_used_percent' => null,
+                    ];
+                }
+            }
+            
+            $historicalData[] = $panelData;
+        }
+        
+        return $historicalData;
     }
 }

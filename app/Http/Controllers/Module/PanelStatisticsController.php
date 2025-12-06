@@ -33,9 +33,13 @@ class PanelStatisticsController extends Controller
         // Вычисляем общие итоги
         $summary = $this->calculateSummary($statistics);
         
+        // Получаем исторические данные для графиков
+        $historicalData = $this->panelRepository->getHistoricalStatistics(6);
+        
         return view('module.panel-statistics.index', [
             'statistics' => $statistics,
             'summary' => $summary,
+            'historicalData' => $historicalData,
         ]);
     }
 
@@ -54,12 +58,16 @@ class PanelStatisticsController extends Controller
         // Вычисляем общие итоги
         $summary = $this->calculateSummary($statistics);
         
+        // Получаем исторические данные для графиков
+        $historicalData = $this->panelRepository->getHistoricalStatistics(6);
+        
         $now = Carbon::now();
         $lastMonth = $now->copy()->subMonth();
         
         $pdf = Pdf::loadView('module.panel-statistics.pdf', [
             'statistics' => $statistics,
             'summary' => $summary,
+            'historicalData' => $historicalData,
             'currentMonth' => $now->locale('ru')->monthName . ' ' . $now->year,
             'lastMonth' => $lastMonth->locale('ru')->monthName . ' ' . $lastMonth->year,
             'generatedAt' => Carbon::now()->format('d.m.Y H:i'),
