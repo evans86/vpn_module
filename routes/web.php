@@ -75,6 +75,9 @@ Route::prefix('personal')->name('personal.')->group(function () {
 // Telegram Bot Webhook
 Route::post('/telegram/webhook/{token}', [FatherBotController::class, 'handle'])->name('telegram.webhook');
 
+// VPN Error Page (только для локальной разработки) - должен быть ПЕРЕД /config/{token}
+Route::get('/config/error', [VpnConfigController::class, 'showError'])->name('vpn.config.error');
+
 // VPN Config Download
 Route::get('/config/{token}', [VpnConfigController::class, 'show'])->name('vpn.config.show');
 

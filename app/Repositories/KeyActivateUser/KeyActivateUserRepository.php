@@ -16,15 +16,14 @@ class KeyActivateUserRepository extends BaseRepository
     /**
      * Find KeyActivateUser by key_activate_id with relations
      * @param string $keyActivateId
-     * @return KeyActivateUser
-     * @throws ModelNotFoundException
+     * @return KeyActivateUser|null
      */
-    public function findByKeyActivateIdWithRelations(string $keyActivateId): KeyActivateUser
+    public function findByKeyActivateIdWithRelations(string $keyActivateId): ?KeyActivateUser
     {
-        /** @var KeyActivateUser */
+        /** @var KeyActivateUser|null */
         return $this->query()
             ->where('key_activate_id', $keyActivateId)
             ->with(['serverUser', 'keyActivate'])
-            ->firstOrFail();
+            ->first();
     }
 }

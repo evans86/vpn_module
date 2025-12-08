@@ -37,8 +37,34 @@ class VpnConfigController extends Controller
     public function show(string $key_activate_id): Response
     {
         try {
+            // Если запрошен роут /config/error, перенаправляем на метод showError
+            if ($key_activate_id === 'error') {
+                return $this->showError();
+            }
+            
             // Получаем запись key_activate_user с отношениями
             $keyActivateUser = $this->keyActivateUserRepository->findByKeyActivateIdWithRelations($key_activate_id);
+            
+            // Если ключ не найден
+            if (!$keyActivateUser) {
+                // В локальной среде показываем демо-страницу для разработки
+                if (app()->environment('local')) {
+                    return $this->showDemoPage($key_activate_id);
+                }
+                
+                // В продакшене показываем ошибку
+                if (request()->wantsJson()) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Configuration not found'
+                    ], 404);
+                }
+                
+                return response()->view('vpn.error', [
+                    'message' => 'Конфигурация не найдена. Ключ может быть неактивен или удален.'
+                ]);
+            }
+            
             // Получаем информацию о пользователе сервера
             $serverUser = $this->serverUserRepository->findById($keyActivateUser->server_user_id);
 
@@ -211,6 +237,57 @@ class VpnConfigController extends Controller
     }
 
     /**
+     * Показывает страницу ошибки (для локального просмотра)
+     */
+    public function showError(): Response
+    {
+        // В продакшене этот роут не должен быть доступен
+        if (!app()->environment('local')) {
+            abort(404);
+        }
+        
+        return response()->view('vpn.error', [
+            'message' => 'Конфигурация не найдена. Ключ может быть неактивен или удален.'
+        ]);
+    }
+
+    /**
+     * Показывает демо-страницу для локальной разработки
+     */
+    private function showDemoPage(string $key_activate_id): Response
+    {
+        // Демо-данные для локального просмотра
+        $userInfo = [
+            'username' => 'demo-user',
+            'status' => 'active',
+            'data_limit' => 100 * 1024 * 1024 * 1024, // 100 GB
+            'data_limit_tariff' => 100 * 1024 * 1024 * 1024,
+            'data_used' => 25.5 * 1024 * 1024 * 1024, // 25.5 GB
+            'expiration_date' => time() + (30 * 24 * 60 * 60), // 30 дней
+            'days_remaining' => 30
+        ];
+
+        // Демо-ключи подключения
+        $demoKeys = [
+            'vless://f83ca0f9-419c-4aa2-bb7e-47a82c900bef@77.238.239.214:2095?security=none&type=ws&headerType=&path=%2Fvless&host=#🚀%20Marz%20(12d21d3a-fe23-4c04-8ade-e316eac24fdf)%20[VLESS%20-%20ws]',
+            'vmess://eyJhZGQiOiAiNzcuMjM4LjIzOS4yMTQiLCAiYWlkIjogIjAiLCAiaG9zdCI6ICIiLCAiaWQiOiAiMjBjYjJiZDMtMzMwYy00Y2NmLWFkZTItNjJlMjZjNmNlNzM5IiwgIm5ldCI6ICJ3cyIsICJwYXRoIjogIi92bWVzcyIsICJwb3J0IjogMjA5NiwgInBzIjogIlx1ZDgzZFx1ZGU4MCBNYXJ6ICgxMmQyMWQzYS1mZTIzLTRjMDQtOGFkZS1lMzE2ZWFjMjRmZGYpIFtWTWVzcyAtIHdzXSIsICJzY3kiOiAiYXV0byIsICJ0bHMiOiAibm9uZSIsICJ0eXBlIjogIiIsICJ2IjogIjIifQ==',
+            'trojan://OaPcTZw8NomUQXfY@77.238.239.214:2097?security=none&type=ws&headerType=&path=%2Ftrojan&host=#🚀%20Marz%20(12d21d3a-fe23-4c04-8ade-e316eac24fdf)%20[Trojan%20-%20ws]',
+            'ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpVZnhLUG1oa3liRjhMdEQ0@77.238.239.214:2098#🚀%20Marz%20(12d21d3a-fe23-4c04-8ade-e316eac24fdf)%20[Shadowsocks%20-%20tcp]'
+        ];
+
+        $formattedKeys = $this->formatConnectionKeys($demoKeys);
+        $botLink = '#';
+        $netcheckUrl = route('netcheck.index');
+
+        Log::info('Showing demo page for local development', [
+            'key_activate_id' => $key_activate_id,
+            'source' => 'vpn'
+        ]);
+
+        return response()->view('vpn.config', compact('userInfo', 'formattedKeys', 'botLink', 'netcheckUrl'));
+    }
+
+    /**
      * Показывает страницу для браузера
      */
     private function showBrowserPage($keyActivateUser, $serverUser, $connectionKeys): Response
@@ -237,9 +314,12 @@ class VpnConfigController extends Controller
 
             // Добавляем ссылку на бота
             $botLink = $keyActivateUser->keyActivate->packSalesman->salesman->bot_link ?? '#';
+            
+            // Добавляем ссылку на страницу проверки качества сети
+            $netcheckUrl = route('netcheck.index');
 
             Log::warning('Returning browser page');
-            return response()->view('vpn.config', compact('userInfo', 'formattedKeys', 'botLink'));
+            return response()->view('vpn.config', compact('userInfo', 'formattedKeys', 'botLink', 'netcheckUrl'));
 
         } catch (Exception $e) {
             Log::error('Error showing browser page:', [
