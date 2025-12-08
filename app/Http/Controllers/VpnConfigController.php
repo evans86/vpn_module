@@ -47,12 +47,15 @@ class VpnConfigController extends Controller
             
             // Если ключ не найден
             if (!$keyActivateUser) {
-                // В локальной среде показываем демо-страницу для разработки
-                if (app()->environment('local')) {
+                // Демо-страница ТОЛЬКО в локальной среде с включенным debug
+                // Во всех остальных случаях (включая продакшен) показываем ошибку
+                $showDemo = app()->environment('local') && config('app.debug', false);
+                
+                if ($showDemo) {
                     return $this->showDemoPage($key_activate_id);
                 }
                 
-                // В продакшене показываем ошибку
+                // В продакшене или при любых сомнениях показываем ошибку
                 if (request()->wantsJson()) {
                     return response()->json([
                         'status' => 'error',
@@ -169,11 +172,17 @@ class VpnConfigController extends Controller
         } catch (Exception $e) {
             Log::error('Failed to get fresh user links', [
                 'user_id' => $serverUser->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'vpn'
             ]);
 
-            // В случае ошибки возвращаем сохраненные ключи
-            return json_decode($serverUser->keys, true) ?? [];
+            // В случае ошибки возвращаем сохраненные ключи, если они есть
+            $storedKeys = json_decode($serverUser->keys, true) ?? [];
+            if (empty($storedKeys)) {
+                // Если сохраненных ключей нет, пробрасываем исключение дальше
+                throw new RuntimeException('Не удалось получить ключи подключения: ' . $e->getMessage());
+            }
+            return $storedKeys;
         }
     }
 
@@ -326,12 +335,14 @@ class VpnConfigController extends Controller
         } catch (Exception $e) {
             Log::error('Error showing browser page:', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'vpn'
             ]);
 
-            // В случае ошибки при подготовке страницы возвращаем конфиг
-            return response(implode("\n", $connectionKeys))
-                ->header('Content-Type', 'text/plain');
+            // В случае ошибки при подготовке страницы показываем страницу ошибки
+            return response()->view('vpn.error', [
+                'message' => 'Не удалось загрузить конфигурацию VPN. Пожалуйста, проверьте правильность ссылки.'
+            ]);
         }
     }
 
