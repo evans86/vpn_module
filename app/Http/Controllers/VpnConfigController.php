@@ -308,22 +308,32 @@ class VpnConfigController extends Controller
 
             Log::info('Panel info retrieved:', ['info' => $info]);
 
+            // Безопасное получение данных из связанных моделей
+            $keyActivate = $keyActivateUser->keyActivate ?? null;
+            $packSalesman = $keyActivate->packSalesman ?? null;
+            $salesman = $packSalesman->salesman ?? null;
+
+            $finishAt = $keyActivate->finish_at ?? null;
+            $daysRemaining = null;
+            if ($finishAt) {
+                $daysRemaining = ceil(($finishAt - time()) / \App\Constants\TimeConstants::SECONDS_IN_DAY);
+            }
+
             $userInfo = [
                 'username' => $serverUser->id,
                 'status' => $info['status'] ?? 'unknown',
                 'data_limit' => $info['data_limit'] ?? 0,
-                'data_limit_tariff' => $keyActivateUser->keyActivate->traffic_limit ?? 0,
+                'data_limit_tariff' => $keyActivate->traffic_limit ?? 0,
                 'data_used' => $info['used_traffic'] ?? 0,
-                'expiration_date' => $keyActivateUser->keyActivate->finish_at ?? null,
-                'days_remaining' => $keyActivateUser->keyActivate->finish_at ?
-                    ceil(($keyActivateUser->keyActivate->finish_at - time()) / \App\Constants\TimeConstants::SECONDS_IN_DAY) : null
+                'expiration_date' => $finishAt,
+                'days_remaining' => $daysRemaining
             ];
 
             // Форматируем ключи для отображения
             $formattedKeys = $this->formatConnectionKeys($connectionKeys);
 
             // Добавляем ссылку на бота
-            $botLink = $keyActivateUser->keyActivate->packSalesman->salesman->bot_link ?? '#';
+            $botLink = $salesman->bot_link ?? '#';
             
             // Добавляем ссылку на страницу проверки качества сети
             $netcheckUrl = route('netcheck.index');
