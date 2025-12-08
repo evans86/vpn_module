@@ -75,7 +75,7 @@ class PanelController extends Controller
             }
 
             $panels = $query->orderBy('id', 'desc')
-                ->paginate(config('app.items_per_page', 30));
+                ->paginate(10);
             
             // Добавляем параметр show_deleted в пагинацию
             $panels->appends($request->only(['show_deleted', 'server', 'panel_adress', 'status', 'panel_id']));

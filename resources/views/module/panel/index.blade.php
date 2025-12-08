@@ -69,121 +69,148 @@
                     </x-slot>
                 </x-admin.empty-state>
             @else
-                <x-admin.table :headers="['#', 'Адрес панели', 'Тип', 'Логин', 'Пароль', 'Сервер', 'Статус', 'Действия']">
-                    @php
-                        $totalPanels = $panels->count();
-                        $currentIndex = 0;
-                    @endphp
+                <!-- Cards Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     @foreach($panels as $panel)
-                        @php
-                            $currentIndex++;
-                            // Если записей 3 или меньше, все меню открываются сверху
-                            // Если записей больше 3, последние 3 открываются сверху
-                            $isLastRows = $totalPanels <= 3 || $currentIndex > ($totalPanels - 3);
-                        @endphp
-                        <tr class="hover:bg-gray-50 {{ $panel->panel_status === Panel::PANEL_DELETED ? 'opacity-60 bg-gray-100' : '' }}">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                {{ $panel->id }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                <a href="{{ $panel->panel_adress }}" target="_blank" class="text-indigo-600 hover:text-indigo-800 flex items-center">
-                                    {{ $panel->formatted_address }}
-                                    <i class="fas fa-external-link-alt ml-1 text-xs"></i>
-                                </a>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{ $panel->panel_type_label }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <div class="flex items-center">
-                                    <span class="font-mono text-xs">{{ $panel->panel_login }}</span>
-                                    <button class="ml-2 text-gray-400 hover:text-gray-600"
-                                            data-clipboard-text="{{ $panel->panel_login }}"
-                                            title="Копировать логин">
-                                        <i class="fas fa-copy text-xs"></i>
-                                    </button>
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow {{ $panel->panel_status === Panel::PANEL_DELETED ? 'opacity-60 bg-gray-50' : '' }}">
+                            <!-- Card Header -->
+                            <div class="px-6 py-4 border-b border-gray-200">
+                                <div class="flex items-center space-x-3">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                                            <i class="fas fa-desktop text-white text-xl"></i>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <h3 class="text-lg font-semibold text-gray-900 truncate" title="{{ $panel->formatted_address }}">
+                                            Панель #{{ $panel->id }}
+                                        </h3>
+                                        <a href="{{ $panel->panel_adress }}" target="_blank" class="text-sm text-indigo-600 hover:text-indigo-800 flex items-center truncate">
+                                            <span class="truncate">{{ $panel->formatted_address }}</span>
+                                            <i class="fas fa-external-link-alt ml-1 text-xs flex-shrink-0"></i>
+                                        </a>
+                                    </div>
                                 </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <div class="flex items-center">
-                                    <span class="font-mono text-xs">{{ $panel->panel_password }}</span>
-                                    <button class="ml-2 text-gray-400 hover:text-gray-600"
-                                            data-clipboard-text="{{ $panel->panel_password }}"
-                                            title="Копировать пароль">
-                                        <i class="fas fa-copy text-xs"></i>
-                                    </button>
+                            </div>
+
+                            <!-- Card Body -->
+                            <div class="px-6 py-4 space-y-4">
+                                <!-- Status Badge -->
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-700">Статус:</span>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                        {{ $panel->status_badge_class === 'success' ? 'bg-green-100 text-green-800' : '' }}
+                                        {{ $panel->status_badge_class === 'danger' ? 'bg-red-100 text-red-800' : '' }}
+                                        {{ $panel->status_badge_class === 'warning' ? 'bg-yellow-100 text-yellow-800' : '' }}
+                                        {{ $panel->status_badge_class === 'info' ? 'bg-blue-100 text-blue-800' : '' }}
+                                        {{ $panel->status_badge_class === 'secondary' ? 'bg-gray-100 text-gray-800' : '' }}">
+                                        {{ $panel->status_label }}
+                                    </span>
                                 </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                @if($panel->server && isset($panel->server->id))
-                                    <a href="{{ route('admin.module.server.index', ['id' => $panel->server_id]) }}"
-                                       class="text-indigo-600 hover:text-indigo-800"
-                                       title="Перейти к серверу">
-                                        {{ $panel->server->name ?? 'N/A' }}
-                                        @if(isset($panel->server->host) && $panel->server->host)
-                                            <div class="text-xs text-gray-500 mt-1">
-                                                {{ $panel->server->host }}
-                                            </div>
-                                        @endif
-                                    </a>
-                                @else
-                                    <span class="text-red-600">Сервер удален</span>
-                                @endif
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                    {{ $panel->status_badge_class === 'success' ? 'bg-green-100 text-green-800' : '' }}
-                                    {{ $panel->status_badge_class === 'danger' ? 'bg-red-100 text-red-800' : '' }}
-                                    {{ $panel->status_badge_class === 'warning' ? 'bg-yellow-100 text-yellow-800' : '' }}
-                                    {{ $panel->status_badge_class === 'info' ? 'bg-blue-100 text-blue-800' : '' }}
-                                    {{ $panel->status_badge_class === 'secondary' ? 'bg-gray-100 text-gray-800' : '' }}">
-                                    {{ $panel->status_label }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <div class="relative inline-block text-left" x-data="{ open: false }">
-                                    <button @click="open = !open" 
-                                            class="text-gray-400 hover:text-gray-600 focus:outline-none">
-                                        <i class="fas fa-ellipsis-v"></i>
-                                    </button>
-                                    
-                                    <div x-show="open" 
-                                         @click.away="open = false"
-                                         x-cloak
-                                         x-transition
-                                         class="absolute right-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 {{ $isLastRows ? 'origin-bottom-right bottom-full mb-2' : 'origin-top-right top-full mt-2' }}">
-                                        <div class="py-1">
-                                            <a href="{{ route('admin.module.server-users.index', ['panel_id' => $panel->id]) }}"
-                                               class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                                <i class="fas fa-users mr-2"></i> Пользователи
+
+                                <!-- Panel Type -->
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-700">Тип:</span>
+                                    <span class="text-sm text-gray-900 font-medium">{{ $panel->panel_type_label }}</span>
+                                </div>
+
+                                <!-- Server -->
+                                <div class="flex items-start justify-between">
+                                    <span class="text-sm font-medium text-gray-700">Сервер:</span>
+                                    <div class="text-right">
+                                        @if($panel->server && isset($panel->server->id))
+                                            <a href="{{ route('admin.module.server.index', ['id' => $panel->server_id]) }}"
+                                               class="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                                               title="Перейти к серверу">
+                                                {{ $panel->server->name ?? 'N/A' }}
                                             </a>
-                                            <form action="{{ route('admin.module.panel.update-config', $panel) }}" method="POST" class="block">
-                                                @csrf
-                                                <button type="submit" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                                    <i class="fas fa-sync mr-2"></i> Обновить конфигурацию
+                                            @if(isset($panel->server->host) && $panel->server->host)
+                                                <div class="text-xs text-gray-500 mt-1 font-mono">
+                                                    {{ $panel->server->host }}
+                                                </div>
+                                            @endif
+                                        @else
+                                            <span class="text-sm text-red-600">Сервер удален</span>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <!-- Credentials -->
+                                <div class="pt-2 border-t border-gray-200">
+                                    <div class="space-y-2">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-medium text-gray-700">Логин:</span>
+                                            <div class="flex items-center space-x-2">
+                                                <span class="text-sm text-gray-900 font-mono">{{ $panel->panel_login }}</span>
+                                                <button onclick="copyToClipboard('{{ $panel->panel_login }}', 'Логин')" 
+                                                        class="text-gray-400 hover:text-indigo-600 transition-colors p-1 rounded hover:bg-gray-100"
+                                                        title="Копировать логин">
+                                                    <i class="fas fa-copy text-xs"></i>
                                                 </button>
-                                            </form>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-medium text-gray-700">Пароль:</span>
+                                            <div class="flex items-center space-x-2">
+                                                <span class="text-sm text-gray-900 font-mono text-xs break-all max-w-[120px] truncate" title="{{ $panel->panel_password }}">{{ $panel->panel_password }}</span>
+                                                <button onclick="copyToClipboard('{{ $panel->panel_password }}', 'Пароль')" 
+                                                        class="text-gray-400 hover:text-indigo-600 transition-colors p-1 rounded hover:bg-gray-100 flex-shrink-0"
+                                                        title="Копировать пароль">
+                                                    <i class="fas fa-copy text-xs"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card Footer -->
+                            @if($panel->panel_status !== Panel::PANEL_DELETED)
+                                <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg">
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <!-- Left Side: Navigation Actions -->
+                                        <div class="flex flex-col gap-2">
+                                            <a href="{{ route('admin.module.server-users.index', ['panel_id' => $panel->id]) }}"
+                                               class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors w-full">
+                                                <i class="fas fa-users mr-2"></i>
+                                                <span>Пользователи</span>
+                                            </a>
                                             @if($panel->panel_status === Panel::PANEL_CONFIGURED)
                                                 <a href="{{ route('admin.module.server-monitoring.index', ['panel_id' => $panel->id]) }}"
-                                                   class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                                    <i class="fas fa-chart-line mr-2"></i> Статистика
+                                                   class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors w-full">
+                                                    <i class="fas fa-chart-line mr-2"></i>
+                                                    <span>Статистика</span>
                                                 </a>
                                             @endif
+                                        </div>
+                                        
+                                        <!-- Right Side: Service Actions -->
+                                        <div class="flex flex-col gap-2">
+                                            <form action="{{ route('admin.module.panel.update-config', $panel) }}" method="POST" class="w-full">
+                                                @csrf
+                                                <button type="submit" class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors w-full">
+                                                    <i class="fas fa-sync mr-2"></i>
+                                                    <span>Обновить</span>
+                                                </button>
+                                            </form>
                                             <button type="button" 
                                                     onclick="deletePanel({{ $panel->id }})"
-                                                    class="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50">
-                                                <i class="fas fa-trash mr-2"></i> Удалить
+                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors w-full">
+                                                <i class="fas fa-trash mr-2"></i>
+                                                <span>Удалить</span>
                                             </button>
                                         </div>
                                     </div>
                                 </div>
-                            </td>
-                        </tr>
+                            @endif
+                        </div>
                     @endforeach
-                </x-admin.table>
+                </div>
 
                 <!-- Pagination -->
-                <x-admin.pagination-wrapper :paginator="$panels" />
+                <div class="mt-6">
+                    <x-admin.pagination-wrapper :paginator="$panels" />
+                </div>
             @endif
         </x-admin.card>
     </div>
@@ -219,20 +246,38 @@
 @endsection
 
 @push('js')
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.8/clipboard.min.js"></script>
     <script>
+        // Функция копирования в буфер обмена
+        function copyToClipboard(text, label) {
+            navigator.clipboard.writeText(text).then(function() {
+                toastr.success(label + ' скопирован в буфер обмена', '', {
+                    timeOut: 2000,
+                    positionClass: 'toast-top-right'
+                });
+            }).catch(function(err) {
+                // Fallback для старых браузеров
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    toastr.success(label + ' скопирован в буфер обмена', '', {
+                        timeOut: 2000,
+                        positionClass: 'toast-top-right'
+                    });
+                } catch (err) {
+                    toastr.error('Не удалось скопировать ' + label, '', {
+                        timeOut: 3000
+                    });
+                }
+                document.body.removeChild(textArea);
+            });
+        }
+
         $(document).ready(function () {
-            var clipboard = new ClipboardJS('[data-clipboard-text]');
-
-            clipboard.on('success', function (e) {
-                toastr.success('Скопировано в буфер обмена');
-                e.clearSelection();
-            });
-
-            clipboard.on('error', function (e) {
-                toastr.error('Ошибка копирования');
-            });
-
             function deletePanel(id) {
                 if (confirm('Вы уверены, что хотите удалить эту панель?')) {
                     $.ajax({
