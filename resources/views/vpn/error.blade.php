@@ -33,8 +33,8 @@
                     </div>
                 </div>
 
-                <!-- Action Buttons -->
-                <div class="space-y-3">
+                <!-- Action Button -->
+                <div>
                     <a href="{{ route('netcheck.index') }}" 
                        class="w-full inline-flex items-center justify-center px-4 py-3 border border-transparent rounded-lg text-base font-semibold text-white bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all shadow-lg hover:shadow-xl">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -42,16 +42,6 @@
                         </svg>
                         Проверить качество сети
                     </a>
-                    
-                    @if(app()->environment('local'))
-                        <a href="{{ route('vpn.config.show', ['token' => 'demo']) }}" 
-                           class="w-full inline-flex items-center justify-center px-4 py-3 border-2 border-gray-300 rounded-lg text-base font-semibold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all">
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                            Посмотреть конфигурацию (демо)
-                        </a>
-                    @endif
                 </div>
 
                 <!-- Help Text -->
