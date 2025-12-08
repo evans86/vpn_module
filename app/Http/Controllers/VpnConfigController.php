@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\ServerUser\ServerUser;
 use App\Repositories\KeyActivate\KeyActivateRepository;
+use App\Repositories\KeyActivateUser\KeyActivateUserRepository;
 use App\Services\External\MarzbanAPI;
 use App\Services\Panel\marzban\MarzbanService;
 use App\Services\Panel\PanelStrategy;
@@ -20,12 +21,18 @@ class VpnConfigController extends Controller
      * @var KeyActivateRepository
      */
     private KeyActivateRepository $keyActivateRepository;
+    /**
+     * @var KeyActivateUserRepository
+     */
+    private KeyActivateUserRepository $keyActivateUserRepository;
 
     public function __construct(
-        KeyActivateRepository $keyActivateRepository
+        KeyActivateRepository $keyActivateRepository,
+        KeyActivateUserRepository $keyActivateUserRepository
     )
     {
         $this->keyActivateRepository = $keyActivateRepository;
+        $this->keyActivateUserRepository = $keyActivateUserRepository;
     }
 
     public function show(string $key_activate_id): Response
@@ -63,10 +70,10 @@ class VpnConfigController extends Controller
             }
             
             // Загружаем отношения для KeyActivate
-            $keyActivate->load(['packSalesman', 'packSalesman.salesman', 'keyActivateUser']);
+            $keyActivate->load(['packSalesman', 'packSalesman.salesman']);
             
-            // Получаем связанный KeyActivateUser
-            $keyActivateUser = $keyActivate->keyActivateUser;
+            // Ищем KeyActivateUser напрямую через репозиторий по key_activate_id
+            $keyActivateUser = $this->keyActivateUserRepository->findByKeyActivateIdWithRelations($key_activate_id);
             
             // Если KeyActivateUser не найден
             if (!$keyActivateUser) {
@@ -84,8 +91,7 @@ class VpnConfigController extends Controller
                 ]);
             }
             
-            // Загружаем отношения для KeyActivateUser
-            $keyActivateUser->load(['serverUser']);
+            // Отношения уже загружены через findByKeyActivateIdWithRelations
             
             // Получаем информацию о пользователе сервера
             $serverUser = $keyActivateUser->serverUser;
