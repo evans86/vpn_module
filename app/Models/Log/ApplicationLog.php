@@ -165,13 +165,35 @@ class ApplicationLog extends Model
     }
 
     /**
-     * Получить список всех источников логов
+     * Получить список всех источников логов из БД
      *
      * @return array
      */
     public static function getSourcesList(): array
     {
         return static::distinct()->pluck('source')->toArray();
+    }
+
+    /**
+     * Получить список всех возможных источников логов в системе
+     *
+     * @return array
+     */
+    public static function getAllPossibleSources(): array
+    {
+        return [
+            'server' => 'Сервер',
+            'panel' => 'Панель',
+            'api' => 'API',
+            'telegram' => 'Telegram',
+            'cron' => 'Cron',
+            'vpn' => 'VPN',
+            'cloudflare' => 'Cloudflare',
+            'system' => 'Система',
+            'key' => 'Ключ',
+            'notification' => 'Уведомление',
+            'pack' => 'Пакет',
+        ];
     }
 
     /**

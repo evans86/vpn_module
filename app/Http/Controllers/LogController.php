@@ -46,10 +46,16 @@ class LogController extends Controller
             // Get logs with filters and pagination
             $logs = $this->logRepository->getPaginatedWithFilters($filters, 30);
 
-            // Get unique sources for filter with caching (увеличено до 5 минут)
-            $sources = cache()->remember('log_sources', 300, function () {
+            // Get all possible sources (not just from DB) for filter
+            $allPossibleSources = ApplicationLog::getAllPossibleSources();
+            
+            // Get unique sources from DB to merge with possible sources
+            $dbSources = cache()->remember('log_sources', 300, function () {
                 return $this->logRepository->getUniqueSources();
             });
+            
+            // Merge: use all possible sources, but also include any sources from DB that might not be in the list
+            $sources = collect($allPossibleSources)->keys()->merge($dbSources)->unique()->sort()->values();
 
             // Получаем статистику по уровням (кэшируем на 60 секунд)
             $stats = cache()->remember('log_stats_' . md5(json_encode($filters)), 60, function () use ($filters) {
@@ -69,6 +75,7 @@ class LogController extends Controller
             return response()->view('logs.index', [
                 'logs' => $logs,
                 'sources' => $sources,
+                'allPossibleSources' => $allPossibleSources,
                 'stats' => $stats,
                 'filters' => $filters
             ]);

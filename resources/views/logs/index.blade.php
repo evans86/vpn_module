@@ -110,8 +110,9 @@
                 <x-admin.filter-select 
                     name="source" 
                     label="Источник"
-                    :options="collect($sources)->mapWithKeys(function($source) {
-                        return [$source => $source];
+                    :options="collect($sources)->mapWithKeys(function($source) use ($allPossibleSources) {
+                        $label = $allPossibleSources[$source] ?? $source;
+                        return [$source => $label];
                     })->toArray()"
                     value="{{ request('source') }}"
                     placeholder="Все источники" />
