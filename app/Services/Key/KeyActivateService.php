@@ -192,14 +192,6 @@ class KeyActivateService
 
             $salesman = Salesman::query()->where('module_bot_id', $botModuleDto->id)->first();
 
-            if (!$salesman) {
-                // Логируем ошибку, но не прерываем процесс
-                $this->logger->error('Продавец не найден для модуля', [
-                    'module_bot_id' => $botModuleDto->id,
-                    'key_id' => $keyID
-                ]);
-            }
-
             $keyActivate = $this->keyActivateRepository->findById($keyID);
 
             if (!$keyActivate) {
@@ -210,10 +202,12 @@ class KeyActivateService
                 $keyActivate->module_salesman_id = $salesman->id;
                 $keyActivate->save();
             } else {
-                // Логируем, что ключ создан, но без привязки к продавцу
-                $this->logger->warning('Ключ создан без привязки к продавцу', [
+                // Логируем только один раз, что ключ создан без привязки к продавцу
+                // Это не критическая ошибка, так как процесс продолжается успешно
+                $this->logger->info('Ключ создан без привязки к продавцу (модуль не привязан к продавцу)', [
                     'key_id' => $keyID,
-                    'module_bot_id' => $botModuleDto->id
+                    'module_bot_id' => $botModuleDto->id,
+                    'source' => 'key'
                 ]);
             }
 
