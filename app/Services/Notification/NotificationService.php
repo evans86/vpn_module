@@ -54,7 +54,8 @@ class NotificationService
         } catch (\Exception $e) {
             Log::error('Error sending expiring keys notification', [
                 'pack_salesman_id' => $packSalesmanId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'notification'
             ]);
         }
     }
@@ -86,7 +87,8 @@ class NotificationService
             Log::error('Error sending key expiration notification', [
                 'user_tg_id' => $userTgId,
                 'key_id' => $keyId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'notification'
             ]);
         }
     }
@@ -120,7 +122,8 @@ class NotificationService
             Log::error('Error sending key activated notification', [
                 'salesman_tg_id' => $salesmanTgId,
                 'key_id' => $keyId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'notification'
             ]);
         }
     }
@@ -143,7 +146,8 @@ class NotificationService
             Log::error('Error sending key deactivated notification', [
                 'salesman_tg_id' => $salesmanTgId,
                 'key_id' => $keyId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'notification'
             ]);
         }
     }

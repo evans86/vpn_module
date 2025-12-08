@@ -46,14 +46,6 @@ class PackController extends Controller
 
             $packs = $this->packService->getAllPaginated($filters);
 
-            $this->logger->info('Просмотр списка пакетов', [
-                'source' => 'pack',
-                'action' => 'view',
-                'user_id' => auth()->id(),
-                'total_packs' => $packs->total(),
-                'filters' => $filters
-            ]);
-
             return view('module.pack.index', compact('packs', 'filters'));
         } catch (Exception $e) {
             $this->logger->error('Ошибка при загрузке списка пакетов', [

@@ -119,9 +119,11 @@ class VdsinaService
             return $server;
 
         } catch (Exception $e) {
-            Log::error('Failed to configure server', [
+            Log::critical('Failed to configure server - critical infrastructure failure', [
+                'server_id' => $server->id ?? null,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'server'
             ]);
             throw $e;
         }
@@ -133,7 +135,7 @@ class VdsinaService
     public function finishConfigure(int $server_id)
     {
         try {
-            Log::info('Starting server configuration', ['server_id' => $server_id]);
+            Log::info('Starting server configuration', ['server_id' => $server_id, 'source' => 'server']);
 
             $server = Server::query()->where('id', $server_id)->first();
             if (!$server) {
@@ -158,7 +160,7 @@ class VdsinaService
             $realPassword = $this->getServerPassword($server_id);
 
             if (!$realPassword) {
-                Log::warning('Could not retrieve password from VDSina, using temporary value');
+                Log::warning('Could not retrieve password from VDSina, using temporary value', ['source' => 'server']);
                 $realPassword = 'TEMPORARY_PASSWORD_' . time();
             }
 
@@ -169,7 +171,8 @@ class VdsinaService
             Log::info('Creating/updating DNS record', [
                 'server_id' => $server_id,
                 'name' => $serverName,
-                'ip' => $serverIp
+                'ip' => $serverIp,
+                'source' => 'server'
             ]);
 
             $cloudflare_service = new CloudflareService();
@@ -195,14 +198,16 @@ class VdsinaService
             Log::info('Server configuration completed with password', [
                 'server_id' => $server_id,
                 'provider_id' => $server->provider_id,
+                'source' => 'server',
                 'password_set' => $realPassword !== 'TEMPORARY_PASSWORD_' . time()
             ]);
 
         } catch (Exception $e) {
-            Log::error('Failed to configure server', [
+            Log::critical('Failed to configure server - critical infrastructure failure', [
                 'server_id' => $server_id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'server'
             ]);
 
             if (isset($server)) {
@@ -222,13 +227,14 @@ class VdsinaService
         try {
             $server = Server::query()->where('id', $server_id)->first();
             if (!$server || !$server->provider_id) {
-                Log::warning('Server not found or no provider_id', ['server_id' => $server_id]);
+                Log::error('Server not found or no provider_id', ['server_id' => $server_id, 'source' => 'server']);
                 return null;
             }
 
             Log::info('Getting server password from VDSina API', [
                 'server_id' => $server_id,
-                'provider_id' => $server->provider_id
+                'provider_id' => $server->provider_id,
+                'source' => 'server'
             ]);
 
             // Используем специальный эндпоинт для получения пароля
@@ -240,7 +246,8 @@ class VdsinaService
 
                 Log::info('Password retrieved successfully from VDSina', [
                     'server_id' => $server_id,
-                    'password_length' => strlen($password)
+                    'password_length' => strlen($password),
+                    'source' => 'server'
                 ]);
 
                 return $password;
@@ -248,13 +255,15 @@ class VdsinaService
 
             Log::warning('No password found in VDSina password response', [
                 'server_id' => $server_id,
-                'response_structure' => $passwordResponse
+                'response_structure' => $passwordResponse,
+                'source' => 'server'
             ]);
 
             return null;
 
         } catch (Exception $e) {
             Log::error('Failed to get server password from VDSina', [
+                'source' => 'server',
                 'server_id' => $server_id,
                 'error' => $e->getMessage()
             ]);
@@ -278,20 +287,22 @@ class VdsinaService
                 ->with(['location', 'panel'])
                 ->get();
 
-            Log::info('Checking status for VDSINA servers', ['count' => count($servers)]);
+            Log::info('Checking status for VDSINA servers', ['count' => count($servers), 'source' => 'server']);
 
             foreach ($servers as $server) {
                 try {
                     if (!$server->provider_id) {
                         Log::error('Server has no provider_id', [
-                            'server_id' => $server->id
+                            'server_id' => $server->id,
+                            'source' => 'server'
                         ]);
                         continue;
                     }
 
                     Log::info('Checking server status', [
                         'server_id' => $server->id,
-                        'provider_id' => $server->provider_id
+                        'provider_id' => $server->provider_id,
+                        'source' => 'server'
                     ]);
 
                     $status = $this->serverStatus($server->provider_id);
@@ -299,19 +310,22 @@ class VdsinaService
                     if ($status) {
                         Log::info('Server is ready for configuration', [
                             'server_id' => $server->id,
-                            'provider_id' => $server->provider_id
+                            'provider_id' => $server->provider_id,
+                            'source' => 'server'
                         ]);
 
                         $this->finishConfigure($server->id);
 
                         Log::info('Server configured successfully', [
                             'server_id' => $server->id,
-                            'provider_id' => $server->provider_id
+                            'provider_id' => $server->provider_id,
+                            'source' => 'server'
                         ]);
                     } else {
                         Log::info('Server not ready yet', [
                             'server_id' => $server->id,
-                            'provider_id' => $server->provider_id
+                            'provider_id' => $server->provider_id,
+                            'source' => 'server'
                         ]);
                     }
                 } catch (Exception $e) {
@@ -319,7 +333,8 @@ class VdsinaService
                         'server_id' => $server->id,
                         'provider_id' => $server->provider_id ?? 'unknown',
                         'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
+                        'trace' => $e->getTraceAsString(),
+                        'source' => 'server'
                     ]);
 
                     // Помечаем сервер как ошибочный
@@ -328,12 +343,11 @@ class VdsinaService
                 }
             }
 
-            Log::info('Finished checking VDSINA servers', ['count' => count($servers)]);
-
         } catch (Exception $e) {
             Log::error('Error in checkStatus', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'server'
             ]);
             throw $e;
         }
@@ -345,14 +359,13 @@ class VdsinaService
     public function serverStatus(int $provider_id): bool
     {
         try {
-            Log::info('Checking server status in VDSina', ['provider_id' => $provider_id]);
-
             $server = $this->vdsinaApi->getServerById($provider_id);
 
             if (!isset($server['data']['status'])) {
                 Log::error('Invalid server response from VDSina', [
                     'provider_id' => $provider_id,
-                    'response' => $server
+                    'response' => $server,
+                    'source' => 'server'
                 ]);
                 throw new RuntimeException('Invalid server response: status not found');
             }
@@ -360,7 +373,8 @@ class VdsinaService
             $external_status = $server['data']['status'];
             Log::info('Server status received from VDSina', [
                 'provider_id' => $provider_id,
-                'status' => $external_status
+                'status' => $external_status,
+                'source' => 'server'
             ]);
 
             switch ($external_status) {
@@ -371,12 +385,14 @@ class VdsinaService
                 default:
                     Log::error('Undefined server status from VDSina', [
                         'provider_id' => $provider_id,
-                        'status' => $external_status
+                        'status' => $external_status,
+                        'source' => 'server'
                     ]);
                     throw new DomainException('Undefined status: ' . $external_status);
             }
         } catch (Exception $e) {
             Log::error('Error checking server status in VDSina', [
+                'source' => 'server',
                 'provider_id' => $provider_id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -393,7 +409,8 @@ class VdsinaService
         try {
             Log::info('Starting server deletion', [
                 'server_id' => $server->id,
-                'provider_id' => $server->provider_id
+                'provider_id' => $server->provider_id,
+                'source' => 'server'
             ]);
 
             // Удаляем сервер у провайдера
@@ -401,11 +418,13 @@ class VdsinaService
                 try {
                     $this->vdsinaApi->deleteServer($server->provider_id);
                     Log::info('Server deleted from provider', [
+                        'source' => 'server',
                         'server_id' => $server->id,
                         'provider_id' => $server->provider_id
                     ]);
                 } catch (Exception $e) {
                     Log::warning('Failed to delete server from provider, continuing with local cleanup', [
+                        'source' => 'server',
                         'server_id' => $server->id,
                         'error' => $e->getMessage()
                     ]);
@@ -418,11 +437,13 @@ class VdsinaService
                     $cloudflare = new CloudflareService();
                     $cloudflare->deleteSubdomain($server->dns_record_id);
                     Log::info('DNS record deleted from Cloudflare', [
+                        'source' => 'server',
                         'server_id' => $server->id,
                         'dns_record_id' => $server->dns_record_id
                     ]);
                 } catch (Exception $e) {
                     Log::warning('Failed to delete DNS record from Cloudflare', [
+                        'source' => 'server',
                         'server_id' => $server->id,
                         'dns_record_id' => $server->dns_record_id,
                         'error' => $e->getMessage()
@@ -441,11 +462,13 @@ class VdsinaService
             $server->save();
 
             Log::info('Server and related records deleted successfully', [
+                'source' => 'server',
                 'server_id' => $server->id
             ]);
 
         } catch (Exception $e) {
             Log::error('Error deleting server', [
+                'source' => 'server',
                 'server_id' => $server->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()

@@ -26,7 +26,8 @@ class WebhookController extends Controller
             Log::info('Received webhook for father bot', [
                 'token' => substr($token, 0, 10) . '...',
                 'request_body' => $request->getContent(),
-                'headers' => $request->headers->all()
+                'headers' => $request->headers->all(),
+                'source' => 'telegram'
             ]);
 
             // Проверяем, что переданный токен совпадает с токеном из конфигурации
@@ -34,7 +35,8 @@ class WebhookController extends Controller
             if ($token !== $configToken) {
                 Log::error('Invalid bot token provided', [
                     'provided' => substr($token, 0, 10) . '...',
-                    'expected' => substr($configToken, 0, 10) . '...'
+                    'expected' => substr($configToken, 0, 10) . '...',
+                    'source' => 'telegram'
                 ]);
                 return response()->json(['status' => 'error', 'message' => 'Invalid token'], ResponseAlias::HTTP_FORBIDDEN);
             }
@@ -47,7 +49,8 @@ class WebhookController extends Controller
             Log::warning('!Error processing FATHER bot webhook!', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'request_body' => $request->getContent()
+                'request_body' => $request->getContent(),
+                'source' => 'telegram'
             ]);
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
         }
@@ -66,7 +69,8 @@ class WebhookController extends Controller
             Log::info('Received webhook for salesman bot', [
                 'token' => substr($token, 0, 10) . '...',
                 'request_body' => $request->getContent(),
-                'headers' => $request->headers->all()
+                'headers' => $request->headers->all(),
+                'source' => 'telegram'
             ]);
 
             $bot = new SalesmanBotController($token);
@@ -77,7 +81,8 @@ class WebhookController extends Controller
             Log::info('!Error processing salesman bot webhook!', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'request_body' => $request->getContent()
+                'request_body' => $request->getContent(),
+                'source' => 'telegram'
             ]);
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
         }

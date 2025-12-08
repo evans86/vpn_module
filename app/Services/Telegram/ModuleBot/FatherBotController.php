@@ -41,7 +41,8 @@ class FatherBotController extends AbstractTelegramBot
             if ($callbackQuery) {
                 Log::info('Вызов callback query', [
                     'data' => $callbackQuery->getData(),
-                    'from' => $callbackQuery->getFrom()->getId()
+                    'from' => $callbackQuery->getFrom()->getId(),
+                    'source' => 'telegram'
                 ]);
                 $this->processCallback($callbackQuery->getData());
                 return;
@@ -52,7 +53,8 @@ class FatherBotController extends AbstractTelegramBot
 
                 if (!$text) {
                     Log::warning('Received message without text', [
-                        'message' => $message
+                        'message' => $message,
+                        'source' => 'telegram'
                     ]);
                     return;
                 }
@@ -123,7 +125,8 @@ class FatherBotController extends AbstractTelegramBot
         } catch (Exception $e) {
             Log::error('Error processing update in FatherBot', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'telegram'
             ]);
             $this->sendErrorMessage();
         }
@@ -135,10 +138,10 @@ class FatherBotController extends AbstractTelegramBot
     private function processCallback($data): void
     {
         try {
-            Log::info('Processing callback data', ['data' => $data]);
+            Log::info('Processing callback data', ['data' => $data, 'source' => 'telegram']);
             $params = json_decode($data, true);
             if (!$params || !isset($params['action'])) {
-                Log::error('Invalid callback data', ['data' => $data]);
+                Log::error('Invalid callback data', ['data' => $data, 'source' => 'telegram']);
                 return;
             }
 
@@ -217,7 +220,8 @@ class FatherBotController extends AbstractTelegramBot
                 default:
                     Log::warning('Unknown callback action', [
                         'action' => $params['action'],
-                        'data' => $data
+                        'data' => $data,
+                        'source' => 'telegram'
                     ]);
             }
             // Всегда отвечаем на callback query чтобы убрать "loading"
@@ -225,7 +229,8 @@ class FatherBotController extends AbstractTelegramBot
 
         } catch (Exception $e) {
             Log::error('Process callback error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'telegram',
             ]);
             $this->sendErrorMessage();
         }
@@ -244,7 +249,7 @@ class FatherBotController extends AbstractTelegramBot
                 'show_alert' => $showAlert
             ]);
         } catch (\Exception $e) {
-            Log::error('Error answering callback query: ' . $e->getMessage());
+            Log::error('Error answering callback query: ' . $e->getMessage(), ['source' => 'telegram']);
         }
     }
 
@@ -289,7 +294,7 @@ class FatherBotController extends AbstractTelegramBot
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Auth initiation failed: ' . $e->getMessage());
+            Log::error('Auth initiation failed: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendMessage("❌ Ошибка: не удалось сформировать ссылку для входа");
         }
     }
@@ -355,7 +360,7 @@ class FatherBotController extends AbstractTelegramBot
             );
 
         } catch (\Exception $e) {
-            Log::error('Auth processing failed: ' . $e->getMessage());
+            Log::error('Auth processing failed: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendMessage("❌ Ошибка авторизации: " . $e->getMessage());
         }
     }
@@ -372,7 +377,7 @@ class FatherBotController extends AbstractTelegramBot
         $requiredFields = ['id', 'auth_date', 'hash'];
         foreach ($requiredFields as $field) {
             if (empty($data[$field])) {
-                Log::warning('Missing required field in Telegram auth data', ['field' => $field]);
+                Log::warning('Missing required field in Telegram auth data', ['field' => $field, 'source' => 'telegram']);
                 return null;
             }
         }
@@ -380,13 +385,13 @@ class FatherBotController extends AbstractTelegramBot
         // 2. Проверка временной метки (не старше 1 дня)
         $authDate = (int)$data['auth_date'];
         if (time() - $authDate > 86400) { // 24 часа
-            Log::warning('Expired Telegram auth data', ['auth_date' => $authDate]);
+            Log::warning('Expired Telegram auth data', ['auth_date' => $authDate, 'source' => 'telegram']);
             return null;
         }
 
         // 3. Верификация хэша (если есть все необходимые данные)
         if (!$this->verifyTelegramHash($data)) {
-            Log::warning('Invalid Telegram hash verification');
+            Log::warning('Invalid Telegram hash verification', ['source' => 'telegram']);
             return null;
         }
 
@@ -454,7 +459,7 @@ class FatherBotController extends AbstractTelegramBot
                 $panelStrategy = new PanelStrategy($key->keyActivateUser->serverUser->panel->panel);
                 $info = $panelStrategy->getSubscribeInfo($key->keyActivateUser->serverUser->panel->id, $key->keyActivateUser->serverUser->id);
             } catch (\Exception $e) {
-                Log::error('Failed to get subscription info for key ' . $key->id . ': ' . $e->getMessage());
+                Log::error('Failed to get subscription info for key ' . $key->id . ': ' . $e->getMessage(), ['source' => 'telegram']);
                 $info = ['used_traffic' => null];
             }
 
@@ -479,7 +484,7 @@ class FatherBotController extends AbstractTelegramBot
             $this->sendMessage($message);
 
         } catch (Exception $e) {
-            Log::error('Key info request error: ' . $e->getMessage());
+            Log::error('Key info request error: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -506,7 +511,7 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->sendMessage($message);
         } catch (Exception $e) {
-            Log::error('Initiate help text change error: ' . $e->getMessage());
+            Log::error('Initiate help text change error: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -541,7 +546,7 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->sendMessage("✅ Текст помощи успешно обновлен!\n\nПредпросмотр:\n\n" . $text);
         } catch (Exception $e) {
-            Log::error('Help text update error: ' . $e->getMessage());
+            Log::error('Help text update error: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -563,7 +568,7 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->sendMessage("✅ Текст помощи сброшен к стандартному");
         } catch (Exception $e) {
-            Log::error('Reset help text error: ' . $e->getMessage());
+            Log::error('Reset help text error: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -592,7 +597,7 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->sendMessage($message);
         } catch (Exception $e) {
-            Log::error('Initiate bot change error: ' . $e->getMessage());
+            Log::error('Initiate bot change error: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -775,7 +780,7 @@ class FatherBotController extends AbstractTelegramBot
                 $this->sendMessage($message, $keyboard);
             }
         } catch (\Exception $e) {
-            Log::error('Error in showPacksList: ' . $e->getMessage());
+            Log::error('Error in showPacksList: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -921,7 +926,7 @@ class FatherBotController extends AbstractTelegramBot
             $this->sendMessage($message, $keyboard);
 
         } catch (\Exception $e) {
-            Log::error('Error in showPackDetails: ' . $e->getMessage());
+            Log::error('Error in showPackDetails: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -1033,7 +1038,7 @@ class FatherBotController extends AbstractTelegramBot
             // Удаляем временный файл
             unlink($tempPath);
         } catch (\Exception $e) {
-            Log::error('Error in exportKeysToFile: ' . $e->getMessage());
+            Log::error('Error in exportKeysToFile: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -1101,7 +1106,7 @@ class FatherBotController extends AbstractTelegramBot
             // Удаляем временный файл
             unlink($tempPath);
         } catch (\Exception $e) {
-            Log::error('Error in exportUnactivatedKeysToFile: ' . $e->getMessage());
+            Log::error('Error in exportUnactivatedKeysToFile: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -1169,7 +1174,7 @@ class FatherBotController extends AbstractTelegramBot
             // Удаляем временный файл
             unlink($tempPath);
         } catch (\Exception $e) {
-            Log::error('Error in exportKeysWithTrafficToFile: ' . $e->getMessage());
+            Log::error('Error in exportKeysWithTrafficToFile: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -1237,7 +1242,7 @@ class FatherBotController extends AbstractTelegramBot
             // Удаляем временный файл
             unlink($tempPath);
         } catch (\Exception $e) {
-            Log::error('Error in exportUsedKeysToFile: ' . $e->getMessage());
+            Log::error('Error in exportUsedKeysToFile: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -1270,7 +1275,7 @@ class FatherBotController extends AbstractTelegramBot
                 $this->generateMenu($message);
             }
         } catch (\Exception $e) {
-            Log::error('Bot token validation error: ' . $e->getMessage());
+            Log::error('Bot token validation error: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendMessage("❌ Неверный токен бота. Пожалуйста, проверьте токен и попробуйте снова.");
 
             // Сбрасываем состояние при ошибке
@@ -1319,7 +1324,7 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->generateMenu($message);
         } catch (\Exception $e) {
-            Log::error('Start command error: ' . $e->getMessage());
+            Log::error('Start command error: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -1438,7 +1443,7 @@ class FatherBotController extends AbstractTelegramBot
                 $this->sendMessage($message, $keyboard);
             }
         } catch (\Exception $e) {
-            Log::error('Show bot info error: ' . $e->getMessage());
+            Log::error('Show bot info error: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -1469,7 +1474,7 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->sendMessage("✅ Бот успешно перезагружен, Webhook обновлен.");
         } catch (\Exception $e) {
-            Log::error('Bot reload error: ' . $e->getMessage());
+            Log::error('Bot reload error: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendMessage("❌ Ошибка при перезагрузке бота: " . $e->getMessage());
         }
     }
@@ -1492,7 +1497,7 @@ class FatherBotController extends AbstractTelegramBot
             $this->showBotInfo($messageId);
 
         } catch (Exception $e) {
-            Log::error('Toggle bot error: ' . $e->getMessage());
+            Log::error('Toggle bot error: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -1539,7 +1544,7 @@ class FatherBotController extends AbstractTelegramBot
 
             $this->sendMessage($message, $keyboard);
         } catch (\Exception $e) {
-            Log::error('Show profile error: ' . $e->getMessage());
+            Log::error('Show profile error: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }

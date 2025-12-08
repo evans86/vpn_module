@@ -49,7 +49,8 @@ abstract class AbstractTelegramBot
         } catch (Exception $e) {
             Log::error('Error initializing Telegram bot', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'telegram'
             ]);
             throw $e;
         }
@@ -63,7 +64,8 @@ abstract class AbstractTelegramBot
     {
         try {
             Log::info('Initializing bot', [
-                'update_raw' => request()->all()
+                'update_raw' => request()->all(),
+                'source' => 'telegram'
             ]);
 
             // Получаем update через Telegram SDK
@@ -83,14 +85,16 @@ abstract class AbstractTelegramBot
             Log::info('Bot initialized', [
                 'chat_id' => $this->chatId,
                 'username' => $this->username,
-                'first_name' => $this->firstName
+                'first_name' => $this->firstName,
+                'source' => 'telegram'
             ]);
 
             $this->processUpdate();
         } catch (Exception $e) {
             Log::info('!Error initializing bot!', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'telegram'
             ]);
             throw $e;
         }
@@ -115,7 +119,8 @@ abstract class AbstractTelegramBot
             Log::info('Setting webhook URL', [
                 'url' => $webhookUrl,
                 'bot_type' => $botType,
-                'token' => substr($token, 0, 10) . '...'
+                'token' => substr($token, 0, 10) . '...',
+                'source' => 'telegram'
             ]);
 
             // Добавляем задержку, чтобы избежать Too Many Requests
@@ -125,7 +130,8 @@ abstract class AbstractTelegramBot
 
             Log::info('Webhook set response', [
                 'response' => $response,
-                'bot_type' => $botType
+                'bot_type' => $botType,
+                'source' => 'telegram'
             ]);
 
             return (bool)$response;
@@ -134,6 +140,7 @@ abstract class AbstractTelegramBot
                 'error' => $e->getMessage(),
                 'bot_type' => $botType,
                 'token' => substr($token, 0, 10) . '...',
+                'source' => 'telegram',
                 'trace' => $e->getTraceAsString()
             ]);
             return false;
@@ -209,7 +216,8 @@ abstract class AbstractTelegramBot
             Log::error('Send message error: ' . $e->getMessage(), [
                 'exception' => $e,
                 'trace' => $e->getTraceAsString(),
-                'params' => $params ?? null
+                'params' => $params ?? null,
+                'source' => 'telegram'
             ]);
         }
     }
@@ -248,6 +256,7 @@ abstract class AbstractTelegramBot
             Log::error('Edit message error: ' . $e->getMessage(), [
                 'exception' => $e,
                 'trace' => $e->getTraceAsString(),
+                'source' => 'telegram',
                 'params' => $params ?? null
             ]);
         }

@@ -21,13 +21,14 @@ class SalesmanBotController extends AbstractTelegramBot
         // Находим продавца по токену
         $this->salesman = $this->salesmanRepository->findByToken($token);
         if (!$this->salesman) {
-            Log::error('Salesman not found for token: ' . substr($token, 0, 10) . '...');
+            Log::error('Salesman not found for token: ' . substr($token, 0, 10) . '...', ['source' => 'telegram']);
             throw new RuntimeException('Salesman not found');
         }
 
         Log::info('Initialized SalesmanBotController', [
             'salesman_id' => $this->salesman->id,
-            'token' => substr($token, 0, 10) . '...'
+            'token' => substr($token, 0, 10) . '...',
+            'source' => 'telegram'
         ]);
     }
 
@@ -115,7 +116,7 @@ class SalesmanBotController extends AbstractTelegramBot
                     }
             }
         } catch (\Exception $e) {
-            Log::error('Process update error: ' . $e->getMessage());
+            Log::error('Process update error: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -150,10 +151,11 @@ class SalesmanBotController extends AbstractTelegramBot
                     'telegram_id' => $telegramId,
                     'username' => $username,
                     'salesman_id' => $this->salesman->id,
+                    'source' => 'telegram'
                 ]);
             }
         } catch (\Exception $e) {
-            Log::error('Failed to ensure Telegram user exists: ' . $e->getMessage());
+            Log::error('Failed to ensure Telegram user exists: ' . $e->getMessage(), ['source' => 'telegram']);
         }
     }
 
@@ -169,7 +171,7 @@ class SalesmanBotController extends AbstractTelegramBot
 
             $this->generateMenu($message);
         } catch (\Exception $e) {
-            Log::error('Start command error: ' . $e->getMessage());
+            Log::error('Start command error: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -214,7 +216,7 @@ class SalesmanBotController extends AbstractTelegramBot
 
             $this->sendMessage("Пожалуйста, отправьте ваш ключ активации:");
         } catch (\Exception $e) {
-            Log::error('Activate action error: ' . $e->getMessage());
+            Log::error('Activate action error: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -232,7 +234,7 @@ class SalesmanBotController extends AbstractTelegramBot
             $this->setCurrentPage($chatId, $page);
 
             /**
-             * @var KeyActivate[] $activeKeys
+             * @var \Illuminate\Support\Collection $activeKeys
              */
             $activeKeys = $this->keyActivateRepository->findAllActiveKeysByUser(
                 $this->chatId,
@@ -268,7 +270,7 @@ class SalesmanBotController extends AbstractTelegramBot
                     if (!$key->keyActivateUser || 
                         !$key->keyActivateUser->serverUser || 
                         !$key->keyActivateUser->serverUser->panel) {
-                        Log::warning('Missing relationships for key', ['key_id' => $key->id]);
+                        Log::warning('Missing relationships for key', ['key_id' => $key->id, 'source' => 'telegram']);
                         $info = ['used_traffic' => null];
                     } else {
                         // Получаем информацию о трафике с панели
@@ -280,7 +282,7 @@ class SalesmanBotController extends AbstractTelegramBot
                     }
                 } catch (\Exception $e) {
                     // Логируем ошибку
-                    Log::error('Failed to get subscription info for key ' . $key->id . ': ' . $e->getMessage());
+                    Log::error('Failed to get subscription info for key ' . $key->id . ': ' . $e->getMessage(), ['source' => 'telegram']);
                     $info = ['used_traffic' => null];
                 }
 
@@ -346,7 +348,7 @@ class SalesmanBotController extends AbstractTelegramBot
             }
 
         } catch (\Exception $e) {
-            Log::error('Status action error: ' . $e->getMessage() . ' | User ID: ' . $this->chatId . ' | Page: ' . $page);
+            Log::error('Status action error: ' . $e->getMessage() . ' | User ID: ' . $this->chatId . ' | Page: ' . $page, ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -358,7 +360,7 @@ class SalesmanBotController extends AbstractTelegramBot
             $this->setCurrentPage($chatId, $page);
 
             /**
-             * @var KeyActivate[] $inactiveKeys
+             * @var \Illuminate\Support\Collection $inactiveKeys
              */
             $inactiveKeys = $this->keyActivateRepository->findAllActiveKeysByUser(
                 $this->chatId,
@@ -429,7 +431,7 @@ class SalesmanBotController extends AbstractTelegramBot
             }
 
         } catch (\Exception $e) {
-            Log::error('Inactive subscriptions action error: ' . $e->getMessage() . ' | User ID: ' . $this->chatId . ' | Page: ' . $page);
+            Log::error('Inactive subscriptions action error: ' . $e->getMessage() . ' | User ID: ' . $this->chatId . ' | Page: ' . $page, ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -480,7 +482,7 @@ class SalesmanBotController extends AbstractTelegramBot
             }
 
         } catch (\Exception $e) {
-            Log::error('Subscription details error: ' . $e->getMessage() . ' | User ID: ' . $this->chatId . ' | Key ID: ' . $keyId);
+            Log::error('Subscription details error: ' . $e->getMessage() . ' | User ID: ' . $this->chatId . ' | Key ID: ' . $keyId, ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }
@@ -529,7 +531,7 @@ class SalesmanBotController extends AbstractTelegramBot
             $key = $this->keyActivateRepository->findById($keyId);
             $botIdFromToken = explode(':', $key->packSalesman->salesman->token)[0];
 
-            Log::debug('IDSToken: ' . $botIdFromToken . ' | CHAT: ' . $this->telegram->getMe()->id);
+            // Token validation check
 
             if (!$key) {
                 $this->sendMessage("❌ Ключ не найден.\n\nПожалуйста, проверьте правильность введенного ключа.");
@@ -568,7 +570,7 @@ class SalesmanBotController extends AbstractTelegramBot
                 $this->sendMessage("❌ Не удалось активировать ключ.\n\nПожалуйста, попробуйте позже или обратитесь к @admin");
             }
         } catch (\Exception $e) {
-            Log::error('Key activation error: ' . $e->getMessage());
+            Log::error('Key activation error: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
         }
     }

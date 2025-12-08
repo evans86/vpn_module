@@ -94,6 +94,7 @@ class SavePanelMonthlyStatistics extends Command
             } catch (\Exception $e) {
                 $errors++;
                 Log::error('Failed to save monthly statistics for panel', [
+                    'source' => 'cron',
                     'panel_id' => $panel->id,
                     'year' => $year,
                     'month' => $month,

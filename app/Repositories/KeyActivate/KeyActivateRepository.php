@@ -63,6 +63,7 @@ class KeyActivateRepository extends BaseRepository
         Log::info('KeyActivate Query', [
             'filters' => $filters,
             'sql' => $query->toSql(),
+            'source' => 'key',
             'bindings' => $query->getBindings()
         ]);
 

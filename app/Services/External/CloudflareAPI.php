@@ -35,7 +35,8 @@ class CloudflareAPI
             return new Guzzle($key);
         } catch (Exception $e) {
             Log::error('Failed to create Cloudflare adapter', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'api'
             ]);
             throw new RuntimeException('Failed to initialize Cloudflare API: ' . $e->getMessage());
         }
@@ -64,20 +65,23 @@ class CloudflareAPI
                 'name' => $name,
                 'ip' => $ip,
                 'type' => self::RECORD_TYPE,
-                'zone_id' => self::ZONE_ID
+                'zone_id' => self::ZONE_ID,
+                'source' => 'api'
             ]);
 
             $DNSRecord = new DNS(self::getAdapter());
+            /** @var stdClass|bool $result */
             $result = $DNSRecord->addRecord(self::ZONE_ID, self::RECORD_TYPE, $name, $ip, 0, false);
 
-            if (!isset($result->id) || !isset($result->name)) {
+            if (!is_object($result) || !isset($result->id) || !isset($result->name)) {
                 throw new RuntimeException('Invalid response from Cloudflare API: missing id or name');
             }
 
             Log::info('DNS record created successfully', [
                 'name' => $name,
                 'ip' => $ip,
-                'record_id' => $result->id
+                'record_id' => $result->id,
+                'source' => 'api'
             ]);
 
             return $result;
@@ -86,7 +90,8 @@ class CloudflareAPI
                 'name' => $name,
                 'ip' => $ip,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'api'
             ]);
             throw new RuntimeException('Failed to create DNS record: ' . $e->getMessage());
         }
@@ -117,28 +122,29 @@ class CloudflareAPI
             Log::info('Updating DNS record', [
                 'record_id' => $record_id,
                 'name' => $name,
-                'ip' => $ip
+                'ip' => $ip,
+                'source' => 'api'
             ]);
 
+            // Cloudflare API не имеет прямого метода updateRecord, поэтому удаляем и создаем заново
             $DNSRecord = new DNS(self::getAdapter());
-            $result = $DNSRecord->updateRecord(
-                self::ZONE_ID,
-                $record_id,
-                [
-                    'type' => self::RECORD_TYPE,
-                    'name' => $name,
-                    'content' => $ip
-                ]
-            );
+            
+            // Удаляем старую запись
+            $DNSRecord->deleteRecord(self::ZONE_ID, $record_id);
+            
+            // Создаем новую запись с обновленными данными
+            /** @var stdClass|bool $result */
+            $result = $DNSRecord->addRecord(self::ZONE_ID, self::RECORD_TYPE, $name, $ip, 0, false);
 
-            if (!isset($result->id) || !isset($result->name)) {
+            if (!is_object($result) || !isset($result->id) || !isset($result->name)) {
                 throw new RuntimeException('Invalid response from Cloudflare API: missing id or name');
             }
 
             Log::info('DNS record updated successfully', [
                 'record_id' => $record_id,
                 'name' => $name,
-                'ip' => $ip
+                'ip' => $ip,
+                'source' => 'api'
             ]);
 
             return $result;
@@ -148,7 +154,8 @@ class CloudflareAPI
                 'name' => $name,
                 'ip' => $ip,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'api'
             ]);
             throw new RuntimeException('Failed to update DNS record: ' . $e->getMessage());
         }
@@ -169,14 +176,16 @@ class CloudflareAPI
 
         try {
             Log::info('Deleting DNS record', [
-                'record_id' => $dns_record_id
+                'record_id' => $dns_record_id,
+                'source' => 'api'
             ]);
 
             $DNSRecord = new DNS(self::getAdapter());
             $result = $DNSRecord->deleteRecord(self::ZONE_ID, $dns_record_id);
 
             Log::info('DNS record deleted successfully', [
-                'record_id' => $dns_record_id
+                'record_id' => $dns_record_id,
+                'source' => 'api'
             ]);
 
             return $result;
@@ -184,7 +193,8 @@ class CloudflareAPI
             Log::error('Failed to delete DNS record', [
                 'record_id' => $dns_record_id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'api'
             ]);
             throw new RuntimeException('Failed to delete DNS record: ' . $e->getMessage());
         }
@@ -199,19 +209,21 @@ class CloudflareAPI
     public function getRecords(): array
     {
         try {
-            Log::info('Getting DNS records list');
+            Log::info('Getting DNS records list', ['source' => 'api']);
 
             $DNSRecord = new DNS(self::getAdapter());
             $result = $DNSRecord->listRecords(self::ZONE_ID)->result;
 
             Log::info('DNS records retrieved successfully', [
-                'count' => count($result)
+                'count' => count($result),
+                'source' => 'api'
             ]);
 
             return $result;
         } catch (Exception $e) {
             Log::error('Failed to get DNS records', [
                 'error' => $e->getMessage(),
+                'source' => 'api',
                 'trace' => $e->getTraceAsString()
             ]);
             throw new RuntimeException('Failed to get DNS records: ' . $e->getMessage());

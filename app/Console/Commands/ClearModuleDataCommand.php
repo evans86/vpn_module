@@ -18,7 +18,7 @@ class ClearModuleDataCommand extends Command
     {
         if (!$this->option('force') && !$this->confirm('Вы уверены, что хотите обновить ВСЕ данные? Это действие необратимо!')) {
             $this->info('Операция отменена.');
-            return;
+            return Command::SUCCESS;
         }
 
         $this->info('Начинаем обновление данных...');
@@ -40,13 +40,14 @@ class ClearModuleDataCommand extends Command
 
             // Логируем успешное удаление
             Log::info('Выполнено обновление данных', [
-
+                'source' => 'cron'
             ]);
 
         } catch (\Exception $e) {
             $this->error('Произошла ошибка при удалении данных: ' . $e->getMessage());
 
             Log::error('Ошибка при очистке данных модуля', [
+                'source' => 'cron',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);

@@ -167,7 +167,8 @@ class MarzbanAPI
         } catch (Exception $e) {
             Log::error('Failed to create user', [
                 'user_id' => $userId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'api'
             ]);
             throw new Exception('Failed to create user: ' . $e->getMessage());
         }
@@ -329,8 +330,10 @@ class MarzbanAPI
 
             $response = $client->delete($action, $requestParam);
 
-            Log::warning('response MARZBAN DELETE НАконец-то дошли до удаления', [
-                'response' => $response
+            // User deletion completed
+            Log::info('User deletion completed', [
+                'response' => $response,
+                'source' => 'api'
             ]);
 
             $result = $response->getBody()->getContents();
@@ -370,7 +373,8 @@ class MarzbanAPI
 
         } catch (\Exception $e) {
             Log::error('Failed to get Marzban config', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'api'
             ]);
             return [];
         }
@@ -399,7 +403,8 @@ class MarzbanAPI
 
         } catch (\Exception $e) {
             Log::error('Failed to update Marzban config', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'api'
             ]);
             throw $e;
         }

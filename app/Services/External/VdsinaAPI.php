@@ -48,12 +48,6 @@ class VdsinaAPI
                 }
             }
 
-            Log::info('VDSina API Request', [
-                'action' => $action,
-                'method' => $method,
-                'data_keys' => array_keys($data)
-            ]);
-
             $client = new Client(['base_uri' => self::BASE_URL]);
             $response = $client->request($method, $action, $options);
 
@@ -62,7 +56,8 @@ class VdsinaAPI
 
             if (!is_array($data)) {
                 Log::error('Invalid JSON response from VDSina', [
-                    'response' => $result
+                    'response' => $result,
+                    'source' => 'api'
                 ]);
                 throw new RuntimeException('Invalid JSON response from VDSina');
             }
@@ -70,16 +65,12 @@ class VdsinaAPI
             if (!isset($data['status']) || $data['status'] !== 'ok') {
                 Log::error('API error response from VDSina', [
                     'response' => $data,
-                    'status_code' => $data['status_code'] ?? 'unknown'
+                    'status_code' => $data['status_code'] ?? 'unknown',
+                    'source' => 'api'
                 ]);
 
                 throw new RuntimeException('VDSina API error: ' . ($data['status_msg'] ?? 'Unknown error'));
             }
-
-            Log::info('VDSina API Response Success', [
-                'action' => $action,
-                'data_count' => isset($data['data']) ? (is_array($data['data']) ? count($data['data']) : 'single') : 'none'
-            ]);
 
             return $data;
 
@@ -91,7 +82,8 @@ class VdsinaAPI
                 'action' => $action,
                 'method' => $method,
                 'error' => $message,
-                'code' => $statusCode
+                'code' => $statusCode,
+                'source' => 'api'
             ]);
 
             if ($statusCode === 401) {
@@ -103,7 +95,8 @@ class VdsinaAPI
             Log::error('VDSina API general error', [
                 'action' => $action,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'api'
             ]);
             throw new RuntimeException('VDSina API request failed: ' . $e->getMessage());
         }
@@ -194,7 +187,7 @@ class VdsinaAPI
             'backup_auto' => $backup_auto
         ];
 
-        Log::info('Creating VDSina server', $serverData);
+        Log::info('Creating VDSina server', array_merge($serverData, ['source' => 'api']));
 
         return $this->makeRequest('server', 'POST', $serverData);
     }
@@ -205,7 +198,8 @@ class VdsinaAPI
     public function deleteServer(int $serverId): array
     {
         Log::info('Deleting VDSina server', [
-            'server_id' => $serverId
+            'server_id' => $serverId,
+            'source' => 'api'
         ]);
 
         return $this->makeRequest("server/{$serverId}", 'DELETE');
@@ -217,7 +211,8 @@ class VdsinaAPI
     public function deleteAllBackups(int $serverId): array
     {
         Log::info('Deleting VDSina server backups', [
-            'server_id' => $serverId
+            'server_id' => $serverId,
+            'source' => 'api'
         ]);
 
         return $this->makeRequest("server.schedule/{$serverId}", 'DELETE');
@@ -229,7 +224,8 @@ class VdsinaAPI
     public function rebootServer(int $serverId): array
     {
         Log::info('Rebooting VDSina server', [
-            'server_id' => $serverId
+            'server_id' => $serverId,
+            'source' => 'api'
         ]);
 
         return $this->makeRequest("server.reboot/{$serverId}", 'PUT');
@@ -241,7 +237,8 @@ class VdsinaAPI
     public function powerOffServer(int $serverId): array
     {
         Log::info('Powering off VDSina server', [
-            'server_id' => $serverId
+            'server_id' => $serverId,
+            'source' => 'api'
         ]);
 
         return $this->makeRequest("server.poweroff/{$serverId}", 'PUT');
@@ -253,7 +250,8 @@ class VdsinaAPI
     public function powerOnServer(int $serverId): array
     {
         Log::info('Powering on VDSina server', [
-            'server_id' => $serverId
+            'server_id' => $serverId,
+            'source' => 'api'
         ]);
 
         return $this->makeRequest("server.poweron/{$serverId}", 'PUT');
@@ -308,39 +306,22 @@ class VdsinaAPI
             // Если лимит не указан, используем значение из конфига (по умолчанию 32TB)
             if ($trafficLimit === null || $trafficLimit === 0) {
                 $trafficLimit = config('panel.server_traffic_limit', 32 * 1024 * 1024 * 1024 * 1024);
-                Log::debug('VDSINA API: Using default traffic limit from config', [
-                    'server_id' => $serverId,
-                    'limit' => $trafficLimit
-                ]);
             }
             
             // Если использованный трафик не указан, считаем что 0
             if ($usedTraffic === null) {
                 $usedTraffic = 0;
-                Log::debug('VDSINA API: No traffic usage data, assuming 0', ['server_id' => $serverId]);
             }
             
             $usedPercent = $trafficLimit > 0 ? (($usedTraffic / $trafficLimit) * 100) : 0;
             $remaining = max(0, $trafficLimit - $usedTraffic);
             $remainingPercent = $trafficLimit > 0 ? (($remaining / $trafficLimit) * 100) : 0;
             
-            Log::debug('VDSINA API: Server traffic data retrieved', [
-                'server_id' => $serverId,
-                'used_bytes' => $usedTraffic,
-                'limit_bytes' => $trafficLimit,
-                'used_percent' => round($usedPercent, 2)
-            ]);
-            
             $currentMonthBytes = isset($data['bandwidth']['current_month']) ? (int)$data['bandwidth']['current_month'] : null;
             $lastMonthBytes = isset($data['bandwidth']['last_month']) ? (int)$data['bandwidth']['last_month'] : null;
-            
-            Log::debug('VDSINA API: Bandwidth data from API', [
-                'server_id' => $serverId,
-                'bandwidth_raw' => $data['bandwidth'] ?? 'not set',
-                'current_month_raw' => $data['bandwidth']['current_month'] ?? 'not set',
-                'last_month_raw' => $data['bandwidth']['last_month'] ?? 'not set',
-                'current_month_processed' => $currentMonthBytes,
+            Log::info('Bandwidth data processed', [
                 'last_month_processed' => $lastMonthBytes,
+                'source' => 'api'
             ]);
             
             return [

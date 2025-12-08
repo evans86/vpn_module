@@ -64,6 +64,7 @@ class ExpiredKeysCommand extends Command
                     $this->info("Key {$key->id} status: {$key->getStatusText()}");
                 } catch (\Exception $e) {
                     Log::error('Error checking Key status', [
+                        'source' => 'cron',
                         'server_id' => $key->id,
                         'error' => $e->getMessage(),
                         'trace' => $e->getTraceAsString()
@@ -75,6 +76,7 @@ class ExpiredKeysCommand extends Command
 
         } catch (\Exception $e) {
             Log::error('Keys expired check command failed', [
+                'source' => 'cron',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);

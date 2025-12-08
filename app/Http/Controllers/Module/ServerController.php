@@ -93,13 +93,6 @@ class ServerController extends Controller
             // Добавляем параметр show_deleted в пагинацию
             $servers->appends($request->only(['show_deleted', 'name', 'ip', 'host', 'status']));
 
-            $this->logger->info('Просмотр списка серверов', [
-                'source' => 'server',
-                'action' => 'index',
-                'user_id' => auth()->id(),
-                'filters' => $request->only(['id', 'name', 'ip', 'host', 'status', 'server_id', 'show_deleted'])
-            ]);
-
             return view('module.server.index', compact('servers', 'showDeleted'));
         } catch (Exception $e) {
             $this->logger->error('Ошибка при просмотре списка серверов', [

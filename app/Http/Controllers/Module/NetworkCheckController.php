@@ -123,7 +123,7 @@ class NetworkCheckController extends Controller
                 'Cache-Control'       => 'no-store, no-cache, must-revalidate, private',
             ]);
         } catch (Throwable $e) {
-            Log::error('PDF generation failed', ['e' => $e]);
+            Log::error('PDF generation failed', ['e' => $e, 'source' => 'system']);
             return response()->json([
                 'ok' => false,
                 'message' => 'PDF generation failed',

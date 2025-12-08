@@ -4,6 +4,7 @@ namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -43,12 +44,13 @@ class Handler extends ExceptionHandler
         $this->reportable(function (Throwable $e) {
             // Дополнительное логирование критических ошибок
             if ($this->shouldReport($e)) {
-                \Log::error('Unhandled exception', [
+                Log::critical('Unhandled exception - system critical error', [
                     'exception' => get_class($e),
                     'message' => $e->getMessage(),
                     'file' => $e->getFile(),
                     'line' => $e->getLine(),
                     'trace' => $e->getTraceAsString(),
+                    'source' => 'system'
                 ]);
             }
         });
@@ -61,6 +63,7 @@ class Handler extends ExceptionHandler
                     'error' => 'Not Found'
                 ], 404);
             }
+            return null;
         });
 
         // Обработка HTTP исключений
@@ -71,6 +74,7 @@ class Handler extends ExceptionHandler
                     'error' => class_basename($e)
                 ], $e->getStatusCode());
             }
+            return null;
         });
     }
 }

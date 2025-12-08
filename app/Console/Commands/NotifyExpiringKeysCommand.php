@@ -13,16 +13,13 @@ class NotifyExpiringKeysCommand extends Command
     protected $signature = 'notify:expiring-keys';
     protected $description = 'Send notifications about expiring keys';
 
-    private KeyActivateService $keyActivateService;
     private NotificationService $notificationService;
 
     public function __construct(
-        KeyActivateService  $keyActivateService,
         NotificationService $notificationService
     )
     {
         parent::__construct();
-        $this->keyActivateService = $keyActivateService;
         $this->notificationService = $notificationService;
     }
 
@@ -33,6 +30,7 @@ class NotifyExpiringKeysCommand extends Command
             $this->notifyExpiringActiveKeys();
         } catch (\Exception $e) {
             Log::error('Error in NotifyExpiringKeysCommand', [
+                'source' => 'cron',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);

@@ -32,7 +32,8 @@ class TelegramNotificationService
 
             if (!$userTgId) {
                 Log::warning('Cannot send notification: user not found', [
-                    'key_id' => $keyActivate->id
+                    'key_id' => $keyActivate->id,
+                    'source' => 'notification'
                 ]);
                 return NotificationResult::userNotFound();
             }
@@ -48,7 +49,8 @@ class TelegramNotificationService
                 Log::warning('Cannot determine notification channel: no salesman assigned', [
                     'key_id' => $keyActivate->id,
                     'module_salesman_id' => $keyActivate->module_salesman_id,
-                    'pack_salesman_id' => $keyActivate->pack_salesman_id
+                    'pack_salesman_id' => $keyActivate->pack_salesman_id,
+                    'source' => 'notification'
                 ]);
                 return NotificationResult::technicalError('No salesman assigned');
             }
@@ -58,7 +60,8 @@ class TelegramNotificationService
                 'key_id' => $keyActivate->id,
                 'user_tg_id' => $keyActivate->user_tg_id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'notification'
             ]);
             return NotificationResult::technicalError($e->getMessage());
         }
@@ -72,7 +75,8 @@ class TelegramNotificationService
         try {
             if (is_null($salesman->telegram_id)) {
                 Log::warning('Cannot send notification: salesman telegram_id not found', [
-                    'salesman_id' => $salesman->id
+                    'salesman_id' => $salesman->id,
+                    'source' => 'notification'
                 ]);
                 return false;
             }
@@ -83,7 +87,8 @@ class TelegramNotificationService
         } catch (\Exception $e) {
             Log::error('Failed to send notification to salesman', [
                 'salesman_id' => $salesman->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'notification'
             ]);
             return false;
         }
@@ -107,7 +112,8 @@ class TelegramNotificationService
         if (!$salesman || !$salesman->botModule) {
             Log::warning('No module found for notification', [
                 'key_id' => $keyActivate->id,
-                'salesman_id' => $keyActivate->module_salesman_id
+                'salesman_id' => $keyActivate->module_salesman_id,
+                'source' => 'notification'
             ]);
             return NotificationResult::technicalError('No module found');
         }
@@ -137,7 +143,8 @@ class TelegramNotificationService
                     Log::warning('Chat not found - user may have blocked bot or deleted chat', [
                         'key_id' => $keyActivate->id,
                         'user_tg_id' => $userTgId,
-                        'error' => $errorMessage
+                        'error' => $errorMessage,
+                        'source' => 'notification'
                     ]);
                     return NotificationResult::blocked($errorMessage);
                 }
@@ -145,7 +152,8 @@ class TelegramNotificationService
                 Log::warning('Error in BottApi response', [
                     'key_id' => $keyActivate->id,
                     'user_tg_id' => $userTgId,
-                    'error' => $errorMessage
+                    'error' => $errorMessage,
+                    'source' => 'notification'
                 ]);
                 return NotificationResult::technicalError($errorMessage);
             }
@@ -154,7 +162,8 @@ class TelegramNotificationService
             Log::warning('Unexpected response format from BottApi::senModuleMessage', [
                 'key_id' => $keyActivate->id,
                 'user_tg_id' => $userTgId,
-                'response' => $result
+                'response' => $result,
+                'source' => 'notification'
             ]);
 
             return NotificationResult::technicalError('Unexpected response format');
@@ -175,7 +184,8 @@ class TelegramNotificationService
             Log::error('Failed to send via module', [
                 'key_id' => $keyActivate->id,
                 'user_tg_id' => $userTgId,
-                'error' => $errorMessage
+                'error' => $errorMessage,
+                'source' => 'notification'
             ]);
             return NotificationResult::technicalError($errorMessage);
         }
@@ -199,7 +209,8 @@ class TelegramNotificationService
         if (!$keyActivate->packSalesman) {
             Log::warning('No packSalesman found for notification', [
                 'key_id' => $keyActivate->id,
-                'pack_salesman_id' => $keyActivate->pack_salesman_id
+                'pack_salesman_id' => $keyActivate->pack_salesman_id,
+                'source' => 'notification'
             ]);
             return NotificationResult::technicalError('No packSalesman found');
         }
@@ -208,7 +219,8 @@ class TelegramNotificationService
         if (!$salesman || !$salesman->token) {
             Log::warning('No salesman bot found for notification', [
                 'key_id' => $keyActivate->id,
-                'salesman_id' => $keyActivate->packSalesman->salesman_id
+                'salesman_id' => $keyActivate->packSalesman->salesman_id,
+                'source' => 'notification'
             ]);
             return NotificationResult::technicalError('No salesman bot found');
         }
@@ -238,7 +250,8 @@ class TelegramNotificationService
                 Log::warning('Bot was blocked by user or chat not found', [
                     'key_id' => $keyActivate->id,
                     'user_tg_id' => $userTgId,
-                    'error' => $errorMessage
+                    'error' => $errorMessage,
+                    'source' => 'notification'
                 ]);
                 return NotificationResult::blocked($errorMessage);
             }
@@ -246,7 +259,8 @@ class TelegramNotificationService
             Log::error('Failed to send via salesman bot (technical error)', [
                 'key_id' => $keyActivate->id,
                 'user_tg_id' => $userTgId,
-                'error' => $errorMessage
+                'error' => $errorMessage,
+                'source' => 'notification'
             ]);
             return NotificationResult::technicalError($errorMessage);
 
@@ -254,7 +268,8 @@ class TelegramNotificationService
             Log::error('Failed to send via salesman bot (exception)', [
                 'key_id' => $keyActivate->id,
                 'user_tg_id' => $userTgId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'notification'
             ]);
             return NotificationResult::technicalError($e->getMessage());
         }
@@ -314,7 +329,8 @@ class TelegramNotificationService
                 strpos($errorMessage, 'Bad Request: chat not found') !== false) {
                 Log::warning('Chat not found - user may have blocked bot or deleted chat', [
                     'chat_id' => $chatId,
-                    'error' => $errorMessage
+                    'error' => $errorMessage,
+                    'source' => 'notification'
                 ]);
                 return false;
             }
@@ -322,14 +338,16 @@ class TelegramNotificationService
             if (strpos($errorMessage, 'bot was blocked') !== false) {
                 Log::warning('Bot was blocked by user', [
                     'chat_id' => $chatId,
-                    'error' => $errorMessage
+                    'error' => $errorMessage,
+                    'source' => 'notification'
                 ]);
                 return false;
             }
 
             Log::error('Failed to send via FatherBot', [
                 'chat_id' => $chatId,
-                'error' => $errorMessage
+                'error' => $errorMessage,
+                'source' => 'notification'
             ]);
             return false;
 

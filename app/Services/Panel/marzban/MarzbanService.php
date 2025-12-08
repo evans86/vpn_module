@@ -46,7 +46,7 @@ class MarzbanService
     public function create(int $server_id): void
     {
         try {
-            Log::info('Starting panel creation', ['server_id' => $server_id]);
+            Log::info('Starting panel creation', ['server_id' => $server_id, 'source' => 'panel']);
             /**
              * @var Server $server
              */
@@ -66,11 +66,12 @@ class MarzbanService
             // Проверка установки и создание панели
             $this->verifyAndCreatePanel($ssh_connect, $server);
 
-            Log::info('Panel created successfully', ['server_id' => $server_id]);
+            Log::info('Panel created successfully', ['server_id' => $server_id, 'source' => 'panel']);
         } catch (Exception $e) {
-            Log::error('Failed to create panel', [
+            Log::critical('Failed to create panel - critical infrastructure failure', [
                 'server_id' => $server_id,
                 'error' => $e->getMessage(),
+                'source' => 'panel',
                 'trace' => $e->getTraceAsString()
             ]);
             throw $e;
@@ -85,8 +86,6 @@ class MarzbanService
      */
     private function checkServerStatus(Server $server): bool
     {
-        Log::info('Checking server status', ['server_id' => $server->id]);
-
         // TODO: Добавить проверку статуса сервера через провайдера
         return $server->server_status == Server::SERVER_CONFIGURED;
     }
@@ -102,7 +101,7 @@ class MarzbanService
     private function installPanel(SSH2 $ssh, string $host): void
     {
         try {
-            Log::info('Installing panel', ['host' => $host]);
+            Log::info('Installing panel', ['host' => $host, 'source' => 'panel']);
 
             $commands = [
                 'wget ' . self::INSTALL_SCRIPT_URL,
@@ -112,7 +111,6 @@ class MarzbanService
 
             foreach ($commands as $command) {
                 $result = $ssh->exec($command);
-                Log::info('Command executed', ['command' => $command, 'result' => $result]);
 
                 if ($ssh->getExitStatus() !== 0) {
                     throw new RuntimeException("Command failed: $command");
@@ -121,7 +119,8 @@ class MarzbanService
         } catch (Exception $e) {
             Log::error('Panel installation failed', [
                 'host' => $host,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'panel'
             ]);
             throw new RuntimeException('Failed to install panel: ' . $e->getMessage());
         }
@@ -137,7 +136,7 @@ class MarzbanService
      */
     private function verifyAndCreatePanel(SSH2 $ssh, Server $server): void
     {
-        Log::info('Verifying panel installation', ['server_id' => $server->id]);
+        Log::info('Verifying panel installation', ['server_id' => $server->id, 'source' => 'panel']);
 
         if (str_contains($ssh->exec('stat ' . self::PANEL_ENV_PATH), 'No such file')) {
             throw new RuntimeException('Panel configuration file not found');
@@ -159,7 +158,7 @@ class MarzbanService
         $panel->panel_password = $config['SUDO_PASSWORD'];
         $panel->save();
 
-        Log::info('Panel record created', ['panel_id' => $panel->id]);
+        Log::info('Panel record created', ['panel_id' => $panel->id, 'source' => 'panel']);
     }
 
     /**
@@ -201,8 +200,6 @@ class MarzbanService
      */
     public function connectSshAdapter(ServerDto $serverDto): SSH2
     {
-        Log::info('Connecting to server via SSH', ['ip' => $serverDto->ip]);
-
         try {
             $ssh = new SSH2($serverDto->ip);
             $ssh->setTimeout(100000);
@@ -211,10 +208,10 @@ class MarzbanService
                 throw new RuntimeException('SSH authentication failed');
             }
 
-            Log::info('SSH connection established', ['ip' => $serverDto->ip]);
             return $ssh;
         } catch (Exception $e) {
             Log::error('SSH connection failed', [
+                'source' => 'panel',
                 'ip' => $serverDto->ip,
                 'error' => $e->getMessage()
             ]);
@@ -232,7 +229,7 @@ class MarzbanService
      */
     public function updateMarzbanToken(int $panel_id): Panel
     {
-        Log::info('Updating panel token', ['panel_id' => $panel_id]);
+        Log::info('Updating panel token', ['panel_id' => $panel_id, 'source' => 'panel']);
 
         try {
             /**
@@ -246,12 +243,13 @@ class MarzbanService
                 $panel->token_died_time = time() + \App\Constants\TimeConstants::PANEL_TOKEN_LIFETIME;
                 $panel->save();
 
-                Log::info('Panel token updated', ['panel_id' => $panel_id]);
+                Log::info('Panel token updated', ['panel_id' => $panel_id, 'source' => 'panel']);
             }
 
             return $panel;
         } catch (Exception $e) {
             Log::error('Failed to update panel token', [
+                'source' => 'panel',
                 'panel_id' => $panel_id,
                 'error' => $e->getMessage()
             ]);
@@ -265,8 +263,6 @@ class MarzbanService
      */
     public function getUserSubscribeInfo(int $panel_id, string $user_id): array
     {
-        Log::info('Checking user subscribe info', ['panel_id' => $panel_id, 'user_id' => $user_id]);
-
         try {
             /**
              * @var ServerUser $serverUser
@@ -276,8 +272,6 @@ class MarzbanService
             $marzbanApi = new MarzbanAPI($panel->api_address);
             $userData = $marzbanApi->getUser($panel->auth_token, $user_id);
 
-            Log::info('Checking USERDATA', ['data' => $userData]);
-
             $info = [
                 'used_traffic' => $userData['used_traffic'],
                 'data_limit' => $userData['data_limit'],
@@ -285,17 +279,10 @@ class MarzbanService
                 'status' => $userData['status'],
             ];
 
-            Log::info('Checking STATUS subscribe info', ['panel_id' => $panel_id, 'user_id' => $user_id, 'status' => $userData['status']]);
-
             if ($userData['status'] !== 'active') {
                 $serverUser->keyActivateUser->keyActivate->status = KeyActivate::EXPIRED;
                 $serverUser->keyActivateUser->keyActivate->save();
             }
-
-            Log::info('User subscribe info', [
-                'panel_id' => $panel_id,
-                'user_id' => $user_id
-            ]);
 
             return $info;
         } catch (Exception $e) {
@@ -319,7 +306,6 @@ class MarzbanService
 
             $panels->each(function ($panel) {
                 // Обработка каждой панели
-                Log::info('Panel ID: ' . $panel->id);
                 $panel = $this->updateMarzbanToken($panel->id);
                 $marzbanApi = new MarzbanAPI($panel->api_address);
                 $serverStats = $marzbanApi->getServerStats($panel->auth_token);
@@ -334,7 +320,8 @@ class MarzbanService
 
         } catch (Exception $e) {
             Log::error('Failed to check user status', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'panel'
             ]);
             throw $e;
         }
@@ -351,6 +338,7 @@ class MarzbanService
 
             Log::info('Starting cleanup of records older than one week.', [
                 'cleanup_date' => $oneWeekAgo,
+                'source' => 'panel'
             ]);
 
             // Удаляем все записи старше недели
@@ -363,11 +351,13 @@ class MarzbanService
 
             Log::info('Cleanup completed.', [
                 'cleanup_date' => $oneWeekAgo,
+                'source' => 'panel'
             ]);
         } catch (Exception $e) {
             // Логируем ошибку, если что-то пошло не так
             Log::error('Failed to clean old records.', [
                 'error' => $e->getMessage(),
+                'source' => 'panel'
             ]);
             throw $e;
         }
@@ -384,8 +374,6 @@ class MarzbanService
      */
     public function checkOnline(int $panel_id, string $user_id): array
     {
-        Log::info('Checking user online status', ['panel_id' => $panel_id, 'user_id' => $user_id]);
-
         try {
             $panel = $this->updateMarzbanToken($panel_id);
             $marzbanApi = new MarzbanAPI($panel->api_address);
@@ -393,12 +381,6 @@ class MarzbanService
 
             $timeOnline = strtotime($userData['online_at']);
             $status = $this->determineUserStatus($timeOnline);
-
-            Log::info('User status checked', [
-                'panel_id' => $panel_id,
-                'user_id' => $user_id,
-                'status' => $status['status']
-            ]);
 
             return $status;
         } catch (Exception $e) {
@@ -452,7 +434,7 @@ class MarzbanService
      */
     public function deleteServerUser(int $panel_id, string $user_id): void
     {
-        Log::info('Deleting server user', ['panel_id' => $panel_id, 'user_id' => $user_id]);
+        Log::info('Deleting server user', ['panel_id' => $panel_id, 'user_id' => $user_id, 'source' => 'panel']);
 
         try {
             $panel = $this->updateMarzbanToken($panel_id);
@@ -460,14 +442,14 @@ class MarzbanService
 
             // Удаляем пользователя из панели
             $deleteResult = $marzbanApi->deleteUser($panel->auth_token, $user_id);
-            Log::info('Marzban API delete result', ['result' => $deleteResult]);
+            Log::info('Marzban API delete result', ['result' => $deleteResult, 'source' => 'panel']);
 
             // Удаляем запись из БД
             $serverUser = ServerUser::query()->where('id', $user_id)->firstOrFail();
 
             // Удаляем связанную запись KeyActivateUser
             if ($serverUser->keyActivateUser) {
-                Log::info('Deleting KeyActivateUser', ['key_activate_user_id' => $serverUser->keyActivateUser->id]);
+                Log::info('Deleting KeyActivateUser', ['key_activate_user_id' => $serverUser->keyActivateUser->id, 'source' => 'panel']);
                 $serverUser->keyActivateUser->delete();
             }
 
@@ -477,13 +459,15 @@ class MarzbanService
 
             Log::info('Server user deleted successfully', [
                 'panel_id' => $panel_id,
-                'user_id' => $user_id
+                'user_id' => $user_id,
+                'source' => 'panel'
             ]);
         } catch (Exception $e) {
             Log::error('Failed to delete server user', [
                 'panel_id' => $panel_id,
                 'user_id' => $user_id,
                 'error' => $e->getMessage(),
+                'source' => 'panel',
                 'trace' => $e->getTraceAsString()
             ]);
             throw $e;
@@ -617,11 +601,12 @@ class MarzbanService
             $panel->panel_status = Panel::PANEL_CONFIGURED;
             $panel->save();
 
-            Log::info('4-protocol configuration updated successfully', ['panel_id' => $panel_id]);
+            Log::info('4-protocol configuration updated successfully', ['panel_id' => $panel_id, 'source' => 'panel']);
         } catch (Exception $e) {
             Log::error('Failed to update configuration', [
                 'panel_id' => $panel_id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'panel'
             ]);
             throw $e;
         }
@@ -645,6 +630,7 @@ class MarzbanService
                 'panel_id' => $panel_id,
                 'data_limit' => $data_limit,
                 'expire' => $expire,
+                'source' => 'panel',
                 'key_activate_id' => $key_activate_id
             ]);
 
@@ -700,20 +686,23 @@ class MarzbanService
 
             Log::info('Server user created successfully', [
                 'user_id' => $userId,
-                'panel_id' => $panel_id
+                'panel_id' => $panel_id,
+                'source' => 'panel'
             ]);
 
             return $serverUser;
         } catch (RuntimeException $r) {
             Log::error('Runtime error while creating server user', [
                 'error' => $r->getMessage(),
-                'trace' => $r->getTraceAsString()
+                'trace' => $r->getTraceAsString(),
+                'source' => 'panel'
             ]);
             throw $r;
         } catch (Exception $e) {
             Log::error('Error while creating server user', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'panel'
             ]);
             throw new RuntimeException($e->getMessage());
         }
@@ -781,6 +770,7 @@ class MarzbanService
                     'user_id' => $serverUser_id,
                     'old_panel' => $sourcePanel_id,
                     'new_panel' => $targetPanel_id,
+                    'source' => 'panel',
                     'old_keys' => $oldKeys,
                     'new_keys' => $newUser['subscription_url']
                 ]);
@@ -813,7 +803,8 @@ class MarzbanService
                     Log::error('Ошибка при отправке сообщения через FatherBot', [
                         'error' => $e->getMessage(),
                         'salesman_id' => $salesman->id,
-                        'telegram_id' => $salesman->telegram_id
+                        'telegram_id' => $salesman->telegram_id,
+                        'source' => 'panel'
                     ]);
                 }
 
@@ -827,6 +818,7 @@ class MarzbanService
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'source_panel' => $sourcePanel_id,
+                'source' => 'panel',
                 'target_panel' => $targetPanel_id,
                 'user_id' => $serverUser_id
             ]);

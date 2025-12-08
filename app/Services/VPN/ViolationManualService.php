@@ -177,7 +177,8 @@ class ViolationManualService
             Log::error('Ошибка замены ключа', [
                 'violation_id' => $violation->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'vpn'
             ]);
             throw $e;
         }
@@ -219,7 +220,8 @@ class ViolationManualService
         } catch (\Exception $e) {
             Log::error('Ошибка сброса счетчика', [
                 'violation_id' => $violation->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'vpn'
             ]);
             return false;
         }
@@ -289,7 +291,8 @@ class ViolationManualService
         } catch (\Exception $e) {
             Log::error('Ошибка отправки уведомления', [
                 'violation_id' => $violation->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'vpn'
             ]);
             return false;
         }
@@ -305,7 +308,8 @@ class ViolationManualService
         } catch (\Exception $e) {
             Log::error('Ошибка игнорирования нарушения', [
                 'violation_id' => $violation->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'vpn'
             ]);
             return false;
         }
@@ -364,7 +368,8 @@ class ViolationManualService
                     // Если не удалось получить информацию о трафике, используем исходный лимит
                     Log::warning('Не удалось получить информацию о трафике при перевыпуске ключа', [
                         'key_id' => $oldKey->id,
-                        'error' => $e->getMessage()
+                        'error' => $e->getMessage(),
+                        'source' => 'vpn'
                     ]);
                 }
 
@@ -376,7 +381,8 @@ class ViolationManualService
                     $newFinishAt = $currentTime + 86400; // Минимум 1 день
                     Log::warning('Оставшееся время меньше 1 дня, установлен минимум', [
                         'old_key_id' => $oldKey->id,
-                        'remaining_seconds' => $remainingTime
+                        'remaining_seconds' => $remainingTime,
+                        'source' => 'vpn'
                     ]);
                 }
 
@@ -429,7 +435,8 @@ class ViolationManualService
                         'old_key_id' => $oldKey->id,
                         'new_key_id' => $newKey->id,
                         'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
+                        'trace' => $e->getTraceAsString(),
+                        'source' => 'vpn'
                     ]);
                     // Не выбрасываем исключение - перевыпуск ключа должен продолжиться
                 }
@@ -464,7 +471,8 @@ class ViolationManualService
             Log::error('Ошибка перевыпуска ключа', [
                 'violation_id' => $violation->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'vpn'
             ]);
             throw $e;
         }
@@ -517,6 +525,7 @@ class ViolationManualService
         } catch (\Exception $e) {
             Log::error('Ошибка отправки уведомления о замене ключа', [
                 'violation_id' => $violation->id,
+                'source' => 'vpn',
                 'new_key_id' => $newKey->id,
                 'error' => $e->getMessage()
             ]);

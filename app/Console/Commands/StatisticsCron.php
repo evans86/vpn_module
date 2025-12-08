@@ -55,7 +55,8 @@ class StatisticsCron extends Command
         } catch (\Exception $e) {
             Log::error('Statistics command failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'cron'
             ]);
 
             $this->error("Command failed: {$e->getMessage()}");
@@ -63,7 +64,8 @@ class StatisticsCron extends Command
         } catch (GuzzleException $e) {
             Log::error('Statistics command failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'cron'
             ]);
         }
         return 0;

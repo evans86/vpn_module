@@ -89,13 +89,6 @@ class PanelController extends Controller
                     return [$server->id => $server->name . ' (' . $server->ip . ')'];
                 });
 
-            $this->logger->info('Просмотр списка панелей', [
-                'source' => 'panel',
-                'action' => 'index',
-                'user_id' => auth()->id(),
-                'filters' => $request->only(['server', 'panel_adress', 'status', 'panel_id', 'show_deleted'])
-            ]);
-
             return view('module.panel.index', compact('panels', 'servers', 'showDeleted'));
         } catch (Exception $e) {
             $this->logger->error('Ошибка при просмотре списка панелей', [

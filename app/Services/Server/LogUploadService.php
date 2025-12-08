@@ -43,7 +43,7 @@ class LogUploadService
     public function enableLogUpload(Server $server): array
     {
         try {
-            Log::info('Enabling log upload', ['server_id' => $server->id]);
+            Log::info('Enabling log upload', ['server_id' => $server->id, 'source' => 'server']);
 
             $serverDto = ServerFactory::fromEntity($server);
             $ssh = $this->marzbanService->connectSshAdapter($serverDto);
@@ -75,7 +75,7 @@ class LogUploadService
             $server->logs_upload_enabled = true;
             $server->save();
 
-            Log::info('Log upload enabled successfully', ['server_id' => $server->id]);
+            Log::info('Log upload enabled successfully', ['server_id' => $server->id, 'source' => 'server']);
 
             return [
                 'success' => true,
@@ -86,7 +86,8 @@ class LogUploadService
             Log::error('Failed to enable log upload', [
                 'server_id' => $server->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'server'
             ]);
 
             return [
@@ -105,7 +106,7 @@ class LogUploadService
     public function checkLogUploadStatus(Server $server): array
     {
         try {
-            Log::info('Checking log upload status', ['server_id' => $server->id]);
+            Log::info('Checking log upload status', ['server_id' => $server->id, 'source' => 'server']);
 
             $serverDto = ServerFactory::fromEntity($server);
             $ssh = $this->marzbanService->connectSshAdapter($serverDto);
@@ -128,7 +129,8 @@ class LogUploadService
 
             Log::info('Log upload status checked', [
                 'server_id' => $server->id,
-                'status' => $status
+                'status' => $status,
+                'source' => 'server'
             ]);
 
             return [
@@ -142,7 +144,8 @@ class LogUploadService
         } catch (Exception $e) {
             Log::error('Failed to check log upload status', [
                 'server_id' => $server->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'server'
             ]);
 
             return [
@@ -192,7 +195,7 @@ class LogUploadService
             throw new RuntimeException("Failed to upload script: $result");
         }
 
-        Log::info('Script uploaded to server successfully');
+        Log::info('Script uploaded to server successfully', ['source' => 'server']);
     }
 
     /**
@@ -207,7 +210,7 @@ class LogUploadService
         $command = 'bash /tmp/upload-logs-install.sh';
         $result = $ssh->exec($command);
         
-        Log::info('Installation script executed', ['output' => $result]);
+        Log::info('Installation script executed', ['output' => $result, 'source' => 'server']);
 
         if ($ssh->getExitStatus() !== 0) {
             throw new RuntimeException("Installation script failed: $result");

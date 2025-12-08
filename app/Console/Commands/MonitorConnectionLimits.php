@@ -32,13 +32,6 @@ class MonitorConnectionLimits extends Command
         $this->info("⏰ Time window: {$window} minutes");
         $this->info("⏳ Please wait...");
 
-        // Логируем начало проверки
-        Log::info('🚀 Запуск проверки нарушений лимитов подключений', [
-            'threshold' => $threshold,
-            'window_minutes' => $window,
-            'started_at' => now()->format('Y-m-d H:i:s')
-        ]);
-
         $startTime = microtime(true);
 
         try {
@@ -70,22 +63,20 @@ class MonitorConnectionLimits extends Command
                 }
             }
 
-            // Логируем успешное завершение проверки
-            Log::info('✅ Проверка нарушений лимитов подключений завершена', [
-                'threshold' => $threshold,
-                'window_minutes' => $window,
-                'violations_found' => $results['violations_found'],
-                'total_servers' => $results['total_servers'],
+            // Monitoring completed
+            Log::info('Monitoring completed', [
                 'servers_checked' => count($results['servers_checked']),
                 'errors_count' => count($results['errors'] ?? []),
                 'execution_time_seconds' => $totalTime,
-                'completed_at' => now()->format('Y-m-d H:i:s')
+                'completed_at' => now()->format('Y-m-d H:i:s'),
+                'source' => 'cron'
             ]);
 
         } catch (\Exception $e) {
             $totalTime = round(microtime(true) - $startTime, 2);
             
             Log::error('❌ Ошибка при проверке нарушений лимитов подключений', [
+                'source' => 'cron',
                 'threshold' => $threshold,
                 'window_minutes' => $window,
                 'error' => $e->getMessage(),

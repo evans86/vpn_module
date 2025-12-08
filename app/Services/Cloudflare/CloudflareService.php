@@ -38,7 +38,8 @@ class CloudflareService
 
             Log::info('Starting subdomain creation/update', [
                 'name' => $name,
-                'ip' => $ip
+                'ip' => $ip,
+                'source' => 'cloudflare'
             ]);
 
             // Проверяем существующие записи
@@ -50,7 +51,8 @@ class CloudflareService
                         Log::info('DNS record already exists with same IP', [
                             'name' => $record->name,
                             'ip' => $ip,
-                            'record_id' => $record->id
+                            'record_id' => $record->id,
+                            'source' => 'cloudflare'
                         ]);
                         return $record;
                     }
@@ -59,7 +61,8 @@ class CloudflareService
                         'name' => $record->name,
                         'old_ip' => $record->content,
                         'new_ip' => $ip,
-                        'record_id' => $record->id
+                        'record_id' => $record->id,
+                        'source' => 'cloudflare'
                     ]);
 
                     // Удаляем старую запись
@@ -75,7 +78,8 @@ class CloudflareService
                     Log::info('DNS record updated successfully', [
                         'name' => $result->name,
                         'ip' => $ip,
-                        'record_id' => $result->id
+                        'record_id' => $result->id,
+                        'source' => 'cloudflare'
                     ]);
 
                     return $result;
@@ -85,7 +89,8 @@ class CloudflareService
             // Если запись не найдена - создаем новую
             Log::info('Creating new DNS record', [
                 'name' => $name,
-                'ip' => $ip
+                'ip' => $ip,
+                'source' => 'cloudflare'
             ]);
 
             $result = $this->api->createDNSRecord($name, $ip);
@@ -97,7 +102,8 @@ class CloudflareService
             Log::info('DNS record created successfully', [
                 'name' => $result->name,
                 'ip' => $ip,
-                'record_id' => $result->id
+                'record_id' => $result->id,
+                'source' => 'cloudflare'
             ]);
 
             return $result;
@@ -107,7 +113,8 @@ class CloudflareService
                 'name' => $name,
                 'ip' => $ip,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'cloudflare'
             ]);
             throw $e;
         }
@@ -127,9 +134,7 @@ class CloudflareService
                 throw new RuntimeException('Record ID is required for deletion');
             }
 
-            Log::info('Checking DNS record existence', [
-                'record_id' => $recordId
-            ]);
+            // Checking DNS record existence
 
             // Проверяем существование записи
             $records = $this->api->getRecords();
@@ -143,26 +148,30 @@ class CloudflareService
 
             if (!$recordExists) {
                 Log::info('DNS record not found, skipping deletion', [
-                    'record_id' => $recordId
+                    'record_id' => $recordId,
+                    'source' => 'cloudflare'
                 ]);
                 return;
             }
 
             Log::info('Deleting DNS record', [
-                'record_id' => $recordId
+                'record_id' => $recordId,
+                'source' => 'cloudflare'
             ]);
 
             $this->api->deleteDNSRecord($recordId);
 
             Log::info('DNS record deleted successfully', [
-                'record_id' => $recordId
+                'record_id' => $recordId,
+                'source' => 'cloudflare'
             ]);
 
         } catch (Exception $e) {
             Log::error('Failed to delete DNS record', [
                 'record_id' => $recordId,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'cloudflare'
             ]);
             throw $e;
         }
@@ -176,16 +185,18 @@ class CloudflareService
     public function getAllRecords(): array
     {
         try {
-            Log::info('Getting all DNS records');
+            Log::info('Getting all DNS records', ['source' => 'cloudflare']);
             $records = $this->api->getRecords();
             Log::info('Retrieved DNS records successfully', [
-                'count' => count($records)
+                'count' => count($records),
+                'source' => 'cloudflare'
             ]);
             return $records;
         } catch (Exception $e) {
             Log::error('Failed to get DNS records', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'cloudflare'
             ]);
             return [];
         }

@@ -35,13 +35,6 @@ class ProcessViolationsCommand extends Command
         $autoResolveHours = (int) $this->option('auto-resolve-hours');
         $autoReissueThreshold = (int) $this->option('auto-reissue-threshold');
 
-        // Логируем начало обработки
-        Log::info('🚀 Запуск автоматической обработки нарушений', [
-            'auto_resolve_hours' => $autoResolveHours,
-            'auto_reissue_threshold' => $autoReissueThreshold,
-            'started_at' => now()->format('Y-m-d H:i:s')
-        ]);
-
         $stats = [
             'notifications_sent' => 0,
             'keys_reissued' => 0,
@@ -71,14 +64,14 @@ class ProcessViolationsCommand extends Command
             $this->line("   ✅ Автоматически решено: {$stats['auto_resolved']}");
             $this->line("   ❌ Ошибок: {$stats['errors']}");
 
-            // Логируем успешное завершение обработки
-            Log::info('✅ Автоматическая обработка нарушений завершена', [
-                'notifications_sent' => $stats['notifications_sent'],
+            // Processing completed
+            Log::info('Processing completed', [
                 'keys_reissued' => $stats['keys_reissued'],
                 'auto_resolved' => $stats['auto_resolved'],
                 'errors' => $stats['errors'],
                 'execution_time_seconds' => $executionTime,
-                'completed_at' => now()->format('Y-m-d H:i:s')
+                'completed_at' => now()->format('Y-m-d H:i:s'),
+                'source' => 'cron'
             ]);
 
             return 0;
@@ -87,6 +80,7 @@ class ProcessViolationsCommand extends Command
             $executionTime = round(microtime(true) - $startTime, 2);
             
             Log::error('❌ Ошибка при автоматической обработке нарушений', [
+                'source' => 'cron',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'execution_time_seconds' => $executionTime,
@@ -177,6 +171,7 @@ class ProcessViolationsCommand extends Command
 
             } catch (\Exception $e) {
                 Log::error('Ошибка обработки нарушения', [
+                    'source' => 'cron',
                     'violation_id' => $violation->id,
                     'error' => $e->getMessage()
                 ]);
@@ -210,6 +205,7 @@ class ProcessViolationsCommand extends Command
                 }
             } catch (\Exception $e) {
                 Log::error('Ошибка автоматического решения нарушения', [
+                    'source' => 'cron',
                     'violation_id' => $violation->id,
                     'error' => $e->getMessage()
                 ]);

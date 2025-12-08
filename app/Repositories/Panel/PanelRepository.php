@@ -77,7 +77,7 @@ class PanelRepository extends BaseRepository
             ->get();
 
         if ($panels->isEmpty()) {
-            Log::info('PANEL_SELECTION: No configured panels available');
+            Log::info('PANEL_SELECTION: No configured panels available', ['source' => 'panel']);
             return null;
         }
 
@@ -93,7 +93,7 @@ class PanelRepository extends BaseRepository
         // Если на всех панелях нет ключей, выбираем случайную панель
         if ($panelsWithKeyCount->sum('key_count') === 0) {
             $selectedPanel = $panels->random();
-            Log::info('PANEL_SELECTION [OLD]: Random selection - Panel ID: ' . $selectedPanel->id . ' (no keys on any panel)');
+            Log::info('PANEL_SELECTION [OLD]: Random selection - Panel ID: ' . $selectedPanel->id . ' (no keys on any panel)', ['source' => 'panel']);
             return $selectedPanel;
         }
 
@@ -101,7 +101,7 @@ class PanelRepository extends BaseRepository
         $selectedPanel = $panelsWithKeyCount->sortBy('key_count')->first()['panel'];
 
         Log::info('PANEL_SELECTION [OLD]: Least loaded panel - Panel ID: ' . $selectedPanel->id .
-            ', Keys: ' . $panelsWithKeyCount->sortBy('key_count')->first()['key_count']);
+            ', Keys: ' . $panelsWithKeyCount->sortBy('key_count')->first()['key_count'], ['source' => 'panel']);
 
         return $selectedPanel;
     }
@@ -201,7 +201,7 @@ class PanelRepository extends BaseRepository
             ->get();
 
         if ($panels->isEmpty()) {
-            Log::warning('PANEL_SELECTION: No available panels after filtering');
+            Log::warning('PANEL_SELECTION: No available panels after filtering', ['source' => 'panel']);
             return null;
         }
 
@@ -237,6 +237,7 @@ class PanelRepository extends BaseRepository
                 // Если статистика устарела или отсутствует - используем fallback
                 if ($panel && !$this->isStatsFresh($panel->id)) {
                     Log::warning('PANEL_SELECTION [INTELLIGENT]: Statistics outdated, falling back to balanced', [
+                        'source' => 'panel',
                         'panel_id' => $panel->id
                     ]);
                     return $this->getConfiguredMarzbanPanel();
@@ -391,7 +392,8 @@ class PanelRepository extends BaseRepository
         } catch (\Exception $e) {
             Log::error('Failed to compare strategies', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'source' => 'panel',
             ]);
             return ['error' => 'Ошибка при получении данных: ' . $e->getMessage()];
         }
@@ -412,10 +414,6 @@ class PanelRepository extends BaseRepository
             if (!$latestStats || !$this->isStatsFresh($panel->id)) {
                 // Fallback: используем количество пользователей из БД
                 $activeUsers = $this->getActiveUsersCount($panel->id);
-                Log::debug('PANEL_SELECTION: Using DB data for panel', [
-                    'panel_id' => $panel->id,
-                    'active_users' => $activeUsers
-                ]);
             } else {
                 $activeUsers = $this->getActiveUsersFromStats($panel->id);
             }
@@ -435,7 +433,7 @@ class PanelRepository extends BaseRepository
         });
 
         if ($scoredPanels->isEmpty()) {
-            Log::warning('PANEL_SELECTION [NEW]: No panels with valid scores');
+            Log::warning('PANEL_SELECTION [NEW]: No panels with valid scores', ['source' => 'panel']);
             return null;
         }
 
@@ -474,6 +472,7 @@ class PanelRepository extends BaseRepository
         Log::info($logMessage, [
             'panel_id' => $panel->id,
             'panel_address' => $panel->panel_adress,
+            'source' => 'panel',
             'score' => $score,
             'active_users' => $activeUsers,
             'total_users' => $this->getTotalUsersCount($panel->id),
@@ -751,7 +750,7 @@ class PanelRepository extends BaseRepository
         });
 
         if ($panelsWithTraffic->isEmpty()) {
-            Log::warning('PANEL_SELECTION [TRAFFIC]: No panels with valid traffic data, falling back to balanced');
+            Log::warning('PANEL_SELECTION [TRAFFIC]: No panels with valid traffic data, falling back to balanced', ['source' => 'panel']);
             return $this->getConfiguredMarzbanPanel();
         }
 
@@ -794,17 +793,12 @@ class PanelRepository extends BaseRepository
                 $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
                 $trafficData = $vdsinaApi->getServerTraffic((int)$panel->server->provider_id);
 
-                if ($trafficData) {
-                    Log::debug('PANEL_SELECTION [TRAFFIC]: Retrieved traffic data from VDSINA', [
-                        'server_id' => $panel->server->id,
-                        'provider_id' => $panel->server->provider_id,
-                        'used_percent' => $trafficData['used_percent']
-                    ]);
-                }
+                // Traffic data retrieved
 
                 return $trafficData;
             } catch (\Exception $e) {
                 Log::error('PANEL_SELECTION [TRAFFIC]: Failed to get traffic data', [
+                    'source' => 'panel',
                     'server_id' => $panel->server->id,
                     'provider_id' => $panel->server->provider_id,
                     'error' => $e->getMessage()
@@ -1055,22 +1049,7 @@ class PanelRepository extends BaseRepository
                 $isCurrentMonth = ($year == $currentYear && $month == $currentMonth);
                 $isLastMonth = ($year == $lastYear && $month == $lastMonth);
                 
-                // Отладочная информация только для текущего и прошлого месяца
-                if ($isCurrentMonth || $isLastMonth) {
-                    Log::debug('Historical statistics month check', [
-                        'panel_id' => $panel->id,
-                        'i' => $i,
-                        'year' => $year,
-                        'month' => $month,
-                        'month_name' => $monthDate->locale('ru')->monthName,
-                        'is_current' => $isCurrentMonth,
-                        'is_last' => $isLastMonth,
-                        'current_year' => $currentYear,
-                        'current_month' => $currentMonth,
-                        'last_year' => $lastYear,
-                        'last_month' => $lastMonth,
-                    ]);
-                }
+                // Processing month statistics
                 
                 $monthData = [
                     'year' => $year,
@@ -1114,14 +1093,7 @@ class PanelRepository extends BaseRepository
                                 $monthData['traffic_used_tb'] = round($trafficBytes / (1024 * 1024 * 1024 * 1024), 2);
                                 $monthData['traffic_used_percent'] = $limitBytes > 0 ? round(($trafficBytes / $limitBytes) * 100, 2) : 0;
                                 
-                                Log::debug('Last month traffic data retrieved from API', [
-                                    'panel_id' => $panel->id,
-                                    'year' => $year,
-                                    'month' => $month,
-                                    'traffic_bytes' => $trafficBytes,
-                                    'traffic_tb' => $monthData['traffic_used_tb'],
-                                    'traffic_percent' => $monthData['traffic_used_percent'],
-                                ]);
+                                // Last month traffic data retrieved from API
                             } else {
                                 // Если API не предоставляет данные, пытаемся получить из сохраненных
                                 $savedStats = PanelMonthlyStatistics::where('panel_id', $panel->id)
@@ -1135,15 +1107,10 @@ class PanelRepository extends BaseRepository
                                     $monthData['traffic_limit_tb'] = round($savedLimitBytes / (1024 * 1024 * 1024 * 1024), 2);
                                     $monthData['traffic_used_percent'] = $savedStats->traffic_used_percent ?? ($savedLimitBytes > 0 ? round(($savedStats->traffic_used_bytes / $savedLimitBytes) * 100, 2) : 0);
                                     
-                                    Log::debug('Last month traffic data retrieved from saved statistics', [
-                                        'panel_id' => $panel->id,
-                                        'year' => $year,
-                                        'month' => $month,
-                                        'traffic_tb' => $monthData['traffic_used_tb'],
-                                        'traffic_percent' => $monthData['traffic_used_percent'],
-                                    ]);
+                                    // Last month traffic data retrieved from saved statistics
                                 } else {
                                     Log::warning('Last month traffic data not available from API or saved statistics', [
+                                        'source' => 'panel',
                                         'panel_id' => $panel->id,
                                         'year' => $year,
                                         'month' => $month,
@@ -1207,6 +1174,7 @@ class PanelRepository extends BaseRepository
             Log::warning('Panel marked with error', [
                 'panel_id' => $panelId,
                 'error_message' => $errorMessage,
+                'source' => 'panel',
             ]);
         } else {
             // Если панель уже помечена, обновляем только сообщение об ошибке
@@ -1250,6 +1218,7 @@ class PanelRepository extends BaseRepository
             Log::info('Panel error cleared', [
                 'panel_id' => $panelId,
                 'resolution_type' => $resolutionType,
+                'source' => 'panel',
             ]);
         }
     }

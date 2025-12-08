@@ -36,6 +36,7 @@ class CheckServerStatusCommand extends Command
 
                 } catch (\Exception $e) {
                     Log::error('Error checking server status', [
+                        'source' => 'cron',
                         'server_id' => $server->id,
                         'provider' => $server->provider,
                         'error' => $e->getMessage(),
@@ -54,6 +55,7 @@ class CheckServerStatusCommand extends Command
 
         } catch (\Exception $e) {
             Log::error('Server status check command failed', [
+                'source' => 'cron',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);

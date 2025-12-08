@@ -97,7 +97,8 @@ class PanelSettingsController extends Controller
             Log::info('Panel selection strategy updated', [
                 'old_strategy' => $oldValue ?? 'intelligent',
                 'new_strategy' => $newValue,
-                'user_id' => auth()->id()
+                'user_id' => auth()->id(),
+                'source' => 'panel'
             ]);
 
             return redirect()->route('admin.module.panel-settings.index')
@@ -106,7 +107,8 @@ class PanelSettingsController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to update panel selection strategy', [
                 'error' => $e->getMessage(),
-                'user_id' => auth()->id()
+                'user_id' => auth()->id(),
+                'source' => 'panel'
             ]);
 
             return redirect()->route('admin.module.panel-settings.index')
@@ -128,7 +130,8 @@ class PanelSettingsController extends Controller
 
             Log::info('Panel error cleared by admin', [
                 'panel_id' => $validated['panel_id'],
-                'user_id' => auth()->id()
+                'user_id' => auth()->id(),
+                'source' => 'panel'
             ]);
 
             return redirect()->route('admin.module.panel-settings.index')
@@ -138,7 +141,8 @@ class PanelSettingsController extends Controller
             Log::error('Failed to clear panel error', [
                 'panel_id' => $validated['panel_id'],
                 'error' => $e->getMessage(),
-                'user_id' => auth()->id()
+                'user_id' => auth()->id(),
+                'source' => 'panel'
             ]);
 
             return redirect()->route('admin.module.panel-settings.index')

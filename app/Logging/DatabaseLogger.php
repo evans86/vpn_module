@@ -54,12 +54,8 @@ class DatabaseLogger
             ]);
         } catch (\Exception $e) {
             // В случае ошибки записи в БД, логируем в файл
-            Log::error('Failed to write to database log: ' . $e->getMessage(), [
-                'original_message' => $message,
-                'original_context' => $context,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            // Это критическая ошибка, т.к. система логирования не может работать
+            error_log('CRITICAL: Failed to write to database log: ' . $e->getMessage() . ' | Original message: ' . $message);
         }
     }
 
@@ -109,6 +105,18 @@ class DatabaseLogger
     public function debug(string $message, array $context = []): void
     {
         $this->write($message, $context, 'debug');
+    }
+
+    /**
+     * Log a critical message
+     *
+     * @param string $message
+     * @param array $context
+     * @return void
+     */
+    public function critical(string $message, array $context = []): void
+    {
+        $this->write($message, $context, 'critical');
     }
 }
 

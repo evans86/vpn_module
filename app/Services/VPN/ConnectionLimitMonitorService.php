@@ -223,7 +223,8 @@ class ConnectionLimitMonitorService
                                 } catch (\Exception $e) {
                                     Log::error('Ошибка автоматического перевыпуска ключа при 3-м нарушении', [
                                         'violation_id' => $existingViolation->id,
-                                        'error' => $e->getMessage()
+                                        'error' => $e->getMessage(),
+                                        'source' => 'vpn'
                                     ]);
                                 }
                             }
@@ -245,7 +246,8 @@ class ConnectionLimitMonitorService
                         // Логируем ошибку, но не прерываем процесс
                         Log::error('Ошибка отправки уведомления при фиксации нарушения', [
                             'violation_id' => $existingViolation->id,
-                            'error' => $e->getMessage()
+                            'error' => $e->getMessage(),
+                            'source' => 'vpn'
                         ]);
                     }
                 }
@@ -334,7 +336,8 @@ class ConnectionLimitMonitorService
         } catch (\Exception $e) {
             Log::error('Ошибка записи нарушения лимита подключений', [
                 'key_id' => $keyActivate->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'vpn'
             ]);
             throw $e;
         }
@@ -417,6 +420,7 @@ class ConnectionLimitMonitorService
 
         } catch (\Exception $e) {
             Log::error('Ошибка при разрешении нарушения', [
+                'source' => 'vpn',
                 'violation_id' => $violation->id,
                 'error' => $e->getMessage()
             ]);
@@ -444,6 +448,7 @@ class ConnectionLimitMonitorService
 
         } catch (\Exception $e) {
             Log::error('Ошибка при игнорировании нарушения', [
+                'source' => 'vpn',
                 'violation_id' => $violation->id,
                 'error' => $e->getMessage()
             ]);
@@ -470,6 +475,7 @@ class ConnectionLimitMonitorService
 
             if (!$keyActivate || !$keyActivate->user_tg_id) {
                 Log::warning('Cannot send violation notification: user not found', [
+                    'source' => 'vpn',
                     'violation_id' => $violation->id,
                     'key_activate_id' => $violation->key_activate_id
                 ]);
@@ -508,6 +514,7 @@ class ConnectionLimitMonitorService
 
         } catch (\Exception $e) {
             Log::error('Failed to send violation notification', [
+                'source' => 'vpn',
                 'violation_id' => $violation->id,
                 'error' => $e->getMessage()
             ]);
@@ -525,6 +532,7 @@ class ConnectionLimitMonitorService
 
             if (!$keyActivate) {
                 Log::warning('Cannot send notification to salesman: keyActivate not found', [
+                    'source' => 'vpn',
                     'violation_id' => $violation->id
                 ]);
                 return false;
@@ -540,6 +548,7 @@ class ConnectionLimitMonitorService
                 $salesman = $keyActivate->packSalesman->salesman;
                 } else {
                     Log::warning('Cannot send notification to salesman: packSalesman not found', [
+                        'source' => 'vpn',
                         'violation_id' => $violation->id,
                         'pack_salesman_id' => $keyActivate->pack_salesman_id
                     ]);
@@ -549,6 +558,7 @@ class ConnectionLimitMonitorService
 
             if (!$salesman || !$salesman->telegram_id) {
                 Log::warning('Cannot send notification to salesman: salesman not found or no telegram_id', [
+                    'source' => 'vpn',
                     'violation_id' => $violation->id,
                     'salesman_id' => $salesman ? $salesman->id : null
                 ]);
@@ -561,6 +571,7 @@ class ConnectionLimitMonitorService
 
         } catch (\Exception $e) {
             Log::error('Failed to send violation notification to salesman', [
+                'source' => 'vpn',
                 'violation_id' => $violation->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()

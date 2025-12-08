@@ -27,11 +27,6 @@ class ConnectionMonitorService
      */
     public function monitorFixed(int $threshold = 3, int $windowMinutes = 15): array
     {
-        Log::info('Начало мониторинга нарушений лимитов подключений', [
-            'threshold' => $threshold,
-            'window_minutes' => $windowMinutes
-        ]);
-
         $servers = Server::where('server_status', Server::SERVER_CONFIGURED)->get();
 
         $results = [
@@ -40,10 +35,6 @@ class ConnectionMonitorService
             'servers_checked' => [],
             'errors' => []
         ];
-
-        Log::info('Найдено серверов для проверки', [
-            'servers_count' => $results['total_servers']
-        ]);
 
         // Собираем данные со всех серверов сначала
         $allUsersData = [];
@@ -100,26 +91,15 @@ class ConnectionMonitorService
                 Log::error('Ошибка при получении данных с сервера', [
                     'server_host' => $server->host,
                     'server_id' => $server->id,
+                    'source' => 'vpn',
                     'error' => $e->getMessage()
                 ]);
             }
         }
 
-        Log::info('Сбор данных с серверов завершен', [
-            'total_users_found' => count($allUsersData),
-            'servers_checked' => count($results['servers_checked']),
-            'errors_count' => count($results['errors'])
-        ]);
-
         // Теперь анализируем собранные данные с новой логикой
         $violationsCount = $this->analyzeUsersWithNewLogic($allUsersData, $threshold);
         $results['violations_found'] = $violationsCount;
-
-        Log::info('Мониторинг нарушений лимитов подключений завершен', [
-            'violations_found' => $violationsCount,
-            'total_users_checked' => count($allUsersData),
-            'threshold' => $threshold
-        ]);
 
         return $results;
     }
@@ -215,13 +195,7 @@ class ConnectionMonitorService
             // Логируем только пользователей с множественными IP (потенциальные нарушения)
             if ($ipCount > $threshold) {
                 $usersWithMultipleIPs++;
-                Log::debug("User with multiple IPs detected", [
-                    'user_id' => $userId,
-                    'unique_ips_count' => $ipCount,
-                    'unique_networks_count' => $networkCount,
-                    'servers_count' => $serverCount,
-                    'ip_addresses' => $uniqueIps
-                ]);
+                // User with multiple IPs detected (potential violation)
             }
 
             // НОВАЯ ЛОГИКА: Нарушение только если разные сети И превышен порог
@@ -231,6 +205,7 @@ class ConnectionMonitorService
                 Log::warning("🚨 REAL VIOLATION FOUND", [
                     'user_id' => $userId,
                     'unique_ips_count' => $ipCount,
+                    'source' => 'vpn',
                     'unique_networks_count' => $networkCount,
                     'ip_addresses' => $uniqueIps,
                     'violation_reason' => 'Multiple networks detected'
@@ -275,11 +250,13 @@ class ConnectionMonitorService
 
         // Логируем анализ сетей только если обнаружено потенциальное нарушение
         if ($networkCount > 1) {
-            Log::debug("Network analysis - multiple networks detected", [
+            // Network analysis - multiple networks detected
+            Log::info('Network analysis - multiple networks detected', [
                 'ip_count' => $ipCount,
                 'network_count' => $networkCount,
                 'networks' => array_keys($networks),
-                'ips' => $ipAddresses
+                'ips' => $ipAddresses,
+                'source' => 'vpn'
             ]);
         }
 
@@ -324,9 +301,10 @@ class ConnectionMonitorService
             $keyActivate = $this->findKeyActivateByUserId($cleanUserId);
 
             if (!$keyActivate) {
-                Log::warning('KeyActivate not found for user', [
+                Log::error('KeyActivate not found for user', [
                     'original_user_id' => $userId,
-                    'clean_user_id' => $cleanUserId
+                    'clean_user_id' => $cleanUserId,
+                    'source' => 'vpn',
                 ]);
                 return false;
             }
@@ -337,6 +315,7 @@ class ConnectionMonitorService
                 Log::info('Пропущена фиксация нарушения - ключ не активен', [
                     'key_id' => $keyActivate->id,
                     'key_status' => $keyActivate->status,
+                    'source' => 'vpn',
                     'user_id' => $userId
                 ]);
                 return false;
@@ -354,6 +333,7 @@ class ConnectionMonitorService
             Log::info('New REAL violation recorded', [
                 'user_id' => $userId,
                 'unique_ips' => $ipCount,
+                'source' => 'vpn',
                 'ip_networks' => $this->getUniqueNetworks($ipAddresses)
             ]);
 
@@ -362,7 +342,8 @@ class ConnectionMonitorService
         } catch (\Exception $e) {
             Log::error('Failed to handle user violation', [
                 'user_id' => $userId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'source' => 'vpn'
             ]);
             return false;
         }

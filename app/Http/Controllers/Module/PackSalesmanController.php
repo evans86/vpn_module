@@ -73,13 +73,6 @@ class PackSalesmanController extends Controller
 
             $pack_salesmans = $query->latest()->paginate(10);
 
-            $this->logger->info('Просмотр списка связей пакет-продавец', [
-                'source' => 'pack_salesman',
-                'action' => 'view',
-                'user_id' => auth()->id(),
-                'page' => $pack_salesmans->currentPage()
-            ]);
-
             return view('module.pack-salesman.index', compact('pack_salesmans'));
         } catch (Exception $e) {
             $this->logger->error('Ошибка при загрузке списка связей пакет-продавец', [

@@ -71,15 +71,6 @@ class KeyActivateController extends Controller
 
             $activate_keys = $this->keyActivateService->getPaginatedWithPack($filters);
 
-            $this->logger->info('Просмотр списка активированных ключей', [
-                'source' => 'key_activate',
-                'action' => 'view_list',
-                'user_id' => auth()->id(),
-                'total_keys' => $activate_keys->total(),
-                'page' => $activate_keys->currentPage(),
-                'filters' => $filters
-            ]);
-
             return view('module.key-activate.index', [
                 'activate_keys' => $activate_keys,
                 'packs' => $packs,

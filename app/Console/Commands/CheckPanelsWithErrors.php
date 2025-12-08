@@ -63,6 +63,7 @@ class CheckPanelsWithErrors extends Command
                 $stillBroken++;
                 
                 Log::error('Error checking panel health', [
+                    'source' => 'cron',
                     'panel_id' => $panel->id,
                     'error' => $e->getMessage(),
                 ]);
@@ -116,6 +117,7 @@ class CheckPanelsWithErrors extends Command
             } catch (\Exception $e) {
                 // Игнорируем ошибки удаления тестового пользователя
                 Log::warning('Failed to delete test user', [
+                    'source' => 'cron',
                     'panel_id' => $panel->id,
                     'test_user_id' => $testUserId,
                     'error' => $e->getMessage(),
@@ -125,7 +127,8 @@ class CheckPanelsWithErrors extends Command
             return true;
 
         } catch (\Exception $e) {
-            Log::debug('Panel health check failed', [
+            Log::error('Panel health check failed', [
+                'source' => 'cron',
                 'panel_id' => $panel->id,
                 'error' => $e->getMessage(),
             ]);

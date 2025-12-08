@@ -436,6 +436,7 @@ class KeyActivateService
                         Log::warning('Panel marked with error and removed from rotation', [
                             'panel_id' => $panel->id,
                             'error' => $e->getMessage(),
+                            'source' => 'key',
                             'attempt' => $attempt + 1,
                         ]);
                     }
@@ -585,6 +586,7 @@ class KeyActivateService
                         Log::warning('Panel marked with error and removed from rotation', [
                             'panel_id' => $panel->id,
                             'error' => $e->getMessage(),
+                            'source' => 'key',
                             'attempt' => $attempt + 1,
                         ]);
                     }

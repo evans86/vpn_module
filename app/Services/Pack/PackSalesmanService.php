@@ -125,7 +125,7 @@ class PackSalesmanService
                         null
                     );
                 } catch (Exception $e) {
-                    Log::error("Ошибка при создании ключа: " . $e->getMessage());
+                    Log::error("Ошибка при создании ключа: " . $e->getMessage(), ['source' => 'pack']);
                     throw new RuntimeException('Ошибка при создании ключа: ' . $e->getMessage());
                 }
             }
@@ -148,26 +148,13 @@ class PackSalesmanService
                 Log::error('Ошибка при отправке сообщения через FatherBot', [
                     'error' => $e->getMessage(),
                     'salesman_id' => $salesman->id,
+                    'source' => 'pack',
                     'telegram_id' => $salesman->telegram_id
                 ]);
             }
 
         } catch (Exception $e) {
             throw new Exception('Ошибка при создании ключей: ' . $e->getMessage());
-        }
-    }
-
-    //проверка всех купленных пакетов по статусу
-    //@TODO
-    public function checkStatus()
-    {
-        /**
-         * @var PackSalesman[] $packs_salesman
-         */
-        $packs_salesman = PackSalesman::query()->where('status', PackSalesman::EXPIRED)->get();
-
-        foreach ($packs_salesman as $pack_salesman) {
-
         }
     }
 }
