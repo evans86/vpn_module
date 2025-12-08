@@ -23,7 +23,12 @@ class KeyActivateUserRepository extends BaseRepository
         /** @var KeyActivateUser|null */
         return $this->query()
             ->where('key_activate_id', $keyActivateId)
-            ->with(['serverUser', 'keyActivate'])
+            ->with([
+                'serverUser',
+                'keyActivate',
+                'keyActivate.packSalesman',
+                'keyActivate.packSalesman.salesman'
+            ])
             ->first();
     }
 }

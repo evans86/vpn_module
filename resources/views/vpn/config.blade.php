@@ -98,25 +98,33 @@
                         <div class="space-y-4">
                             <div>
                                 <span class="text-gray-600 font-medium block mb-2">Действует до:</span>
-                                <span class="text-lg font-bold text-gray-900">{{ date('d.m.Y H:i', $userInfo['expiration_date']) }}</span>
-                                @php
-                                    $days = $userInfo['days_remaining'];
-                                    $lastDigit = $days % 10;
-                                    $lastTwoDigits = $days % 100;
+                                @if($userInfo['expiration_date'])
+                                    <span class="text-lg font-bold text-gray-900">{{ date('d.m.Y H:i', $userInfo['expiration_date']) }}</span>
+                                    @php
+                                        $days = $userInfo['days_remaining'];
+                                        if ($days !== null) {
+                                            $lastDigit = $days % 10;
+                                            $lastTwoDigits = $days % 100;
 
-                                    if ($lastTwoDigits >= 11 && $lastTwoDigits <= 19) {
-                                        $daysText = 'дней';
-                                    } elseif ($lastDigit === 1) {
-                                        $daysText = 'день';
-                                    } elseif ($lastDigit >= 2 && $lastDigit <= 4) {
-                                        $daysText = 'дня';
-                                    } else {
-                                        $daysText = 'дней';
-                                    }
-                                @endphp
-                                <div class="text-sm text-indigo-600 font-medium mt-2">
-                                    ⏱ Осталось {{ $days }} {{ $daysText }}
-                                </div>
+                                            if ($lastTwoDigits >= 11 && $lastTwoDigits <= 19) {
+                                                $daysText = 'дней';
+                                            } elseif ($lastDigit === 1) {
+                                                $daysText = 'день';
+                                            } elseif ($lastDigit >= 2 && $lastDigit <= 4) {
+                                                $daysText = 'дня';
+                                            } else {
+                                                $daysText = 'дней';
+                                            }
+                                        }
+                                    @endphp
+                                    @if($userInfo['days_remaining'] !== null)
+                                        <div class="text-sm text-indigo-600 font-medium mt-2">
+                                            ⏱ Осталось {{ $userInfo['days_remaining'] }} {{ $daysText }}
+                                        </div>
+                                    @endif
+                                @else
+                                    <span class="text-lg font-bold text-gray-500">Не указано</span>
+                                @endif
                             </div>
                         </div>
                     </div>

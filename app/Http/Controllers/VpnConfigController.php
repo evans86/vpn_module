@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\KeyActivate\KeyActivate;
 use App\Models\ServerUser\ServerUser;
-use App\Repositories\KeyActivateUser\KeyActivateUserRepository;
-use App\Repositories\ServerUser\ServerUserRepository;
+use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Services\External\MarzbanAPI;
 use App\Services\Panel\marzban\MarzbanService;
 use App\Services\Panel\PanelStrategy;
@@ -17,21 +17,15 @@ use Symfony\Component\HttpFoundation\Response;
 class VpnConfigController extends Controller
 {
     /**
-     * @var KeyActivateUserRepository
+     * @var KeyActivateRepository
      */
-    private KeyActivateUserRepository $keyActivateUserRepository;
-    /**
-     * @var ServerUserRepository
-     */
-    private ServerUserRepository $serverUserRepository;
+    private KeyActivateRepository $keyActivateRepository;
 
     public function __construct(
-        KeyActivateUserRepository $keyActivateUserRepository,
-        ServerUserRepository      $serverUserRepository
+        KeyActivateRepository $keyActivateRepository
     )
     {
-        $this->keyActivateUserRepository = $keyActivateUserRepository;
-        $this->serverUserRepository = $serverUserRepository;
+        $this->keyActivateRepository = $keyActivateRepository;
     }
 
     public function show(string $key_activate_id): Response
@@ -42,11 +36,11 @@ class VpnConfigController extends Controller
                 return $this->showError();
             }
             
-            // Получаем запись key_activate_user с отношениями
-            $keyActivateUser = $this->keyActivateUserRepository->findByKeyActivateIdWithRelations($key_activate_id);
+            // Сначала находим KeyActivate по ID (это ID из таблицы key_activate)
+            $keyActivate = $this->keyActivateRepository->findById($key_activate_id);
             
-            // Если ключ не найден
-            if (!$keyActivateUser) {
+            // Если KeyActivate не найден
+            if (!$keyActivate) {
                 // Демо-страница ТОЛЬКО в локальной среде с включенным debug
                 // Во всех остальных случаях (включая продакшен) показываем ошибку
                 $showDemo = app()->environment('local') && config('app.debug', false);
@@ -68,8 +62,33 @@ class VpnConfigController extends Controller
                 ]);
             }
             
+            // Загружаем отношения для KeyActivate
+            $keyActivate->load(['packSalesman', 'packSalesman.salesman', 'keyActivateUser']);
+            
+            // Получаем связанный KeyActivateUser
+            $keyActivateUser = $keyActivate->keyActivateUser;
+            
+            // Если KeyActivateUser не найден
+            if (!$keyActivateUser) {
+                Log::warning('KeyActivateUser not found for KeyActivate', [
+                    'key_activate_id' => $key_activate_id,
+                    'source' => 'vpn'
+                ]);
+                
+                if (app()->environment('local') && config('app.debug', false)) {
+                    return $this->showDemoPage($key_activate_id);
+                }
+                
+                return response()->view('vpn.error', [
+                    'message' => 'Конфигурация не найдена. Пользователь сервера не привязан к ключу.'
+                ]);
+            }
+            
+            // Загружаем отношения для KeyActivateUser
+            $keyActivateUser->load(['serverUser']);
+            
             // Получаем информацию о пользователе сервера
-            $serverUser = $this->serverUserRepository->findById($keyActivateUser->server_user_id);
+            $serverUser = $keyActivateUser->serverUser;
 
             if (!$serverUser) {
                 throw new RuntimeException('Server user not found');
@@ -108,7 +127,7 @@ class VpnConfigController extends Controller
 
             // Если это браузер - показываем HTML страницу
             if ($isBrowser) {
-                return $this->showBrowserPage($keyActivateUser, $serverUser, $connectionKeys);
+                return $this->showBrowserPage($keyActivate, $keyActivateUser, $serverUser, $connectionKeys);
             }
 
             // По умолчанию для неизвестных клиентов возвращаем конфигурацию
@@ -300,22 +319,36 @@ class VpnConfigController extends Controller
     /**
      * Показывает страницу для браузера
      */
-    private function showBrowserPage($keyActivateUser, $serverUser, $connectionKeys): Response
+    private function showBrowserPage(KeyActivate $keyActivate, $keyActivateUser, $serverUser, $connectionKeys): Response
     {
         try {
+            // Обновляем модель из базы данных, чтобы получить актуальные данные
+            $keyActivate->refresh();
+            
+            // Загружаем отношения заново
+            $keyActivate->load(['packSalesman', 'packSalesman.salesman']);
+            
             $panel_strategy = new PanelStrategy($serverUser->panel->panel);
             $info = $panel_strategy->getSubscribeInfo($serverUser->panel->id, $serverUser->id);
 
-            Log::info('Panel info retrieved:', ['info' => $info]);
+            Log::info('Panel info retrieved:', ['info' => $info, 'source' => 'vpn']);
 
-            // Безопасное получение данных из связанных моделей
-            $keyActivate = $keyActivateUser->keyActivate ?? null;
+            // Получаем данные из KeyActivate (который уже загружен с отношениями)
             $packSalesman = $keyActivate->packSalesman ?? null;
             $salesman = $packSalesman->salesman ?? null;
 
             $finishAt = $keyActivate->finish_at ?? null;
+            
+            Log::info('KeyActivate data retrieved', [
+                'key_activate_id' => $keyActivate->id,
+                'finish_at' => $finishAt,
+                'finish_at_type' => gettype($finishAt),
+                'finish_at_value' => $finishAt,
+                'source' => 'vpn'
+            ]);
+            
             $daysRemaining = null;
-            if ($finishAt) {
+            if ($finishAt && $finishAt > 0) {
                 $daysRemaining = ceil(($finishAt - time()) / \App\Constants\TimeConstants::SECONDS_IN_DAY);
             }
 
