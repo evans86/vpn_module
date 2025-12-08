@@ -44,6 +44,12 @@ class PanelController extends Controller
         try {
             $query = Panel::query()->with(['server', 'server.location']);
 
+            // По умолчанию скрываем удаленные панели, если не указан параметр show_deleted
+            $showDeleted = $request->boolean('show_deleted', false);
+            if (!$showDeleted) {
+                $query->where('panel_status', '!=', Panel::PANEL_DELETED);
+            }
+
             // Если передан panel_id, показываем только эту панель
             if ($request->filled('panel_id')) {
                 $query->where('id', $request->panel_id);
@@ -70,6 +76,9 @@ class PanelController extends Controller
 
             $panels = $query->orderBy('id', 'desc')
                 ->paginate(config('app.items_per_page', 30));
+            
+            // Добавляем параметр show_deleted в пагинацию
+            $panels->appends($request->only(['show_deleted', 'server', 'panel_adress', 'status', 'panel_id']));
 
             // Получаем список серверов для формы создания панели
             $servers = Server::where('server_status', Server::SERVER_CONFIGURED)
@@ -84,10 +93,10 @@ class PanelController extends Controller
                 'source' => 'panel',
                 'action' => 'index',
                 'user_id' => auth()->id(),
-                'filters' => $request->only(['server', 'panel_adress', 'status', 'panel_id'])
+                'filters' => $request->only(['server', 'panel_adress', 'status', 'panel_id', 'show_deleted'])
             ]);
 
-            return view('module.panel.index', compact('panels', 'servers'));
+            return view('module.panel.index', compact('panels', 'servers', 'showDeleted'));
         } catch (Exception $e) {
             $this->logger->error('Ошибка при просмотре списка панелей', [
                 'source' => 'panel',

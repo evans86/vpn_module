@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Module;
 use App\Http\Controllers\Controller;
 use App\Models\Server\Server;
 use App\Services\Server\ServerStrategy;
+use App\Services\Server\LogUploadService;
 use App\Repositories\Server\ServerRepository;
 use App\Logging\DatabaseLogger;
 use Exception;
@@ -27,14 +28,20 @@ class ServerController extends Controller
      * @var DatabaseLogger
      */
     private DatabaseLogger $logger;
+    /**
+     * @var LogUploadService
+     */
+    private LogUploadService $logUploadService;
 
     public function __construct(
         ServerRepository $serverRepository,
-        DatabaseLogger   $logger
+        DatabaseLogger   $logger,
+        LogUploadService $logUploadService
     )
     {
         $this->serverRepository = $serverRepository;
         $this->logger = $logger;
+        $this->logUploadService = $logUploadService;
     }
 
     /**
@@ -47,6 +54,12 @@ class ServerController extends Controller
     {
         try {
             $query = Server::query()->with(['panel', 'location']);
+
+            // По умолчанию скрываем удаленные серверы, если не указан параметр show_deleted
+            $showDeleted = $request->boolean('show_deleted', false);
+            if (!$showDeleted) {
+                $query->where('server_status', '!=', Server::SERVER_DELETED);
+            }
 
             // Фильтрация по конкретному серверу
             if ($request->filled('server_id')) {
@@ -76,15 +89,18 @@ class ServerController extends Controller
 
             $servers = $query->orderBy('id', 'desc')
                 ->paginate(config('app.items_per_page', 30));
+            
+            // Добавляем параметр show_deleted в пагинацию
+            $servers->appends($request->only(['show_deleted', 'name', 'ip', 'host', 'status']));
 
             $this->logger->info('Просмотр списка серверов', [
                 'source' => 'server',
                 'action' => 'index',
                 'user_id' => auth()->id(),
-                'filters' => $request->only(['id', 'name', 'ip', 'host', 'status', 'server_id'])
+                'filters' => $request->only(['id', 'name', 'ip', 'host', 'status', 'server_id', 'show_deleted'])
             ]);
 
-            return view('module.server.index', compact('servers'));
+            return view('module.server.index', compact('servers', 'showDeleted'));
         } catch (Exception $e) {
             $this->logger->error('Ошибка при просмотре списка серверов', [
                 'source' => 'server',
@@ -280,5 +296,96 @@ class ServerController extends Controller
             'status' => $server->server_status,
             'message' => $server->status_label
         ]);
+    }
+
+    /**
+     * Включить выгрузку логов на сервере
+     *
+     * @param Server $server
+     * @return JsonResponse
+     */
+    public function enableLogUpload(Server $server): JsonResponse
+    {
+        try {
+            $this->logger->info('Enabling log upload', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'server_id' => $server->id
+            ]);
+
+            $result = $this->logUploadService->enableLogUpload($server);
+
+            if ($result['success']) {
+                $this->logger->info('Log upload enabled successfully', [
+                    'source' => 'server',
+                    'user_id' => auth()->id(),
+                    'server_id' => $server->id
+                ]);
+            } else {
+                $this->logger->error('Failed to enable log upload', [
+                    'source' => 'server',
+                    'user_id' => auth()->id(),
+                    'server_id' => $server->id,
+                    'error' => $result['message']
+                ]);
+            }
+
+            return response()->json($result, $result['success'] ? 200 : 400);
+
+        } catch (Exception $e) {
+            $this->logger->error('Error enabling log upload', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Ошибка при включении выгрузки логов: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Проверить статус выгрузки логов на сервере
+     *
+     * @param Server $server
+     * @return JsonResponse
+     */
+    public function checkLogUploadStatus(Server $server): JsonResponse
+    {
+        try {
+            $this->logger->info('Checking log upload status', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'server_id' => $server->id
+            ]);
+
+            $result = $this->logUploadService->checkLogUploadStatus($server);
+
+            return response()->json($result, $result['success'] ? 200 : 400);
+
+        } catch (Exception $e) {
+            $this->logger->error('Error checking log upload status', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Ошибка при проверке статуса выгрузки логов: ' . $e->getMessage(),
+                'status' => [
+                    'installed' => false,
+                    'cron_configured' => false,
+                    'enabled_in_db' => (bool)$server->logs_upload_enabled,
+                    'active' => false
+                ]
+            ], 500);
+        }
     }
 }

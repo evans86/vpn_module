@@ -126,6 +126,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::put('/{server}', [ServerController::class, 'update'])->name('update');
                 Route::delete('/{server}', [ServerController::class, 'destroy'])->name('destroy');
                 Route::post('/{server}/toggle-status', [ServerController::class, 'toggleStatus'])->name('toggle-status');
+                Route::post('/{server}/enable-log-upload', [ServerController::class, 'enableLogUpload'])->name('enable-log-upload');
+                Route::get('/{server}/check-log-upload-status', [ServerController::class, 'checkLogUploadStatus'])->name('check-log-upload-status');
             });
 
             // Панели

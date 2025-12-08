@@ -11,12 +11,31 @@
     <div class="space-y-6">
         <x-admin.card title="Список панелей">
             <x-slot name="tools">
-                <button type="button" 
-                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                        onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createPanelModal' } }))">
-                    <i class="fas fa-plus mr-2"></i>
-                    Добавить панель
-                </button>
+                <div class="flex items-center space-x-3">
+                    @php
+                        $currentParams = request()->except(['page', 'show_deleted']);
+                        $showDeletedParam = isset($showDeleted) && $showDeleted;
+                    @endphp
+                    @if($showDeletedParam)
+                        <a href="{{ route('admin.module.panel.index', $currentParams) }}" 
+                           class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            <i class="fas fa-eye-slash mr-2"></i>
+                            Скрыть удаленные
+                        </a>
+                    @else
+                        <a href="{{ route('admin.module.panel.index', array_merge($currentParams, ['show_deleted' => 1])) }}" 
+                           class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            <i class="fas fa-eye mr-2"></i>
+                            Показать скрытые
+                        </a>
+                    @endif
+                    <button type="button" 
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createPanelModal' } }))">
+                        <i class="fas fa-plus mr-2"></i>
+                        Добавить панель
+                    </button>
+                </div>
             </x-slot>
 
             <!-- Filters -->
@@ -62,7 +81,7 @@
                             // Если записей больше 3, последние 3 открываются сверху
                             $isLastRows = $totalPanels <= 3 || $currentIndex > ($totalPanels - 3);
                         @endphp
-                        <tr class="hover:bg-gray-50">
+                        <tr class="hover:bg-gray-50 {{ $panel->panel_status === Panel::PANEL_DELETED ? 'opacity-60 bg-gray-100' : '' }}">
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                 {{ $panel->id }}
                             </td>

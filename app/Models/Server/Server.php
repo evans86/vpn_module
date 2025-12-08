@@ -43,7 +43,8 @@ class Server extends Model
         'provider',
         'location_id',
         'server_status',
-        'is_free'
+        'is_free',
+        'logs_upload_enabled'
     ];
 
     // Провайдеры серверов

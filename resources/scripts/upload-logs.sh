@@ -40,7 +40,7 @@ COMBINED_LOG="/tmp/marzban-combined-${YESTERDAY}.log"
 COMBINED_GZ="/var/lib/marzban/marzban-${YESTERDAY}-${IP}.log.gz"
 
 # Путь к S3 бакету (используется переменная из установочного скрипта)
-# S3_BUCKET уже определен выше
+# S3_BUCKET уже определен в начале скрипта
 
 # Проверяем существование обоих логов
 if [[ -f "$ACCESS_LOG" || -f "$ERROR_LOG" ]]; then

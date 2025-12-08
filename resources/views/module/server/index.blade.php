@@ -11,12 +11,31 @@
     <div class="space-y-6">
         <x-admin.card title="Список серверов">
             <x-slot name="tools">
-                <button type="button" 
-                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                        onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createServerModal' } }))">
-                    <i class="fas fa-plus mr-2"></i>
-                    Добавить сервер
-                </button>
+                <div class="flex items-center space-x-3">
+                    @php
+                        $currentParams = request()->except(['page', 'show_deleted']);
+                        $showDeletedParam = isset($showDeleted) && $showDeleted;
+                    @endphp
+                    @if($showDeletedParam)
+                        <a href="{{ route('admin.module.server.index', $currentParams) }}" 
+                           class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            <i class="fas fa-eye-slash mr-2"></i>
+                            Скрыть удаленные
+                        </a>
+                    @else
+                        <a href="{{ route('admin.module.server.index', array_merge($currentParams, ['show_deleted' => 1])) }}" 
+                           class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            <i class="fas fa-eye mr-2"></i>
+                            Показать скрытые
+                        </a>
+                    @endif
+                    <button type="button" 
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createServerModal' } }))">
+                        <i class="fas fa-plus mr-2"></i>
+                        Добавить сервер
+                    </button>
+                </div>
             </x-slot>
 
             <!-- Filters -->
@@ -61,7 +80,7 @@
                     </x-slot>
                 </x-admin.empty-state>
             @else
-                <x-admin.table :headers="['#', 'Название', 'IP', 'Логин', 'Пароль', 'Хост', 'Локация', 'Статус', 'Действия']">
+                <x-admin.table :headers="['#', 'Название', 'IP', 'Логин', 'Пароль', 'Хост', 'Локация', 'Статус', 'Выгрузка логов', 'Действия']">
                     @php
                         $totalServers = $servers->count();
                         $currentIndex = 0;
@@ -73,7 +92,7 @@
                             // Если записей больше 3, последние 3 открываются сверху
                             $isLastRows = $totalServers <= 3 || $currentIndex > ($totalServers - 3);
                         @endphp
-                        <tr class="hover:bg-gray-50">
+                        <tr class="hover:bg-gray-50 {{ $server->server_status === Server::SERVER_DELETED ? 'opacity-60 bg-gray-100' : '' }}">
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                 {{ $server->id }}
                             </td>
@@ -111,6 +130,17 @@
                                     {{ $server->status_label }}
                                 </span>
                             </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                @if($server->logs_upload_enabled)
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800" title="Выгрузка логов активна">
+                                        <i class="fas fa-check-circle mr-1"></i> Включена
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800" title="Выгрузка логов не настроена">
+                                        <i class="fas fa-times-circle mr-1"></i> Выключена
+                                    </span>
+                                @endif
+                            </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 @if($server->server_status !== Server::SERVER_DELETED)
                                     <div class="relative inline-block text-left" x-data="{ open: false }">
@@ -123,7 +153,7 @@
                                              @click.away="open = false"
                                              x-cloak
                                              x-transition
-                                             class="absolute right-0 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 {{ $isLastRows ? 'origin-bottom-right bottom-full mb-2' : 'origin-top-right top-full mt-2' }}">
+                                             class="absolute right-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 {{ $isLastRows ? 'origin-bottom-right bottom-full mb-2' : 'origin-top-right top-full mt-2' }}">
                                             <div class="py-1">
                                                 @if($server->panel)
                                                     <a href="{{ route('admin.module.panel.index', ['panel_id' => $server->panel->id]) }}" 
@@ -135,6 +165,16 @@
                                                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                                     <i class="fas fa-users mr-2"></i> Пользователи
                                                 </a>
+                                                <div class="border-t border-gray-100 my-1"></div>
+                                                <button onclick="enableLogUpload({{ $server->id }})"
+                                                        class="block w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50">
+                                                    <i class="fas fa-upload mr-2"></i> Включить выгрузку логов
+                                                </button>
+                                                <button onclick="checkLogUploadStatus({{ $server->id }})"
+                                                        class="block w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50">
+                                                    <i class="fas fa-check-circle mr-2"></i> Проверить выгрузку логов
+                                                </button>
+                                                <div class="border-t border-gray-100 my-1"></div>
                                                 <button onclick="deleteServer({{ $server->id }})"
                                                         class="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50">
                                                     <i class="fas fa-trash mr-2"></i> Удалить
@@ -278,6 +318,90 @@
                     });
                 });
             });
+
+            // Включить выгрузку логов
+            function enableLogUpload(id) {
+                if (!confirm('Включить выгрузку логов на этом сервере? Это может занять некоторое время.')) {
+                    return;
+                }
+
+                $.ajax({
+                    url: '{{ route('admin.module.server.enable-log-upload', ['server' => ':id']) }}'.replace(':id', id),
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}'
+                    },
+                    beforeSend: function() {
+                        toastr.info('Настройка выгрузки логов...', 'Пожалуйста, подождите');
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            toastr.success(response.message || 'Выгрузка логов успешно включена');
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1500);
+                        } else {
+                            toastr.error(response.message || 'Ошибка при включении выгрузки логов');
+                        }
+                    },
+                    error: function (xhr) {
+                        let errorMessage = 'Произошла ошибка при включении выгрузки логов';
+                        if (xhr.responseJSON) {
+                            errorMessage = xhr.responseJSON.message || errorMessage;
+                        }
+                        toastr.error(errorMessage);
+                    }
+                });
+            }
+
+            // Проверить статус выгрузки логов
+            function checkLogUploadStatus(id) {
+                $.ajax({
+                    url: '{{ route('admin.module.server.check-log-upload-status', ['server' => ':id']) }}'.replace(':id', id),
+                    method: 'GET',
+                    beforeSend: function() {
+                        toastr.info('Проверка статуса выгрузки логов...', 'Пожалуйста, подождите');
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            let status = response.status;
+                            let message = response.message || 'Статус проверен';
+                            
+                            let details = [];
+                            details.push('Установлен: ' + (status.installed ? '✓ Да' : '✗ Нет'));
+                            details.push('Cron настроен: ' + (status.cron_configured ? '✓ Да' : '✗ Нет'));
+                            details.push('Включено в БД: ' + (status.enabled_in_db ? '✓ Да' : '✗ Нет'));
+                            details.push('Активен: ' + (status.active ? '✓ Да' : '✗ Нет'));
+                            
+                            if (status.active) {
+                                toastr.success(message + '\n\n' + details.join('\n'), 'Статус выгрузки логов', {
+                                    timeOut: 10000,
+                                    extendedTimeOut: 10000
+                                });
+                            } else {
+                                toastr.warning(message + '\n\n' + details.join('\n'), 'Статус выгрузки логов', {
+                                    timeOut: 10000,
+                                    extendedTimeOut: 10000
+                                });
+                            }
+                            
+                            // Обновляем страницу через 2 секунды, чтобы показать обновленный статус
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 2000);
+                        } else {
+                            toastr.error(response.message || 'Ошибка при проверке статуса');
+                        }
+                    },
+                    error: function (xhr) {
+                        let errorMessage = 'Произошла ошибка при проверке статуса';
+                        if (xhr.responseJSON) {
+                            errorMessage = xhr.responseJSON.message || errorMessage;
+                        }
+                        toastr.error(errorMessage);
+                    }
+                });
+            }
         </script>
     @endpush
 
