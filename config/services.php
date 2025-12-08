@@ -45,4 +45,10 @@ return [
         'client_secret' => env('TELEGRAM_BOT_NAME'), // Это username вашего бота (например: 'MyBot')
         'redirect' => env('TELEGRAM_REDIRECT_URI'), // URL callback (например: 'https://yourdomain.com/personal/auth/telegram/callback')
     ],
+
+    's3_logs' => [
+        'access_key' => env('S3_LOGS_ACCESS_KEY'),
+        'secret_key' => env('S3_LOGS_SECRET_KEY'),
+        'bucket' => env('S3_LOGS_BUCKET', 's3://logsvpn'),
+    ],
 ];
