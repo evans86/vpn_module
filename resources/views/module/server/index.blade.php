@@ -80,116 +80,167 @@
                     </x-slot>
                 </x-admin.empty-state>
             @else
-                <x-admin.table :headers="['#', 'Название', 'IP', 'Логин', 'Пароль', 'Хост', 'Локация', 'Статус', 'Выгрузка логов', 'Действия']">
-                    @php
-                        $totalServers = $servers->count();
-                        $currentIndex = 0;
-                    @endphp
+                <!-- Cards Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     @foreach($servers as $server)
-                        @php
-                            $currentIndex++;
-                            // Если записей 3 или меньше, все меню открываются сверху
-                            // Если записей больше 3, последние 3 открываются сверху
-                            $isLastRows = $totalServers <= 3 || $currentIndex > ($totalServers - 3);
-                        @endphp
-                        <tr class="hover:bg-gray-50 {{ $server->server_status === Server::SERVER_DELETED ? 'opacity-60 bg-gray-100' : '' }}">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                {{ $server->id }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {{ $server->name }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <code class="bg-gray-100 px-2 py-1 rounded text-xs">{{ $server->ip }}</code>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{ $server->login }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <span class="font-mono text-xs">{{ $server->password }}</span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{ $server->host }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <div class="flex items-center">
-                                    <img src="https://flagcdn.com/w40/{{ strtolower($server->location->code) }}.png"
-                                         class="w-6 h-4 mr-2 rounded object-cover"
-                                         alt="{{ strtoupper($server->location->code) }}"
-                                         title="{{ strtoupper($server->location->code) }}">
-                                    <span>{{ strtoupper($server->location->code) }}</span>
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow {{ $server->server_status === Server::SERVER_DELETED ? 'opacity-60 bg-gray-50' : '' }}">
+                            <!-- Card Header -->
+                            <div class="px-6 py-4 border-b border-gray-200">
+                                <div class="flex items-center space-x-3">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center">
+                                            <i class="fas fa-server text-white text-xl"></i>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <h3 class="text-lg font-semibold text-gray-900 truncate" title="{{ $server->name }}">
+                                            {{ $server->name ?: 'Сервер #' . $server->id }}
+                                        </h3>
+                                        <p class="text-xs text-gray-500">ID: {{ $server->id }}</p>
+                                    </div>
                                 </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                    {{ $server->status_badge_class === 'success' ? 'bg-green-100 text-green-800' : '' }}
-                                    {{ $server->status_badge_class === 'danger' ? 'bg-red-100 text-red-800' : '' }}
-                                    {{ $server->status_badge_class === 'warning' ? 'bg-yellow-100 text-yellow-800' : '' }}
-                                    {{ $server->status_badge_class === 'info' ? 'bg-blue-100 text-blue-800' : '' }}
-                                    {{ $server->status_badge_class === 'secondary' ? 'bg-gray-100 text-gray-800' : '' }}">
-                                    {{ $server->status_label }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                @if($server->logs_upload_enabled)
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800" title="Выгрузка логов активна">
-                                        <i class="fas fa-check-circle mr-1"></i> Включена
+                            </div>
+
+                            <!-- Card Body -->
+                            <div class="px-6 py-4 space-y-4">
+                                <!-- Status Badge -->
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-700">Статус:</span>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                        {{ $server->status_badge_class === 'success' ? 'bg-green-100 text-green-800' : '' }}
+                                        {{ $server->status_badge_class === 'danger' ? 'bg-red-100 text-red-800' : '' }}
+                                        {{ $server->status_badge_class === 'warning' ? 'bg-yellow-100 text-yellow-800' : '' }}
+                                        {{ $server->status_badge_class === 'info' ? 'bg-blue-100 text-blue-800' : '' }}
+                                        {{ $server->status_badge_class === 'secondary' ? 'bg-gray-100 text-gray-800' : '' }}">
+                                        {{ $server->status_label }}
                                     </span>
-                                @else
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800" title="Выгрузка логов не настроена">
-                                        <i class="fas fa-times-circle mr-1"></i> Выключена
-                                    </span>
-                                @endif
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                @if($server->server_status !== Server::SERVER_DELETED)
-                                    <div class="relative inline-block text-left" x-data="{ open: false }">
-                                        <button @click="open = !open" 
-                                                class="text-gray-400 hover:text-gray-600 focus:outline-none">
-                                            <i class="fas fa-ellipsis-v"></i>
+                                </div>
+
+                                <!-- Location -->
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-700">Локация:</span>
+                                    <div class="flex items-center space-x-2">
+                                        <img src="https://flagcdn.com/w40/{{ strtolower($server->location->code) }}.png"
+                                             class="w-5 h-4 rounded object-cover"
+                                             alt="{{ strtoupper($server->location->code) }}"
+                                             title="{{ strtoupper($server->location->code) }}">
+                                        <span class="text-sm text-gray-900 font-medium">{{ strtoupper($server->location->code) }}</span>
+                                    </div>
+                                </div>
+
+                                <!-- IP Address -->
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-700">IP адрес:</span>
+                                    <div class="flex items-center space-x-2">
+                                        <code class="bg-gray-100 px-2 py-1 rounded text-xs font-mono text-gray-800">{{ $server->ip }}</code>
+                                        <button onclick="copyToClipboard('{{ $server->ip }}', 'IP адрес')" 
+                                                class="text-gray-400 hover:text-indigo-600 transition-colors p-1 rounded hover:bg-gray-100"
+                                                title="Копировать IP адрес">
+                                            <i class="fas fa-copy text-xs"></i>
                                         </button>
-                                        
-                                        <div x-show="open" 
-                                             @click.away="open = false"
-                                             x-cloak
-                                             x-transition
-                                             class="absolute right-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 {{ $isLastRows ? 'origin-bottom-right bottom-full mb-2' : 'origin-top-right top-full mt-2' }}">
-                                            <div class="py-1">
-                                                @if($server->panel)
-                                                    <a href="{{ route('admin.module.panel.index', ['panel_id' => $server->panel->id]) }}" 
-                                                       class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                                        <i class="fas fa-desktop mr-2"></i> Панель
-                                                    </a>
-                                                @endif
-                                                <a href="{{ route('admin.module.server-users.index', ['server_id' => $server->id]) }}" 
-                                                   class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                                    <i class="fas fa-users mr-2"></i> Пользователи
-                                                </a>
-                                                <div class="border-t border-gray-100 my-1"></div>
-                                                <button onclick="enableLogUpload({{ $server->id }})"
-                                                        class="block w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50">
-                                                    <i class="fas fa-upload mr-2"></i> Включить выгрузку логов
+                                    </div>
+                                </div>
+
+                                <!-- Host -->
+                                <div class="flex items-start justify-between">
+                                    <span class="text-sm font-medium text-gray-700">Хост:</span>
+                                    <span class="text-sm text-gray-900 text-right font-mono break-all ml-2">{{ $server->host }}</span>
+                                </div>
+
+                                <!-- Credentials -->
+                                <div class="pt-2 border-t border-gray-200">
+                                    <div class="space-y-2">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-medium text-gray-700">Логин:</span>
+                                            <div class="flex items-center space-x-2">
+                                                <span class="text-sm text-gray-900 font-mono">{{ $server->login }}</span>
+                                                <button onclick="copyToClipboard('{{ $server->login }}', 'Логин')" 
+                                                        class="text-gray-400 hover:text-indigo-600 transition-colors p-1 rounded hover:bg-gray-100"
+                                                        title="Копировать логин">
+                                                    <i class="fas fa-copy text-xs"></i>
                                                 </button>
-                                                <button onclick="checkLogUploadStatus({{ $server->id }})"
-                                                        class="block w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50">
-                                                    <i class="fas fa-check-circle mr-2"></i> Проверить выгрузку логов
-                                                </button>
-                                                <div class="border-t border-gray-100 my-1"></div>
-                                                <button onclick="deleteServer({{ $server->id }})"
-                                                        class="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50">
-                                                    <i class="fas fa-trash mr-2"></i> Удалить
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-medium text-gray-700">Пароль:</span>
+                                            <div class="flex items-center space-x-2">
+                                                <span class="text-sm text-gray-900 font-mono text-xs break-all max-w-[120px] truncate" title="{{ $server->password }}">{{ $server->password }}</span>
+                                                <button onclick="copyToClipboard('{{ $server->password }}', 'Пароль')" 
+                                                        class="text-gray-400 hover:text-indigo-600 transition-colors p-1 rounded hover:bg-gray-100 flex-shrink-0"
+                                                        title="Копировать пароль">
+                                                    <i class="fas fa-copy text-xs"></i>
                                                 </button>
                                             </div>
                                         </div>
                                     </div>
-                                @endif
-                            </td>
-                        </tr>
+                                </div>
+
+                                <!-- Logs Upload Status -->
+                                <div class="pt-2 border-t border-gray-200">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-sm font-medium text-gray-700">Выгрузка логов:</span>
+                                        @if($server->logs_upload_enabled)
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800" title="Выгрузка логов активна">
+                                                <i class="fas fa-check-circle mr-1"></i> Включена
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800" title="Выгрузка логов не настроена">
+                                                <i class="fas fa-times-circle mr-1"></i> Выключена
+                                            </span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card Footer -->
+                            @if($server->server_status !== Server::SERVER_DELETED)
+                                <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg">
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <!-- Left Side: Navigation Actions -->
+                                        <div class="flex flex-col gap-2">
+                                            @if($server->panel)
+                                                <a href="{{ route('admin.module.panel.index', ['panel_id' => $server->panel->id]) }}" 
+                                                   class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors w-full">
+                                                    <i class="fas fa-desktop mr-2"></i>
+                                                    <span>Панель</span>
+                                                </a>
+                                            @endif
+                                            <a href="{{ route('admin.module.server-users.index', ['server_id' => $server->id]) }}" 
+                                               class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors w-full">
+                                                <i class="fas fa-users mr-2"></i>
+                                                <span>Пользователи</span>
+                                            </a>
+                                        </div>
+                                        
+                                        <!-- Right Side: Service Actions -->
+                                        <div class="flex flex-col gap-2">
+                                            <button onclick="enableLogUpload({{ $server->id }})"
+                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors w-full">
+                                                <i class="fas fa-upload mr-2"></i>
+                                                <span>Включить логи</span>
+                                            </button>
+                                            <button onclick="checkLogUploadStatus({{ $server->id }})"
+                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 transition-colors w-full">
+                                                <i class="fas fa-check-circle mr-2"></i>
+                                                <span>Проверить логи</span>
+                                            </button>
+                                            <button onclick="deleteServer({{ $server->id }})"
+                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors w-full">
+                                                <i class="fas fa-trash mr-2"></i>
+                                                <span>Удалить</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
                     @endforeach
-                </x-admin.table>
+                </div>
 
                 <!-- Pagination -->
-                <x-admin.pagination-wrapper :paginator="$servers" />
+                <div class="mt-6">
+                    <x-admin.pagination-wrapper :paginator="$servers" />
+                </div>
             @endif
         </x-admin.card>
     </div>
@@ -225,6 +276,36 @@
 
     @push('js')
         <script>
+            // Функция копирования в буфер обмена
+            function copyToClipboard(text, label) {
+                navigator.clipboard.writeText(text).then(function() {
+                    toastr.success(label + ' скопирован в буфер обмена', '', {
+                        timeOut: 2000,
+                        positionClass: 'toast-top-right'
+                    });
+                }).catch(function(err) {
+                    // Fallback для старых браузеров
+                    const textArea = document.createElement('textarea');
+                    textArea.value = text;
+                    textArea.style.position = 'fixed';
+                    textArea.style.left = '-999999px';
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        toastr.success(label + ' скопирован в буфер обмена', '', {
+                            timeOut: 2000,
+                            positionClass: 'toast-top-right'
+                        });
+                    } catch (err) {
+                        toastr.error('Не удалось скопировать ' + label, '', {
+                            timeOut: 3000
+                        });
+                    }
+                    document.body.removeChild(textArea);
+                });
+            }
+
             // Глобальная функция удаления сервера
             function deleteServer(id) {
                 if (confirm('Вы уверены, что хотите удалить этот сервер?')) {

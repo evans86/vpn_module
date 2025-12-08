@@ -6,6 +6,7 @@ use App\Models\KeyActivate\KeyActivate;
 use App\Models\ServerUser\ServerUser;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Repositories\KeyActivateUser\KeyActivateUserRepository;
+use App\Repositories\ServerUser\ServerUserRepository;
 use App\Services\External\MarzbanAPI;
 use App\Services\Panel\marzban\MarzbanService;
 use App\Services\Panel\PanelStrategy;
@@ -25,14 +26,20 @@ class VpnConfigController extends Controller
      * @var KeyActivateUserRepository
      */
     private KeyActivateUserRepository $keyActivateUserRepository;
+    /**
+     * @var ServerUserRepository
+     */
+    private ServerUserRepository $serverUserRepository;
 
     public function __construct(
         KeyActivateRepository $keyActivateRepository,
-        KeyActivateUserRepository $keyActivateUserRepository
+        KeyActivateUserRepository $keyActivateUserRepository,
+        ServerUserRepository $serverUserRepository
     )
     {
         $this->keyActivateRepository = $keyActivateRepository;
         $this->keyActivateUserRepository = $keyActivateUserRepository;
+        $this->serverUserRepository = $serverUserRepository;
     }
 
     public function show(string $key_activate_id): Response
@@ -95,9 +102,40 @@ class VpnConfigController extends Controller
             
             // Получаем информацию о пользователе сервера
             $serverUser = $keyActivateUser->serverUser;
-
+            
+            // Если отношение не загружено, пытаемся загрузить явно
+            if (!$serverUser && $keyActivateUser->server_user_id) {
+                $keyActivateUser->load('serverUser');
+                $serverUser = $keyActivateUser->serverUser;
+            }
+            
+            // Если всё ещё не найден, пытаемся получить через репозиторий
+            if (!$serverUser && $keyActivateUser->server_user_id) {
+                $serverUser = $this->serverUserRepository->findById($keyActivateUser->server_user_id);
+                
+                // Если найден через репозиторий, устанавливаем отношение
+                if ($serverUser) {
+                    $keyActivateUser->setRelation('serverUser', $serverUser);
+                }
+            }
+            
+            // Если всё ещё не найден, логируем и показываем ошибку
             if (!$serverUser) {
-                throw new RuntimeException('Server user not found');
+                Log::error('Server user not found for KeyActivateUser', [
+                    'key_activate_user_id' => $keyActivateUser->id,
+                    'key_activate_id' => $key_activate_id,
+                    'server_user_id' => $keyActivateUser->server_user_id,
+                    'key_activate_user_data' => $keyActivateUser->toArray(),
+                    'source' => 'vpn'
+                ]);
+                
+                if (app()->environment('local') && config('app.debug', false)) {
+                    return $this->showDemoPage($key_activate_id);
+                }
+                
+                return response()->view('vpn.error', [
+                    'message' => 'Конфигурация не найдена. Пользователь сервера не привязан к ключу.'
+                ]);
             }
 
             // Декодируем ключи подключения
