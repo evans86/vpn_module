@@ -214,11 +214,13 @@
                                         
                                         <!-- Right Side: Service Actions -->
                                         <div class="flex flex-col gap-2">
-                                            <button onclick="enableLogUpload({{ $server->id }})"
-                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors w-full">
-                                                <i class="fas fa-upload mr-2"></i>
-                                                <span>Включить логи</span>
-                                            </button>
+                                            @if(!$server->logs_upload_enabled)
+                                                <button onclick="enableLogUpload({{ $server->id }})"
+                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors w-full">
+                                                    <i class="fas fa-upload mr-2"></i>
+                                                    <span>Включить логи</span>
+                                                </button>
+                                            @endif
                                             <button onclick="checkLogUploadStatus({{ $server->id }})"
                                                     class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 transition-colors w-full">
                                                 <i class="fas fa-check-circle mr-2"></i>

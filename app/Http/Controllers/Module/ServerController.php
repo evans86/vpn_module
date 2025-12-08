@@ -88,7 +88,7 @@ class ServerController extends Controller
             }
 
             $servers = $query->orderBy('id', 'desc')
-                ->paginate(config('app.items_per_page', 30));
+                ->paginate(10);
             
             // Добавляем параметр show_deleted в пагинацию
             $servers->appends($request->only(['show_deleted', 'name', 'ip', 'host', 'status']));
