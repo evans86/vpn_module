@@ -278,13 +278,14 @@ class VpnConfigController extends Controller
         $formattedKeys = $this->formatConnectionKeys($demoKeys);
         $botLink = '#';
         $netcheckUrl = route('netcheck.index');
+        $isDemoMode = true; // Флаг для отображения демо-баннера
 
         Log::info('Showing demo page for local development', [
             'key_activate_id' => $key_activate_id,
             'source' => 'vpn'
         ]);
 
-        return response()->view('vpn.config', compact('userInfo', 'formattedKeys', 'botLink', 'netcheckUrl'));
+        return response()->view('vpn.config', compact('userInfo', 'formattedKeys', 'botLink', 'netcheckUrl', 'isDemoMode'));
     }
 
     /**
@@ -317,9 +318,10 @@ class VpnConfigController extends Controller
             
             // Добавляем ссылку на страницу проверки качества сети
             $netcheckUrl = route('netcheck.index');
+            $isDemoMode = false; // Это реальная страница, не демо
 
             Log::warning('Returning browser page');
-            return response()->view('vpn.config', compact('userInfo', 'formattedKeys', 'botLink', 'netcheckUrl'));
+            return response()->view('vpn.config', compact('userInfo', 'formattedKeys', 'botLink', 'netcheckUrl', 'isDemoMode'));
 
         } catch (Exception $e) {
             Log::error('Error showing browser page:', [

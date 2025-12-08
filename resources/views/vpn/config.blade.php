@@ -5,7 +5,7 @@
 
 @section('content')
     <div class="container mx-auto px-4 py-8 max-w-6xl">
-        @if(app()->environment('local'))
+        @if(isset($isDemoMode) && $isDemoMode && app()->environment('local'))
             <!-- Demo Mode Banner -->
             <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-r-lg">
                 <div class="flex items-start justify-between">
