@@ -67,8 +67,7 @@ class NotificationService
             $expirationDate = date('d.m.Y', $expirationDate);
 
             $message = "⚠️ Внимание! У вашего ключа <code>{$keyId}</code> заканчивается срок работы <b>{$expirationDate}</b>.\n";
-            $message .= "После окончания срока работы ключ будет деактивирован.\n";
-            $message .= "Купить новый ключ можно у создателя бота.";
+            $message .= "После окончания срока работы ключ будет деактивирован.";
 
             $keyboard = [
                 'inline_keyboard' => [
