@@ -114,6 +114,25 @@
                                     <span class="text-sm text-gray-900 font-medium">{{ $panel->panel_type_label }}</span>
                                 </div>
 
+                                <!-- Config Type -->
+                                @if($panel->config_type)
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-700">Конфиг:</span>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                        {{ $panel->config_type_badge_class === 'success' ? 'bg-green-100 text-green-800' : '' }}
+                                        {{ $panel->config_type_badge_class === 'info' ? 'bg-blue-100 text-blue-800' : '' }}
+                                        {{ $panel->config_type_badge_class === 'secondary' ? 'bg-gray-100 text-gray-800' : '' }}">
+                                        {{ $panel->config_type_label }}
+                                    </span>
+                                </div>
+                                @if($panel->config_updated_at)
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-700">Обновлен:</span>
+                                    <span class="text-xs text-gray-500">{{ $panel->config_updated_at->format('d.m.Y H:i') }}</span>
+                                </div>
+                                @endif
+                                @endif
+
                                 <!-- Server -->
                                 <div class="flex items-start justify-between">
                                     <span class="text-sm font-medium text-gray-700">Сервер:</span>
@@ -186,13 +205,30 @@
                                         
                                         <!-- Right Side: Service Actions -->
                                         <div class="flex flex-col gap-2">
-                                            <form action="{{ route('admin.module.panel.update-config', $panel) }}" method="POST" class="w-full">
+                                            <!-- Stable Config Button -->
+                                            <form action="{{ route('admin.module.panel.update-config-stable', $panel) }}" method="POST" class="w-full">
                                                 @csrf
-                                                <button type="submit" class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors w-full">
-                                                    <i class="fas fa-sync mr-2"></i>
-                                                    <span>Обновить</span>
+                                                <button type="submit" 
+                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors w-full
+                                                        {{ $panel->config_type === 'stable' ? 'ring-2 ring-blue-500' : '' }}"
+                                                        title="Стабильный конфиг (без REALITY) - максимальная надежность">
+                                                    <i class="fas fa-shield-alt mr-2"></i>
+                                                    <span>Стабильный</span>
                                                 </button>
                                             </form>
+                                            
+                                            <!-- REALITY Config Button -->
+                                            <form action="{{ route('admin.module.panel.update-config-reality', $panel) }}" method="POST" class="w-full">
+                                                @csrf
+                                                <button type="submit" 
+                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 transition-colors w-full
+                                                        {{ $panel->config_type === 'reality' ? 'ring-2 ring-green-500' : '' }}"
+                                                        title="Конфиг с REALITY - лучший обход блокировок">
+                                                    <i class="fas fa-rocket mr-2"></i>
+                                                    <span>REALITY</span>
+                                                </button>
+                                            </form>
+                                            
                                             <button type="button" 
                                                     onclick="deletePanel({{ $panel->id }})"
                                                     class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors w-full">

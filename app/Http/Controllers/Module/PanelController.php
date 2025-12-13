@@ -195,7 +195,79 @@ class PanelController extends Controller
     }
 
     /**
-     * Update panel configuration.
+     * Update panel configuration - stable (without REALITY).
+     *
+     * @param Panel $panel
+     * @return RedirectResponse
+     * @throws GuzzleException
+     */
+    public function updateConfigStable(Panel $panel): RedirectResponse
+    {
+        try {
+            $this->logger->info('Обновление конфигурации панели (стабильный)', [
+                'source' => 'panel',
+                'action' => 'update-config-stable',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id
+            ]);
+
+            $strategy = new PanelStrategy($panel->panel);
+            $strategy->updateConfigurationStable($panel->id);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'Стабильная конфигурация панели успешно применена');
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при обновлении конфигурации панели (стабильный)', [
+                'source' => 'panel',
+                'action' => 'update-config-stable',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Ошибка при обновлении конфигурации: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Update panel configuration - with REALITY (best bypass).
+     *
+     * @param Panel $panel
+     * @return RedirectResponse
+     * @throws GuzzleException
+     */
+    public function updateConfigReality(Panel $panel): RedirectResponse
+    {
+        try {
+            $this->logger->info('Обновление конфигурации панели (REALITY)', [
+                'source' => 'panel',
+                'action' => 'update-config-reality',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id
+            ]);
+
+            $strategy = new PanelStrategy($panel->panel);
+            $strategy->updateConfigurationReality($panel->id);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'Конфигурация с REALITY успешно применена');
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при обновлении конфигурации панели (REALITY)', [
+                'source' => 'panel',
+                'action' => 'update-config-reality',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Ошибка при обновлении конфигурации: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Update panel configuration (legacy method).
      *
      * @param Panel $panel
      * @return RedirectResponse
@@ -203,31 +275,8 @@ class PanelController extends Controller
      */
     public function updateConfig(Panel $panel): RedirectResponse
     {
-        try {
-            $this->logger->info('Обновление конфигурации панели', [
-                'source' => 'panel',
-                'action' => 'update-config',
-                'user_id' => auth()->id(),
-                'panel_id' => $panel->id
-            ]);
-
-            $strategy = new PanelStrategy($panel->panel);
-            $strategy->updateConfiguration($panel->id);
-
-            return redirect()->route('admin.module.panel.index')
-                ->with('success', 'Конфигурация панели успешно обновлена');
-        } catch (Exception $e) {
-            $this->logger->error('Ошибка при обновлении конфигурации панели', [
-                'source' => 'panel',
-                'action' => 'update-config',
-                'user_id' => auth()->id(),
-                'panel_id' => $panel->id,
-                'error' => $e->getMessage()
-            ]);
-
-            return redirect()->route('admin.module.panel.index')
-                ->with('error', 'Ошибка при обновлении конфигурации панели: ' . $e->getMessage());
-        }
+        // По умолчанию используем REALITY конфигурацию
+        return $this->updateConfigReality($panel);
     }
 
     /**

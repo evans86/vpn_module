@@ -59,6 +59,30 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
     }
 
     /**
+     * Обновление конфигурации панели - стабильный вариант (без REALITY)
+     *
+     * @param int $panel_id
+     * @return void
+     * @throws GuzzleException
+     */
+    public function updateConfigurationStable(int $panel_id): void
+    {
+        $this->marzbanService->updateConfigurationStable($panel_id);
+    }
+
+    /**
+     * Обновление конфигурации панели - с REALITY (лучший обход блокировок)
+     *
+     * @param int $panel_id
+     * @return void
+     * @throws GuzzleException
+     */
+    public function updateConfigurationReality(int $panel_id): void
+    {
+        $this->marzbanService->updateConfigurationReality($panel_id);
+    }
+
+    /**
      * Добавление пользователя
      *
      * @param int $panel_id

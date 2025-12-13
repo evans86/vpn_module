@@ -69,6 +69,30 @@ class PanelStrategy
     }
 
     /**
+     * Обновление конфига панели - стабильный вариант (без REALITY)
+     *
+     * @param int $panel_id
+     * @return void
+     * @throws GuzzleException
+     */
+    public function updateConfigurationStable(int $panel_id): void
+    {
+        $this->strategy->updateConfigurationStable($panel_id);
+    }
+
+    /**
+     * Обновление конфига панели - с REALITY (лучший обход блокировок)
+     *
+     * @param int $panel_id
+     * @return void
+     * @throws GuzzleException
+     */
+    public function updateConfigurationReality(int $panel_id): void
+    {
+        $this->strategy->updateConfigurationReality($panel_id);
+    }
+
+    /**
      * Добавление пользователя панели
      *
      * @param int $panel_id

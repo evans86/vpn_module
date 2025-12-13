@@ -71,7 +71,14 @@ class Panel extends Model
         'token_died_time',
         'has_error',
         'error_message',
-        'error_at'
+        'error_at',
+        'reality_private_key',
+        'reality_public_key',
+        'reality_short_id',
+        'reality_grpc_short_id',
+        'reality_keys_generated_at',
+        'config_type',
+        'config_updated_at'
     ];
 
     protected $hidden = [
@@ -84,8 +91,20 @@ class Panel extends Model
         'token_died_time' => 'integer',
         'server_id' => 'integer',
         'has_error' => 'boolean',
-        'error_at' => 'datetime'
+        'error_at' => 'datetime',
+        'reality_keys_generated_at' => 'datetime',
+        'config_updated_at' => 'datetime'
     ];
+
+    /**
+     * @var string Тип конфига: стабильный (без REALITY)
+     */
+    const CONFIG_TYPE_STABLE = 'stable';
+
+    /**
+     * @var string Тип конфига: с REALITY (лучший обход)
+     */
+    const CONFIG_TYPE_REALITY = 'reality';
 
     /**
      * Get the server associated with the panel.
@@ -239,5 +258,88 @@ class Panel extends Model
             $value = rtrim($value, '/') . '/dashboard';
         }
         $this->attributes['panel_adress'] = $value;
+    }
+
+    /**
+     * Check if panel has REALITY keys generated.
+     *
+     * @return bool
+     */
+    public function hasRealityKeys(): bool
+    {
+        return !empty($this->reality_private_key) 
+            && !empty($this->reality_public_key)
+            && !empty($this->reality_short_id)
+            && !empty($this->reality_grpc_short_id);
+    }
+
+    /**
+     * Get REALITY keys as array.
+     *
+     * @return array
+     */
+    public function getRealityKeys(): array
+    {
+        return [
+            'private_key' => $this->reality_private_key,
+            'public_key' => $this->reality_public_key,
+            'short_id' => $this->reality_short_id,
+            'grpc_short_id' => $this->reality_grpc_short_id,
+            'generated_at' => $this->reality_keys_generated_at
+        ];
+    }
+
+    /**
+     * Get config type label.
+     *
+     * @return string
+     */
+    public function getConfigTypeLabelAttribute(): string
+    {
+        switch ($this->config_type) {
+            case self::CONFIG_TYPE_STABLE:
+                return 'Стабильный (без REALITY)';
+            case self::CONFIG_TYPE_REALITY:
+                return 'С REALITY (лучший обход)';
+            default:
+                return 'Неизвестно';
+        }
+    }
+
+    /**
+     * Get config type badge class.
+     *
+     * @return string
+     */
+    public function getConfigTypeBadgeClassAttribute(): string
+    {
+        switch ($this->config_type) {
+            case self::CONFIG_TYPE_STABLE:
+                return 'info';
+            case self::CONFIG_TYPE_REALITY:
+                return 'success';
+            default:
+                return 'secondary';
+        }
+    }
+
+    /**
+     * Check if using REALITY config.
+     *
+     * @return bool
+     */
+    public function isUsingRealityConfig(): bool
+    {
+        return $this->config_type === self::CONFIG_TYPE_REALITY;
+    }
+
+    /**
+     * Check if using stable config.
+     *
+     * @return bool
+     */
+    public function isUsingStableConfig(): bool
+    {
+        return $this->config_type === self::CONFIG_TYPE_STABLE;
     }
 }

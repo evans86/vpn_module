@@ -23,6 +23,22 @@ interface PanelInterface
     public function updateConfiguration(int $panel_id): void;
 
     /**
+     * Обновление конфигурации панели - стабильный вариант (без REALITY)
+     *
+     * @param int $panel_id
+     * @return void
+     */
+    public function updateConfigurationStable(int $panel_id): void;
+
+    /**
+     * Обновление конфигурации панели - с REALITY (лучший обход блокировок)
+     *
+     * @param int $panel_id
+     * @return void
+     */
+    public function updateConfigurationReality(int $panel_id): void;
+
+    /**
      * Добавление пользователя панели
      *
      * @param int $panel_id

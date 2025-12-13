@@ -1,0 +1,166 @@
+{
+  "log": {
+    "loglevel": "warning",
+    "access": "/var/lib/marzban/access.log",
+    "error": "/var/lib/marzban/error.log",
+    "dnsLog": true
+  },
+  "inbounds": [
+    {
+      "tag": "VLESS TCP REALITY",
+      "listen": "0.0.0.0",
+      "port": 2040,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none",
+        "level": 0
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "dest": "tradingview.com:443",
+          "xver": 0,
+          "serverNames": ["tradingview.com"],
+          "privateKey": "ВАШ_ПРИВАТНЫЙ_КЛЮЧ_ЗДЕСЬ",
+          "shortIds": ["", "ВАШ_SHORT_ID_ЗДЕСЬ"]
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"]
+      }
+    },
+    {
+      "tag": "VLESS GRPC REALITY",
+      "listen": "0.0.0.0",
+      "port": 2041,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none",
+        "level": 0
+      },
+      "streamSettings": {
+        "network": "grpc",
+        "grpcSettings": {
+          "serviceName": "xyz"
+        },
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "dest": "discordapp.com:443",
+          "xver": 0,
+          "serverNames": ["cdn.discordapp.com", "discordapp.com"],
+          "privateKey": "ВАШ_ПРИВАТНЫЙ_КЛЮЧ_ЗДЕСЬ",
+          "shortIds": ["", "ВАШ_ДРУГОЙ_SHORT_ID_ЗДЕСЬ"]
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"]
+      }
+    },
+    {
+      "tag": "VLESS-WS",
+      "listen": "0.0.0.0",
+      "port": 2095,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none",
+        "level": 0
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "none",
+        "wsSettings": {
+          "path": "/vless"
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls"]
+      }
+    },
+    {
+      "tag": "VMESS-WS",
+      "listen": "0.0.0.0",
+      "port": 2096,
+      "protocol": "vmess",
+      "settings": {
+        "clients": [],
+        "level": 0
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "none",
+        "wsSettings": {
+          "path": "/vmess"
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls"]
+      }
+    },
+    {
+      "tag": "TROJAN-WS",
+      "listen": "0.0.0.0",
+      "port": 2097,
+      "protocol": "trojan",
+      "settings": {
+        "clients": [],
+        "level": 0
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "none",
+        "wsSettings": {
+          "path": "/trojan"
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls"]
+      }
+    },
+    {
+      "tag": "Shadowsocks-TCP",
+      "listen": "0.0.0.0",
+      "port": 2098,
+      "protocol": "shadowsocks",
+      "settings": {
+        "clients": [],
+        "network": "tcp,udp",
+        "level": 0
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "DIRECT"
+    }
+  ],
+  "policy": {
+    "levels": [
+      {
+        "handshake": 4,
+        "connIdle": 300,
+        "uplinkOnly": 1,
+        "downlinkOnly": 1,
+        "statsUserUplink": true,
+        "statsUserDownlink": true
+      }
+    ],
+    "system": {
+      "statsInboundUplink": true,
+      "statsInboundDownlink": true
+    }
+  }
+}
+

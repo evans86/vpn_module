@@ -475,101 +475,169 @@ class MarzbanService
     }
 
     /**
-     * Обновление конфигурации панели
+     * Генерация REALITY ключей через SSH
      *
-     * @param int $panel_id
-     * @return void
-     * @throws GuzzleException
+     * @param Panel $panel
+     * @return array Массив с ключами: ['private_key', 'public_key', 'short_id', 'grpc_short_id']
+     * @throws RuntimeException
      */
-    public function updateConfiguration(int $panel_id): void
+    private function generateRealityKeys(Panel $panel): array
     {
-        $panel = self::updateMarzbanToken($panel_id);
+        try {
+            if (!$panel->server) {
+                throw new RuntimeException('Server not found for panel');
+            }
 
-        $marzbanApi = new MarzbanAPI($panel->api_address);
+            $serverDto = ServerFactory::fromEntity($panel->server);
+            $ssh = $this->connectSshAdapter($serverDto);
 
-        $json_config = [
+            Log::info('Generating REALITY keys', [
+                'panel_id' => $panel->id,
+                'server_id' => $panel->server_id,
+                'source' => 'panel'
+            ]);
+
+            // Генерация приватного и публичного ключа
+            $x25519Output = $ssh->exec('docker exec marzban-marzban-1 xray x25519 2>&1');
+            
+            if ($ssh->getExitStatus() !== 0) {
+                throw new RuntimeException("Failed to generate x25519 keys: {$x25519Output}");
+            }
+
+            // Парсинг вывода xray x25519
+            // Формат может быть разным:
+            // "Private key: XXX\nPublic key: YYY"
+            // или "XXX\nYYY" (без префиксов)
+            $privateKey = null;
+            $publicKey = null;
+            
+            $lines = array_filter(array_map('trim', explode("\n", $x25519Output)));
+            
+            foreach ($lines as $line) {
+                // Ищем строки с префиксами "Private key:" или "Public key:"
+                if (preg_match('/Private\s+key[:\s]+(.+)/i', $line, $matches)) {
+                    $privateKey = trim($matches[1]);
+                } elseif (preg_match('/Public\s+key[:\s]+(.+)/i', $line, $matches)) {
+                    $publicKey = trim($matches[1]);
+                } elseif (empty($privateKey) && preg_match('/^[A-Za-z0-9_\-]{40,}$/', $line)) {
+                    // Если нет префиксов, первая длинная строка - приватный ключ
+                    $privateKey = $line;
+                } elseif (!empty($privateKey) && empty($publicKey) && preg_match('/^[A-Za-z0-9_\-]{40,}$/', $line)) {
+                    // Вторая длинная строка - публичный ключ
+                    $publicKey = $line;
+                }
+            }
+
+            if (empty($privateKey) || empty($publicKey)) {
+                throw new RuntimeException("Failed to parse x25519 keys from output. Output: " . substr($x25519Output, 0, 200));
+            }
+
+            // Генерация ShortID для TCP REALITY
+            $shortIdOutput = $ssh->exec('openssl rand -hex 8 2>&1');
+            if ($ssh->getExitStatus() !== 0) {
+                throw new RuntimeException("Failed to generate ShortID: {$shortIdOutput}");
+            }
+            $shortId = trim($shortIdOutput);
+
+            // Генерация ShortID для GRPC REALITY (другой)
+            $grpcShortIdOutput = $ssh->exec('openssl rand -hex 8 2>&1');
+            if ($ssh->getExitStatus() !== 0) {
+                throw new RuntimeException("Failed to generate GRPC ShortID: {$grpcShortIdOutput}");
+            }
+            $grpcShortId = trim($grpcShortIdOutput);
+
+            // Валидация ключей
+            if (strlen($privateKey) < 40 || strlen($publicKey) < 40) {
+                throw new RuntimeException("Invalid key length generated");
+            }
+
+            if (strlen($shortId) !== 16 || strlen($grpcShortId) !== 16) {
+                throw new RuntimeException("Invalid ShortID length generated");
+            }
+
+            Log::info('REALITY keys generated successfully', [
+                'panel_id' => $panel->id,
+                'source' => 'panel'
+            ]);
+
+            return [
+                'private_key' => $privateKey,
+                'public_key' => $publicKey,
+                'short_id' => $shortId,
+                'grpc_short_id' => $grpcShortId
+            ];
+        } catch (Exception $e) {
+            Log::error('Failed to generate REALITY keys', [
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage(),
+                'source' => 'panel'
+            ]);
+            throw new RuntimeException('Failed to generate REALITY keys: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Получение или генерация REALITY ключей для панели
+     *
+     * @param Panel $panel
+     * @return array
+     * @throws RuntimeException
+     */
+    private function getOrGenerateRealityKeys(Panel $panel): array
+    {
+        // Проверяем, есть ли уже сохраненные ключи
+        if ($panel->hasRealityKeys()) {
+            Log::info('Using existing REALITY keys', [
+                'panel_id' => $panel->id,
+                'generated_at' => $panel->reality_keys_generated_at,
+                'source' => 'panel'
+            ]);
+
+            return [
+                'private_key' => $panel->reality_private_key,
+                'public_key' => $panel->reality_public_key,
+                'short_id' => $panel->reality_short_id,
+                'grpc_short_id' => $panel->reality_grpc_short_id
+            ];
+        }
+
+        // Генерируем новые ключи
+        Log::info('Generating new REALITY keys', [
+            'panel_id' => $panel->id,
+            'source' => 'panel'
+        ]);
+
+        $keys = $this->generateRealityKeys($panel);
+
+        // Сохраняем ключи в БД
+        $panel->reality_private_key = $keys['private_key'];
+        $panel->reality_public_key = $keys['public_key'];
+        $panel->reality_short_id = $keys['short_id'];
+        $panel->reality_grpc_short_id = $keys['grpc_short_id'];
+        $panel->reality_keys_generated_at = now();
+        $panel->save();
+
+        Log::info('REALITY keys saved to database', [
+            'panel_id' => $panel->id,
+            'source' => 'panel'
+        ]);
+
+        return $keys;
+    }
+
+    /**
+     * Построение базовой конфигурации (общая часть)
+     *
+     * @return array
+     */
+    private function buildBaseConfig(): array
+    {
+        return [
             "log" => [
                 "loglevel" => "warning",
                 "access" => "/var/lib/marzban/access.log",
                 "error" => "/var/lib/marzban/error.log",
                 "dnsLog" => true
-            ],
-            "inbounds" => [
-                [
-                    "tag" => "VLESS-WS",
-                    "listen" => "0.0.0.0",
-                    "port" => 2095,
-                    "protocol" => "vless",
-                    "settings" => [
-                        "clients" => [],
-                        "decryption" => "none",
-                        "level" => 0
-                    ],
-                    "streamSettings" => [
-                        "network" => "ws",
-                        "security" => "none",
-                        "wsSettings" => [
-                            "path" => "/vless"
-                        ]
-                    ],
-                    "sniffing" => [
-                        "enabled" => true,
-                        "destOverride" => ["http", "tls"]
-                    ]
-                ],
-                [
-                    "tag" => "VMESS-WS",
-                    "listen" => "0.0.0.0",
-                    "port" => 2096,
-                    "protocol" => "vmess",
-                    "settings" => [
-                        "clients" => [],
-                        "level" => 0
-                    ],
-                    "streamSettings" => [
-                        "network" => "ws",
-                        "security" => "none",
-                        "wsSettings" => [
-                            "path" => "/vmess"
-                        ]
-                    ],
-                    "sniffing" => [
-                        "enabled" => true,
-                        "destOverride" => ["http", "tls"]
-                    ]
-                ],
-                [
-                    "tag" => "TROJAN-WS",
-                    "listen" => "0.0.0.0",
-                    "port" => 2097,
-                    "protocol" => "trojan",
-                    "settings" => [
-                        "clients" => [],
-                        "level" => 0
-                    ],
-                    "streamSettings" => [
-                        "network" => "ws",
-                        "security" => "none",
-                        "wsSettings" => [
-                            "path" => "/trojan"
-                        ]
-                    ],
-                    "sniffing" => [
-                        "enabled" => true,
-                        "destOverride" => ["http", "tls"]
-                    ]
-                ],
-                [
-                    "tag" => "Shadowsocks-TCP",
-                    "listen" => "0.0.0.0",
-                    "port" => 2098,
-                    "protocol" => "shadowsocks",
-                    "settings" => [
-                        "clients" => [],
-                        "network" => "tcp,udp",
-                        "level" => 0
-                    ]
-                ]
             ],
             "outbounds" => [
                 [
@@ -594,22 +662,371 @@ class MarzbanService
                 ]
             ]
         ];
+    }
+
+    /**
+     * Построение стабильных протоколов (без REALITY)
+     *
+     * @return array
+     */
+    private function buildStableInbounds(): array
+    {
+        return [
+            [
+                "tag" => "VLESS-WS",
+                "listen" => "0.0.0.0",
+                "port" => 2095,
+                "protocol" => "vless",
+                "settings" => [
+                    "clients" => [],
+                    "decryption" => "none",
+                    "level" => 0
+                ],
+                "streamSettings" => [
+                    "network" => "ws",
+                    "security" => "none",
+                    "wsSettings" => [
+                        "path" => "/vless"
+                    ]
+                ],
+                "sniffing" => [
+                    "enabled" => true,
+                    "destOverride" => ["http", "tls"]
+                ]
+            ],
+            [
+                "tag" => "VMESS-WS",
+                "listen" => "0.0.0.0",
+                "port" => 2096,
+                "protocol" => "vmess",
+                "settings" => [
+                    "clients" => [],
+                    "level" => 0
+                ],
+                "streamSettings" => [
+                    "network" => "ws",
+                    "security" => "none",
+                    "wsSettings" => [
+                        "path" => "/vmess"
+                    ]
+                ],
+                "sniffing" => [
+                    "enabled" => true,
+                    "destOverride" => ["http", "tls"]
+                ]
+            ],
+            [
+                "tag" => "TROJAN-WS",
+                "listen" => "0.0.0.0",
+                "port" => 2097,
+                "protocol" => "trojan",
+                "settings" => [
+                    "clients" => [],
+                    "level" => 0
+                ],
+                "streamSettings" => [
+                    "network" => "ws",
+                    "security" => "none",
+                    "wsSettings" => [
+                        "path" => "/trojan"
+                    ]
+                ],
+                "sniffing" => [
+                    "enabled" => true,
+                    "destOverride" => ["http", "tls"]
+                ]
+            ],
+            [
+                "tag" => "Shadowsocks-TCP",
+                "listen" => "0.0.0.0",
+                "port" => 2098,
+                "protocol" => "shadowsocks",
+                "settings" => [
+                    "clients" => [],
+                    "network" => "tcp,udp",
+                    "level" => 0
+                ]
+            ]
+        ];
+    }
+
+    /**
+     * Построение REALITY протоколов
+     *
+     * @param string $privateKey
+     * @param string $shortId
+     * @param string $grpcShortId
+     * @return array
+     */
+    private function buildRealityInbounds(string $privateKey, string $shortId, string $grpcShortId): array
+    {
+        return [
+            [
+                "tag" => "VLESS TCP REALITY",
+                "listen" => "0.0.0.0",
+                "port" => 2040,
+                "protocol" => "vless",
+                "settings" => [
+                    "clients" => [],
+                    "decryption" => "none",
+                    "level" => 0
+                ],
+                "streamSettings" => [
+                    "network" => "tcp",
+                    "tcpSettings" => [],
+                    "security" => "reality",
+                    "realitySettings" => [
+                        "show" => false,
+                        "dest" => "tradingview.com:443",
+                        "xver" => 0,
+                        "serverNames" => ["tradingview.com"],
+                        "privateKey" => $privateKey,
+                        "shortIds" => ["", $shortId]
+                    ]
+                ],
+                "sniffing" => [
+                    "enabled" => true,
+                    "destOverride" => ["http", "tls", "quic"]
+                ]
+            ],
+            [
+                "tag" => "VLESS GRPC REALITY",
+                "listen" => "0.0.0.0",
+                "port" => 2041,
+                "protocol" => "vless",
+                "settings" => [
+                    "clients" => [],
+                    "decryption" => "none",
+                    "level" => 0
+                ],
+                "streamSettings" => [
+                    "network" => "grpc",
+                    "grpcSettings" => [
+                        "serviceName" => "xyz"
+                    ],
+                    "security" => "reality",
+                    "realitySettings" => [
+                        "show" => false,
+                        "dest" => "discordapp.com:443",
+                        "xver" => 0,
+                        "serverNames" => ["cdn.discordapp.com", "discordapp.com"],
+                        "privateKey" => $privateKey,
+                        "shortIds" => ["", $grpcShortId]
+                    ]
+                ],
+                "sniffing" => [
+                    "enabled" => true,
+                    "destOverride" => ["http", "tls", "quic"]
+                ]
+            ]
+        ];
+    }
+
+    /**
+     * Применение конфигурации к панели
+     *
+     * @param Panel $panel
+     * @param array $json_config
+     * @param string $config_type
+     * @return void
+     * @throws RuntimeException
+     */
+    private function applyConfiguration(Panel $panel, array $json_config, string $config_type): void
+    {
+        $marzbanApi = new MarzbanAPI($panel->api_address);
 
         try {
+            // Валидация конфигурации перед отправкой
+            $this->validateConfiguration($json_config);
+
+            // Применение конфигурации
             $marzbanApi->modifyConfig($panel->auth_token, $json_config);
 
+            // Обновление статуса панели
             $panel->panel_status = Panel::PANEL_CONFIGURED;
+            $panel->config_type = $config_type;
+            $panel->config_updated_at = now();
+            $panel->has_error = false;
+            $panel->error_message = null;
+            $panel->error_at = null;
             $panel->save();
 
-            Log::info('4-protocol configuration updated successfully', ['panel_id' => $panel_id, 'source' => 'panel']);
+            $protocolsCount = count($json_config['inbounds']);
+            Log::info('Configuration updated successfully', [
+                'panel_id' => $panel->id,
+                'config_type' => $config_type,
+                'protocols_count' => $protocolsCount,
+                'source' => 'panel'
+            ]);
         } catch (Exception $e) {
+            // Сохранение ошибки в БД
+            $panel->has_error = true;
+            $panel->error_message = $e->getMessage();
+            $panel->error_at = now();
+            $panel->save();
+
             Log::error('Failed to update configuration', [
+                'panel_id' => $panel->id,
+                'config_type' => $config_type,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'source' => 'panel'
+            ]);
+
+            throw new RuntimeException('Failed to update panel configuration: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Обновление конфигурации панели - стабильный вариант (без REALITY)
+     * 
+     * Использует только проверенные протоколы для максимальной стабильности
+     *
+     * @param int $panel_id
+     * @return void
+     * @throws GuzzleException
+     */
+    public function updateConfigurationStable(int $panel_id): void
+    {
+        $panel = self::updateMarzbanToken($panel_id);
+
+        Log::info('Updating configuration to stable (without REALITY)', [
+            'panel_id' => $panel_id,
+            'source' => 'panel'
+        ]);
+
+        $json_config = $this->buildBaseConfig();
+        $json_config['inbounds'] = $this->buildStableInbounds();
+
+        $this->applyConfiguration($panel, $json_config, Panel::CONFIG_TYPE_STABLE);
+    }
+
+    /**
+     * Обновление конфигурации панели - с REALITY (лучший обход блокировок)
+     * 
+     * Автоматически генерирует и сохраняет REALITY ключи при необходимости
+     * Включает REALITY протоколы + стабильные протоколы для обратной совместимости
+     * При ошибке генерации ключей использует fallback на стабильный конфиг
+     *
+     * @param int $panel_id
+     * @return void
+     * @throws GuzzleException
+     */
+    public function updateConfigurationReality(int $panel_id): void
+    {
+        $panel = self::updateMarzbanToken($panel_id);
+
+        Log::info('Updating configuration to REALITY (best bypass)', [
+            'panel_id' => $panel_id,
+            'source' => 'panel'
+        ]);
+
+        try {
+            // Получаем или генерируем REALITY ключи
+            $realityKeys = $this->getOrGenerateRealityKeys($panel);
+
+            $json_config = $this->buildBaseConfig();
+            $json_config['inbounds'] = array_merge(
+                $this->buildRealityInbounds(
+                    $realityKeys['private_key'],
+                    $realityKeys['short_id'],
+                    $realityKeys['grpc_short_id']
+                ),
+                $this->buildStableInbounds()
+            );
+
+            $this->applyConfiguration($panel, $json_config, Panel::CONFIG_TYPE_REALITY);
+        } catch (Exception $e) {
+            // Fallback: если не удалось сгенерировать ключи, используем стабильный конфиг
+            Log::warning('Failed to generate REALITY keys, falling back to stable config', [
                 'panel_id' => $panel_id,
                 'error' => $e->getMessage(),
                 'source' => 'panel'
             ]);
-            throw $e;
+
+            // Применяем стабильный конфиг вместо REALITY
+            $this->updateConfigurationStable($panel_id);
+            
+            // Пробрасываем исключение с информацией о fallback
+            throw new RuntimeException(
+                'Не удалось применить REALITY конфигурацию. ' .
+                'Применен стабильный конфиг. Ошибка: ' . $e->getMessage()
+            );
         }
+    }
+
+    /**
+     * Обновление конфигурации панели (legacy метод для обратной совместимости)
+     * 
+     * По умолчанию использует REALITY конфигурацию
+     *
+     * @param int $panel_id
+     * @return void
+     * @throws GuzzleException
+     */
+    public function updateConfiguration(int $panel_id): void
+    {
+        // По умолчанию используем REALITY конфигурацию
+        $this->updateConfigurationReality($panel_id);
+    }
+
+    /**
+     * Валидация конфигурации перед применением
+     *
+     * @param array $config
+     * @return void
+     * @throws RuntimeException
+     */
+    private function validateConfiguration(array $config): void
+    {
+        // Проверка обязательных полей
+        if (empty($config['inbounds'])) {
+            throw new RuntimeException('Configuration must contain inbounds');
+        }
+
+        // Проверка портов на уникальность
+        $ports = [];
+        foreach ($config['inbounds'] as $inbound) {
+            if (isset($inbound['port'])) {
+                $port = $inbound['port'];
+                if (isset($ports[$port])) {
+                    throw new RuntimeException("Duplicate port found: {$port}");
+                }
+                $ports[$port] = true;
+
+                // Проверка валидности порта
+                if ($port < 1 || $port > 65535) {
+                    throw new RuntimeException("Invalid port number: {$port}");
+                }
+            }
+        }
+
+        // Проверка REALITY настроек
+        foreach ($config['inbounds'] as $inbound) {
+            if (isset($inbound['streamSettings']['security']) 
+                && $inbound['streamSettings']['security'] === 'reality') {
+                
+                $realitySettings = $inbound['streamSettings']['realitySettings'] ?? [];
+                
+                if (empty($realitySettings['privateKey'])) {
+                    throw new RuntimeException('REALITY private key is required');
+                }
+
+                if (empty($realitySettings['shortIds']) || count($realitySettings['shortIds']) < 2) {
+                    throw new RuntimeException('REALITY shortIds must contain at least 2 values');
+                }
+
+                if (empty($realitySettings['serverNames'])) {
+                    throw new RuntimeException('REALITY serverNames are required');
+                }
+
+                if (empty($realitySettings['dest'])) {
+                    throw new RuntimeException('REALITY dest is required');
+                }
+            }
+        }
+
+        Log::info('Configuration validation passed', ['source' => 'panel']);
     }
 
     /**

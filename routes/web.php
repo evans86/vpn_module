@@ -144,6 +144,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::delete('/{panel}', [PanelController::class, 'destroy'])->name('destroy');
                 Route::post('/{panel}/configure', [PanelController::class, 'configure'])->name('configure');
                 Route::post('/{panel}/update-config', [PanelController::class, 'updateConfig'])->name('update-config');
+                Route::post('/{panel}/update-config-stable', [PanelController::class, 'updateConfigStable'])->name('update-config-stable');
+                Route::post('/{panel}/update-config-reality', [PanelController::class, 'updateConfigReality'])->name('update-config-reality');
             });
 
             // Настройки распределения панелей
