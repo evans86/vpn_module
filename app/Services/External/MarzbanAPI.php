@@ -84,21 +84,84 @@ class MarzbanAPI
                     'Accept' => 'application/json'
                 ],
                 'json' => $json_config,
-                'verify' => false // Отключаем проверку SSL сертификата
+                'verify' => false, // Отключаем проверку SSL сертификата
+                'timeout' => 30, // Таймаут 30 секунд
+                'connect_timeout' => 10 // Таймаут подключения 10 секунд
             ];
 
             $client = new Client([
                 'base_uri' => $this->host . '/api/',
-                'verify' => false // Отключаем проверку SSL сертификата
+                'verify' => false, // Отключаем проверку SSL сертификата
+                'timeout' => 30,
+                'connect_timeout' => 10
             ]);
 
             $response = $client->put($action, $requestParam);
             $result = $response->getBody()->getContents();
             return (json_decode($result, true));
+        } catch (\GuzzleHttp\Exception\ServerException $e) {
+            // Обработка ошибок 5xx (502, 503, 504 и т.д.)
+            $statusCode = $e->getResponse() ? $e->getResponse()->getStatusCode() : 0;
+            $message = "Сервер Marzban недоступен (HTTP {$statusCode}). ";
+            
+            if ($statusCode === 502) {
+                $message .= "Возможные причины: сервер перегружен, контейнер Marzban не запущен, или проблемы с сетью.";
+            } elseif ($statusCode === 503) {
+                $message .= "Сервис временно недоступен. Попробуйте позже.";
+            } elseif ($statusCode === 504) {
+                $message .= "Таймаут запроса. Сервер не отвечает вовремя.";
+            }
+            
+            Log::error('Marzban server error', [
+                'status_code' => $statusCode,
+                'error' => $e->getMessage(),
+                'host' => $this->host,
+                'source' => 'api'
+            ]);
+            
+            throw new RuntimeException($message);
+        } catch (\GuzzleHttp\Exception\ClientException $e) {
+            // Обработка ошибок 4xx (401, 403, 404 и т.д.)
+            $statusCode = $e->getResponse() ? $e->getResponse()->getStatusCode() : 0;
+            $message = "Ошибка авторизации или доступа (HTTP {$statusCode}). ";
+            
+            if ($statusCode === 401) {
+                $message .= "Неверный токен авторизации. Обновите токен.";
+            } elseif ($statusCode === 403) {
+                $message .= "Доступ запрещен. Проверьте права доступа.";
+            } elseif ($statusCode === 404) {
+                $message .= "Эндпоинт не найден. Проверьте версию Marzban.";
+            }
+            
+            Log::error('Marzban client error', [
+                'status_code' => $statusCode,
+                'error' => $e->getMessage(),
+                'host' => $this->host,
+                'source' => 'api'
+            ]);
+            
+            throw new RuntimeException($message);
+        } catch (\GuzzleHttp\Exception\ConnectException $e) {
+            // Обработка ошибок подключения
+            $message = "Не удалось подключиться к серверу Marzban. ";
+            $message .= "Проверьте доступность сервера и правильность адреса: " . $this->host;
+            
+            Log::error('Marzban connection error', [
+                'error' => $e->getMessage(),
+                'host' => $this->host,
+                'source' => 'api'
+            ]);
+            
+            throw new RuntimeException($message);
         } catch (RuntimeException $r) {
             throw new RuntimeException($r->getMessage());
         } catch (Exception $e) {
-            throw new Exception($e->getMessage());
+            Log::error('Marzban config update error', [
+                'error' => $e->getMessage(),
+                'host' => $this->host,
+                'source' => 'api'
+            ]);
+            throw new Exception('Ошибка при обновлении конфигурации: ' . $e->getMessage());
         }
     }
 

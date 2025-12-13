@@ -839,8 +839,32 @@ class MarzbanService
             // Валидация конфигурации перед отправкой
             $this->validateConfiguration($json_config);
 
-            // Применение конфигурации
-            $marzbanApi->modifyConfig($panel->auth_token, $json_config);
+            // Применение конфигурации с retry механизмом
+            $maxRetries = 2;
+            $retryDelay = 2; // секунды
+            
+            for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+                try {
+                    $marzbanApi->modifyConfig($panel->auth_token, $json_config);
+                    break; // Успешно, выходим из цикла
+                } catch (RuntimeException $e) {
+                    // Если это последняя попытка или ошибка не связана с сервером, пробрасываем дальше
+                    if ($attempt === $maxRetries || !str_contains($e->getMessage(), 'Сервер Marzban недоступен')) {
+                        throw $e;
+                    }
+                    
+                    // Логируем попытку повтора
+                    Log::warning('Retrying configuration update', [
+                        'panel_id' => $panel->id,
+                        'attempt' => $attempt,
+                        'max_retries' => $maxRetries,
+                        'source' => 'panel'
+                    ]);
+                    
+                    // Ждем перед следующей попыткой
+                    sleep($retryDelay);
+                }
+            }
 
             // Обновление статуса панели
             $panel->panel_status = Panel::PANEL_CONFIGURED;
