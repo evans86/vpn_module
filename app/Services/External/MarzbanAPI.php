@@ -100,11 +100,26 @@ class MarzbanAPI
             $result = $response->getBody()->getContents();
             return (json_decode($result, true));
         } catch (\GuzzleHttp\Exception\ServerException $e) {
-            // Обработка ошибок 5xx (502, 503, 504 и т.д.)
+            // Обработка ошибок 5xx (500, 502, 503, 504 и т.д.)
             $statusCode = $e->getResponse() ? $e->getResponse()->getStatusCode() : 0;
+            $responseBody = '';
+            
+            try {
+                if ($e->getResponse()) {
+                    $responseBody = $e->getResponse()->getBody()->getContents();
+                }
+            } catch (\Exception $bodyException) {
+                $responseBody = 'Не удалось прочитать тело ответа';
+            }
+            
             $message = "Сервер Marzban недоступен (HTTP {$statusCode}). ";
             
-            if ($statusCode === 502) {
+            if ($statusCode === 500) {
+                $message .= "Внутренняя ошибка сервера. Возможные причины: невалидная конфигурация, ошибка в xray-core, или проблемы с сервером.";
+                if (!empty($responseBody)) {
+                    $message .= " Ответ сервера: " . substr($responseBody, 0, 200);
+                }
+            } elseif ($statusCode === 502) {
                 $message .= "Возможные причины: сервер перегружен, контейнер Marzban не запущен, или проблемы с сетью.";
             } elseif ($statusCode === 503) {
                 $message .= "Сервис временно недоступен. Попробуйте позже.";
@@ -115,6 +130,7 @@ class MarzbanAPI
             Log::error('Marzban server error', [
                 'status_code' => $statusCode,
                 'error' => $e->getMessage(),
+                'response_body' => $responseBody,
                 'host' => $this->host,
                 'source' => 'api'
             ]);

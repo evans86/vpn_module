@@ -773,7 +773,6 @@ class MarzbanService
                 ],
                 "streamSettings" => [
                     "network" => "tcp",
-                    "tcpSettings" => [],
                     "security" => "reality",
                     "realitySettings" => [
                         "show" => false,
@@ -838,6 +837,45 @@ class MarzbanService
         try {
             // Валидация конфигурации перед отправкой
             $this->validateConfiguration($json_config);
+
+            // Получаем текущую конфигурацию для сравнения (опционально, для отладки)
+            try {
+                $currentConfig = $marzbanApi->getConfig($panel->auth_token);
+                if (!empty($currentConfig)) {
+                    Log::debug('Current Marzban config structure', [
+                        'panel_id' => $panel->id,
+                        'has_inbounds' => isset($currentConfig['inbounds']),
+                        'inbounds_count' => isset($currentConfig['inbounds']) ? count($currentConfig['inbounds']) : 0,
+                        'source' => 'panel'
+                    ]);
+                }
+            } catch (\Exception $e) {
+                // Игнорируем ошибку получения текущей конфигурации
+                Log::debug('Could not get current config for comparison', [
+                    'panel_id' => $panel->id,
+                    'error' => $e->getMessage(),
+                    'source' => 'panel'
+                ]);
+            }
+
+            // Логирование конфигурации перед отправкой (для отладки)
+            // Сохраняем JSON для проверки структуры
+            $configJson = json_encode($json_config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            Log::info('Sending configuration to Marzban', [
+                'panel_id' => $panel->id,
+                'config_type' => $config_type,
+                'inbounds_count' => count($json_config['inbounds']),
+                'inbounds_tags' => array_column($json_config['inbounds'], 'tag'),
+                'config_size' => strlen($configJson),
+                'source' => 'panel'
+            ]);
+            
+            // Детальное логирование для отладки (только первые 2000 символов)
+            Log::debug('Configuration JSON (first 2000 chars)', [
+                'panel_id' => $panel->id,
+                'config_preview' => substr($configJson, 0, 2000),
+                'source' => 'panel'
+            ]);
 
             // Применение конфигурации с retry механизмом
             $maxRetries = 2;
