@@ -766,13 +766,13 @@ class MarzbanService
      * @param string $privateKey
      * @param string $shortId
      * @param string $grpcShortId
-     * @param string $xhttpShortId
+     * @param string $xhttpShortId (зарезервировано для будущего использования)
      * @return array
      */
     private function buildRealityInbounds(string $privateKey, string $shortId, string $grpcShortId, string $xhttpShortId): array
     {
         return [
-            // VLESS TCP REALITY - основной протокол для обхода
+            // VLESS TCP REALITY - основной протокол для обхода (лучший для обхода белых списков)
             [
                 "tag" => "VLESS TCP REALITY",
                 "listen" => "0.0.0.0",
@@ -800,7 +800,7 @@ class MarzbanService
                     "destOverride" => ["http", "tls", "quic"]
                 ]
             ],
-            // VLESS GRPC REALITY - альтернативный протокол
+            // VLESS GRPC REALITY - альтернативный протокол (устаревает, но пока работает)
             [
                 "tag" => "VLESS GRPC REALITY",
                 "listen" => "0.0.0.0",
@@ -831,9 +831,9 @@ class MarzbanService
                     "destOverride" => ["http", "tls", "quic"]
                 ]
             ],
-            // VLESS XHTTP H2 REALITY - современный протокол (замена WebSocket)
+            // Дополнительный VLESS TCP REALITY с другим SNI для разнообразия
             [
-                "tag" => "VLESS XHTTP H2 REALITY",
+                "tag" => "VLESS TCP REALITY ALT",
                 "listen" => "0.0.0.0",
                 "port" => 2042,
                 "protocol" => "vless",
@@ -843,49 +843,13 @@ class MarzbanService
                     "level" => 0
                 ],
                 "streamSettings" => [
-                    "network" => "http",
-                    "httpSettings" => [
-                        "host" => ["www.cloudflare.com"],
-                        "path" => "/cdn-cgi/trace"
-                    ],
+                    "network" => "tcp",
                     "security" => "reality",
                     "realitySettings" => [
                         "show" => false,
                         "dest" => "www.cloudflare.com:443",
                         "xver" => 0,
                         "serverNames" => ["www.cloudflare.com", "cloudflare.com", "one.one.one.one"],
-                        "privateKey" => $privateKey,
-                        "shortIds" => ["", $xhttpShortId]
-                    ]
-                ],
-                "sniffing" => [
-                    "enabled" => true,
-                    "destOverride" => ["http", "tls", "quic"]
-                ]
-            ],
-            // VLESS XHTTP H2 REALITY (альтернативный) - дополнительный вариант для разнообразия
-            [
-                "tag" => "VLESS XHTTP H2 REALITY ALT",
-                "listen" => "0.0.0.0",
-                "port" => 2043,
-                "protocol" => "vless",
-                "settings" => [
-                    "clients" => [],
-                    "decryption" => "none",
-                    "level" => 0
-                ],
-                "streamSettings" => [
-                    "network" => "http",
-                    "httpSettings" => [
-                        "host" => ["www.google.com"],
-                        "path" => "/search"
-                    ],
-                    "security" => "reality",
-                    "realitySettings" => [
-                        "show" => false,
-                        "dest" => "www.google.com:443",
-                        "xver" => 0,
-                        "serverNames" => ["www.google.com", "google.com", "accounts.google.com"],
                         "privateKey" => $privateKey,
                         "shortIds" => ["", $xhttpShortId]
                     ]
