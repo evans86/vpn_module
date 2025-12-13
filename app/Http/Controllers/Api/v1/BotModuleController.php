@@ -14,6 +14,7 @@ use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class BotModuleController extends Controller
@@ -124,6 +125,8 @@ class BotModuleController extends Controller
 
             return ApiHelpers::success(BotModuleFactory::fromEntity($botModule)->getSettings());
 
+        } catch (ValidationException $v) {
+            return ApiHelpers::error($v->getMessage());
         } catch (RuntimeException $r) {
             return ApiHelpers::error($r->getMessage());
         } catch (Exception $e) {

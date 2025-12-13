@@ -60,7 +60,7 @@ class BotModuleService
     {
         $bot = BotModule::query()->where('public_key', $dto->public_key)->where('private_key', $dto->private_key)->first();
         if (empty($bot))
-            return ApiHelpers::error('Not found module.');
+            throw new RuntimeException('Not found module.');
 
         $bot->version = $dto->version;
         $bot->category_id = $dto->category_id;
@@ -70,13 +70,30 @@ class BotModuleService
         $bot->bot_user_id = $dto->bot_user_id;
 
         $creator = BottApi::getCreator($dto->public_key, $dto->private_key);
-        $salesman = Salesman::query()->where('telegram_id', $creator['data']['user']['telegram_id'])->first();
-
-        if (!isset($salesman)) {
-            $this->salesmanService->create($creator['data']['user']['telegram_id'], $creator['data']['user']['username']);
+        
+        // Проверка наличия данных в ответе API
+        if (!isset($creator['data']) || !isset($creator['data']['user'])) {
+            Log::error('Invalid API response from getCreator', [
+                'public_key' => $dto->public_key,
+                'response' => $creator
+            ]);
+            throw new RuntimeException('Invalid API response: missing user data');
         }
 
-        $salesman = Salesman::query()->where('telegram_id', $creator['data']['user']['telegram_id'])->first();
+        $telegramId = $creator['data']['user']['telegram_id'];
+        $username = $creator['data']['user']['username'] ?? null;
+        
+        $salesman = Salesman::query()->where('telegram_id', $telegramId)->first();
+
+        if (!isset($salesman)) {
+            $this->salesmanService->create($telegramId, $username);
+        }
+
+        $salesman = Salesman::query()->where('telegram_id', $telegramId)->first();
+        if (!$salesman) {
+            throw new RuntimeException('Failed to create or find salesman');
+        }
+        
         $salesman->module_bot_id = $dto->id;
 
         if (!$salesman->save())
