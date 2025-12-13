@@ -546,12 +546,19 @@ class MarzbanService
             }
             $grpcShortId = trim($grpcShortIdOutput);
 
+            // Генерация ShortID для XHTTP REALITY
+            $xhttpShortIdOutput = $ssh->exec('openssl rand -hex 8 2>&1');
+            if ($ssh->getExitStatus() !== 0) {
+                throw new RuntimeException("Failed to generate XHTTP ShortID: {$xhttpShortIdOutput}");
+            }
+            $xhttpShortId = trim($xhttpShortIdOutput);
+
             // Валидация ключей
             if (strlen($privateKey) < 40 || strlen($publicKey) < 40) {
                 throw new RuntimeException("Invalid key length generated");
             }
 
-            if (strlen($shortId) !== 16 || strlen($grpcShortId) !== 16) {
+            if (strlen($shortId) !== 16 || strlen($grpcShortId) !== 16 || strlen($xhttpShortId) !== 16) {
                 throw new RuntimeException("Invalid ShortID length generated");
             }
 
@@ -564,7 +571,8 @@ class MarzbanService
                 'private_key' => $privateKey,
                 'public_key' => $publicKey,
                 'short_id' => $shortId,
-                'grpc_short_id' => $grpcShortId
+                'grpc_short_id' => $grpcShortId,
+                'xhttp_short_id' => $xhttpShortId
             ];
         } catch (Exception $e) {
             Log::error('Failed to generate REALITY keys', [
@@ -597,7 +605,8 @@ class MarzbanService
                 'private_key' => $panel->reality_private_key,
                 'public_key' => $panel->reality_public_key,
                 'short_id' => $panel->reality_short_id,
-                'grpc_short_id' => $panel->reality_grpc_short_id
+                'grpc_short_id' => $panel->reality_grpc_short_id,
+                'xhttp_short_id' => $panel->reality_xhttp_short_id
             ];
         }
 
@@ -614,6 +623,7 @@ class MarzbanService
         $panel->reality_public_key = $keys['public_key'];
         $panel->reality_short_id = $keys['short_id'];
         $panel->reality_grpc_short_id = $keys['grpc_short_id'];
+        $panel->reality_xhttp_short_id = $keys['xhttp_short_id'];
         $panel->reality_keys_generated_at = now();
         $panel->save();
 
@@ -751,16 +761,18 @@ class MarzbanService
     }
 
     /**
-     * Построение REALITY протоколов
+     * Построение REALITY протоколов (улучшенная версия для обхода белых списков)
      *
      * @param string $privateKey
      * @param string $shortId
      * @param string $grpcShortId
+     * @param string $xhttpShortId
      * @return array
      */
-    private function buildRealityInbounds(string $privateKey, string $shortId, string $grpcShortId): array
+    private function buildRealityInbounds(string $privateKey, string $shortId, string $grpcShortId, string $xhttpShortId): array
     {
         return [
+            // VLESS TCP REALITY - основной протокол для обхода
             [
                 "tag" => "VLESS TCP REALITY",
                 "listen" => "0.0.0.0",
@@ -776,9 +788,9 @@ class MarzbanService
                     "security" => "reality",
                     "realitySettings" => [
                         "show" => false,
-                        "dest" => "tradingview.com:443",
+                        "dest" => "www.microsoft.com:443",
                         "xver" => 0,
-                        "serverNames" => ["tradingview.com"],
+                        "serverNames" => ["www.microsoft.com", "microsoft.com", "login.microsoftonline.com"],
                         "privateKey" => $privateKey,
                         "shortIds" => ["", $shortId]
                     ]
@@ -788,6 +800,7 @@ class MarzbanService
                     "destOverride" => ["http", "tls", "quic"]
                 ]
             ],
+            // VLESS GRPC REALITY - альтернативный протокол
             [
                 "tag" => "VLESS GRPC REALITY",
                 "listen" => "0.0.0.0",
@@ -801,16 +814,80 @@ class MarzbanService
                 "streamSettings" => [
                     "network" => "grpc",
                     "grpcSettings" => [
-                        "serviceName" => "xyz"
+                        "serviceName" => "GunService"
                     ],
                     "security" => "reality",
                     "realitySettings" => [
                         "show" => false,
-                        "dest" => "discordapp.com:443",
+                        "dest" => "www.apple.com:443",
                         "xver" => 0,
-                        "serverNames" => ["cdn.discordapp.com", "discordapp.com"],
+                        "serverNames" => ["www.apple.com", "apple.com", "cdn-apple.com"],
                         "privateKey" => $privateKey,
                         "shortIds" => ["", $grpcShortId]
+                    ]
+                ],
+                "sniffing" => [
+                    "enabled" => true,
+                    "destOverride" => ["http", "tls", "quic"]
+                ]
+            ],
+            // VLESS XHTTP H2 REALITY - современный протокол (замена WebSocket)
+            [
+                "tag" => "VLESS XHTTP H2 REALITY",
+                "listen" => "0.0.0.0",
+                "port" => 2042,
+                "protocol" => "vless",
+                "settings" => [
+                    "clients" => [],
+                    "decryption" => "none",
+                    "level" => 0
+                ],
+                "streamSettings" => [
+                    "network" => "http",
+                    "httpSettings" => [
+                        "host" => ["www.cloudflare.com"],
+                        "path" => "/cdn-cgi/trace"
+                    ],
+                    "security" => "reality",
+                    "realitySettings" => [
+                        "show" => false,
+                        "dest" => "www.cloudflare.com:443",
+                        "xver" => 0,
+                        "serverNames" => ["www.cloudflare.com", "cloudflare.com", "one.one.one.one"],
+                        "privateKey" => $privateKey,
+                        "shortIds" => ["", $xhttpShortId]
+                    ]
+                ],
+                "sniffing" => [
+                    "enabled" => true,
+                    "destOverride" => ["http", "tls", "quic"]
+                ]
+            ],
+            // VLESS XHTTP H2 REALITY (альтернативный) - дополнительный вариант для разнообразия
+            [
+                "tag" => "VLESS XHTTP H2 REALITY ALT",
+                "listen" => "0.0.0.0",
+                "port" => 2043,
+                "protocol" => "vless",
+                "settings" => [
+                    "clients" => [],
+                    "decryption" => "none",
+                    "level" => 0
+                ],
+                "streamSettings" => [
+                    "network" => "http",
+                    "httpSettings" => [
+                        "host" => ["www.google.com"],
+                        "path" => "/search"
+                    ],
+                    "security" => "reality",
+                    "realitySettings" => [
+                        "show" => false,
+                        "dest" => "www.google.com:443",
+                        "xver" => 0,
+                        "serverNames" => ["www.google.com", "google.com", "accounts.google.com"],
+                        "privateKey" => $privateKey,
+                        "shortIds" => ["", $xhttpShortId]
                     ]
                 ],
                 "sniffing" => [
@@ -992,7 +1069,8 @@ class MarzbanService
                 $this->buildRealityInbounds(
                     $realityKeys['private_key'],
                     $realityKeys['short_id'],
-                    $realityKeys['grpc_short_id']
+                    $realityKeys['grpc_short_id'],
+                    $realityKeys['xhttp_short_id']
                 ),
                 $this->buildStableInbounds()
             );

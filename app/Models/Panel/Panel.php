@@ -76,6 +76,7 @@ class Panel extends Model
         'reality_public_key',
         'reality_short_id',
         'reality_grpc_short_id',
+        'reality_xhttp_short_id',
         'reality_keys_generated_at',
         'config_type',
         'config_updated_at'
@@ -270,7 +271,8 @@ class Panel extends Model
         return !empty($this->reality_private_key) 
             && !empty($this->reality_public_key)
             && !empty($this->reality_short_id)
-            && !empty($this->reality_grpc_short_id);
+            && !empty($this->reality_grpc_short_id)
+            && !empty($this->reality_xhttp_short_id);
     }
 
     /**
@@ -285,6 +287,7 @@ class Panel extends Model
             'public_key' => $this->reality_public_key,
             'short_id' => $this->reality_short_id,
             'grpc_short_id' => $this->reality_grpc_short_id,
+            'xhttp_short_id' => $this->reality_xhttp_short_id,
             'generated_at' => $this->reality_keys_generated_at
         ];
     }
