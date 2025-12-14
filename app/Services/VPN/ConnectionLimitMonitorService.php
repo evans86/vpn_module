@@ -37,10 +37,15 @@ class ConnectionLimitMonitorService
         try {
             // ВАЖНО: Не фиксируем нарушения для просроченных или неактивных ключей
             // Если ключ был перевыпущен или деактивирован, нарушения не должны фиксироваться
-            if ($keyActivate->status !== KeyActivate::ACTIVE) {
+            // Приводим статус к int для корректного сравнения (может быть строкой из БД)
+            $keyStatus = (int)$keyActivate->status;
+            if ($keyStatus !== KeyActivate::ACTIVE) {
                 $this->logger->info('Пропущена фиксация нарушения - ключ не активен', [
                     'key_id' => $keyActivate->id,
                     'key_status' => $keyActivate->status,
+                    'key_status_type' => gettype($keyActivate->status),
+                    'key_status_int' => $keyStatus,
+                    'expected_status' => KeyActivate::ACTIVE,
                     'user_tg_id' => $keyActivate->user_tg_id
                 ]);
 

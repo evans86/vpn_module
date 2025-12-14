@@ -311,10 +311,15 @@ class ConnectionMonitorService
 
             // ВАЖНО: Проверяем, что ключ активен перед фиксацией нарушения
             // Если ключ был перевыпущен (статус EXPIRED), нарушения не должны фиксироваться
-            if ($keyActivate->status !== \App\Models\KeyActivate\KeyActivate::ACTIVE) {
+            // Приводим статус к int для корректного сравнения (может быть строкой из БД)
+            $keyStatus = (int)$keyActivate->status;
+            if ($keyStatus !== \App\Models\KeyActivate\KeyActivate::ACTIVE) {
                 Log::info('Пропущена фиксация нарушения - ключ не активен', [
                     'key_id' => $keyActivate->id,
                     'key_status' => $keyActivate->status,
+                    'key_status_type' => gettype($keyActivate->status),
+                    'key_status_int' => $keyStatus,
+                    'expected_status' => \App\Models\KeyActivate\KeyActivate::ACTIVE,
                     'source' => 'vpn',
                     'user_id' => $userId
                 ]);

@@ -38,6 +38,13 @@ class KeyActivate extends Model
     public $incrementing = false;
     protected $guarded = false;
     protected $table = 'key_activate';
+    
+    protected $casts = [
+        'status' => 'integer',
+        'finish_at' => 'integer',
+        'deleted_at' => 'integer',
+        'activated_at' => 'integer',
+    ];
 
     /**
      * Get the pack salesman relation

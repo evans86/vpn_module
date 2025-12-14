@@ -128,7 +128,8 @@ class ProcessViolationsCommand extends Command
         foreach ($violations as $violation) {
             try {
                 // Проверяем что ключ еще существует и активен
-                if (!$violation->keyActivate || $violation->keyActivate->status !== \App\Models\KeyActivate\KeyActivate::ACTIVE) {
+                // Приводим статус к int для корректного сравнения (может быть строкой из БД)
+                if (!$violation->keyActivate || (int)$violation->keyActivate->status !== \App\Models\KeyActivate\KeyActivate::ACTIVE) {
                     continue;
                 }
 
