@@ -208,12 +208,35 @@ class ConnectionMonitorService
                     'source' => 'vpn',
                     'unique_networks_count' => $networkCount,
                     'ip_addresses' => $uniqueIps,
+                    'threshold' => $threshold,
                     'violation_reason' => 'Multiple networks detected'
                 ]);
 
                 $violationCreated = $this->handleUserViolation($userId, $ipCount, $uniqueIps);
                 if ($violationCreated) {
                     $violationsCount++;
+                    Log::info('Violation successfully recorded', [
+                        'user_id' => $userId,
+                        'violations_count' => $violationsCount,
+                        'source' => 'vpn'
+                    ]);
+                } else {
+                    Log::warning('Violation detection failed - handleUserViolation returned false', [
+                        'user_id' => $userId,
+                        'unique_ips_count' => $ipCount,
+                        'source' => 'vpn'
+                    ]);
+                }
+            } else {
+                // Логируем почему нарушение не обнаружено (только для отладки, если превышен порог)
+                if ($ipCount > $threshold) {
+                    Log::debug('Potential violation skipped - all IPs from same network', [
+                        'user_id' => $userId,
+                        'unique_ips_count' => $ipCount,
+                        'unique_networks_count' => $networkCount,
+                        'threshold' => $threshold,
+                        'source' => 'vpn'
+                    ]);
                 }
             }
         }
@@ -234,7 +257,7 @@ class ConnectionMonitorService
      */
     private function isRealViolation(array $ipAddresses, int $ipCount, int $threshold): bool
     {
-        // Если IP меньше порога - не нарушение
+        // Если IP меньше или равно порогу - не нарушение
         if ($ipCount <= $threshold) {
             return false;
         }
@@ -248,21 +271,21 @@ class ConnectionMonitorService
 
         $networkCount = count($networks);
 
-        // Логируем анализ сетей только если обнаружено потенциальное нарушение
-        if ($networkCount > 1) {
-            // Network analysis - multiple networks detected
-            Log::info('Network analysis - multiple networks detected', [
-                'ip_count' => $ipCount,
-                'network_count' => $networkCount,
-                'networks' => array_keys($networks),
-                'ips' => $ipAddresses,
-                'source' => 'vpn'
-            ]);
-        }
+        // Логируем анализ сетей для всех случаев превышения порога
+        Log::info('Network analysis for potential violation', [
+            'ip_count' => $ipCount,
+            'network_count' => $networkCount,
+            'threshold' => $threshold,
+            'networks' => array_keys($networks),
+            'ips' => $ipAddresses,
+            'is_violation' => $networkCount > 1,
+            'source' => 'vpn'
+        ]);
 
-        // НАША НОВАЯ ЛОГИКА:
-        // Нарушение только если есть IP из РАЗНЫХ сетей
+        // НАША ЛОГИКА:
+        // Нарушение только если есть IP из РАЗНЫХ сетей И превышен порог
         // Если все IP из одной сети (/24) - это не нарушение (пользователь в одной локации)
+        // Это позволяет избежать ложных срабатываний для пользователей с несколькими устройствами в одной сети
         return $networkCount > 1;
     }
 
@@ -348,6 +371,7 @@ class ConnectionMonitorService
             Log::error('Failed to handle user violation', [
                 'user_id' => $userId,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'source' => 'vpn'
             ]);
             return false;

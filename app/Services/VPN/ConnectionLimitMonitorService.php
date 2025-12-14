@@ -77,11 +77,24 @@ class ConnectionLimitMonitorService
             }
 
             $allowedConnections = 3; // Лимит подключений
+            
+            // Проверяем наличие связи keyActivateUser
+            if (!$keyActivate->keyActivateUser) {
+                throw new \Exception('KeyActivateUser not found for key: ' . $keyActivate->id);
+            }
+            
             $serverUser = $keyActivate->keyActivateUser->serverUser;
+            
+            if (!$serverUser) {
+                throw new \Exception('ServerUser not found for key: ' . $keyActivate->id);
+            }
 
             // Если panelId не указан, используем панель пользователя
             if (!$panelId) {
                 $panel = $serverUser->panel;
+                if (!$panel) {
+                    throw new \Exception('Panel not found for serverUser: ' . $serverUser->id);
+                }
                 $panelId = $panel->id;
             }
 
