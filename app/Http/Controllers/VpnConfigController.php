@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\KeyActivate\KeyActivate;
+use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Models\ServerUser\ServerUser;
 use App\Models\VPN\ConnectionLimitViolation;
 use App\Repositories\KeyActivate\KeyActivateRepository;
@@ -180,12 +181,70 @@ class VpnConfigController extends Controller
             return response(implode("\n", $connectionKeys))
                 ->header('Content-Type', 'text/plain');
 
+        } catch (\App\Exceptions\KeyReplacedException $e) {
+            // Ключ был перевыпущен - показываем страницу ошибки с информацией о новом ключе
+            $newKeyId = $e->getNewKeyId();
+            
+            Log::info('Key was replaced, showing error page with new key link', [
+                'old_key_id' => $key_activate_id,
+                'new_key_id' => $newKeyId,
+                'source' => 'vpn'
+            ]);
+
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Key was replaced',
+                    'new_key_id' => $newKeyId
+                ], 404);
+            }
+
+            return response()->view('vpn.error', [
+                'message' => 'Конфигурация VPN не найдена. Пожалуйста, проверьте правильность ссылки или обратитесь в поддержку.',
+                'replacedKeyId' => $newKeyId
+            ]);
         } catch (Exception $e) {
             Log::error('Error showing VPN config', [
                 'key_activate_id' => $key_activate_id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
+
+            // Проверяем, может быть это ошибка 404 из-за перевыпуска ключа
+            if (str_contains($e->getMessage(), '404') || str_contains($e->getMessage(), 'User not found')) {
+                // Ищем KeyActivate по ID
+                $keyActivate = $this->keyActivateRepository->findById($key_activate_id);
+                
+                if ($keyActivate) {
+                    // Проверяем, был ли ключ перевыпущен
+                    $replacedViolation = \App\Models\VPN\ConnectionLimitViolation::where('key_activate_id', $keyActivate->id)
+                        ->whereNotNull('key_replaced_at')
+                        ->whereNotNull('replaced_key_id')
+                        ->orderBy('key_replaced_at', 'desc')
+                        ->first();
+
+                    if ($replacedViolation && $replacedViolation->replaced_key_id) {
+                        Log::info('Key was replaced, showing error page with new key link', [
+                            'old_key_id' => $key_activate_id,
+                            'new_key_id' => $replacedViolation->replaced_key_id,
+                            'source' => 'vpn'
+                        ]);
+
+                        if (request()->wantsJson()) {
+                            return response()->json([
+                                'status' => 'error',
+                                'message' => 'Key was replaced',
+                                'new_key_id' => $replacedViolation->replaced_key_id
+                            ], 404);
+                        }
+
+                        return response()->view('vpn.error', [
+                            'message' => 'Конфигурация VPN не найдена. Пожалуйста, проверьте правильность ссылки или обратитесь в поддержку.',
+                            'replacedKeyId' => $replacedViolation->replaced_key_id
+                        ]);
+                    }
+                }
+            }
 
             if (request()->wantsJson()) {
                 return response()->json([
@@ -239,6 +298,31 @@ class VpnConfigController extends Controller
                 'error' => $e->getMessage(),
                 'source' => 'vpn'
             ]);
+
+            // Проверяем, является ли это ошибкой 404 (User not found)
+            // Если да, проверяем, был ли ключ перевыпущен
+            // Для этого нужно получить key_activate_id из serverUser через keyActivateUser
+            if (str_contains($e->getMessage(), '404') || str_contains($e->getMessage(), 'User not found')) {
+                // Ищем KeyActivateUser по server_user_id
+                $keyActivateUser = KeyActivateUser::where('server_user_id', $serverUser->id)->first();
+                
+                if ($keyActivateUser && $keyActivateUser->key_activate_id) {
+                    // Проверяем, был ли ключ перевыпущен
+                    $replacedViolation = \App\Models\VPN\ConnectionLimitViolation::where('key_activate_id', $keyActivateUser->key_activate_id)
+                        ->whereNotNull('key_replaced_at')
+                        ->whereNotNull('replaced_key_id')
+                        ->orderBy('key_replaced_at', 'desc')
+                        ->first();
+
+                    if ($replacedViolation && $replacedViolation->replaced_key_id) {
+                        // Ключ был перевыпущен - пробрасываем специальное исключение
+                        throw new \App\Exceptions\KeyReplacedException(
+                            'Ключ был перевыпущен',
+                            $replacedViolation->replaced_key_id
+                        );
+                    }
+                }
+            }
 
             // В случае ошибки возвращаем сохраненные ключи, если они есть
             $storedKeys = json_decode($serverUser->keys, true) ?? [];

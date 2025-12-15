@@ -123,33 +123,15 @@
                                             ⚠️ Обнаружено нарушение
                                         @endif
                                     </h3>
-                                    <p class="text-white/90 mb-3">
+                                    <p class="text-white/90">
                                         @if($violationCount >= 3)
-                                            Обнаружено {{ $violationCount }} нарушений лимита подключений. Ключ был автоматически перевыпущен.
+                                            Обнаружено нарушение лимита подключений. Ключ был автоматически перевыпущен.
                                         @elseif($violationCount >= 2)
-                                            Обнаружено {{ $violationCount }} нарушения лимита подключений. При следующем нарушении ключ будет перевыпущен.
+                                            Обнаружено повторное нарушение лимита подключений. При следующем нарушении ключ будет перевыпущен.
                                         @else
                                             Обнаружено нарушение лимита подключений. Пожалуйста, используйте не более 3 одновременных подключений.
                                         @endif
                                     </p>
-                                    <div class="flex flex-wrap gap-4 text-sm">
-                                        <div class="flex items-center">
-                                            <span class="font-medium">Нарушений:</span>
-                                            <span class="ml-2 px-2 py-1 bg-white/20 rounded font-bold">{{ $violationCount }}</span>
-                                        </div>
-                                        @if($activeViolation->actual_connections)
-                                            <div class="flex items-center">
-                                                <span class="font-medium">Подключений:</span>
-                                                <span class="ml-2 px-2 py-1 bg-white/20 rounded font-bold">{{ $activeViolation->actual_connections }}</span>
-                                            </div>
-                                        @endif
-                                        @if($activeViolation->created_at)
-                                            <div class="flex items-center">
-                                                <span class="font-medium">Обнаружено:</span>
-                                                <span class="ml-2">{{ $activeViolation->created_at->format('d.m.Y H:i') }}</span>
-                                            </div>
-                                        @endif
-                                    </div>
                                 </div>
                             </div>
                         </div>

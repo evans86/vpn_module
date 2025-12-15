@@ -16,6 +16,33 @@
                 <h2 class="text-lg font-bold text-white">Ошибка</h2>
             </div>
 
+            <!-- Key Replaced Notification -->
+            @if(isset($replacedKeyId) && $replacedKeyId)
+                <div class="bg-gradient-to-r from-green-600 to-emerald-700 px-6 py-4 text-white">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0">
+                            <svg class="h-6 w-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div class="ml-3 flex-1">
+                            <h3 class="text-lg font-bold mb-2">✅ Ключ был перевыпущен</h3>
+                            <p class="text-white/90 mb-3 text-sm">
+                                Ваш ключ доступа был автоматически перевыпущен из-за превышения лимита подключений. 
+                                Пожалуйста, используйте новый ключ для подключения.
+                            </p>
+                            <a href="{{ route('vpn.config.show', $replacedKeyId) }}" 
+                               class="inline-flex items-center px-4 py-2 bg-white text-emerald-700 rounded-lg font-semibold hover:bg-green-50 transition-colors shadow-lg">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                                </svg>
+                                Перейти к новому ключу
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <!-- Error Message Section -->
             <div class="px-6 py-4">
                 <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-3 mb-3">
