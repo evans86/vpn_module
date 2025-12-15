@@ -98,9 +98,7 @@ class ConnectionLimitMonitorService
                 $panelId = $panel->id;
             }
 
-            // Проверяем есть ли уже активное нарушение для этого ключа
-            // Ищем активные нарушения в пределах окна мониторинга (1 час) для проверки на дубликаты
-            // Если нарушение найдено вне окна - это новое нарушение, увеличим счетчик
+            // ПРОСТАЯ ЛОГИКА: Проверяем есть ли уже активное нарушение для этого ключа
             $existingViolation = ConnectionLimitViolation::where([
                 'key_activate_id' => $keyActivate->id,
                 'status' => ConnectionLimitViolation::STATUS_ACTIVE
@@ -110,107 +108,63 @@ class ConnectionLimitMonitorService
             ->first();
 
             if ($existingViolation) {
-                // Проверяем, находится ли нарушение в пределах окна мониторинга (1 час)
-                // Если нарушение старше 1 часа - это новое нарушение, увеличиваем счетчик
-                $violationAgeMinutes = $existingViolation->created_at->diffInMinutes(now());
-                $isWithinWindow = $violationAgeMinutes < 60;
+                // ПРОСТАЯ ЛОГИКА: Проверяем, прошло ли больше часа с последнего уведомления
+                // Если прошло меньше часа - пропускаем (защита от спама)
+                // Если прошло больше часа - это новое нарушение, увеличиваем счетчик
                 
-                if (!$isWithinWindow) {
-                    // Нарушение вне окна - это новое нарушение, увеличиваем счетчик
-                    $existingViolation->violation_count += 1;
-                    $newViolationCount = $existingViolation->violation_count;
-                    $existingViolation->actual_connections = $uniqueIpCount;
-                    $existingViolation->ip_addresses = array_values(array_unique($ipAddresses));
-                    $existingViolation->created_at = now(); // Обновляем время последнего нарушения
-                    $existingViolation->save();
+                $lastNotificationTime = $existingViolation->last_notification_sent_at;
+                
+                if ($lastNotificationTime) {
+                    $hoursSinceLastNotification = $lastNotificationTime->diffInHours(now());
+                    
+                    // Если прошло меньше часа - пропускаем (защита от спама)
+                    if ($hoursSinceLastNotification < 1) {
+                        // Просто обновляем данные, но НЕ увеличиваем счетчик
+                        $existingViolation->actual_connections = $uniqueIpCount;
+                        $existingViolation->ip_addresses = array_values(array_unique($ipAddresses));
+                        $existingViolation->created_at = now(); // Обновляем время последней проверки
+                        $existingViolation->save();
 
-                    $this->logger->warning('Обновлено нарушение лимита подключений (новое нарушение вне окна)', [
-                        'key_id' => $keyActivate->id,
-                        'user_tg_id' => $keyActivate->user_tg_id,
-                        'violation_count' => $newViolationCount,
-                        'actual_ips' => $uniqueIpCount,
-                        'violation_id' => $existingViolation->id,
-                        'previous_violation_age_minutes' => $violationAgeMinutes
-                    ]);
-
-                    // Отправляем уведомление для нового нарушения
-                    // (логика отправки будет ниже)
-                } else {
-                    // Нарушение в пределах окна - проверяем на дубликаты
-                    $existingIps = $existingViolation->ip_addresses ?? [];
-                    $currentIps = array_values(array_unique($ipAddresses));
-
-                    // Сортируем для сравнения
-                    sort($existingIps);
-                    sort($currentIps);
-
-                    // Если IP адреса идентичны и нарушение создано недавно (менее 15 минут назад), это дубликат
-                    // ДОПОЛНИТЕЛЬНО: если уведомление было отправлено недавно (менее 2 минут назад), это тоже дубликат
-                    $isDuplicateIps = $existingIps === $currentIps;
-                    $isRecentViolation = $violationAgeMinutes < 15;
-                    $isRecentNotification = $existingViolation->last_notification_sent_at &&
-                                           $existingViolation->last_notification_sent_at->diffInSeconds(now()) < 120;
-
-                    if (($isDuplicateIps && $isRecentViolation) || $isRecentNotification) {
-                        // Это дубликат из-за перекрытия окон или недавней отправки - просто обновляем время, но не увеличиваем счетчик
-                    $existingViolation->actual_connections = $uniqueIpCount; // Обновляем количество на случай изменений
-                    $existingViolation->created_at = now(); // Обновляем время последней проверки
-                    $existingViolation->save();
-
-                        $this->logger->info('Пропущено дублирующее нарушение (перекрытие окон или недавняя отправка)', [
+                        $this->logger->info('Пропущено нарушение - прошло менее часа с последнего уведомления (защита от спама)', [
                             'key_id' => $keyActivate->id,
                             'violation_id' => $existingViolation->id,
-                            'created_at' => $existingViolation->created_at->format('Y-m-d H:i:s'),
-                            'last_notification_sent_at' => $existingViolation->last_notification_sent_at ? $existingViolation->last_notification_sent_at->format('Y-m-d H:i:s') : null,
-                            'is_duplicate_ips' => $isDuplicateIps,
-                            'is_recent_notification' => $isRecentNotification
+                            'violation_count' => $existingViolation->violation_count,
+                            'hours_since_last_notification' => round($hoursSinceLastNotification, 2),
+                            'last_notification_sent_at' => $lastNotificationTime->format('Y-m-d H:i:s')
                         ]);
 
                         return $existingViolation;
                     }
-
-                    // IP изменились в пределах окна - это новое нарушение
-                    // Увеличиваем счетчик нарушений и обновляем данные
-                    $existingViolation->violation_count += 1;
-                    $newViolationCount = $existingViolation->violation_count;
-                    $existingViolation->actual_connections = $uniqueIpCount;
-                    // Храним только IP текущего нарушения, не объединяем с предыдущими
-                    $existingViolation->ip_addresses = $currentIps; // Сохраняем только IP текущего нарушения
-                    $existingViolation->created_at = now(); // Обновляем время последнего нарушения
-                    $existingViolation->save();
-
-                    $this->logger->warning('Обновлено нарушение лимита подключений (повторное в пределах окна)', [
-                        'key_id' => $keyActivate->id,
-                        'user_tg_id' => $keyActivate->user_tg_id,
-                        'violation_count' => $newViolationCount,
-                        'actual_ips' => $uniqueIpCount,
-                        'violation_id' => $existingViolation->id
-                    ]);
                 }
+
+                // Прошло больше часа (или уведомление еще не отправлялось) - это новое нарушение
+                // Увеличиваем счетчик нарушений
+                $existingViolation->violation_count += 1;
+                $newViolationCount = $existingViolation->violation_count;
+                $existingViolation->actual_connections = $uniqueIpCount;
+                $existingViolation->ip_addresses = array_values(array_unique($ipAddresses));
+                $existingViolation->created_at = now(); // Обновляем время последнего нарушения
+                $existingViolation->save();
+
+                $this->logger->warning('Зафиксировано новое нарушение (прошло больше часа с последнего уведомления)', [
+                    'key_id' => $keyActivate->id,
+                    'user_tg_id' => $keyActivate->user_tg_id,
+                    'violation_count' => $newViolationCount,
+                    'actual_ips' => $uniqueIpCount,
+                    'violation_id' => $existingViolation->id,
+                    'hours_since_last_notification' => $lastNotificationTime ? round($lastNotificationTime->diffInHours(now()), 2) : null,
+                    'last_notification_sent_at' => $lastNotificationTime ? $lastNotificationTime->format('Y-m-d H:i:s') : null
+                ]);
                 
-                // Для обоих случаев (вне окна или новое в пределах окна) продолжаем с отправкой уведомления
                 // Перезагружаем нарушение из БД, чтобы получить актуальные данные
                 $existingViolation->refresh();
                 $newViolationCount = $existingViolation->violation_count;
 
                 // Отправляем уведомление сразу при увеличении счетчика нарушений
-                // Проверяем, что уведомление еще не отправлено для текущего количества нарушений
-                // ВАЖНО: Проверяем ПЕРЕД отправкой, чтобы избежать дублирования
                 $notificationsSent = $existingViolation->getNotificationsSentCount();
+                
+                // Проверяем, что уведомление еще не отправлено для текущего количества нарушений
                 if ($notificationsSent < $newViolationCount) {
-                    // Дополнительная проверка: если уведомление было отправлено недавно (менее 1 минуты назад),
-                    // и violation_count не изменился, не отправляем повторно (защита от гонок)
-                    if ($existingViolation->last_notification_sent_at &&
-                        $existingViolation->last_notification_sent_at->diffInSeconds(now()) < 60 &&
-                        $notificationsSent >= ($newViolationCount - 1)) {
-                        $this->logger->info('Пропущена отправка уведомления - недавно уже было отправлено', [
-                            'violation_id' => $existingViolation->id,
-                            'violation_count' => $newViolationCount,
-                            'notifications_sent' => $notificationsSent,
-                            'last_sent_at' => $existingViolation->last_notification_sent_at->format('Y-m-d H:i:s')
-                        ]);
-                        return $existingViolation;
-                    }
 
                     try {
                         $result = $this->sendViolationNotificationWithResult($existingViolation);
