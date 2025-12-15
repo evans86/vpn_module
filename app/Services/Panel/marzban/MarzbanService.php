@@ -682,81 +682,81 @@ class MarzbanService
     private function buildStableInbounds(): array
     {
         return [
-            [
-                "tag" => "VLESS-WS",
-                "listen" => "0.0.0.0",
-                "port" => 2095,
-                "protocol" => "vless",
-                "settings" => [
-                    "clients" => [],
-                    "decryption" => "none",
-                    "level" => 0
-                ],
-                "streamSettings" => [
-                    "network" => "ws",
-                    "security" => "none",
-                    "wsSettings" => [
-                        "path" => "/vless"
+                [
+                    "tag" => "VLESS-WS",
+                    "listen" => "0.0.0.0",
+                    "port" => 2095,
+                    "protocol" => "vless",
+                    "settings" => [
+                        "clients" => [],
+                        "decryption" => "none",
+                        "level" => 0
+                    ],
+                    "streamSettings" => [
+                        "network" => "ws",
+                        "security" => "none",
+                        "wsSettings" => [
+                            "path" => "/vless"
+                        ]
+                    ],
+                    "sniffing" => [
+                        "enabled" => true,
+                        "destOverride" => ["http", "tls"]
                     ]
                 ],
-                "sniffing" => [
-                    "enabled" => true,
-                    "destOverride" => ["http", "tls"]
-                ]
-            ],
-            [
-                "tag" => "VMESS-WS",
-                "listen" => "0.0.0.0",
-                "port" => 2096,
-                "protocol" => "vmess",
-                "settings" => [
-                    "clients" => [],
-                    "level" => 0
-                ],
-                "streamSettings" => [
-                    "network" => "ws",
-                    "security" => "none",
-                    "wsSettings" => [
-                        "path" => "/vmess"
+                [
+                    "tag" => "VMESS-WS",
+                    "listen" => "0.0.0.0",
+                    "port" => 2096,
+                    "protocol" => "vmess",
+                    "settings" => [
+                        "clients" => [],
+                        "level" => 0
+                    ],
+                    "streamSettings" => [
+                        "network" => "ws",
+                        "security" => "none",
+                        "wsSettings" => [
+                            "path" => "/vmess"
+                        ]
+                    ],
+                    "sniffing" => [
+                        "enabled" => true,
+                        "destOverride" => ["http", "tls"]
                     ]
                 ],
-                "sniffing" => [
-                    "enabled" => true,
-                    "destOverride" => ["http", "tls"]
-                ]
-            ],
-            [
-                "tag" => "TROJAN-WS",
-                "listen" => "0.0.0.0",
-                "port" => 2097,
-                "protocol" => "trojan",
-                "settings" => [
-                    "clients" => [],
-                    "level" => 0
-                ],
-                "streamSettings" => [
-                    "network" => "ws",
-                    "security" => "none",
-                    "wsSettings" => [
-                        "path" => "/trojan"
+                [
+                    "tag" => "TROJAN-WS",
+                    "listen" => "0.0.0.0",
+                    "port" => 2097,
+                    "protocol" => "trojan",
+                    "settings" => [
+                        "clients" => [],
+                        "level" => 0
+                    ],
+                    "streamSettings" => [
+                        "network" => "ws",
+                        "security" => "none",
+                        "wsSettings" => [
+                            "path" => "/trojan"
+                        ]
+                    ],
+                    "sniffing" => [
+                        "enabled" => true,
+                        "destOverride" => ["http", "tls"]
                     ]
                 ],
-                "sniffing" => [
-                    "enabled" => true,
-                    "destOverride" => ["http", "tls"]
+                [
+                    "tag" => "Shadowsocks-TCP",
+                    "listen" => "0.0.0.0",
+                    "port" => 2098,
+                    "protocol" => "shadowsocks",
+                    "settings" => [
+                        "clients" => [],
+                        "network" => "tcp,udp",
+                        "level" => 0
+                    ]
                 ]
-            ],
-            [
-                "tag" => "Shadowsocks-TCP",
-                "listen" => "0.0.0.0",
-                "port" => 2098,
-                "protocol" => "shadowsocks",
-                "settings" => [
-                    "clients" => [],
-                    "network" => "tcp,udp",
-                    "level" => 0
-                ]
-            ]
         ];
     }
 
@@ -923,8 +923,8 @@ class MarzbanService
             $retryDelay = 2; // секунды
             
             for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
-                try {
-                    $marzbanApi->modifyConfig($panel->auth_token, $json_config);
+        try {
+            $marzbanApi->modifyConfig($panel->auth_token, $json_config);
                     break; // Успешно, выходим из цикла
                 } catch (RuntimeException $e) {
                     // Если это последняя попытка или ошибка не связана с сервером, пробрасываем дальше

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\ServerUser\ServerUser;
+use App\Models\VPN\ConnectionLimitViolation;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Repositories\KeyActivateUser\KeyActivateUserRepository;
 use App\Repositories\ServerUser\ServerUserRepository;
@@ -352,12 +353,81 @@ class VpnConfigController extends Controller
         $netcheckUrl = route('netcheck.index');
         $isDemoMode = true; // Флаг для отображения демо-баннера
 
+        // Создаем демо-нарушение для просмотра
+        // Можно изменить violation_count через параметр ?violation=1,2,3 в URL для просмотра разных состояний
+        $violationCount = request()->get('violation', 2); // По умолчанию показываем 2-е нарушение
+        $violationCount = in_array((int)$violationCount, [1, 2, 3]) ? (int)$violationCount : 2;
+        
+        $demoViolation = new \App\Models\VPN\ConnectionLimitViolation([
+            'violation_count' => $violationCount,
+            'actual_connections' => 5,
+            'allowed_connections' => 3,
+            'ip_addresses' => ['192.168.1.1', '192.168.1.2', '10.0.0.1', '172.16.0.1', '192.168.1.3'],
+            'status' => \App\Models\VPN\ConnectionLimitViolation::STATUS_ACTIVE,
+            'notifications_sent' => $violationCount,
+            'created_at' => now()->subHours(2),
+            'last_notification_sent_at' => now()->subHours(1)
+        ]);
+        // Устанавливаем ID для корректной работы методов
+        $demoViolation->id = 'demo-violation-' . $key_activate_id;
+        $demoViolation->exists = true;
+
+        // Создаем коллекцию с одним нарушением
+        $violations = collect([$demoViolation]);
+
+        // Для демо-режима: если параметр ?replaced=1, показываем перевыпущенный ключ
+        $showReplaced = request()->get('replaced', 0) == 1;
+        $replacedViolation = null;
+        $newKeyActivate = null;
+        $newKeyFormattedKeys = null;
+        $newKeyUserInfo = null;
+
+        if ($showReplaced) {
+            // Создаем демо-нарушение с перевыпущенным ключом
+            $replacedViolation = new \App\Models\VPN\ConnectionLimitViolation([
+                'violation_count' => 3,
+                'actual_connections' => 5,
+                'allowed_connections' => 3,
+                'ip_addresses' => ['192.168.1.1', '192.168.1.2', '10.0.0.1', '172.16.0.1', '192.168.1.3'],
+                'status' => \App\Models\VPN\ConnectionLimitViolation::STATUS_RESOLVED,
+                'notifications_sent' => 3,
+                'created_at' => now()->subDays(2),
+                'key_replaced_at' => now()->subHours(1),
+                'replaced_key_id' => 'demo-new-key-' . $key_activate_id
+            ]);
+            $replacedViolation->id = 'demo-replaced-violation-' . $key_activate_id;
+            $replacedViolation->exists = true;
+
+            // Создаем демо-новый ключ
+            $newKeyActivate = new \stdClass();
+            $newKeyActivate->id = 'demo-new-key-' . $key_activate_id;
+            $newKeyActivate->exists = true;
+
+            // Используем те же ключи, но помечаем как новые
+            $newKeyFormattedKeys = $formattedKeys;
+            
+            // Информация о новом ключе (те же данные, но можно изменить)
+            $newKeyUserInfo = $userInfo;
+        }
+
         Log::info('Showing demo page for local development', [
             'key_activate_id' => $key_activate_id,
+            'show_replaced' => $showReplaced,
             'source' => 'vpn'
         ]);
 
-        return response()->view('vpn.config', compact('userInfo', 'formattedKeys', 'botLink', 'netcheckUrl', 'isDemoMode'));
+        return response()->view('vpn.config', compact(
+            'userInfo', 
+            'formattedKeys', 
+            'botLink', 
+            'netcheckUrl', 
+            'isDemoMode', 
+            'violations',
+            'replacedViolation',
+            'newKeyActivate',
+            'newKeyFormattedKeys',
+            'newKeyUserInfo'
+        ));
     }
 
     /**
@@ -416,8 +486,89 @@ class VpnConfigController extends Controller
             $netcheckUrl = route('netcheck.index');
             $isDemoMode = false; // Это реальная страница, не демо
 
+            // Получаем активные нарушения для этого ключа
+            $violations = ConnectionLimitViolation::where('key_activate_id', $keyActivate->id)
+                ->where('status', ConnectionLimitViolation::STATUS_ACTIVE)
+                ->whereNull('key_replaced_at')
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            // Проверяем, был ли ключ перевыпущен
+            $replacedViolation = ConnectionLimitViolation::where('key_activate_id', $keyActivate->id)
+                ->whereNotNull('key_replaced_at')
+                ->whereNotNull('replaced_key_id')
+                ->orderBy('key_replaced_at', 'desc')
+                ->first();
+
+            $newKeyActivate = null;
+            $newKeyFormattedKeys = null;
+            $newKeyUserInfo = null;
+
+            if ($replacedViolation && $replacedViolation->replaced_key_id) {
+                // Находим новый ключ
+                $newKeyActivate = $this->keyActivateRepository->findById($replacedViolation->replaced_key_id);
+                
+                if ($newKeyActivate) {
+                    // Загружаем отношения для нового ключа
+                    $newKeyActivate->load(['packSalesman', 'packSalesman.salesman']);
+                    
+                    // Ищем KeyActivateUser для нового ключа
+                    $newKeyActivateUser = $this->keyActivateUserRepository->findByKeyActivateIdWithRelations($newKeyActivate->id);
+                    
+                    if ($newKeyActivateUser && $newKeyActivateUser->serverUser) {
+                        $newServerUser = $newKeyActivateUser->serverUser;
+                        
+                        // Получаем актуальные ключи для нового ключа
+                        try {
+                            $newConnectionKeys = $this->getFreshUserLinks($newServerUser);
+                            
+                            if ($newConnectionKeys) {
+                                $newKeyFormattedKeys = $this->formatConnectionKeys($newConnectionKeys);
+                                
+                                // Получаем информацию о подписке для нового ключа
+                                $panel_strategy = new PanelStrategy($newServerUser->panel->panel);
+                                $newInfo = $panel_strategy->getSubscribeInfo($newServerUser->panel->id, $newServerUser->id);
+                                
+                                $newFinishAt = $newKeyActivate->finish_at ?? null;
+                                $newDaysRemaining = null;
+                                if ($newFinishAt && $newFinishAt > 0) {
+                                    $newDaysRemaining = ceil(($newFinishAt - time()) / \App\Constants\TimeConstants::SECONDS_IN_DAY);
+                                }
+                                
+                                $newKeyUserInfo = [
+                                    'username' => $newServerUser->id,
+                                    'status' => $newInfo['status'] ?? 'unknown',
+                                    'data_limit' => $newInfo['data_limit'] ?? 0,
+                                    'data_limit_tariff' => $newKeyActivate->traffic_limit ?? 0,
+                                    'data_used' => $newInfo['used_traffic'] ?? 0,
+                                    'expiration_date' => $newFinishAt,
+                                    'days_remaining' => $newDaysRemaining
+                                ];
+                            }
+                        } catch (Exception $e) {
+                            Log::error('Ошибка при получении конфигурации нового ключа', [
+                                'new_key_id' => $newKeyActivate->id,
+                                'error' => $e->getMessage(),
+                                'source' => 'vpn'
+                            ]);
+                        }
+                    }
+                }
+            }
+
             Log::warning('Returning browser page');
-            return response()->view('vpn.config', compact('userInfo', 'formattedKeys', 'botLink', 'netcheckUrl', 'isDemoMode'));
+            return response()->view('vpn.config', compact(
+                'userInfo', 
+                'formattedKeys', 
+                'botLink', 
+                'netcheckUrl', 
+                'isDemoMode', 
+                'violations',
+                'replacedViolation',
+                'newKeyActivate',
+                'newKeyFormattedKeys',
+                'newKeyUserInfo'
+            ));
 
         } catch (Exception $e) {
             Log::error('Error showing browser page:', [

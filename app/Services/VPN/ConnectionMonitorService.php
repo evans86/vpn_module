@@ -273,14 +273,14 @@ class ConnectionMonitorService
 
         // Логируем анализ сетей для всех случаев превышения порога
         Log::info('Network analysis for potential violation', [
-            'ip_count' => $ipCount,
-            'network_count' => $networkCount,
+                'ip_count' => $ipCount,
+                'network_count' => $networkCount,
             'threshold' => $threshold,
-            'networks' => array_keys($networks),
-            'ips' => $ipAddresses,
+                'networks' => array_keys($networks),
+                'ips' => $ipAddresses,
             'is_violation' => $networkCount > 1,
-            'source' => 'vpn'
-        ]);
+                'source' => 'vpn'
+            ]);
 
         // НАША ЛОГИКА:
         // Нарушение только если есть IP из РАЗНЫХ сетей И превышен порог

@@ -120,10 +120,10 @@ class ConnectionLimitMonitorService
                     // Если прошло меньше часа - пропускаем (защита от спама)
                     if ($hoursSinceLastNotification < 1) {
                         // Просто обновляем данные, но НЕ увеличиваем счетчик
-                        $existingViolation->actual_connections = $uniqueIpCount;
-                        $existingViolation->ip_addresses = array_values(array_unique($ipAddresses));
-                        $existingViolation->created_at = now(); // Обновляем время последней проверки
-                        $existingViolation->save();
+                    $existingViolation->actual_connections = $uniqueIpCount;
+                    $existingViolation->ip_addresses = array_values(array_unique($ipAddresses));
+                    $existingViolation->created_at = now(); // Обновляем время последней проверки
+                    $existingViolation->save();
 
                         $this->logger->info('Пропущено нарушение - прошло менее часа с последнего уведомления (защита от спама)', [
                             'key_id' => $keyActivate->id,
@@ -135,26 +135,26 @@ class ConnectionLimitMonitorService
 
                         return $existingViolation;
                     }
-                }
+                    }
 
                 // Прошло больше часа (или уведомление еще не отправлялось) - это новое нарушение
                 // Увеличиваем счетчик нарушений
-                $existingViolation->violation_count += 1;
-                $newViolationCount = $existingViolation->violation_count;
-                $existingViolation->actual_connections = $uniqueIpCount;
+                    $existingViolation->violation_count += 1;
+                    $newViolationCount = $existingViolation->violation_count;
+                    $existingViolation->actual_connections = $uniqueIpCount;
                 $existingViolation->ip_addresses = array_values(array_unique($ipAddresses));
-                $existingViolation->created_at = now(); // Обновляем время последнего нарушения
-                $existingViolation->save();
+                    $existingViolation->created_at = now(); // Обновляем время последнего нарушения
+                    $existingViolation->save();
 
                 $this->logger->warning('Зафиксировано новое нарушение (прошло больше часа с последнего уведомления)', [
-                    'key_id' => $keyActivate->id,
-                    'user_tg_id' => $keyActivate->user_tg_id,
-                    'violation_count' => $newViolationCount,
-                    'actual_ips' => $uniqueIpCount,
+                        'key_id' => $keyActivate->id,
+                        'user_tg_id' => $keyActivate->user_tg_id,
+                        'violation_count' => $newViolationCount,
+                        'actual_ips' => $uniqueIpCount,
                     'violation_id' => $existingViolation->id,
                     'hours_since_last_notification' => $lastNotificationTime ? round($lastNotificationTime->diffInHours(now()), 2) : null,
                     'last_notification_sent_at' => $lastNotificationTime ? $lastNotificationTime->format('Y-m-d H:i:s') : null
-                ]);
+                    ]);
                 
                 // Перезагружаем нарушение из БД, чтобы получить актуальные данные
                 $existingViolation->refresh();

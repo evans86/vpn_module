@@ -31,6 +31,33 @@
                 </div>
             </div>
         @endif
+
+        <!-- Key Replaced Notification -->
+        @if(isset($replacedViolation) && $replacedViolation && isset($newKeyActivate) && $newKeyActivate && isset($newKeyFormattedKeys) && $newKeyFormattedKeys)
+            <div class="bg-gradient-to-r from-green-600 to-emerald-700 rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">
+                <div class="flex items-start justify-between">
+                    <div class="flex items-start flex-1">
+                        <div class="flex-shrink-0">
+                            <svg class="h-6 w-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div class="ml-4 flex-1">
+                            <h3 class="text-xl font-bold mb-2">✅ Ключ был перевыпущен</h3>
+                            <p class="text-white/90 mb-3">
+                                Ваш ключ доступа был автоматически перевыпущен из-за превышения лимита подключений. 
+                                Ниже отображается новый ключ. Пожалуйста, обновите конфигурацию в вашем VPN-клиенте.
+                            </p>
+                            @if($replacedViolation->key_replaced_at)
+                                <div class="text-sm text-white/80">
+                                    Перевыпущен: {{ $replacedViolation->key_replaced_at->format('d.m.Y H:i') }}
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
         
         <!-- Hero Section -->
         <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">
@@ -70,7 +97,72 @@
                 </button>
             </div>
 
+            <!-- Violations Section -->
+            @if(isset($violations) && $violations->count() > 0)
+                @php
+                    $activeViolation = $violations->first();
+                    $violationCount = $activeViolation->violation_count ?? 0;
+                    $notificationsSent = $activeViolation->getNotificationsSentCount();
+                @endphp
+                <div class="mb-8">
+                    <div class="bg-gradient-to-r {{ $violationCount >= 3 ? 'from-red-600 to-red-700' : ($violationCount >= 2 ? 'from-orange-600 to-orange-700' : 'from-yellow-600 to-yellow-700') }} rounded-2xl shadow-xl p-6 mb-8 text-white">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-start flex-1">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-6 w-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                    </svg>
+                                </div>
+                                <div class="ml-4 flex-1">
+                                    <h3 class="text-xl font-bold mb-2">
+                                        @if($violationCount >= 3)
+                                            ⚠️ Критическое нарушение
+                                        @elseif($violationCount >= 2)
+                                            ⚠️ Повторное нарушение
+                                        @else
+                                            ⚠️ Обнаружено нарушение
+                                        @endif
+                                    </h3>
+                                    <p class="text-white/90 mb-3">
+                                        @if($violationCount >= 3)
+                                            Обнаружено {{ $violationCount }} нарушений лимита подключений. Ключ был автоматически перевыпущен.
+                                        @elseif($violationCount >= 2)
+                                            Обнаружено {{ $violationCount }} нарушения лимита подключений. При следующем нарушении ключ будет перевыпущен.
+                                        @else
+                                            Обнаружено нарушение лимита подключений. Пожалуйста, используйте не более 3 одновременных подключений.
+                                        @endif
+                                    </p>
+                                    <div class="flex flex-wrap gap-4 text-sm">
+                                        <div class="flex items-center">
+                                            <span class="font-medium">Нарушений:</span>
+                                            <span class="ml-2 px-2 py-1 bg-white/20 rounded font-bold">{{ $violationCount }}</span>
+                                        </div>
+                                        @if($activeViolation->actual_connections)
+                                            <div class="flex items-center">
+                                                <span class="font-medium">Подключений:</span>
+                                                <span class="ml-2 px-2 py-1 bg-white/20 rounded font-bold">{{ $activeViolation->actual_connections }}</span>
+                                            </div>
+                                        @endif
+                                        @if($activeViolation->created_at)
+                                            <div class="flex items-center">
+                                                <span class="font-medium">Обнаружено:</span>
+                                                <span class="ml-2">{{ $activeViolation->created_at->format('d.m.Y H:i') }}</span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <!-- User Information Section -->
+            @php
+                // Используем данные нового ключа, если он был перевыпущен
+                $displayUserInfo = (isset($newKeyUserInfo) && $newKeyUserInfo) ? $newKeyUserInfo : $userInfo;
+                $displayFormattedKeys = (isset($newKeyFormattedKeys) && $newKeyFormattedKeys) ? $newKeyFormattedKeys : $formattedKeys;
+            @endphp
             <div class="mb-8">
                 <h2 class="text-2xl font-bold mb-6 text-gray-900 flex items-center">
                     <svg class="w-6 h-6 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -83,13 +175,13 @@
                         <div class="space-y-4">
                             <div class="flex items-center justify-between">
                                 <span class="text-gray-600 font-medium">Статус:</span>
-                                <span class="px-3 py-1.5 rounded-full text-sm font-semibold {{ $userInfo['status'] === 'active' ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200' }}">
-                                    {{ $userInfo['status'] === 'active' ? '✓ Активен' : '✗ Неактивен' }}
+                                <span class="px-3 py-1.5 rounded-full text-sm font-semibold {{ $displayUserInfo['status'] === 'active' ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200' }}">
+                                    {{ $displayUserInfo['status'] === 'active' ? '✓ Активен' : '✗ Неактивен' }}
                                 </span>
                             </div>
                             <div class="flex items-center justify-between">
                                 <span class="text-gray-600 font-medium">Использовано:</span>
-                                <span class="font-bold text-gray-900">{{ number_format($userInfo['data_used'] / (1024*1024*1024), 2) }} GB</span>
+                                <span class="font-bold text-gray-900">{{ number_format($displayUserInfo['data_used'] / (1024*1024*1024), 2) }} GB</span>
                             </div>
                         </div>
                     </div>
@@ -98,10 +190,10 @@
                         <div class="space-y-4">
                             <div>
                                 <span class="text-gray-600 font-medium block mb-2">Действует до:</span>
-                                @if($userInfo['expiration_date'])
-                                    <span class="text-lg font-bold text-gray-900">{{ date('d.m.Y H:i', $userInfo['expiration_date']) }}</span>
+                                @if($displayUserInfo['expiration_date'])
+                                    <span class="text-lg font-bold text-gray-900">{{ date('d.m.Y H:i', $displayUserInfo['expiration_date']) }}</span>
                                     @php
-                                        $days = $userInfo['days_remaining'];
+                                        $days = $displayUserInfo['days_remaining'];
                                         if ($days !== null) {
                                             $lastDigit = $days % 10;
                                             $lastTwoDigits = $days % 100;
@@ -117,9 +209,9 @@
                                             }
                                         }
                                     @endphp
-                                    @if($userInfo['days_remaining'] !== null)
+                                    @if($displayUserInfo['days_remaining'] !== null)
                                         <div class="text-sm text-indigo-600 font-medium mt-2">
-                                            ⏱ Осталось {{ $userInfo['days_remaining'] }} {{ $daysText }}
+                                            ⏱ Осталось {{ $displayUserInfo['days_remaining'] }} {{ $daysText }}
                                         </div>
                                     @endif
                                 @else
@@ -132,7 +224,7 @@
             </div>
 
             <!-- Connection Keys Section -->
-            @if($userInfo['status'] === 'active')
+            @if($displayUserInfo['status'] === 'active')
                 <div>
                     <h2 class="text-2xl font-bold mb-6 text-gray-900 flex items-center">
                         <svg class="w-6 h-6 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -141,7 +233,7 @@
                         Доступные протоколы
                     </h2>
                     <div class="space-y-4">
-                        @foreach($formattedKeys as $key)
+                        @foreach($displayFormattedKeys as $key)
                             <div class="border-2 border-gray-200 rounded-xl p-5 hover:border-indigo-300 hover:shadow-lg transition-all bg-white">
                                 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                                     <div class="flex items-center flex-grow">

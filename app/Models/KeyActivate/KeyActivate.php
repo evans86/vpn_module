@@ -38,7 +38,7 @@ class KeyActivate extends Model
     public $incrementing = false;
     protected $guarded = false;
     protected $table = 'key_activate';
-    
+
     protected $casts = [
         'status' => 'integer',
         'finish_at' => 'integer',
