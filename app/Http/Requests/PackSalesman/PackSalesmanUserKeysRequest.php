@@ -24,7 +24,10 @@ class PackSalesmanUserKeysRequest extends FormRequest
     public function rules()
     {
         return [
+            'public_key' => 'required|string',
+//            'private_key' => 'required|string',
             'user_tg_id' => 'required',
+            'user_secret_key' => 'required|string',
 //            'offset' => 'required',
 //            'limit' => 'required'
         ];

@@ -25,6 +25,10 @@ class KeyActivateRequest extends FormRequest
     {
         return [
             'key' => 'required|string',
+            'public_key' => 'required|string',
+//            'private_key' => 'required|string',
+            'user_tg_id' => 'required',
+            'user_secret_key' => 'required|string',
         ];
     }
 }

@@ -12,6 +12,7 @@ use App\Http\Requests\PackSalesman\PackSalesmanFreeKeyRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanUserKeysRequest;
 use App\Models\Bot\BotModule;
 use App\Models\KeyActivate\KeyActivate;
+use App\Models\Salesman\Salesman;
 use App\Services\External\BottApi;
 use App\Services\Key\KeyActivateService;
 use Carbon\Carbon;
@@ -116,7 +117,7 @@ class KeyActivateController extends Controller
 
             // Используем константу для размера бесплатного ключа (5GB)
             $freeKeySize = \App\Constants\ProductConstants::FREE_KEY_SIZE_GB * \App\Constants\DataConstants::BYTES_IN_GB;
-            
+
             $hasExistingKey = KeyActivate::where('user_tg_id', $request->user_tg_id)
                 ->where('traffic_limit', $freeKeySize)
                 ->whereBetween('created_at', [$currentMonth, $nextMonth])
@@ -171,15 +172,71 @@ class KeyActivateController extends Controller
      *
      * @param KeyActivateRequest $request
      * @return array|string
+     * @throws GuzzleException
      */
     public function getUserKey(KeyActivateRequest $request)
     {
         try {
-            $key = KeyActivate::where('id', $request->key)->first();
+            // Проверка существования модуля бота
+            $botModule = BotModule::where('public_key', $request->public_key)->first();
+
+            if (!$botModule) {
+                throw new RuntimeException('Модуль бота не найден или неверные ключи доступа');
+            }
+
+            // Проверка авторизации пользователя
+            $userCheck = BottApi::checkUser(
+                $request->user_tg_id,
+                $request->user_secret_key,
+                $botModule->public_key,
+                $botModule->private_key
+            );
+
+            if (!$userCheck['result']) {
+                throw new RuntimeException($userCheck['message'] ?? 'Ошибка авторизации пользователя');
+            }
+
+            // Получаем ключ с загрузкой связей для проверки принадлежности
+            $key = KeyActivate::with(['packSalesman.pack', 'moduleSalesman'])
+                ->where('id', $request->key)
+                ->first();
 
             // Если ключ не найден
             if (!$key) {
                 return ApiHelpers::error('Ключ не найден');
+            }
+
+            // Проверяем, что ключ принадлежит этому пользователю
+            // Приводим к строке для корректного сравнения (может быть разный тип)
+            if ((string)$key->user_tg_id !== (string)$request->user_tg_id) {
+                return ApiHelpers::error('Доступ запрещен');
+            }
+
+            // Получаем salesman, связанный с этим модулем
+            $salesman = Salesman::where('module_bot_id', $botModule->id)->first();
+
+            if (!$salesman) {
+                throw new RuntimeException('Продавец не найден для данного модуля');
+            }
+
+            // Проверяем, что ключ принадлежит этому модулю
+            $keyBelongsToModule = false;
+
+            // Проверка через packSalesman
+            if ($key->pack_salesman_id) {
+                $keyBelongsToModule = $key->packSalesman
+                    && $key->packSalesman->salesman_id == $salesman->id
+                    && $key->packSalesman->pack
+                    && $key->packSalesman->pack->module_key == true;
+            }
+
+            // Проверка через moduleSalesman
+            if (!$keyBelongsToModule && $key->module_salesman_id) {
+                $keyBelongsToModule = $key->module_salesman_id == $salesman->id;
+            }
+
+            if (!$keyBelongsToModule) {
+                return ApiHelpers::error('Доступ запрещен');
             }
 
             $resultKey = [
@@ -202,7 +259,9 @@ class KeyActivateController extends Controller
                 'exception' => get_class($e),
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'key' => $request->key ?? null
+                'key' => $request->key ?? null,
+                'user_tg_id' => $request->user_tg_id ?? null,
+                'public_key' => $request->public_key ?? null
             ]);
             return ApiHelpers::error('Ошибка при получении ключа');
         }
@@ -213,14 +272,50 @@ class KeyActivateController extends Controller
      *
      * @param PackSalesmanUserKeysRequest $request
      * @return array|string
+     * @throws GuzzleException
      */
     public function getUserKeys(PackSalesmanUserKeysRequest $request)
     {
         try {
+            // Проверка существования модуля бота
+            $botModule = BotModule::where('public_key', $request->public_key)->first();
+
+            if (!$botModule) {
+                throw new RuntimeException('Модуль бота не найден или неверные ключи доступа');
+            }
+
+            // Проверка авторизации пользователя
+            $userCheck = BottApi::checkUser(
+                $request->user_tg_id,
+                $request->user_secret_key,
+                $botModule->public_key,
+                $botModule->private_key
+            );
+
+            if (!$userCheck['result']) {
+                throw new RuntimeException($userCheck['message'] ?? 'Ошибка авторизации пользователя');
+            }
+
+            // Получаем salesman, связанный с этим модулем
+            $salesman = Salesman::where('module_bot_id', $botModule->id)->first();
+
+            if (!$salesman) {
+                throw new RuntimeException('Продавец не найден для данного модуля');
+            }
+
+            // Запрос ключей пользователя с проверкой принадлежности модулю
+            // Ключи могут быть через packSalesman (из бота) или напрямую через moduleSalesman (из модуля)
             $query = KeyActivate::where('user_tg_id', $request->user_tg_id)
                 ->where('status', '!=', KeyActivate::DELETED)
-                ->whereHas('packSalesman.pack', function ($query) {
-                    $query->where('module_key', true); // Только пакеты для модуля
+                ->where(function ($q) use ($salesman) {
+                    // Ключи из бота через packSalesman
+                    $q->whereHas('packSalesman', function ($query) use ($salesman) {
+                        $query->where('salesman_id', $salesman->id)
+                            ->whereHas('pack', function ($packQuery) {
+                                $packQuery->where('module_key', true); // Только пакеты для модуля
+                            });
+                    })
+                    ->orWhere('module_salesman_id', $salesman->id);
                 });
 
             $total = $query->count();
