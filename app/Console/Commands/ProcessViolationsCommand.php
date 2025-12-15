@@ -142,21 +142,23 @@ class ProcessViolationsCommand extends Command
                 // 1. Уведомление еще не отправлено для текущего количества нарушений (старые нарушения)
                 // 2. ИЛИ есть техническая ошибка и попыток меньше 3
                 if ($notificationsCount < $violationCount || ($isTechnicalError && $retryCount < 3)) {
-                    // Отправляем только ОДНО уведомление за раз, чтобы не спамить
-                    // Если уведомлений не хватает, отправляем только следующее недостающее
+                    // КРИТИЧЕСКИ ВАЖНО: Отправляем только ОДНО уведомление за раз
+                    // sendUserNotification уже определяет следующее недостающее уведомление
+                    // и отправляет только его, даже если не хватает нескольких
+                    $nextNotificationNumber = $notificationsCount + 1;
                     $result = $this->manualService->sendUserNotification($violation);
                     if ($result) {
                         $notificationsSent++;
                         $status = $violation->fresh()->last_notification_status ?? 'unknown';
                         $statusText = $status === 'blocked' ? ' (пользователь заблокировал бота)' : '';
-                        $this->line("   ✓ Уведомление засчитано для нарушения #{$violation->id} (нарушение #{$violationCount}){$statusText}");
+                        $this->line("   ✓ Уведомление #{$nextNotificationNumber} засчитано для нарушения #{$violation->id} (всего нарушений: {$violationCount}){$statusText}");
                     } else {
                         // Техническая ошибка - логируем для повторной попытки
                         $newRetryCount = $violation->fresh()->notification_retry_count ?? 0;
                         if ($newRetryCount < 3) {
-                            $this->line("   ⚠ Техническая ошибка отправки для нарушения #{$violation->id} (попытка {$newRetryCount}/3)");
+                            $this->line("   ⚠ Техническая ошибка отправки уведомления #{$nextNotificationNumber} для нарушения #{$violation->id} (попытка {$newRetryCount}/3)");
                         } else {
-                            $this->line("   ❌ Не удалось отправить уведомление для нарушения #{$violation->id} после 3 попыток");
+                            $this->line("   ❌ Не удалось отправить уведомление #{$nextNotificationNumber} для нарушения #{$violation->id} после 3 попыток");
                         }
                     }
                 }

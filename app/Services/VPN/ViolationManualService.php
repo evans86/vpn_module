@@ -244,12 +244,22 @@ class ViolationManualService
 
     /**
      * Отправка уведомления пользователю
+     * Отправляет только ОДНО уведомление - для следующего недостающего номера нарушения
      */
     public function sendUserNotification(ConnectionLimitViolation $violation): bool
     {
         try {
-            // Используем новый метод с детальным результатом
-            $result = $this->limitMonitorService->sendViolationNotificationWithResult($violation);
+            // Определяем, какое уведомление нужно отправить (следующее недостающее)
+            $notificationsSent = $violation->getNotificationsSentCount();
+            $nextNotificationNumber = $notificationsSent + 1;
+            
+            // Если уже отправлены все уведомления для текущего количества нарушений - ничего не делаем
+            if ($nextNotificationNumber > $violation->violation_count) {
+                return false;
+            }
+            
+            // Используем новый метод с детальным результатом, передавая номер уведомления
+            $result = $this->limitMonitorService->sendViolationNotificationWithResult($violation, $nextNotificationNumber);
 
             // Если уведомление должно считаться отправленным (успешно или заблокирован)
             if ($result->shouldCountAsSent) {

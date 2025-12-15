@@ -112,6 +112,29 @@ class ConnectionLimitMonitorService
                 // Если прошло меньше часа - пропускаем (защита от спама)
                 // Если прошло больше часа - это новое нарушение, увеличиваем счетчик
                 
+                // КРИТИЧЕСКИ ВАЖНО: Проверяем, были ли отправлены все уведомления для текущего количества нарушений
+                // Если нет - не увеличиваем счетчик, даже если прошло больше часа
+                $notificationsSent = $existingViolation->getNotificationsSentCount();
+                $violationCount = $existingViolation->violation_count;
+                
+                // Если уведомления еще не отправлены для текущего количества нарушений - не увеличиваем счетчик
+                if ($notificationsSent < $violationCount) {
+                    // Просто обновляем данные, но НЕ увеличиваем счетчик
+                    $existingViolation->actual_connections = $uniqueIpCount;
+                    $existingViolation->ip_addresses = array_values(array_unique($ipAddresses));
+                    $existingViolation->created_at = now(); // Обновляем время последней проверки
+                    $existingViolation->save();
+
+                    $this->logger->info('Пропущено нарушение - уведомления еще не отправлены для текущего количества нарушений', [
+                        'key_id' => $keyActivate->id,
+                        'violation_id' => $existingViolation->id,
+                        'violation_count' => $violationCount,
+                        'notifications_sent' => $notificationsSent
+                    ]);
+
+                    return $existingViolation;
+                }
+                
                 $lastNotificationTime = $existingViolation->last_notification_sent_at;
                 
                 if ($lastNotificationTime) {
@@ -120,10 +143,10 @@ class ConnectionLimitMonitorService
                     // Если прошло меньше часа - пропускаем (защита от спама)
                     if ($hoursSinceLastNotification < 1) {
                         // Просто обновляем данные, но НЕ увеличиваем счетчик
-                    $existingViolation->actual_connections = $uniqueIpCount;
-                    $existingViolation->ip_addresses = array_values(array_unique($ipAddresses));
-                    $existingViolation->created_at = now(); // Обновляем время последней проверки
-                    $existingViolation->save();
+                        $existingViolation->actual_connections = $uniqueIpCount;
+                        $existingViolation->ip_addresses = array_values(array_unique($ipAddresses));
+                        $existingViolation->created_at = now(); // Обновляем время последней проверки
+                        $existingViolation->save();
 
                         $this->logger->info('Пропущено нарушение - прошло менее часа с последнего уведомления (защита от спама)', [
                             'key_id' => $keyActivate->id,
@@ -135,7 +158,7 @@ class ConnectionLimitMonitorService
 
                         return $existingViolation;
                     }
-                    }
+                }
 
                 // Прошло больше часа (или уведомление еще не отправлялось) - это новое нарушение
                 // Увеличиваем счетчик нарушений
@@ -165,9 +188,13 @@ class ConnectionLimitMonitorService
                 
                 // Проверяем, что уведомление еще не отправлено для текущего количества нарушений
                 if ($notificationsSent < $newViolationCount) {
+                    // КРИТИЧЕСКИ ВАЖНО: Отправляем уведомление для ТЕКУЩЕГО количества нарушений
+                    // Например, если violation_count увеличился с 1 до 2, отправляем уведомление #2
+                    // Это гарантирует, что уведомления отправляются последовательно
+                    $notificationNumberToSend = $newViolationCount;
 
                     try {
-                        $result = $this->sendViolationNotificationWithResult($existingViolation);
+                        $result = $this->sendViolationNotificationWithResult($existingViolation, $notificationNumberToSend);
                         if ($result->shouldCountAsSent) {
                             $existingViolation->incrementNotifications();
                             $existingViolation->last_notification_status = $result->status;
@@ -439,8 +466,11 @@ class ConnectionLimitMonitorService
 
     /**
      * Отправка уведомления пользователю о нарушении с детальным результатом
+     * 
+     * @param ConnectionLimitViolation $violation Нарушение
+     * @param int|null $notificationNumber Номер уведомления для отправки (1, 2, 3). Если null, используется violation_count
      */
-    public function sendViolationNotificationWithResult(ConnectionLimitViolation $violation): NotificationResult
+    public function sendViolationNotificationWithResult(ConnectionLimitViolation $violation, ?int $notificationNumber = null): NotificationResult
     {
         try {
             $keyActivate = $violation->keyActivate;
@@ -454,7 +484,10 @@ class ConnectionLimitMonitorService
                 return NotificationResult::userNotFound();
             }
 
-            $message = $this->formatViolationMessage($violation);
+            // Используем переданный номер уведомления или текущий violation_count
+            $notificationNum = $notificationNumber ?? $violation->violation_count;
+            
+            $message = $this->formatViolationMessage($violation, $notificationNum);
             $keyboard = $this->getViolationKeyboard($violation);
 
             // Отправляем уведомление пользователю с детальным результатом
@@ -554,10 +587,14 @@ class ConnectionLimitMonitorService
 
     /**
      * Форматирование сообщения о нарушении для пользователя
+     * 
+     * @param ConnectionLimitViolation $violation Нарушение
+     * @param int|null $notificationNumber Номер уведомления (1, 2, 3). Если null, используется violation_count
      */
-    private function formatViolationMessage(ConnectionLimitViolation $violation): string
+    private function formatViolationMessage(ConnectionLimitViolation $violation, ?int $notificationNumber = null): string
     {
-        $violationCount = $violation->violation_count;
+        // Используем переданный номер уведомления или текущий violation_count
+        $violationCount = $notificationNumber ?? $violation->violation_count;
         $ipCount = $violation->actual_connections;
         $allowedCount = $violation->allowed_connections;
 
