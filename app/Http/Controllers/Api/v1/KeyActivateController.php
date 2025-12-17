@@ -215,8 +215,67 @@ class KeyActivateController extends Controller
             // Получаем salesman, связанный с этим модулем
             $salesman = Salesman::where('module_bot_id', $botModule->id)->first();
 
+            // Если продавец не найден, пытаемся создать/обновить связь
             if (!$salesman) {
-                throw new RuntimeException('Продавец не найден для данного модуля');
+                // Получаем информацию о создателе модуля из API
+                try {
+                    $creator = \App\Services\External\BottApi::getCreator($botModule->public_key, $botModule->private_key);
+                    
+                    if (isset($creator['data']['user']['telegram_id'])) {
+                        $telegramId = $creator['data']['user']['telegram_id'];
+                        $username = $creator['data']['user']['username'] ?? null;
+                        
+                        // Ищем продавца по telegram_id
+                        $salesman = Salesman::where('telegram_id', $telegramId)->first();
+                        
+                        // Если продавец не найден, создаем его
+                        if (!$salesman) {
+                            try {
+                                $salesmanService = app(\App\Services\Salesman\SalesmanService::class);
+                                $salesmanDto = $salesmanService->create($telegramId, $username);
+                                // После создания ищем продавца по telegram_id
+                                $salesman = Salesman::where('telegram_id', $telegramId)->first();
+                            } catch (\Exception $e) {
+                                // Если продавец уже существует, просто находим его
+                                if (str_contains($e->getMessage(), 'already exists')) {
+                                    $salesman = Salesman::where('telegram_id', $telegramId)->first();
+                                } else {
+                                    Log::error('Ошибка при создании продавца', [
+                                        'telegram_id' => $telegramId,
+                                        'error' => $e->getMessage()
+                                    ]);
+                                }
+                            }
+                        }
+                        
+                        // Устанавливаем связь с модулем
+                        if ($salesman && !$salesman->module_bot_id) {
+                            $salesman->module_bot_id = $botModule->id;
+                            $salesman->save();
+                            
+                            Log::info('Автоматически установлена связь продавца с модулем', [
+                                'salesman_id' => $salesman->id,
+                                'module_id' => $botModule->id,
+                                'telegram_id' => $telegramId
+                            ]);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Ошибка при попытке автоматически создать/обновить связь продавца с модулем', [
+                        'module_id' => $botModule->id,
+                        'public_key' => $botModule->public_key,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+                
+                // Повторно ищем продавца
+                if (!$salesman) {
+                    $salesman = Salesman::where('module_bot_id', $botModule->id)->first();
+                }
+                
+                if (!$salesman) {
+                    throw new RuntimeException('Продавец не найден для данного модуля');
+                }
             }
 
             // Проверяем, что ключ принадлежит этому модулю
@@ -299,8 +358,67 @@ class KeyActivateController extends Controller
             // Получаем salesman, связанный с этим модулем
             $salesman = Salesman::where('module_bot_id', $botModule->id)->first();
 
+            // Если продавец не найден, пытаемся создать/обновить связь
             if (!$salesman) {
-                throw new RuntimeException('Продавец не найден для данного модуля');
+                // Получаем информацию о создателе модуля из API
+                try {
+                    $creator = \App\Services\External\BottApi::getCreator($botModule->public_key, $botModule->private_key);
+                    
+                    if (isset($creator['data']['user']['telegram_id'])) {
+                        $telegramId = $creator['data']['user']['telegram_id'];
+                        $username = $creator['data']['user']['username'] ?? null;
+                        
+                        // Ищем продавца по telegram_id
+                        $salesman = Salesman::where('telegram_id', $telegramId)->first();
+                        
+                        // Если продавец не найден, создаем его
+                        if (!$salesman) {
+                            try {
+                                $salesmanService = app(\App\Services\Salesman\SalesmanService::class);
+                                $salesmanDto = $salesmanService->create($telegramId, $username);
+                                // После создания ищем продавца по telegram_id
+                                $salesman = Salesman::where('telegram_id', $telegramId)->first();
+                            } catch (\Exception $e) {
+                                // Если продавец уже существует, просто находим его
+                                if (str_contains($e->getMessage(), 'already exists')) {
+                                    $salesman = Salesman::where('telegram_id', $telegramId)->first();
+                                } else {
+                                    Log::error('Ошибка при создании продавца', [
+                                        'telegram_id' => $telegramId,
+                                        'error' => $e->getMessage()
+                                    ]);
+                                }
+                            }
+                        }
+                        
+                        // Устанавливаем связь с модулем
+                        if ($salesman && !$salesman->module_bot_id) {
+                            $salesman->module_bot_id = $botModule->id;
+                            $salesman->save();
+                            
+                            Log::info('Автоматически установлена связь продавца с модулем', [
+                                'salesman_id' => $salesman->id,
+                                'module_id' => $botModule->id,
+                                'telegram_id' => $telegramId
+                            ]);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Ошибка при попытке автоматически создать/обновить связь продавца с модулем', [
+                        'module_id' => $botModule->id,
+                        'public_key' => $botModule->public_key,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+                
+                // Повторно ищем продавца
+                if (!$salesman) {
+                    $salesman = Salesman::where('module_bot_id', $botModule->id)->first();
+                }
+                
+                if (!$salesman) {
+                    throw new RuntimeException('Продавец не найден для данного модуля');
+                }
             }
 
             // Запрос ключей пользователя с проверкой принадлежности модулю
