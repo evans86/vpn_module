@@ -66,13 +66,59 @@ class ServerVdsinaStrategy extends ServerMainStrategy
      * Проверка статуса всех созданных серверов и их окончательная настройка
      * 
      * Проверяет статус серверов со статусом SERVER_CREATED и завершает их настройку
+     * 
+     * ВАЖНО: Стратегия знает, какие серверы ей нужно обработать (по провайдеру)
      *
      * @return void
      * @throws Exception При ошибках настройки
      */
     public function checkStatus(): void
     {
-        $this->service->checkStatus();
+        // Стратегия знает, какие серверы ей нужно обработать
+        // Используем константу провайдера из модели Server
+        $servers = \App\Models\Server\Server::query()
+            ->where('provider', \App\Models\Server\Server::VDSINA)
+            ->where('server_status', \App\Models\Server\Server::SERVER_CREATED)
+            ->with(['location', 'panel'])
+            ->get();
+
+        \Illuminate\Support\Facades\Log::info('Checking status for VDSINA servers', [
+            'count' => count($servers),
+            'source' => 'server'
+        ]);
+
+        foreach ($servers as $server) {
+            try {
+                if (!$server->provider_id) {
+                    \Illuminate\Support\Facades\Log::error('Server has no provider_id', [
+                        'server_id' => $server->id,
+                        'source' => 'server'
+                    ]);
+                    continue;
+                }
+
+                \Illuminate\Support\Facades\Log::info('Checking server status', [
+                    'server_id' => $server->id,
+                    'provider_id' => $server->provider_id,
+                    'source' => 'server'
+                ]);
+
+                // Используем метод сервиса для проверки статуса конкретного сервера
+                $this->service->checkServerStatus($server);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Error processing server', [
+                    'server_id' => $server->id,
+                    'provider_id' => $server->provider_id ?? 'unknown',
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'source' => 'server'
+                ]);
+
+                // Помечаем сервер как ошибочный
+                $server->server_status = \App\Models\Server\Server::SERVER_ERROR;
+                $server->save();
+            }
+        }
     }
 
     /**

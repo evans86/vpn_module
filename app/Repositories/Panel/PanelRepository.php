@@ -42,30 +42,43 @@ class PanelRepository extends BaseRepository
 
     /**
      * Get all active panels
+     * 
+     * @param string|null $panelType Тип панели (если null, возвращаются все типы)
      * @return Collection
      */
-    public function getAllConfiguredPanels(): Collection
+    public function getAllConfiguredPanels(?string $panelType = null): Collection
     {
-        // Получаем все настроенные панели Marzban (исключаем панели с ошибками)
+        // Получаем все настроенные панели (исключаем панели с ошибками)
         // Оптимизация: добавляем eager loading для сервера
-        return $this->query()
+        $query = $this->query()
             ->where('panel_status', Panel::PANEL_CONFIGURED)
-            ->where('panel', Panel::MARZBAN)
             ->where('has_error', false) // Исключаем панели с ошибками
             ->with('server.location')
-            ->orderBy('id', 'desc')
-            ->get();
+            ->orderBy('id', 'desc');
+        
+        // Если указан тип панели, фильтруем по нему
+        if ($panelType !== null) {
+            $query->where('panel', $panelType);
+        }
+        
+        return $query->get();
     }
 
     /**
+     * Получить настроенную панель с минимальной нагрузкой
+     * 
+     * @param string|null $panelType Тип панели (по умолчанию Panel::MARZBAN для обратной совместимости)
      * @return Panel|null
      */
-    public function getConfiguredMarzbanPanel(): ?Panel
+    public function getConfiguredMarzbanPanel(?string $panelType = null): ?Panel
     {
-        // Получаем все настроенные панели Marzban (исключаем панели с ошибками)
+        // Используем Panel::MARZBAN по умолчанию для обратной совместимости
+        $panelType = $panelType ?? Panel::MARZBAN;
+        
+        // Получаем все настроенные панели указанного типа (исключаем панели с ошибками)
         $panels = $this->query()
             ->where('panel_status', Panel::PANEL_CONFIGURED)
-            ->where('panel', Panel::MARZBAN)
+            ->where('panel', $panelType)
             ->where('has_error', false) // Исключаем панели с ошибками
             ->whereNotIn('id', function ($query) {
                 // Исключаем панели, которые привязаны к продавцам
@@ -184,13 +197,22 @@ class PanelRepository extends BaseRepository
      * НОВАЯ СИСТЕМА: Получение оптимальной панели с интеллектуальным распределением
      * @return Panel|null
      */
-    public function getOptimizedMarzbanPanel(): ?Panel
+    /**
+     * Получить оптимизированную панель с минимальной нагрузкой
+     * 
+     * @param string|null $panelType Тип панели (по умолчанию Panel::MARZBAN для обратной совместимости)
+     * @return Panel|null
+     */
+    public function getOptimizedMarzbanPanel(?string $panelType = null): ?Panel
     {
+        // Используем Panel::MARZBAN по умолчанию для обратной совместимости
+        $panelType = $panelType ?? Panel::MARZBAN;
+        
         // Получаем панели с исключением привязанных к продавцам (как в оригинальном методе)
         // Оптимизация: добавляем eager loading для сервера
         $panels = $this->query()
             ->where('panel_status', Panel::PANEL_CONFIGURED)
-            ->where('panel', Panel::MARZBAN)
+            ->where('panel', $panelType)
             ->where('has_error', false) // Исключаем панели с ошибками
             ->whereNotIn('id', function ($query) {
                 $query->select('panel_id')
@@ -292,12 +314,21 @@ class PanelRepository extends BaseRepository
      * Сравнение всех стратегий выбора панели
      * @return array
      */
-    public function compareAllStrategies(): array
+    /**
+     * Сравнить все стратегии выбора панели
+     * 
+     * @param string|null $panelType Тип панели (по умолчанию Panel::MARZBAN для обратной совместимости)
+     * @return array
+     */
+    public function compareAllStrategies(?string $panelType = null): array
     {
+        // Используем Panel::MARZBAN по умолчанию для обратной совместимости
+        $panelType = $panelType ?? Panel::MARZBAN;
+        
         try {
             $panels = $this->query()
                 ->where('panel_status', Panel::PANEL_CONFIGURED)
-                ->where('panel', Panel::MARZBAN)
+                ->where('panel', $panelType)
                 ->where('has_error', false) // Исключаем панели с ошибками
                 ->whereNotIn('id', function ($query) {
                     $query->select('panel_id')
@@ -775,9 +806,19 @@ class PanelRepository extends BaseRepository
      * @param Panel $panel
      * @return array|null
      */
-    public function getServerTrafficData(Panel $panel): ?array
+    /**
+     * Получить данные о трафике сервера
+     * 
+     * @param Panel $panel Панель
+     * @param string|null $provider Провайдер сервера (по умолчанию Server::VDSINA для обратной совместимости)
+     * @return array|null
+     */
+    public function getServerTrafficData(Panel $panel, ?string $provider = null): ?array
     {
-        if (!$panel->server || $panel->server->provider !== Server::VDSINA) {
+        // Используем Server::VDSINA по умолчанию для обратной совместимости
+        $provider = $provider ?? Server::VDSINA;
+        
+        if (!$panel->server || $panel->server->provider !== $provider) {
             return null;
         }
 

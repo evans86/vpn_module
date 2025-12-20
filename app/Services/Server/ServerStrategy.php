@@ -3,7 +3,6 @@
 namespace App\Services\Server;
 
 use App\Models\Server\Server;
-use App\Services\Server\strategy\ServerVdsinaStrategy;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 
@@ -11,10 +10,14 @@ use GuzzleHttp\Exception\GuzzleException;
  * Strategy pattern для работы с серверами различных провайдеров
  * 
  * Использует паттерн Strategy для инкапсуляции алгоритмов работы с разными провайдерами серверов
+ * 
+ * @deprecated Используйте ServerStrategyFactory напрямую для создания стратегий
+ * Этот класс сохранен для обратной совместимости
  */
 class ServerStrategy
 {
     public ServerInterface $strategy;
+    private ServerStrategyFactory $factory;
 
     /**
      * Создает стратегию для работы с указанным провайдером
@@ -24,14 +27,8 @@ class ServerStrategy
      */
     public function __construct(string $provider)
     {
-        switch ($provider) {
-            case Server::VDSINA:
-                // Используем DI контейнер для создания стратегии с зависимостями
-                $this->strategy = app(ServerVdsinaStrategy::class);
-                break;
-            default:
-                throw new \DomainException('Server strategy not found');
-        }
+        $this->factory = new ServerStrategyFactory();
+        $this->strategy = $this->factory->create($provider);
     }
 
     /**

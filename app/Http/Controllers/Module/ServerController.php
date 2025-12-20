@@ -123,10 +123,18 @@ class ServerController extends Controller
                 'provider' => $request->input('provider')
             ]);
 
+            // Получаем список доступных провайдеров через фабрику
+            $serverStrategyFactory = new \App\Services\Server\ServerStrategyFactory();
+            $availableProviders = $serverStrategyFactory->getAvailableProviders();
+            
+            if (empty($availableProviders)) {
+                throw new \DomainException('No server providers available');
+            }
+            
             // Валидация входных данных
             $validated = $request->validate([
                 'location_id' => 'required|integer|exists:location,id',
-                'provider' => 'required|string|in:' . Server::VDSINA
+                'provider' => 'required|string|in:' . implode(',', $availableProviders)
             ]);
 
             $strategy = new ServerStrategy($validated['provider']);

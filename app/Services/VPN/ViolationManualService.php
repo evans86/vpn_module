@@ -420,28 +420,30 @@ class ViolationManualService
                 try {
                     if ($oldKey->keyActivateUser && $oldKey->keyActivateUser->serverUser) {
                         $serverUser = $oldKey->keyActivateUser->serverUser;
-                        if ($serverUser->panel && $serverUser->panel->panel === \App\Models\Panel\Panel::MARZBAN) {
-                            // Удаляем пользователя из панели через API
-                            // Используем прямой вызов API, чтобы не удалять из БД
+                        if ($serverUser->panel) {
+                            // Используем стратегию для работы с панелью (независимо от типа)
                             $panel = $serverUser->panel;
-                            $marzbanService = app(\App\Services\Panel\marzban\MarzbanService::class);
-                            $panel = $marzbanService->updateMarzbanToken($panel->id);
+                            $panelStrategyFactory = new \App\Services\Panel\PanelStrategyFactory();
+                            $panelStrategy = $panelStrategyFactory->create($panel->panel);
                             
-                            $marzbanApi = new \App\Services\External\MarzbanAPI($panel->api_address);
-                            $deleteResult = $marzbanApi->deleteUser($panel->auth_token, $serverUser->id);
+                            // Обновляем токен через стратегию
+                            $panel = $panelStrategy->updateToken($panel->id);
                             
-                            $this->logger->info('Пользователь удален из панели Marzban при перевыпуске ключа', [
+                            // Удаляем пользователя через стратегию
+                            $panelStrategy->deleteServerUser($panel->id, $serverUser->id);
+                            
+                            $this->logger->info('Пользователь удален из панели при перевыпуске ключа', [
                                 'old_key_id' => $oldKey->id,
                                 'new_key_id' => $newKey->id,
                                 'server_user_id' => $serverUser->id,
                                 'panel_id' => $panel->id,
-                                'delete_result' => $deleteResult
+                                'panel_type' => $panel->panel
                             ]);
                         }
                     }
                 } catch (\Exception $e) {
                     // Логируем ошибку, но не прерываем процесс перевыпуска
-                    Log::error('Ошибка при удалении пользователя из панели Marzban при перевыпуске ключа', [
+                    Log::error('Ошибка при удалении пользователя из панели при перевыпуске ключа', [
                         'old_key_id' => $oldKey->id,
                         'new_key_id' => $newKey->id,
                         'error' => $e->getMessage(),

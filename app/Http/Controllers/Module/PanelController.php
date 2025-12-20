@@ -130,8 +130,25 @@ class PanelController extends Controller
 
             // Используем DB::transaction() для автоматического rollback при ошибках
             DB::transaction(function () use ($validated) {
+                // Получаем сервер для определения типа панели
+                $server = Server::find($validated['server_id']);
+                if (!$server) {
+                    throw new \RuntimeException('Server not found');
+                }
+                
+                // Получаем тип панели из запроса или используем первый доступный тип
+                $panelStrategyFactory = new \App\Services\Panel\PanelStrategyFactory();
+                $availablePanelTypes = $panelStrategyFactory->getAvailablePanelTypes();
+                
+                if (empty($availablePanelTypes)) {
+                    throw new \DomainException('No panel types available');
+                }
+                
+                // Используем первый доступный тип панели (в будущем можно добавить выбор в форму)
+                $panelType = $availablePanelTypes[0];
+                
                 // Создаем панель через стратегию
-                $strategy = new PanelStrategy(Panel::MARZBAN);
+                $strategy = new PanelStrategy($panelType);
                 $strategy->create($validated['server_id']);
             });
 

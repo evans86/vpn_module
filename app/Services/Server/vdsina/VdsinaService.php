@@ -272,85 +272,91 @@ class VdsinaService
     }
 
     /**
-     * Проверка всех, только созданных серверов VDSINA
+     * Проверка статуса конкретного сервера у провайдера
+     * 
+     * ВАЖНО: Этот метод теперь работает только с конкретным сервером.
+     * Логика поиска серверов вынесена в ServerVdsinaStrategy::checkStatus()
+     * 
+     * @param Server $server Сервер для проверки
+     * @return bool true если сервер готов к настройке, false если еще не готов
+     * @throws Exception При ошибках проверки
      */
-    public function checkStatus()
+    public function checkServerStatus(Server $server): bool
     {
         try {
-            /**
-             * @var Server[] $servers
-             */
-            // Оптимизация: добавляем eager loading для связанных данных
-            $servers = Server::query()
-                ->where('provider', Server::VDSINA)
-                ->where('server_status', Server::SERVER_CREATED)
-                ->with(['location', 'panel'])
-                ->get();
-
-            Log::info('Checking status for VDSINA servers', ['count' => count($servers), 'source' => 'server']);
-
-            foreach ($servers as $server) {
-                try {
-                    if (!$server->provider_id) {
-                        Log::error('Server has no provider_id', [
-                            'server_id' => $server->id,
-                            'source' => 'server'
-                        ]);
-                        continue;
-                    }
-
-                    Log::info('Checking server status', [
-                        'server_id' => $server->id,
-                        'provider_id' => $server->provider_id,
-                        'source' => 'server'
-                    ]);
-
-                    $status = $this->serverStatus($server->provider_id);
-
-                    if ($status) {
-                        Log::info('Server is ready for configuration', [
-                            'server_id' => $server->id,
-                            'provider_id' => $server->provider_id,
-                            'source' => 'server'
-                        ]);
-
-                        $this->finishConfigure($server->id);
-
-                        Log::info('Server configured successfully', [
-                            'server_id' => $server->id,
-                            'provider_id' => $server->provider_id,
-                            'source' => 'server'
-                        ]);
-                    } else {
-                        Log::info('Server not ready yet', [
-                            'server_id' => $server->id,
-                            'provider_id' => $server->provider_id,
-                            'source' => 'server'
-                        ]);
-                    }
-                } catch (Exception $e) {
-                    Log::error('Error processing server', [
-                        'server_id' => $server->id,
-                        'provider_id' => $server->provider_id ?? 'unknown',
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString(),
-                        'source' => 'server'
-                    ]);
-
-                    // Помечаем сервер как ошибочный
-                    $server->server_status = Server::SERVER_ERROR;
-                    $server->save();
-                }
+            if (!$server->provider_id) {
+                Log::error('Server has no provider_id', [
+                    'server_id' => $server->id,
+                    'source' => 'server'
+                ]);
+                return false;
             }
 
+            Log::info('Checking server status', [
+                'server_id' => $server->id,
+                'provider_id' => $server->provider_id,
+                'source' => 'server'
+            ]);
+
+            $status = $this->serverStatus($server->provider_id);
+
+            if ($status) {
+                Log::info('Server is ready for configuration', [
+                    'server_id' => $server->id,
+                    'provider_id' => $server->provider_id,
+                    'source' => 'server'
+                ]);
+
+                $this->finishConfigure($server->id);
+
+                Log::info('Server configured successfully', [
+                    'server_id' => $server->id,
+                    'provider_id' => $server->provider_id,
+                    'source' => 'server'
+                ]);
+                
+                return true;
+            } else {
+                Log::info('Server not ready yet', [
+                    'server_id' => $server->id,
+                    'provider_id' => $server->provider_id,
+                    'source' => 'server'
+                ]);
+                
+                return false;
+            }
         } catch (Exception $e) {
-            Log::error('Error in checkStatus', [
+            Log::error('Error checking server status', [
+                'server_id' => $server->id,
+                'provider_id' => $server->provider_id ?? 'unknown',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'source' => 'server'
             ]);
+
+            // Помечаем сервер как ошибочный
+            $server->server_status = Server::SERVER_ERROR;
+            $server->save();
+            
             throw $e;
         }
+    }
+
+    /**
+     * @deprecated Используйте checkServerStatus(Server $server) для проверки конкретного сервера
+     * Логика поиска серверов вынесена в ServerVdsinaStrategy::checkStatus()
+     * 
+     * Этот метод оставлен для обратной совместимости, но не должен использоваться напрямую
+     */
+    public function checkStatus()
+    {
+        // Этот метод устарел - логика перенесена в ServerVdsinaStrategy::checkStatus()
+        // Оставляем для обратной совместимости, но выбрасываем исключение
+        throw new \RuntimeException(
+            'Метод checkStatus() устарел. ' .
+            'Используйте ServerVdsinaStrategy::checkStatus() для проверки всех серверов или ' .
+            'VdsinaService::checkServerStatus(Server $server) для проверки конкретного сервера.'
+        );
     }
 
     /**

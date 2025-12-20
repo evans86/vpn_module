@@ -123,4 +123,30 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
     {
         $this->marzbanService->deleteServerUser($panel_id, $user_id);
     }
+
+    /**
+     * Обновление токена авторизации панели
+     *
+     * @param int $panel_id ID панели
+     * @return \App\Models\Panel\Panel Обновленная панель
+     * @throws \Exception
+     */
+    public function updateToken(int $panel_id): \App\Models\Panel\Panel
+    {
+        return $this->marzbanService->updateMarzbanToken($panel_id);
+    }
+
+    /**
+     * Перенос пользователя с одной панели на другую
+     *
+     * @param int $sourcePanel_id ID исходной панели
+     * @param int $targetPanel_id ID целевой панели
+     * @param string $serverUser_id ID пользователя сервера (key_activate_id)
+     * @return \App\Models\ServerUser\ServerUser Обновленный пользователь сервера
+     * @throws \Exception
+     */
+    public function transferUser(int $sourcePanel_id, int $targetPanel_id, string $serverUser_id): \App\Models\ServerUser\ServerUser
+    {
+        return $this->marzbanService->transferUser($sourcePanel_id, $targetPanel_id, $serverUser_id);
+    }
 }

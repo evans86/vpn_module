@@ -283,8 +283,8 @@ class KeyActivateService
 
             $finishAt = time() + ($key->packSalesman->pack->period * \App\Constants\TimeConstants::SECONDS_IN_DAY);
 
-            // Создаем стратегию для работы с панелью
-            $panelStrategy = new PanelStrategy(Panel::MARZBAN);
+            // Создаем стратегию для работы с панелью (используем тип панели из объекта)
+            $panelStrategy = new PanelStrategy($panel->panel ?? Panel::MARZBAN);
             // Добавляем пользователя на сервер
             $serverUser = $panelStrategy->addServerUser(
                 $panel->id,
@@ -364,8 +364,8 @@ class KeyActivateService
                 $finishAt = Carbon::now()->addMonth()->startOfMonth()->timestamp;
             }
 
-            // Создаем стратегию для работы с панелью
-            $panelStrategy = new PanelStrategy(Panel::MARZBAN);
+            // Создаем стратегию для работы с панелью (будет определена после выбора панели)
+            $panelStrategy = null;
 
             // Список ID панелей, которые уже пробовали (чтобы не повторяться)
             $attemptedPanelIds = [];
@@ -403,6 +403,9 @@ class KeyActivateService
                     }
 
                     $attemptedPanelIds[] = $panel->id;
+
+                    // Создаем стратегию для работы с выбранной панелью
+                    $panelStrategy = new PanelStrategy($panel->panel ?? Panel::MARZBAN);
 
                     // Добавляем пользователя на сервер
                     $serverUser = $panelStrategy->addServerUser(
@@ -513,8 +516,8 @@ class KeyActivateService
                 throw new RuntimeException('Ключ уже используется другим пользователем');
             }
 
-            // Создаем стратегию для работы с панелью
-            $panelStrategy = new PanelStrategy(Panel::MARZBAN);
+            // Создаем стратегию для работы с панелью (будет определена после выбора панели)
+            $panelStrategy = null;
 
             // Список ID панелей, которые уже пробовали (чтобы не повторяться)
             $attemptedPanelIds = [];
@@ -552,6 +555,9 @@ class KeyActivateService
                     }
 
                     $attemptedPanelIds[] = $panel->id;
+
+                    // Создаем стратегию для работы с выбранной панелью
+                    $panelStrategy = new PanelStrategy($panel->panel ?? Panel::MARZBAN);
 
                     // Используем переданный finish_at вместо пересчета
                     // Добавляем пользователя на сервер

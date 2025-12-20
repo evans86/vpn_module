@@ -7,7 +7,7 @@ use App\Models\KeyActivate\KeyActivate;
 use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Models\Panel\Panel;
 use App\Models\ServerUser\ServerUser;
-use App\Services\Panel\marzban\MarzbanService;
+use App\Services\Panel\PanelStrategy;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Http\JsonResponse;
@@ -17,15 +17,6 @@ use RuntimeException;
 
 class ServerUserTransferController extends Controller
 {
-    /**
-     * @var MarzbanService
-     */
-    private MarzbanService $marzbanService;
-
-    public function __construct(MarzbanService $marzbanService)
-    {
-        $this->marzbanService = $marzbanService;
-    }
 
     /**
      * Получить список доступных панелей для переноса
@@ -127,14 +118,22 @@ class ServerUserTransferController extends Controller
 
             $key = KeyActivate::findOrFail($validated['key_id']);
             $sourcePanel_id = $key->keyActivateUser->serverUser->panel_id;
+            $sourcePanel = \App\Models\Panel\Panel::findOrFail($sourcePanel_id);
+            $targetPanel = \App\Models\Panel\Panel::findOrFail($validated['target_panel_id']);
 
             // Проверяем, что панели разные
             if ($sourcePanel_id === $validated['target_panel_id']) {
                 return response()->json(['message' => 'Source and target panels are the same'], 400);
             }
 
-            // Выполняем перенос
-            $updatedKey = $this->marzbanService->transferUser(
+            // Проверяем, что обе панели одного типа (перенос между разными типами не поддерживается)
+            if ($sourcePanel->panel !== $targetPanel->panel) {
+                return response()->json(['message' => 'Cannot transfer between different panel types'], 400);
+            }
+
+            // Используем стратегию для переноса пользователя
+            $panelStrategy = new PanelStrategy($sourcePanel->panel);
+            $updatedKey = $panelStrategy->transferUser(
                 $sourcePanel_id,
                 $validated['target_panel_id'],
                 $validated['key_id']

@@ -4,24 +4,26 @@ namespace App\Services\Panel;
 
 use App\Models\Panel\Panel;
 use App\Models\ServerUser\ServerUser;
-use App\Services\Panel\strategy\PanelMarzbanStrategy;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 
+/**
+ * Strategy pattern для работы с панелями различных типов
+ * 
+ * Использует фабрику для создания стратегий, что позволяет легко добавлять новые типы панелей
+ * 
+ * @deprecated Используйте PanelStrategyFactory напрямую для создания стратегий
+ * Этот класс сохранен для обратной совместимости
+ */
 class PanelStrategy
 {
     public PanelInterface $strategy;
+    private PanelStrategyFactory $factory;
 
     public function __construct(string $provider)
     {
-        switch ($provider) {
-            case Panel::MARZBAN:
-                // Используем DI контейнер для создания стратегии с зависимостями
-                $this->strategy = app(PanelMarzbanStrategy::class);
-                break;
-            default:
-                throw new \DomainException('panel strategy not found');
-        }
+        $this->factory = new PanelStrategyFactory();
+        $this->strategy = $this->factory->create($provider);
     }
 
     /**
@@ -138,13 +140,39 @@ class PanelStrategy
     /**
      * Удаление пользователя панели
      *
-     * @param string $user_id
      * @param int $panel_id
+     * @param string $user_id
      * @return void
      * @throws GuzzleException
      */
     public function deleteServerUser(int $panel_id, string $user_id): void
     {
         $this->strategy->deleteServerUser($panel_id, $user_id);
+    }
+
+    /**
+     * Обновление токена авторизации панели
+     *
+     * @param int $panel_id ID панели
+     * @return Panel Обновленная панель
+     * @throws \Exception
+     */
+    public function updateToken(int $panel_id): Panel
+    {
+        return $this->strategy->updateToken($panel_id);
+    }
+
+    /**
+     * Перенос пользователя с одной панели на другую
+     *
+     * @param int $sourcePanel_id ID исходной панели
+     * @param int $targetPanel_id ID целевой панели
+     * @param string $serverUser_id ID пользователя сервера (key_activate_id)
+     * @return ServerUser Обновленный пользователь сервера
+     * @throws \Exception
+     */
+    public function transferUser(int $sourcePanel_id, int $targetPanel_id, string $serverUser_id): ServerUser
+    {
+        return $this->strategy->transferUser($sourcePanel_id, $targetPanel_id, $serverUser_id);
     }
 }

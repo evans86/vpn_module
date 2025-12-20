@@ -260,12 +260,27 @@ class VpnConfigController extends Controller
     }
 
 
-    //ЖЕСТОКИЙ КОСТЫЛЬ
+    /**
+     * Получить актуальные ссылки пользователя из панели
+     * 
+     * @param ServerUser $serverUser Пользователь сервера
+     * @return array Массив ссылок
+     */
     private function getFreshUserLinks(ServerUser $serverUser): array
     {
         try {
-            $marzbanService = new MarzbanService();
-            $panel = $marzbanService->updateMarzbanToken($serverUser->panel_id);
+            // Используем стратегию для работы с панелью
+            $panel = $serverUser->panel;
+            if (!$panel) {
+                throw new \RuntimeException('Panel not found for server user');
+            }
+            
+            $panelStrategyFactory = new \App\Services\Panel\PanelStrategyFactory();
+            $panelStrategy = $panelStrategyFactory->create($panel->panel);
+            
+            // Обновляем токен через стратегию
+            $panel = $panelStrategy->updateToken($panel->id);
+            
             $marzbanApi = new MarzbanAPI($panel->api_address);
 
             // Получаем актуальные данные пользователя из Marzban
