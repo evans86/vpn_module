@@ -142,6 +142,16 @@ class ProcessViolationsCommand extends Command
                 // 1. Уведомление еще не отправлено для текущего количества нарушений (старые нарушения)
                 // 2. ИЛИ есть техническая ошибка и попыток меньше 3
                 if ($notificationsCount < $violationCount || ($isTechnicalError && $retryCount < 3)) {
+                    // Проверяем, прошло ли 30 минут с последнего уведомления по этому ключу
+                    $lastNotificationTime = $violation->last_notification_sent_at;
+                    if ($lastNotificationTime) {
+                        $minutesSinceLastNotification = $lastNotificationTime->diffInMinutes(now());
+                        if ($minutesSinceLastNotification < 30) {
+                            $this->output->writeln("Пропущено нарушение {$violation->id} - прошло менее 30 минут с последнего уведомления");
+                            continue;
+                        }
+                    }
+                    
                     // КРИТИЧЕСКИ ВАЖНО: Отправляем только ОДНО уведомление за раз
                     // sendUserNotification уже определяет следующее недостающее уведомление
                     // и отправляет только его, даже если не хватает нескольких

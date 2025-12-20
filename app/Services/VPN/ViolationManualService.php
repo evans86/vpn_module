@@ -249,6 +249,21 @@ class ViolationManualService
     public function sendUserNotification(ConnectionLimitViolation $violation): bool
     {
         try {
+            // Проверяем, прошло ли 30 минут с последнего уведомления по этому ключу
+            $lastNotificationTime = $violation->last_notification_sent_at;
+            if ($lastNotificationTime) {
+                $minutesSinceLastNotification = $lastNotificationTime->diffInMinutes(now());
+                if ($minutesSinceLastNotification < 30) {
+                    Log::info('Пропущена отправка уведомления - прошло менее 30 минут с последнего уведомления', [
+                        'violation_id' => $violation->id,
+                        'key_id' => $violation->key_activate_id,
+                        'minutes_since_last_notification' => round($minutesSinceLastNotification, 2),
+                        'last_notification_sent_at' => $lastNotificationTime->format('Y-m-d H:i:s')
+                    ]);
+                    return false;
+                }
+            }
+            
             // Определяем, какое уведомление нужно отправить (следующее недостающее)
             $notificationsSent = $violation->getNotificationsSentCount();
             $nextNotificationNumber = $notificationsSent + 1;

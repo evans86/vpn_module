@@ -138,21 +138,21 @@ class ConnectionLimitMonitorService
                 $lastNotificationTime = $existingViolation->last_notification_sent_at;
                 
                 if ($lastNotificationTime) {
-                    $hoursSinceLastNotification = $lastNotificationTime->diffInHours(now());
+                    $minutesSinceLastNotification = $lastNotificationTime->diffInMinutes(now());
                     
-                    // Если прошло меньше часа - пропускаем (защита от спама)
-                    if ($hoursSinceLastNotification < 1) {
+                    // Если прошло меньше 30 минут - пропускаем (защита от спама)
+                    if ($minutesSinceLastNotification < 30) {
                         // Просто обновляем данные, но НЕ увеличиваем счетчик
                         $existingViolation->actual_connections = $uniqueIpCount;
                         $existingViolation->ip_addresses = array_values(array_unique($ipAddresses));
                         $existingViolation->created_at = now(); // Обновляем время последней проверки
                         $existingViolation->save();
 
-                        $this->logger->info('Пропущено нарушение - прошло менее часа с последнего уведомления (защита от спама)', [
+                        $this->logger->info('Пропущено нарушение - прошло менее 30 минут с последнего уведомления (защита от спама)', [
                             'key_id' => $keyActivate->id,
                             'violation_id' => $existingViolation->id,
                             'violation_count' => $existingViolation->violation_count,
-                            'hours_since_last_notification' => round($hoursSinceLastNotification, 2),
+                            'minutes_since_last_notification' => round($minutesSinceLastNotification, 2),
                             'last_notification_sent_at' => $lastNotificationTime->format('Y-m-d H:i:s')
                         ]);
 
@@ -169,13 +169,13 @@ class ConnectionLimitMonitorService
                     $existingViolation->created_at = now(); // Обновляем время последнего нарушения
                     $existingViolation->save();
 
-                $this->logger->warning('Зафиксировано новое нарушение (прошло больше часа с последнего уведомления)', [
+                $this->logger->warning('Зафиксировано новое нарушение (прошло больше 30 минут с последнего уведомления)', [
                         'key_id' => $keyActivate->id,
                         'user_tg_id' => $keyActivate->user_tg_id,
                         'violation_count' => $newViolationCount,
                         'actual_ips' => $uniqueIpCount,
                     'violation_id' => $existingViolation->id,
-                    'hours_since_last_notification' => $lastNotificationTime ? round($lastNotificationTime->diffInHours(now()), 2) : null,
+                    'minutes_since_last_notification' => $lastNotificationTime ? round($lastNotificationTime->diffInMinutes(now()), 2) : null,
                     'last_notification_sent_at' => $lastNotificationTime ? $lastNotificationTime->format('Y-m-d H:i:s') : null
                     ]);
                 
@@ -188,6 +188,22 @@ class ConnectionLimitMonitorService
                 
                 // Проверяем, что уведомление еще не отправлено для текущего количества нарушений
                 if ($notificationsSent < $newViolationCount) {
+                    // Проверяем, прошло ли 30 минут с последнего уведомления по этому ключу
+                    $lastNotificationTime = $existingViolation->last_notification_sent_at;
+                    if ($lastNotificationTime) {
+                        $minutesSinceLastNotification = $lastNotificationTime->diffInMinutes(now());
+                        if ($minutesSinceLastNotification < 30) {
+                            $this->logger->info('Пропущена отправка уведомления - прошло менее 30 минут с последнего уведомления', [
+                                'violation_id' => $existingViolation->id,
+                                'violation_count' => $newViolationCount,
+                                'notifications_sent' => $notificationsSent,
+                                'minutes_since_last_notification' => round($minutesSinceLastNotification, 2),
+                                'last_notification_sent_at' => $lastNotificationTime->format('Y-m-d H:i:s')
+                            ]);
+                            return $existingViolation;
+                        }
+                    }
+                    
                     // КРИТИЧЕСКИ ВАЖНО: Отправляем уведомление для ТЕКУЩЕГО количества нарушений
                     // Например, если violation_count увеличился с 1 до 2, отправляем уведомление #2
                     // Это гарантирует, что уведомления отправляются последовательно
@@ -277,8 +293,29 @@ class ConnectionLimitMonitorService
             ]);
 
             // Отправляем уведомление сразу при создании первого нарушения
-            try {
-                $result = $this->sendViolationNotificationWithResult($violation);
+            // Но проверяем, не было ли уведомления по этому ключу менее 30 минут назад
+            $lastNotificationForKey = ConnectionLimitViolation::where('key_activate_id', $keyActivate->id)
+                ->whereNotNull('last_notification_sent_at')
+                ->orderBy('last_notification_sent_at', 'desc')
+                ->first();
+            
+            $shouldSendNotification = true;
+            if ($lastNotificationForKey && $lastNotificationForKey->last_notification_sent_at) {
+                $minutesSinceLastNotification = $lastNotificationForKey->last_notification_sent_at->diffInMinutes(now());
+                if ($minutesSinceLastNotification < 30) {
+                    $shouldSendNotification = false;
+                    $this->logger->info('Пропущена отправка уведомления для первого нарушения - прошло менее 30 минут с последнего уведомления по этому ключу', [
+                        'violation_id' => $violation->id,
+                        'key_id' => $keyActivate->id,
+                        'minutes_since_last_notification' => round($minutesSinceLastNotification, 2),
+                        'last_notification_sent_at' => $lastNotificationForKey->last_notification_sent_at->format('Y-m-d H:i:s')
+                    ]);
+                }
+            }
+            
+            if ($shouldSendNotification) {
+                try {
+                    $result = $this->sendViolationNotificationWithResult($violation);
                 if ($result->shouldCountAsSent) {
                     $violation->incrementNotifications();
                     $violation->last_notification_status = $result->status;
@@ -328,6 +365,7 @@ class ConnectionLimitMonitorService
                     'violation_id' => $violation->id,
                     'error' => $e->getMessage()
                 ]);
+            }
             }
 
             return $violation;
