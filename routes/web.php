@@ -158,6 +158,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::get('/', [\App\Http\Controllers\Module\PanelSettingsController::class, 'index'])->name('index');
                 Route::put('/strategy', [\App\Http\Controllers\Module\PanelSettingsController::class, 'updateStrategy'])->name('update-strategy');
                 Route::post('/clear-error', [\App\Http\Controllers\Module\PanelSettingsController::class, 'clearPanelError'])->name('clear-error');
+                Route::post('/toggle-rotation', [\App\Http\Controllers\Module\PanelSettingsController::class, 'toggleRotation'])->name('toggle-rotation');
             });
 
             // Salesman
@@ -201,6 +202,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::get('/', [KeyActivateController::class, 'index'])->name('index');
                 Route::delete('/{id}', [KeyActivateController::class, 'destroy'])->name('destroy');
                 Route::post('/update-date', [KeyActivateController::class, 'updateDate'])->name('update-date');
+                Route::post('/renew', [KeyActivateController::class, 'renew'])->name('renew');
             });
 
             // Server Monitoring

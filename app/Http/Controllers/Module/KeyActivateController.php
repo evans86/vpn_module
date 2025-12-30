@@ -258,6 +258,85 @@ class KeyActivateController extends Controller
     }
 
     /**
+     * Перевыпуск просроченного ключа
+     *
+     * @param Request $request
+     * @return JsonResponse
+     * @throws GuzzleException
+     */
+    public function renew(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'key_id' => 'required|uuid|exists:key_activate,id'
+            ]);
+
+            $key = KeyActivate::findOrFail($validated['key_id']);
+
+            // Проверяем, что ключ просрочен
+            if ($key->status !== KeyActivate::EXPIRED) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ключ не может быть перевыпущен. Только просроченные ключи могут быть перевыпущены.'
+                ], 400);
+            }
+
+            // Проверяем, что есть user_tg_id
+            if (!$key->user_tg_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Нельзя перевыпустить ключ без привязки к пользователю Telegram'
+                ], 400);
+            }
+
+            $this->logger->info('Начало перевыпуска ключа', [
+                'source' => 'key_activate',
+                'action' => 'renew',
+                'user_id' => auth()->id(),
+                'key_id' => $key->id,
+                'user_tg_id' => $key->user_tg_id,
+                'traffic_limit' => $key->traffic_limit,
+                'finish_at' => $key->finish_at
+            ]);
+
+            $renewedKey = $this->keyActivateService->renew($key);
+
+            $this->logger->info('Перевыпуск ключа выполнен успешно', [
+                'source' => 'key_activate',
+                'action' => 'renew',
+                'user_id' => auth()->id(),
+                'key_id' => $renewedKey->id,
+                'new_status' => $renewedKey->status
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Ключ успешно перевыпущен',
+                'key' => [
+                    'id' => $renewedKey->id,
+                    'status' => $renewedKey->status,
+                    'status_text' => $renewedKey->getStatusText()
+                ]
+            ]);
+
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при перевыпуске ключа', [
+                'source' => 'key_activate',
+                'action' => 'renew',
+                'user_id' => auth()->id(),
+                'key_id' => $request->input('key_id'),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Ошибка при перевыпуске ключа: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Update date for the specified key activate
      *
      * @param Request $request

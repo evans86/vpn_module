@@ -8,42 +8,42 @@
         <x-admin.card title="Ключи активации">
             <!-- Filters -->
             <x-admin.filter-form action="{{ route('admin.module.key-activate.index') }}">
-                <x-admin.filter-input 
-                    name="id" 
-                    label="ID ключа" 
-                    value="{{ request('id') }}" 
+                <x-admin.filter-input
+                    name="id"
+                    label="ID ключа"
+                    value="{{ request('id') }}"
                     placeholder="Введите ID" />
-                
-                <x-admin.filter-input 
-                    name="pack_id" 
-                    label="ID пакета" 
-                    value="{{ request('pack_id') }}" 
+
+                <x-admin.filter-input
+                    name="pack_id"
+                    label="ID пакета"
+                    value="{{ request('pack_id') }}"
                     placeholder="Введите ID пакета" />
-                
-                <x-admin.filter-select 
-                    name="status" 
+
+                <x-admin.filter-select
+                    name="status"
                     label="Статус"
                     :options="$statuses"
                     value="{{ request('status') }}" />
-                
-                <x-admin.filter-input 
-                    name="user_tg_id" 
-                    label="Telegram ID покупателя" 
-                    value="{{ request('user_tg_id') }}" 
+
+                <x-admin.filter-input
+                    name="user_tg_id"
+                    label="Telegram ID покупателя"
+                    value="{{ request('user_tg_id') }}"
                     placeholder="Введите Telegram ID"
                     type="number" />
-                
-                <x-admin.filter-input 
-                    name="telegram_id" 
-                    label="Telegram ID продавца" 
-                    value="{{ request('telegram_id') }}" 
+
+                <x-admin.filter-input
+                    name="telegram_id"
+                    label="Telegram ID продавца"
+                    value="{{ request('telegram_id') }}"
                     placeholder="Введите Telegram ID" />
             </x-admin.filter-form>
 
             <!-- Table -->
             @if($activate_keys->isEmpty())
-                <x-admin.empty-state 
-                    icon="fa-key" 
+                <x-admin.empty-state
+                    icon="fa-key"
                     title="Ключи не найдены"
                     description="Попробуйте изменить параметры фильтрации" />
             @else
@@ -121,7 +121,7 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm">
                                 @if($key->user_tg_id)
-                                    <a href="https://t.me/{{ $key->user_tg_id }}" 
+                                    <a href="https://t.me/{{ $key->user_tg_id }}"
                                        target="_blank"
                                        class="text-indigo-600 hover:text-indigo-800">
                                         {{ $key->user_tg_id }}
@@ -147,17 +147,27 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <div class="relative inline-block text-left" x-data="{ open: false }">
-                                    <button @click="open = !open" 
+                                    <button @click="open = !open"
                                             class="text-gray-400 hover:text-gray-600 focus:outline-none">
                                         <i class="fas fa-cog"></i>
                                     </button>
-                                    
-                                    <div x-show="open" 
+
+                                    <div x-show="open"
                                          @click.away="open = false"
                                          x-cloak
                                          x-transition
                                          class="absolute right-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 @if($isLastRows)origin-bottom-right bottom-full mb-2 @elseorigin-top-right top-full mt-2 @endif">
                                         <div class="py-1">
+                                            @if($key->status === \App\Models\KeyActivate\KeyActivate::EXPIRED && $key->user_tg_id)
+                                                <button type="button"
+                                                        class="block w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 btn-renew-key"
+                                                        data-key-id="{{ $key->id }}"
+                                                        data-key-traffic="{{ $key->traffic_limit }}"
+                                                        data-key-finish="{{ $key->finish_at }}"
+                                                        data-key-user-tg-id="{{ $key->user_tg_id }}">
+                                                    <i class="fas fa-redo mr-2"></i> Перевыпустить
+                                                </button>
+                                            @endif
                                             @if($key->user_tg_id)
                                                 <button type="button"
                                                         class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 btn-transfer-key"
@@ -186,6 +196,47 @@
         </x-admin.card>
     </div>
 
+    <!-- Modal: Renew Key -->
+    <x-admin.modal id="renewKeyModal" title="Перевыпуск ключа" size="md">
+        <div class="mb-4">
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-triangle text-yellow-600"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-yellow-800">
+                            Внимание!
+                        </h3>
+                        <div class="mt-2 text-sm text-yellow-700">
+                            <p>Вы собираетесь перевыпустить просроченный ключ. Будет создан новый пользователь сервера с сохранением всех параметров:</p>
+                            <ul class="list-disc list-inside mt-2 space-y-1">
+                                <li>Остатки трафика: <span id="renew-traffic-info" class="font-semibold"></span></li>
+                                <li>Дата окончания: <span id="renew-finish-info" class="font-semibold"></span></li>
+                                <li>Telegram ID: <span id="renew-user-tg-id" class="font-semibold"></span></li>
+                            </ul>
+                            <p class="mt-2 font-semibold">Ключ будет возвращен в статус "Активирован".</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p class="text-sm text-gray-600">Вы уверены, что хотите продолжить?</p>
+        </div>
+        <x-slot name="footer">
+            <button type="button"
+                    class="btn btn-primary"
+                    id="confirm-renew-key">
+                <span class="spinner spinner-border-sm d-none" role="status"></span>
+                Да, перевыпустить
+            </button>
+            <button type="button"
+                    class="btn btn-secondary"
+                    onclick="window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'renewKeyModal' } }))">
+                Отмена
+            </button>
+        </x-slot>
+    </x-admin.modal>
+
     <!-- Modal: Transfer Key -->
     <x-admin.modal id="transferKeyModal" title="Перенос ключа на другой сервер" size="md">
         <form id="transfer-key-form">
@@ -207,8 +258,8 @@
                 <span class="spinner spinner-border-sm d-none" role="status"></span>
                 Перенести
             </button>
-            <button type="button" 
-                    class="btn btn-secondary" 
+            <button type="button"
+                    class="btn btn-secondary"
                     onclick="window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'transferKeyModal' } }))">
                 Отмена
             </button>
@@ -293,6 +344,81 @@
                 });
 
                 fp.open();
+            });
+
+            // Обработчик клика по кнопке перевыпуска
+            $(document).on('click', '.btn-renew-key', function () {
+                const keyId = $(this).data('key-id');
+                const trafficLimit = $(this).data('key-traffic');
+                const finishAt = $(this).data('key-finish');
+                const userTgId = $(this).data('key-user-tg-id');
+
+                // Форматируем трафик
+                const trafficGB = (trafficLimit / (1024 * 1024 * 1024)).toFixed(1);
+                $('#renew-traffic-info').text(trafficGB + ' GB');
+
+                // Форматируем дату
+                if (finishAt) {
+                    const finishDate = new Date(finishAt * 1000);
+                    const formattedDate = finishDate.toLocaleDateString('ru-RU', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    $('#renew-finish-info').text(formattedDate);
+                } else {
+                    $('#renew-finish-info').text('Не указана');
+                }
+
+                $('#renew-user-tg-id').text(userTgId);
+
+                // Сохраняем ID ключа в data-атрибут кнопки подтверждения
+                $('#confirm-renew-key').data('key-id', keyId);
+
+                window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'renewKeyModal' } }));
+            });
+
+            // Обработчик подтверждения перевыпуска
+            $('#confirm-renew-key').on('click', function () {
+                const keyId = $(this).data('key-id');
+                const submitBtn = $(this);
+                const spinner = submitBtn.find('.spinner');
+
+                if (!keyId) {
+                    toastr.error('Ошибка: не указан ID ключа');
+                    return;
+                }
+
+                submitBtn.prop('disabled', true);
+                spinner.removeClass('d-none');
+
+                $.ajax({
+                    url: '{{ route('admin.module.key-activate.renew') }}',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                    },
+                    data: {
+                        key_id: keyId
+                    },
+                    success: function (response) {
+                        window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'renewKeyModal' } }));
+                        toastr.success('Ключ успешно перевыпущен');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                    },
+                    error: function (xhr) {
+                        const errorMessage = xhr.responseJSON?.message || 'Неизвестная ошибка';
+                        toastr.error('Ошибка при перевыпуске ключа: ' + errorMessage);
+                    },
+                    complete: function () {
+                        submitBtn.prop('disabled', false);
+                        spinner.addClass('d-none');
+                    }
+                });
             });
 
             // Обработчик клика по кнопке переноса

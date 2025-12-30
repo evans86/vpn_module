@@ -422,14 +422,14 @@ class KeyActivateService
 
                 } catch (Exception $e) {
                     $lastError = $e;
-                    
+
                     // Сразу помечаем панель как имеющую ошибку и убираем из ротации
                     if (isset($panel) && $panel) {
                         $this->panelRepository->markPanelWithError(
                             $panel->id,
                             'Ошибка при создании пользователя: ' . $e->getMessage()
                         );
-                        
+
                         Log::warning('Panel marked with error and removed from rotation', [
                             'panel_id' => $panel->id,
                             'error' => $e->getMessage(),
@@ -575,14 +575,14 @@ class KeyActivateService
 
                 } catch (Exception $e) {
                     $lastError = $e;
-                    
+
                     // Сразу помечаем панель как имеющую ошибку и убираем из ротации
                     if (isset($panel) && $panel) {
                         $this->panelRepository->markPanelWithError(
                             $panel->id,
                             'Ошибка при создании пользователя: ' . $e->getMessage()
                         );
-                        
+
                         Log::warning('Panel marked with error and removed from rotation', [
                             'panel_id' => $panel->id,
                             'error' => $e->getMessage(),
@@ -692,6 +692,139 @@ class KeyActivateService
             ]);
 
             throw new RuntimeException('Ошибка при обновлении статуса ключа: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Перевыпуск просроченного ключа
+     * Создает нового пользователя сервера с теми же параметрами и возвращает ключ в статус ACTIVE
+     *
+     * @param KeyActivate $key
+     * @return KeyActivate
+     * @throws RuntimeException|GuzzleException
+     */
+    public function renew(KeyActivate $key): KeyActivate
+    {
+        try {
+            // Проверяем, что ключ просрочен
+            if ($key->status !== KeyActivate::EXPIRED) {
+                throw new RuntimeException('Ключ не может быть перевыпущен. Только просроченные ключи могут быть перевыпущены.');
+            }
+
+            // Проверяем, что есть user_tg_id
+            if (!$key->user_tg_id) {
+                throw new RuntimeException('Нельзя перевыпустить ключ без привязки к пользователю Telegram');
+            }
+
+            // Загружаем связи
+            $key->load(['keyActivateUser.serverUser.panel', 'packSalesman.salesman']);
+
+            // Удаляем старого пользователя сервера, если он существует
+            if ($key->keyActivateUser && $key->keyActivateUser->serverUser) {
+                $oldServerUser = $key->keyActivateUser->serverUser;
+                $oldPanel = $oldServerUser->panel;
+
+                if ($oldPanel) {
+                    try {
+                        $panelStrategy = new PanelStrategy($oldPanel->panel ?? Panel::MARZBAN);
+                        $panelStrategy->deleteServerUser($oldPanel->id, $oldServerUser->id);
+
+                        $this->logger->info('Старый пользователь сервера удален при перевыпуске', [
+                            'source' => 'key_activate',
+                            'action' => 'renew',
+                            'key_id' => $key->id,
+                            'old_server_user_id' => $oldServerUser->id,
+                            'panel_id' => $oldPanel->id
+                        ]);
+                    } catch (Exception $e) {
+                        $this->logger->warning('Ошибка при удалении старого пользователя сервера (продолжаем перевыпуск)', [
+                            'source' => 'key_activate',
+                            'action' => 'renew',
+                            'key_id' => $key->id,
+                            'old_server_user_id' => $oldServerUser->id,
+                            'error' => $e->getMessage()
+                        ]);
+                        // Не прерываем процесс, если не удалось удалить старого пользователя
+                    }
+                }
+            }
+
+            // Определяем панель для создания нового пользователя
+            $panel = null;
+            if ($key->packSalesman && $key->packSalesman->salesman && $key->packSalesman->salesman->panel_id) {
+                $panel = $key->packSalesman->salesman->panel;
+            } else {
+                $panel = $this->panelRepository->getOptimizedMarzbanPanel();
+            }
+
+            if (!$panel) {
+                throw new RuntimeException('Активная панель Marzban не найдена');
+            }
+
+            // Используем существующие параметры ключа
+            $trafficLimit = $key->traffic_limit ?? 0;
+            $finishAt = $key->finish_at;
+
+            // Если finish_at не установлен, устанавливаем его на основе периода пакета
+            if (!$finishAt && $key->packSalesman && $key->packSalesman->pack) {
+                $finishAt = time() + ($key->packSalesman->pack->period * \App\Constants\TimeConstants::SECONDS_IN_DAY);
+            } elseif (!$finishAt) {
+                // Если нет пакета, устанавливаем на месяц вперед
+                $finishAt = Carbon::now()->addMonth()->startOfMonth()->timestamp;
+            }
+
+            // Создаем стратегию для работы с панелью
+            $panelStrategy = new PanelStrategy($panel->panel ?? Panel::MARZBAN);
+
+            // Создаем нового пользователя на сервере с теми же параметрами
+            $serverUser = $panelStrategy->addServerUser(
+                $panel->id,
+                $key->user_tg_id,
+                $trafficLimit,
+                $finishAt,
+                $key->id,
+                ['max_connections' => 3]
+            );
+
+            // Обновляем данные активации - возвращаем ключ в статус ACTIVE
+            $activatedKey = $this->keyActivateRepository->updateActivationData(
+                $key,
+                $key->user_tg_id,
+                KeyActivate::ACTIVE
+            );
+
+            // Обновляем finish_at в ключе (на случай, если он был пересчитан)
+            $activatedKey->finish_at = $finishAt;
+            $activatedKey->save();
+
+            $this->logger->info('Ключ успешно перевыпущен', [
+                'source' => 'key_activate',
+                'action' => 'renew',
+                'key_id' => $activatedKey->id,
+                'user_tg_id' => $key->user_tg_id,
+                'server_user_id' => $serverUser->id,
+                'panel_id' => $serverUser->panel_id,
+                'traffic_limit' => $trafficLimit,
+                'finish_at' => $finishAt
+            ]);
+
+            // Отправляем уведомление продавцу о перевыпуске ключа
+            if ($key->pack_salesman_id) {
+                $packSalesman = $this->packSalesmanRepository->findByIdOrFail($key->pack_salesman_id);
+                $this->notificationService->sendKeyActivatedNotification($packSalesman->salesman->telegram_id, $key->id);
+            }
+
+            return $activatedKey;
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при перевыпуске ключа', [
+                'source' => 'key_activate',
+                'action' => 'renew',
+                'key_id' => $key->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            throw new RuntimeException('Ошибка при перевыпуске ключа: ' . $e->getMessage());
         }
     }
 
