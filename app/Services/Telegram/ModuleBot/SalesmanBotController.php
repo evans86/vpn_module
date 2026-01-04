@@ -293,10 +293,10 @@ class SalesmanBotController extends AbstractTelegramBot
                 $message .= "📅 Действует до: {$finishDate}\n";
                 $message .= "⏳ Осталось: {$daysRemaining} дней\n";
 
-//                if ($key->traffic_limit) {
-//                    $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
+                if ($key->traffic_limit) {
+                    $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
 //                    $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
-//                }
+                }
 
                 if ($info['used_traffic']) {
                     $trafficUsedGB = round($info['used_traffic'] / (1024 * 1024 * 1024), 2);
@@ -388,10 +388,10 @@ class SalesmanBotController extends AbstractTelegramBot
                 $message .= "📅 Действует до: {$finishDate}\n";
                 $message .= "⏳ Осталось: {$daysRemaining} дней\n";
 
-//                if ($key->traffic_limit) {
-//                    $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
+                if ($key->traffic_limit) {
+                    $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
 //                    $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
-//                }
+                }
 
                 $message .= "🔗 [Открыть конфигурацию](https://vpn-telegram.com/config/{$key->id})\n\n";
             }
@@ -456,10 +456,10 @@ class SalesmanBotController extends AbstractTelegramBot
             $message .= "📅 Действует до: {$finishDate}\n";
             $message .= "⏳ Осталось: {$daysRemaining} дней\n";
 
-//            if ($key->traffic_limit) {
-//                $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
+            if ($key->traffic_limit) {
+                $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
 //                $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
-//            }
+            }
 
             if ($key->traffic_used) {
                 $trafficUsedGB = round($key->traffic_used / (1024 * 1024 * 1024), 2);
