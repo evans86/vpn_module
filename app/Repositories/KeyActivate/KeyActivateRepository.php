@@ -26,7 +26,21 @@ class KeyActivateRepository extends BaseRepository
      */
     public function getPaginatedWithPack(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
+        // Ограничиваем поля для экономии памяти
         $query = $this->query()
+            ->select([
+                'id',
+                'traffic_limit',
+                'pack_salesman_id',
+                'module_salesman_id',
+                'finish_at',
+                'activated_at',
+                'user_tg_id',
+                'deleted_at',
+                'status',
+                'created_at',
+                'updated_at'
+            ])
             ->with([
                 'packSalesman' => function ($query) {
                     $query->select('id', 'pack_id', 'salesman_id');
@@ -70,11 +84,15 @@ class KeyActivateRepository extends BaseRepository
             $query->where('user_tg_id', $filters['user_tg_id']);
         }
 
+        // Ограничиваем максимальное количество записей на странице для защиты от перегрузки памяти
+        $perPage = min($perPage, 100); // Максимум 100 записей на странице
+
         Log::info('KeyActivate Query', [
             'filters' => $filters,
             'sql' => $query->toSql(),
             'source' => 'key',
-            'bindings' => $query->getBindings()
+            'bindings' => $query->getBindings(),
+            'per_page' => $perPage
         ]);
 
         return $query->paginate($perPage);

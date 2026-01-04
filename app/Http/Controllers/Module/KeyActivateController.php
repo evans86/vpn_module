@@ -61,7 +61,8 @@ class KeyActivateController extends Controller
                 $filters['pack_salesman_id'] = $request->pack_salesman_id;
             }
 
-            $packs = Pack::all();
+            // Загружаем только нужные поля для экономии памяти
+            $packs = Pack::select('id', 'name', 'period', 'traffic_limit')->orderBy('name')->get();
             $statuses = [
                 KeyActivate::EXPIRED => 'Просрочен',
                 KeyActivate::ACTIVE => 'Активирован',

@@ -28,10 +28,27 @@ class ConnectionLimitViolationController extends Controller
     public function index(Request $request): View
     {
         $query = ConnectionLimitViolation::with([
-            'keyActivate.packSalesman.salesman',
-            'keyActivate.moduleSalesman',
-            'serverUser',
-            'panel.server'
+            'keyActivate' => function ($query) {
+                $query->select('id', 'pack_salesman_id', 'module_salesman_id', 'user_tg_id', 'status');
+            },
+            'keyActivate.packSalesman' => function ($query) {
+                $query->select('id', 'pack_id', 'salesman_id');
+            },
+            'keyActivate.packSalesman.salesman' => function ($query) {
+                $query->select('id', 'telegram_id', 'username', 'panel_id');
+            },
+            'keyActivate.moduleSalesman' => function ($query) {
+                $query->select('id', 'telegram_id', 'username', 'panel_id');
+            },
+            'serverUser' => function ($query) {
+                $query->select('id', 'panel_id', 'user_id', 'key_activate_id');
+            },
+            'panel' => function ($query) {
+                $query->select('id', 'panel', 'panel_adress', 'panel_status', 'server_id');
+            },
+            'panel.server' => function ($query) {
+                $query->select('id', 'name', 'ip', 'host', 'location_id');
+            }
         ])->latest();
 
         // Фильтрация по статусу
@@ -75,8 +92,17 @@ class ConnectionLimitViolationController extends Controller
         $stats = $this->monitorService->getViolationStats();
 
         // Дополнительные данные для фильтров (с eager loading для оптимизации)
+        // Ограничиваем поля для экономии памяти
         $panels = \App\Models\Panel\Panel::where('panel_status', \App\Models\Panel\Panel::PANEL_CONFIGURED)
-            ->with('server.location')
+            ->select('id', 'panel', 'panel_adress', 'panel_status', 'server_id')
+            ->with([
+                'server' => function ($query) {
+                    $query->select('id', 'name', 'ip', 'host', 'location_id');
+                },
+                'server.location' => function ($query) {
+                    $query->select('id', 'name', 'country', 'city');
+                }
+            ])
             ->get();
 
         return view('module.connection-limit-violations.index', compact('violations', 'stats', 'panels'));
