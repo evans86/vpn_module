@@ -722,7 +722,7 @@ class KeyActivateService
                     $query->select('id', 'key_activate_id', 'server_user_id');
                 },
                 'keyActivateUser.serverUser' => function ($query) {
-                    $query->select('id', 'panel_id', 'user_id', 'key_activate_id');
+                    $query->select('id', 'panel_id', 'keys', 'is_free', 'status', 'used_traffic');
                 },
                 'keyActivateUser.serverUser.panel' => function ($query) {
                     $query->select('id', 'panel', 'panel_adress', 'panel_login', 'panel_password', 'panel_status', 'server_id');

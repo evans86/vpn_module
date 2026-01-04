@@ -114,7 +114,7 @@ class KeyActivateController extends Controller
                 $query->select('id', 'key_activate_id', 'server_user_id');
             },
             'keyActivateUser.serverUser' => function ($query) {
-                $query->select('id', 'panel_id', 'user_id', 'key_activate_id');
+                $query->select('id', 'panel_id', 'keys', 'is_free', 'status', 'used_traffic');
             }
         ]);
         return view('module.key-activate.show', compact('key'));

@@ -41,7 +41,7 @@ class ConnectionLimitViolationController extends Controller
                 $query->select('id', 'telegram_id', 'username', 'panel_id');
             },
             'serverUser' => function ($query) {
-                $query->select('id', 'panel_id', 'user_id', 'key_activate_id');
+                $query->select('id', 'panel_id', 'keys', 'is_free', 'status', 'used_traffic');
             },
             'panel' => function ($query) {
                 $query->select('id', 'panel', 'panel_adress', 'panel_status', 'server_id');
