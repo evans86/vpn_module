@@ -267,8 +267,8 @@ class SalesmanBotController extends AbstractTelegramBot
             foreach ($currentPageKeys as $key) {
                 try {
                     // Проверяем наличие связанных данных перед доступом
-                    if (!$key->keyActivateUser || 
-                        !$key->keyActivateUser->serverUser || 
+                    if (!$key->keyActivateUser ||
+                        !$key->keyActivateUser->serverUser ||
                         !$key->keyActivateUser->serverUser->panel) {
                         Log::warning('Missing relationships for key', ['key_id' => $key->id, 'source' => 'telegram']);
                         $info = ['used_traffic' => null];
@@ -276,7 +276,7 @@ class SalesmanBotController extends AbstractTelegramBot
                         // Получаем информацию о трафике с панели
                         $panelStrategy = new PanelStrategy($key->keyActivateUser->serverUser->panel->panel);
                         $info = $panelStrategy->getSubscribeInfo(
-                            $key->keyActivateUser->serverUser->panel->id, 
+                            $key->keyActivateUser->serverUser->panel->id,
                             $key->keyActivateUser->serverUser->id
                         );
                     }
@@ -388,10 +388,10 @@ class SalesmanBotController extends AbstractTelegramBot
                 $message .= "📅 Действует до: {$finishDate}\n";
                 $message .= "⏳ Осталось: {$daysRemaining} дней\n";
 
-                if ($key->traffic_limit) {
-                    $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
-                    $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
-                }
+//                if ($key->traffic_limit) {
+//                    $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
+//                    $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
+//                }
 
                 $message .= "🔗 [Открыть конфигурацию](https://vpn-telegram.com/config/{$key->id})\n\n";
             }
@@ -456,10 +456,10 @@ class SalesmanBotController extends AbstractTelegramBot
             $message .= "📅 Действует до: {$finishDate}\n";
             $message .= "⏳ Осталось: {$daysRemaining} дней\n";
 
-            if ($key->traffic_limit) {
-                $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
-                $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
-            }
+//            if ($key->traffic_limit) {
+//                $trafficGB = round($key->traffic_limit / (1024 * 1024 * 1024), 2);
+//                $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
+//            }
 
             if ($key->traffic_used) {
                 $trafficUsedGB = round($key->traffic_used / (1024 * 1024 * 1024), 2);
