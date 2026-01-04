@@ -92,7 +92,7 @@ class ConnectionLimitViolationController extends Controller
         $stats = $this->monitorService->getViolationStats();
 
         // Дополнительные данные для фильтров (с eager loading для оптимизации)
-        // Ограничиваем поля для экономии памяти
+        // Ограничиваем поля для экономии памяти и количество записей
         $panels = \App\Models\Panel\Panel::where('panel_status', \App\Models\Panel\Panel::PANEL_CONFIGURED)
             ->select('id', 'panel', 'panel_adress', 'panel_status', 'server_id')
             ->with([
@@ -100,9 +100,10 @@ class ConnectionLimitViolationController extends Controller
                     $query->select('id', 'name', 'ip', 'host', 'location_id');
                 },
                 'server.location' => function ($query) {
-                    $query->select('id', 'name', 'country', 'city');
+                    $query->select('id', 'code', 'emoji');
                 }
             ])
+            ->limit(100) // Ограничиваем количество панелей для экономии памяти
             ->get();
 
         return view('module.connection-limit-violations.index', compact('violations', 'stats', 'panels'));
