@@ -74,6 +74,7 @@ abstract class AbstractTelegramBot
             // Получаем chat_id
             $message = $this->update->getMessage();
             $callbackQuery = $this->update->getCallbackQuery();
+            $chatMember = $this->update->getChatMember();
             
             // Проверяем, что message - это объект Message, а не Collection
             if ($message && method_exists($message, 'getChat')) {
@@ -99,15 +100,22 @@ abstract class AbstractTelegramBot
                     $this->username = $from->getUsername();
                     $this->firstName = $from->getFirstName();
                 }
+            } elseif ($chatMember && method_exists($chatMember, 'getChat')) {
+                // Обработка обновлений типа chat_member (пользователь присоединился/покинул чат)
+                $chat = $chatMember->getChat();
+                if ($chat) {
+                    $this->chatId = $chat->getId();
+                }
+                $from = $chatMember->getFrom();
+                if ($from) {
+                    $this->username = $from->getUsername();
+                    $this->firstName = $from->getFirstName();
+                }
             }
             
-            // Если chat_id не получен, возможно это обновление другого типа (chat_member, edited_message и т.д.)
-            // В таких случаях просто пропускаем обработку
+            // Если chat_id не получен, возможно это обновление другого типа (edited_message, channel_post и т.д.)
+            // В таких случаях просто пропускаем обработку без логирования (чтобы не засорять логи)
             if ($this->chatId === null) {
-                Log::info('Update type not supported or missing chat_id', [
-                    'update_type' => $this->update->toArray(),
-                    'source' => 'telegram'
-                ]);
                 return;
             }
 
