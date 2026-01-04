@@ -27,7 +27,17 @@ class KeyActivateRepository extends BaseRepository
     public function getPaginatedWithPack(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
         $query = $this->query()
-            ->with(['packSalesman.pack', 'packSalesman.salesman'])
+            ->with([
+                'packSalesman' => function ($query) {
+                    $query->select('id', 'pack_id', 'salesman_id');
+                },
+                'packSalesman.pack' => function ($query) {
+                    $query->select('id', 'name', 'period', 'traffic_limit');
+                },
+                'packSalesman.salesman' => function ($query) {
+                    $query->select('id', 'telegram_id', 'username', 'panel_id');
+                }
+            ])
             ->orderBy('created_at', 'desc');
 
         if (!empty($filters['id'])) {
@@ -199,10 +209,15 @@ class KeyActivateRepository extends BaseRepository
     public function updateActivationData(KeyActivate $key, int $userTgId, string $status): KeyActivate
     {
         // Получаем период действия из связанного пакета
-        if (isset($key->packSalesman->pack)){
+        // Загружаем связь, если она не загружена
+        if (!$key->relationLoaded('packSalesman')) {
+            $key->load(['packSalesman.pack']);
+        }
+        
+        if ($key->packSalesman && $key->packSalesman->pack) {
             $pack = $key->packSalesman->pack;
             $finishAt = time() + ($pack->period * \App\Constants\TimeConstants::SECONDS_IN_DAY);
-        }else{
+        } else {
             $finishAt = \Carbon\Carbon::now()->addMonth()->startOfMonth()->timestamp; // для бесплатного ключа
         }
 

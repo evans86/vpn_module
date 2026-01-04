@@ -99,7 +99,23 @@ class KeyActivateController extends Controller
      */
     public function show(KeyActivate $key): View
     {
-        $key->load(['packSalesman.pack', 'packSalesman.salesman', 'keyActivateUser.serverUser']);
+        $key->load([
+            'packSalesman' => function ($query) {
+                $query->select('id', 'pack_id', 'salesman_id');
+            },
+            'packSalesman.pack' => function ($query) {
+                $query->select('id', 'name', 'period', 'traffic_limit');
+            },
+            'packSalesman.salesman' => function ($query) {
+                $query->select('id', 'telegram_id', 'panel_id');
+            },
+            'keyActivateUser' => function ($query) {
+                $query->select('id', 'key_activate_id', 'server_user_id');
+            },
+            'keyActivateUser.serverUser' => function ($query) {
+                $query->select('id', 'panel_id', 'user_id', 'key_activate_id');
+            }
+        ]);
         return view('module.key-activate.show', compact('key'));
     }
 
@@ -115,7 +131,17 @@ class KeyActivateController extends Controller
             /**
              * @var KeyActivate $key
              */
-            $key = KeyActivate::with(['keyActivateUser.serverUser.panel'])->findOrFail($id);
+            $key = KeyActivate::with([
+                'keyActivateUser' => function ($query) {
+                    $query->select('id', 'key_activate_id', 'server_user_id');
+                },
+                'keyActivateUser.serverUser' => function ($query) {
+                    $query->select('id', 'panel_id', 'user_id', 'key_activate_id');
+                },
+                'keyActivateUser.serverUser.panel' => function ($query) {
+                    $query->select('id', 'panel', 'panel_adress', 'panel_login', 'panel_password', 'panel_status', 'server_id');
+                }
+            ])->findOrFail($id);
 
             $this->logger->info('Начало удаления ключа активации', [
                 'key_id' => $id,

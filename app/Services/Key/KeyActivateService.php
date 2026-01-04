@@ -422,14 +422,14 @@ class KeyActivateService
 
                 } catch (Exception $e) {
                     $lastError = $e;
-
+                    
                     // Сразу помечаем панель как имеющую ошибку и убираем из ротации
                     if (isset($panel) && $panel) {
                         $this->panelRepository->markPanelWithError(
                             $panel->id,
                             'Ошибка при создании пользователя: ' . $e->getMessage()
                         );
-
+                        
                         Log::warning('Panel marked with error and removed from rotation', [
                             'panel_id' => $panel->id,
                             'error' => $e->getMessage(),
@@ -575,14 +575,14 @@ class KeyActivateService
 
                 } catch (Exception $e) {
                     $lastError = $e;
-
+                    
                     // Сразу помечаем панель как имеющую ошибку и убираем из ротации
                     if (isset($panel) && $panel) {
                         $this->panelRepository->markPanelWithError(
                             $panel->id,
                             'Ошибка при создании пользователя: ' . $e->getMessage()
                         );
-
+                        
                         Log::warning('Panel marked with error and removed from rotation', [
                             'panel_id' => $panel->id,
                             'error' => $e->getMessage(),
@@ -716,8 +716,24 @@ class KeyActivateService
                 throw new RuntimeException('Нельзя перевыпустить ключ без привязки к пользователю Telegram');
             }
 
-            // Загружаем связи
-            $key->load(['keyActivateUser.serverUser.panel', 'packSalesman.salesman']);
+            // Загружаем связи с ограничением полей для экономии памяти
+            $key->load([
+                'keyActivateUser' => function ($query) {
+                    $query->select('id', 'key_activate_id', 'server_user_id');
+                },
+                'keyActivateUser.serverUser' => function ($query) {
+                    $query->select('id', 'panel_id', 'user_id', 'key_activate_id');
+                },
+                'keyActivateUser.serverUser.panel' => function ($query) {
+                    $query->select('id', 'panel', 'panel_adress', 'panel_login', 'panel_password', 'panel_status', 'server_id');
+                },
+                'packSalesman' => function ($query) {
+                    $query->select('id', 'pack_id', 'salesman_id');
+                },
+                'packSalesman.salesman' => function ($query) {
+                    $query->select('id', 'telegram_id', 'panel_id');
+                }
+            ]);
 
             // Удаляем старого пользователя сервера, если он существует
             if ($key->keyActivateUser && $key->keyActivateUser->serverUser) {
