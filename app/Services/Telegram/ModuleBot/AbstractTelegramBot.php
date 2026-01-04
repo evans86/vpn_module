@@ -72,20 +72,43 @@ abstract class AbstractTelegramBot
             $this->update = $this->telegram->getWebhookUpdate();
 
             // Получаем chat_id
-            if ($this->update->getMessage()) {
-                $this->chatId = $this->update->getMessage()->getChat()->getId();
-                $from = $this->update->getMessage()->getFrom();
+            $message = $this->update->getMessage();
+            $callbackQuery = $this->update->getCallbackQuery();
+            
+            // Проверяем, что message - это объект Message, а не Collection
+            if ($message && method_exists($message, 'getChat')) {
+                $chat = $message->getChat();
+                if ($chat) {
+                    $this->chatId = $chat->getId();
+                }
+                $from = $message->getFrom();
                 if ($from) {
                     $this->username = $from->getUsername();
                     $this->firstName = $from->getFirstName();
                 }
-            } elseif ($this->update->getCallbackQuery()) {
-                $this->chatId = $this->update->getCallbackQuery()->getMessage()->getChat()->getId();
-                $from = $this->update->getCallbackQuery()->getFrom();
+            } elseif ($callbackQuery) {
+                $callbackMessage = $callbackQuery->getMessage();
+                if ($callbackMessage && method_exists($callbackMessage, 'getChat')) {
+                    $chat = $callbackMessage->getChat();
+                    if ($chat) {
+                        $this->chatId = $chat->getId();
+                    }
+                }
+                $from = $callbackQuery->getFrom();
                 if ($from) {
                     $this->username = $from->getUsername();
                     $this->firstName = $from->getFirstName();
                 }
+            }
+            
+            // Если chat_id не получен, возможно это обновление другого типа (chat_member, edited_message и т.д.)
+            // В таких случаях просто пропускаем обработку
+            if ($this->chatId === null) {
+                Log::info('Update type not supported or missing chat_id', [
+                    'update_type' => $this->update->toArray(),
+                    'source' => 'telegram'
+                ]);
+                return;
             }
 
             Log::info('Bot initialized', [
