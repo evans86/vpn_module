@@ -21,7 +21,8 @@ class SalesmanBotController extends AbstractTelegramBot
         // Находим продавца по токену
         $this->salesman = $this->salesmanRepository->findByToken($token);
         if (!$this->salesman) {
-            Log::error('Salesman not found for token: ' . substr($token, 0, 10) . '...', ['source' => 'telegram']);
+            Log::error('Salesman not found for token: ' . $token, ['source' => 'telegram']);
+//            Log::error('Salesman not found for token: ' . substr($token, 0, 10) . '...', ['source' => 'telegram']);
             throw new RuntimeException('Salesman not found');
         }
 
