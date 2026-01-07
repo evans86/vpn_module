@@ -97,6 +97,7 @@ abstract class AbstractTelegramBot
                 'source' => 'telegram'
             ]);
             throw $e;
+
         }
     }
 
