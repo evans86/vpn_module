@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Pack\Pack;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Services\Key\KeyActivateService;
+use Illuminate\Support\Facades\Log;
 use App\Services\Panel\PanelStrategy;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Contracts\Foundation\Application;
@@ -17,6 +18,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Exception;
 use RuntimeException;
+use Illuminate\Support\Facades\Cache; // Добавим кэширование
 
 class KeyActivateController extends Controller
 {
@@ -32,6 +34,10 @@ class KeyActivateController extends Controller
      * @var KeyActivateRepository
      */
     private KeyActivateRepository $keyActivateRepository;
+
+    // Добавляем константы для оптимизации
+    private const PACK_CACHE_TIME = 3600; // 1 час
+    private const PER_PAGE = 50; // Ограничиваем количество записей на странице
 
     public function __construct(
         DatabaseLogger        $logger,
@@ -61,7 +67,16 @@ class KeyActivateController extends Controller
                 $filters['pack_salesman_id'] = $request->pack_salesman_id;
             }
 
-            $packs = Pack::all();
+            // ОПТИМИЗАЦИЯ 1: Используем кэширование для packs
+            $packs = Cache::remember('packs_list', self::PACK_CACHE_TIME, function () {
+                // Выбираем только нужные поля
+                return Pack::select(['id', 'name', 'price', 'description'])
+                    ->orderBy('name')
+                    ->get()
+                    ->pluck('name', 'id'); // Используем pluck для экономии памяти
+            });
+
+            // Статусы можно также кэшировать
             $statuses = [
                 KeyActivate::EXPIRED => 'Просрочен',
                 KeyActivate::ACTIVE => 'Активирован',
@@ -69,7 +84,17 @@ class KeyActivateController extends Controller
                 KeyActivate::DELETED => 'Удален'
             ];
 
-            $activate_keys = $this->keyActivateService->getPaginatedWithPack($filters);
+            // ОПТИМИЗАЦИЯ 2: Добавляем ограничение на количество записей
+            $activate_keys = $this->keyActivateService->getPaginatedWithPack(
+                $filters,
+                self::PER_PAGE // Передаем лимит
+            );
+
+            // ОПТИМИЗАЦИЯ 3: Логируем использование памяти для отладки
+            if (app()->environment('local')) {
+                Log::debug('Memory usage after query: ' . memory_get_usage() / 1024 / 1024 . ' MB');
+                Log::debug('Records count: ' . $activate_keys->total());
+            }
 
             return view('module.key-activate.index', [
                 'activate_keys' => $activate_keys,
@@ -99,7 +124,19 @@ class KeyActivateController extends Controller
      */
     public function show(KeyActivate $key): View
     {
-        $key->load(['packSalesman.pack', 'packSalesman.salesman', 'keyActivateUser.serverUser']);
+        // ОПТИМИЗАЦИЯ: Выбираем только нужные поля и ограничиваем вложенные отношения
+        $key->load([
+            'packSalesman:id,pack_id,salesman_id' => [
+                'pack:id,name',
+                'salesman:id,name'
+            ],
+            'keyActivateUser:id,server_user_id,key_activate_id' => [
+                'serverUser:id,panel_id,username' => [
+                    'panel:id,name,panel'
+                ]
+            ]
+        ]);
+
         return view('module.key-activate.show', compact('key'));
     }
 
@@ -115,7 +152,16 @@ class KeyActivateController extends Controller
             /**
              * @var KeyActivate $key
              */
-            $key = KeyActivate::with(['keyActivateUser.serverUser.panel'])->findOrFail($id);
+            // ОПТИМИЗАЦИЯ: Выбираем только необходимые поля и отношения
+            $key = KeyActivate::select(['id', 'status', 'user_tg_id'])
+                ->with([
+                    'keyActivateUser:id,server_user_id,key_activate_id' => [
+                        'serverUser:id,panel_id,username' => [
+                            'panel:id,panel'
+                        ]
+                    ]
+                ])
+                ->findOrFail($id);
 
             $this->logger->info('Начало удаления ключа активации', [
                 'key_id' => $id,
@@ -271,7 +317,9 @@ class KeyActivateController extends Controller
                 'key_id' => 'required|uuid|exists:key_activate,id'
             ]);
 
-            $key = KeyActivate::findOrFail($validated['key_id']);
+            // ОПТИМИЗАЦИЯ: Выбираем только необходимые поля
+            $key = KeyActivate::select(['id', 'status', 'user_tg_id', 'traffic_limit', 'finish_at'])
+                ->findOrFail($validated['key_id']);
 
             // Проверяем, что ключ просрочен
             if ($key->status !== KeyActivate::EXPIRED) {
@@ -351,20 +399,20 @@ class KeyActivateController extends Controller
                 'value' => 'required|integer'
             ]);
 
-            $key = KeyActivate::findOrFail($validated['id']);
+            // ОПТИМИЗАЦИЯ: Обновляем напрямую через запрос
+            $affected = KeyActivate::where('id', $validated['id'])
+                ->update([$validated['type'] => $validated['value']]);
 
-            // Обновляем дату
-            $key->{$validated['type']} = $validated['value'];
-            $key->save();
-
-            $this->logger->info('Обновление даты для ключа активации', [
-                'source' => 'key_activate',
-                'action' => 'update_date',
-                'user_id' => auth()->id(),
-                'key_id' => $key->id,
-                'field' => $validated['type'],
-                'new_value' => $validated['value']
-            ]);
+            if ($affected) {
+                $this->logger->info('Обновление даты для ключа активации', [
+                    'source' => 'key_activate',
+                    'action' => 'update_date',
+                    'user_id' => auth()->id(),
+                    'key_id' => $validated['id'],
+                    'field' => $validated['type'],
+                    'new_value' => $validated['value']
+                ]);
+            }
 
             return response()->json([
                 'success' => true,
