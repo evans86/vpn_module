@@ -8,9 +8,6 @@ use App\Services\VPN\ConnectionLimitMonitorService;
 use App\Services\VPN\ViolationManualService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 
 class ConnectionLimitViolationController extends Controller
 {
@@ -30,164 +27,59 @@ class ConnectionLimitViolationController extends Controller
      */
     public function index(Request $request): View
     {
-        try {
-            // Временное увеличение лимита памяти для диагностики
-            if (app()->environment('local')) {
-                ini_set('memory_limit', '256M');
-            }
+        $query = ConnectionLimitViolation::with([
+            'keyActivate.packSalesman.salesman',
+            'keyActivate.moduleSalesman',
+            'serverUser',
+            'panel.server'
+        ])->latest();
 
-            $query = ConnectionLimitViolation::query();
-
-            // ОПТИМИЗАЦИЯ: Выбираем только необходимые поля и загружаем отношения с выбором полей
-            $query->select([
-                'id',
-                'key_activate_id',
-                'panel_id',
-                'server_user_id',
-                'user_tg_id',
-                'violation_count',
-                'first_detected_at',
-                'last_detected_at',
-                'status',
-                'resolved_at',
-                'created_at',
-                'updated_at'
-            ]);
-
-            // ОПТИМИЗАЦИЯ: Загружаем отношения с выбором только нужных полей
-            $query->with([
-                'keyActivate:id,pack_salesman_id,module_salesman_id,user_tg_id,status' => [
-                    'packSalesman:id,salesman_id' => [
-                        'salesman:id,name,telegram_id'
-                    ],
-                    'moduleSalesman:id,name'
-                ],
-                'serverUser:id,username,panel_id',
-                'panel:id,name,server_id' => [
-                    'server:id,name,location_id'
-                ]
-            ]);
-
-            // Сортировка с использованием индексов
-            $query->orderBy('created_at', 'desc');
-
-            // Фильтрация по статусу
-            if ($request->filled('status')) {
-                $query->where('status', $request->status);
-            }
-
-            // Фильтрация по панели
-            if ($request->filled('panel_id')) {
-                $query->where('panel_id', $request->panel_id);
-            }
-
-            // Фильтрация по количеству нарушений
-            if ($request->filled('violation_count')) {
-                $query->where('violation_count', '>=', $request->violation_count);
-            }
-
-            // Фильтрация по дате
-            if ($request->filled('date_from')) {
-                $query->whereDate('created_at', '>=', $request->date_from);
-            }
-
-            if ($request->filled('date_to')) {
-                $query->whereDate('created_at', '<=', $request->date_to);
-            }
-
-            // Поиск по ID ключа или пользователя
-            if ($request->filled('search')) {
-                $search = $request->search;
-                $query->where(function($q) use ($search) {
-                    $q->where('user_tg_id', 'LIKE', "%{$search}%")
-                        ->orWhereHas('keyActivate', function($q) use ($search) {
-                            $q->select('id')->where('id', 'LIKE', "%{$search}%");
-                        });
-                });
-            }
-
-            // ОПТИМИЗАЦИЯ: Ограничиваем количество записей и используем простую пагинацию
-            $violations = $query->paginate(config('app.items_per_page', 20)) // Уменьшено с 30 до 20
-            ->onEachSide(1); // Уменьшаем количество страниц для пагинации
-
-            // Статистика для виджетов - с ограничением записей
-            $stats = $this->getOptimizedViolationStats();
-
-            // ОПТИМИЗАЦИЯ: Загружаем панели с ограничением
-            $panels = \App\Models\Panel\Panel::where('panel_status', \App\Models\Panel\Panel::PANEL_CONFIGURED)
-                ->select(['id', 'name', 'server_id', 'panel_status'])
-                ->with(['server:id,name'])
-                ->limit(50) // Ограничиваем количество панелей
-                ->get();
-
-            // Логируем использование памяти для отладки
-            if (app()->environment('local')) {
-                Log::debug('ConnectionLimitViolationController memory usage: ' .
-                    round(memory_get_usage() / 1024 / 1024, 2) . ' MB');
-                Log::debug('Violations count: ' . $violations->total());
-            }
-
-            return view('module.connection-limit-violations.index', compact('violations', 'stats', 'panels'));
-
-        } catch (\Exception $e) {
-            Log::error('Error in ConnectionLimitViolationController@index', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'memory_usage' => round(memory_get_usage() / 1024 / 1024, 2) . ' MB'
-            ]);
-
-            // Возвращаем страницу с правильной структурой статистики
-            return view('module.connection-limit-violations.index', [
-                'violations' => new \Illuminate\Pagination\LengthAwarePaginator([], 0, 20),
-                'stats' => $this->getEmptyStats(), // Используем метод для пустой статистики
-                'panels' => [],
-                'error' => 'Произошла ошибка при загрузке данных. Попробуйте обновить страницу или уточнить фильтры.'
-            ]);
+        // Фильтрация по статусу
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
         }
-    }
 
-    /**
-     * Оптимизированная статистика
-     */
-    private function getOptimizedViolationStats(): array
-    {
-        return Cache::remember('violation_stats', 300, function () { // Кэшируем на 5 минут
-            return [
-                'total' => DB::table('connection_limit_violations')
-                    ->selectRaw('COUNT(*) as count')
-                    ->value('count'),
-                'active' => DB::table('connection_limit_violations')
-                    ->where('status', ConnectionLimitViolation::STATUS_ACTIVE)
-                    ->selectRaw('COUNT(*) as count')
-                    ->value('count'),
-                'resolved' => DB::table('connection_limit_violations')
-                    ->where('status', ConnectionLimitViolation::STATUS_RESOLVED)
-                    ->selectRaw('COUNT(*) as count')
-                    ->value('count'),
-                'ignored' => DB::table('connection_limit_violations')
-                    ->where('status', ConnectionLimitViolation::STATUS_IGNORED)
-                    ->selectRaw('COUNT(*) as count')
-                    ->value('count'),
-                'today' => DB::table('connection_limit_violations')
-                    ->whereDate('created_at', today())
-                    ->selectRaw('COUNT(*) as count')
-                    ->value('count')
-            ];
-        });
-    }
+        // Фильтрация по панели
+        if ($request->filled('panel_id')) {
+            $query->where('panel_id', $request->panel_id);
+        }
 
-    /**
-     * Пустая статистика для случая ошибки
-     */
-    private function getEmptyStats(): array
-    {
-        return [
-            'total' => 0,
-            'active' => 0,
-            'resolved' => 0,
-            'ignored' => 0,
-            'today' => 0
-        ];
+        // Фильтрация по количеству нарушений
+        if ($request->filled('violation_count')) {
+            $query->where('violation_count', '>=', $request->violation_count);
+        }
+
+        // Фильтрация по дате
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        // Поиск по ID ключа или пользователя
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('user_tg_id', 'LIKE', "%{$search}%")
+                    ->orWhereHas('keyActivate', function($q) use ($search) {
+                        $q->where('id', 'LIKE', "%{$search}%");
+                    });
+            });
+        }
+
+        $violations = $query->paginate(config('app.items_per_page', 30));
+
+        // Статистика для виджетов
+        $stats = $this->monitorService->getViolationStats();
+
+        // Дополнительные данные для фильтров (с eager loading для оптимизации)
+        $panels = \App\Models\Panel\Panel::where('panel_status', \App\Models\Panel\Panel::PANEL_CONFIGURED)
+            ->with('server.location')
+            ->get();
+
+        return view('module.connection-limit-violations.index', compact('violations', 'stats', 'panels'));
     }
 
     /**
@@ -206,7 +98,6 @@ class ConnectionLimitViolationController extends Controller
                 ->with('check_results', $results);
 
         } catch (\Exception $e) {
-            Log::error('Error in manualCheck', ['error' => $e->getMessage()]);
             return redirect()->back()->with('error', 'Ошибка при проверке: ' . $e->getMessage());
         }
     }
@@ -219,6 +110,7 @@ class ConnectionLimitViolationController extends Controller
         $action = $request->input('action');
         $violationIds = $request->input('violation_ids', []);
 
+        // Если запрос через AJAX, возвращаем JSON
         $isAjax = $request->expectsJson() || $request->ajax();
 
         if (empty($violationIds)) {
@@ -229,9 +121,6 @@ class ConnectionLimitViolationController extends Controller
         }
 
         try {
-            // ОПТИМИЗАЦИЯ: Ограничиваем количество обрабатываемых записей
-            $violationIds = array_slice($violationIds, 0, 100); // Максимум 100 записей
-
             $count = 0;
             $message = '';
 
@@ -268,9 +157,6 @@ class ConnectionLimitViolationController extends Controller
                     return redirect()->back()->with('error', 'Неизвестное действие');
             }
 
-            // Очищаем кэш статистики
-            Cache::forget('violation_stats');
-
             if ($isAjax) {
                 return response()->json([
                     'success' => true,
@@ -282,8 +168,6 @@ class ConnectionLimitViolationController extends Controller
             return redirect()->back()->with('success', $message);
 
         } catch (\Exception $e) {
-            Log::error('Error in bulkActions', ['error' => $e->getMessage()]);
-
             if ($isAjax) {
                 return response()->json([
                     'success' => false,
@@ -302,8 +186,6 @@ class ConnectionLimitViolationController extends Controller
         $action = $request->input('action');
 
         try {
-            $result = null;
-
             switch ($action) {
                 case 'send_notification':
                     $this->manualService->sendUserNotification($violation);
@@ -313,7 +195,6 @@ class ConnectionLimitViolationController extends Controller
                 case 'reissue_key':
                     $newKey = $this->manualService->reissueKey($violation);
                     $message = "Ключ перевыпущен. Новый ключ: {$newKey->id}";
-                    $result = ['new_key_id' => $newKey->id];
                     break;
 
                 case 'ignore':
@@ -325,16 +206,9 @@ class ConnectionLimitViolationController extends Controller
                     return response()->json(['success' => false, 'message' => 'Неизвестное действие']);
             }
 
-            // Очищаем кэш статистики
-            Cache::forget('violation_stats');
-
-            return response()->json(array_merge(
-                ['success' => true, 'message' => $message],
-                $result ?? []
-            ));
+            return response()->json(['success' => true, 'message' => $message, 'new_key_id' => $newKey->id ?? null]);
 
         } catch (\Exception $e) {
-            Log::error('Error in manageViolation', ['violation_id' => $violation->id, 'error' => $e->getMessage()]);
             return response()->json(['success' => false, 'message' => 'Ошибка: ' . $e->getMessage()]);
         }
     }
@@ -370,9 +244,6 @@ class ConnectionLimitViolationController extends Controller
                     return response()->json(['error' => 'Unknown action'], 400);
             }
 
-            // Очищаем кэш статистики
-            Cache::forget('violation_stats');
-
             return response()->json([
                 'success' => true,
                 'new_status' => $violation->fresh()->status,
@@ -381,7 +252,6 @@ class ConnectionLimitViolationController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Error in quickAction', ['violation_id' => $violation->id, 'error' => $e->getMessage()]);
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
@@ -391,18 +261,11 @@ class ConnectionLimitViolationController extends Controller
      */
     public function show(ConnectionLimitViolation $violation): View
     {
-        // ОПТИМИЗАЦИЯ: Загружаем только необходимые поля
         $violation->load([
-            'keyActivate:id,pack_salesman_id,module_salesman_id,user_tg_id,status,key' => [
-                'packSalesman:id,salesman_id' => [
-                    'salesman:id,name,telegram_id'
-                ],
-                'moduleSalesman:id,name'
-            ],
-            'serverUser:id,username,panel_id,key_activate_id',
-            'panel:id,name,server_id' => [
-                'server:id,name,location_id'
-            ]
+            'keyActivate.packSalesman.salesman',
+            'keyActivate.moduleSalesman',
+            'serverUser',
+            'panel.server'
         ]);
 
         return view('module.connection-limit-violations.show', compact('violation'));
