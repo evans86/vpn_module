@@ -70,10 +70,10 @@ class KeyActivateController extends Controller
             // ОПТИМИЗАЦИЯ 1: Используем кэширование для packs
             $packs = Cache::remember('packs_list', self::PACK_CACHE_TIME, function () {
                 // Выбираем только нужные поля
-                return Pack::select(['id', 'name', 'price', 'description'])
-                    ->orderBy('name')
+                return Pack::select(['id', 'title', 'price', 'description'])
+                    ->orderBy('title')
                     ->get()
-                    ->pluck('name', 'id'); // Используем pluck для экономии памяти
+                    ->pluck('title', 'id'); // Используем pluck для экономии памяти
             });
 
             // Статусы можно также кэшировать
