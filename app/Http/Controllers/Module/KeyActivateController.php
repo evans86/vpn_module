@@ -86,7 +86,7 @@ class KeyActivateController extends Controller
             ];
 
             // Получаем данные с пагинацией (добавляем лимит записей)
-            $activate_keys = $this->keyActivateService->getPaginatedWithPack($filters, 50); // Ограничиваем 50 записями на странице
+            $activate_keys = $this->keyActivateService->getPaginatedWithPack($filters, 25); // Ограничиваем 50 записями на странице
 
             // Логируем использование памяти для отладки
             if (app()->environment('local')) {
