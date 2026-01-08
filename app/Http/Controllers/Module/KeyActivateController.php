@@ -8,7 +8,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Pack\Pack;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Services\Key\KeyActivateService;
-use Illuminate\Support\Facades\Log;
 use App\Services\Panel\PanelStrategy;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Contracts\Foundation\Application;
@@ -18,7 +17,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Exception;
 use RuntimeException;
-use Illuminate\Support\Facades\Cache; // Добавим кэширование
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class KeyActivateController extends Controller
 {
@@ -35,9 +36,10 @@ class KeyActivateController extends Controller
      */
     private KeyActivateRepository $keyActivateRepository;
 
-    // Добавляем константы для оптимизации
+    // Константы для оптимизации
     private const PACK_CACHE_TIME = 3600; // 1 час
     private const PER_PAGE = 50; // Ограничиваем количество записей на странице
+    private const MAX_FILTER_RESULTS = 5000; // Максимальное количество записей при фильтрации
 
     public function __construct(
         DatabaseLogger        $logger,
@@ -60,23 +62,29 @@ class KeyActivateController extends Controller
     public function index(Request $request)
     {
         try {
+            // Собираем фильтры, убирая пустые значения
             $filters = array_filter($request->only(['id', 'pack_id', 'status', 'user_tg_id', 'telegram_id']));
 
             // Добавляем pack_salesman_id в фильтры, если он есть
             if ($request->has('pack_salesman_id')) {
-                $filters['pack_salesman_id'] = $request->pack_salesman_id;
+                $packSalesmanId = $request->pack_salesman_id;
+                if (!empty($packSalesmanId)) {
+                    $filters['pack_salesman_id'] = $packSalesmanId;
+                }
             }
 
-            // ОПТИМИЗАЦИЯ 1: Используем кэширование для packs
+            // ОПТИМИЗАЦИЯ: Используем кэширование для packs
             $packs = Cache::remember('packs_list', self::PACK_CACHE_TIME, function () {
-                // Выбираем только нужные поля
-                return Pack::select(['id', 'title', 'price'])
+                return Pack::select(['id', 'title', 'price', 'period'])
+                    ->where('status', Pack::ACTIVE)
                     ->orderBy('title')
                     ->get()
-                    ->pluck('title', 'id'); // Используем pluck для экономии памяти
+                    ->mapWithKeys(function ($pack) {
+                        return [$pack->id => $pack->title . ' (' . $pack->getFormattedPriceAttribute() . ')'];
+                    });
             });
 
-            // Статусы можно также кэшировать
+            // Статусы ключей
             $statuses = [
                 KeyActivate::EXPIRED => 'Просрочен',
                 KeyActivate::ACTIVE => 'Активирован',
@@ -84,17 +92,14 @@ class KeyActivateController extends Controller
                 KeyActivate::DELETED => 'Удален'
             ];
 
-            // ОПТИМИЗАЦИЯ 2: Добавляем ограничение на количество записей
-            $activate_keys = $this->keyActivateService->getPaginatedWithPack(
-                $filters,
-                self::PER_PAGE // Передаем лимит
-            );
+            // ОПТИМИЗАЦИЯ: Проверяем, не слишком ли большой результат запроса
+            $this->checkFilterResults($filters);
 
-            // ОПТИМИЗАЦИЯ 3: Логируем использование памяти для отладки
-            if (app()->environment('local')) {
-                Log::debug('Memory usage after query: ' . memory_get_usage() / 1024 / 1024 . ' MB');
-                Log::debug('Records count: ' . $activate_keys->total());
-            }
+            // Получаем данные с пагинацией
+            $activate_keys = $this->keyActivateRepository->getPaginatedWithPack($filters, self::PER_PAGE);
+
+            // ОПТИМИЗАЦИЯ: Логируем использование памяти для отладки
+            $this->logMemoryUsage('After query execution');
 
             return view('module.key-activate.index', [
                 'activate_keys' => $activate_keys,
@@ -112,30 +117,49 @@ class KeyActivateController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
 
-            throw $e;
+            // Показываем страницу с ошибкой вместо редиректа
+            if ($e->getMessage() === 'Too many results') {
+                return view('module.key-activate.index', [
+                    'activate_keys' => new \Illuminate\Pagination\LengthAwarePaginator([], 0, self::PER_PAGE),
+                    'packs' => [],
+                    'statuses' => $statuses ?? [],
+                    'filters' => $filters ?? [],
+                    'error' => 'Слишком много результатов по вашему запросу. Пожалуйста, уточните фильтры.'
+                ]);
+            }
+
+            // Для других ошибок показываем общее сообщение
+            return view('module.key-activate.index', [
+                'activate_keys' => new \Illuminate\Pagination\LengthAwarePaginator([], 0, self::PER_PAGE),
+                'packs' => [],
+                'statuses' => $statuses ?? [],
+                'filters' => $filters ?? [],
+                'error' => 'Произошла ошибка при загрузке данных. Попробуйте обновить страницу.'
+            ]);
         }
     }
 
     /**
      * Display the specified key activate
      *
-     * @param KeyActivate $key
+     * @param string $id
      * @return Application|Factory|View
      */
-    public function show(KeyActivate $key): View
+    public function show(string $id): View
     {
-        // ОПТИМИЗАЦИЯ: Выбираем только нужные поля и ограничиваем вложенные отношения
-        $key->load([
+        // Загружаем ключ с отношениями
+        $key = KeyActivate::with([
             'packSalesman:id,pack_id,salesman_id' => [
-                'pack:id,name',
-                'salesman:id,name'
+                'pack:id,title,price,period',
+                'salesman:id,name,telegram_id'
             ],
             'keyActivateUser:id,server_user_id,key_activate_id' => [
                 'serverUser:id,panel_id,username' => [
                     'panel:id,name,panel'
                 ]
-            ]
-        ]);
+            ],
+            'user:id,telegram_id,username,first_name'
+        ])->findOrFail($id);
 
         return view('module.key-activate.show', compact('key'));
     }
@@ -152,25 +176,22 @@ class KeyActivateController extends Controller
             /**
              * @var KeyActivate $key
              */
-            // ОПТИМИЗАЦИЯ: Выбираем только необходимые поля и отношения
-            $key = KeyActivate::select(['id', 'status', 'user_tg_id'])
-                ->with([
-                    'keyActivateUser:id,server_user_id,key_activate_id' => [
-                        'serverUser:id,panel_id,username' => [
-                            'panel:id,panel'
-                        ]
+            $key = KeyActivate::with([
+                'keyActivateUser:id,server_user_id,key_activate_id' => [
+                    'serverUser:id,panel_id,username' => [
+                        'panel:id,panel'
                     ]
-                ])
-                ->findOrFail($id);
+                ]
+            ])->findOrFail($id);
 
             $this->logger->info('Начало удаления ключа активации', [
                 'key_id' => $id,
                 'key_activate_user_exists' => $key->keyActivateUser ? 'yes' : 'no',
-                'server_user_exists' => $key->keyActivateUser->serverUser ? 'yes' : 'no'
+                'server_user_exists' => $key->keyActivateUser && $key->keyActivateUser->serverUser ? 'yes' : 'no'
             ]);
 
             // Если есть связанный пользователь на сервере, удаляем его
-            if ($key->keyActivateUser->serverUser && $key->keyActivateUser->serverUser->panel) {
+            if ($key->keyActivateUser && $key->keyActivateUser->serverUser && $key->keyActivateUser->serverUser->panel) {
                 $serverUser = $key->keyActivateUser->serverUser;
                 $panel = $serverUser->panel;
 
@@ -227,13 +248,15 @@ class KeyActivateController extends Controller
 
     /**
      * Test activation of the key (development only)
-     * @param KeyActivate $key
+     * @param string $id
      * @return JsonResponse
      * @throws GuzzleException
      */
-    public function testActivate(KeyActivate $key): JsonResponse
+    public function testActivate(string $id): JsonResponse
     {
         try {
+            $key = KeyActivate::findOrFail($id);
+
             // Проверяем статус ключа
             if (!$this->keyActivateRepository->hasCorrectStatusForActivation($key)) {
                 $this->logger->warning('Попытка активации ключа с неверным статусом', [
@@ -285,21 +308,27 @@ class KeyActivateController extends Controller
                 'source' => 'key_activate',
                 'action' => 'test_activate',
                 'user_id' => auth()->id(),
-                'key_id' => $key->id,
+                'key_id' => $id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'key_status' => $key->status,
-                'deleted_at' => $key->deleted_at
+                'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
-                'message' => $e->getMessage(),
-                'key' => [
-                    'id' => $key->id,
-                    'status' => $key->status,
-                    'deleted_at' => $key->deleted_at
-                ]
+                'message' => $e->getMessage()
             ], 400);
+        } catch (Exception $e) {
+            $this->logger->error('Неизвестная ошибка при тестовой активации ключа', [
+                'source' => 'key_activate',
+                'action' => 'test_activate',
+                'user_id' => auth()->id(),
+                'key_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'message' => 'Внутренняя ошибка сервера'
+            ], 500);
         }
     }
 
@@ -317,9 +346,7 @@ class KeyActivateController extends Controller
                 'key_id' => 'required|uuid|exists:key_activate,id'
             ]);
 
-            // ОПТИМИЗАЦИЯ: Выбираем только необходимые поля
-            $key = KeyActivate::select(['id', 'status', 'user_tg_id', 'traffic_limit', 'finish_at'])
-                ->findOrFail($validated['key_id']);
+            $key = KeyActivate::findOrFail($validated['key_id']);
 
             // Проверяем, что ключ просрочен
             if ($key->status !== KeyActivate::EXPIRED) {
@@ -399,7 +426,7 @@ class KeyActivateController extends Controller
                 'value' => 'required|integer'
             ]);
 
-            // ОПТИМИЗАЦИЯ: Обновляем напрямую через запрос
+            // Обновляем напрямую через запрос для экономии памяти
             $affected = KeyActivate::where('id', $validated['id'])
                 ->update([$validated['type'] => $validated['value']]);
 
@@ -433,6 +460,63 @@ class KeyActivateController extends Controller
                 'success' => false,
                 'message' => 'Ошибка при обновлении даты'
             ], 500);
+        }
+    }
+
+    /**
+     * Check if filter query returns too many results
+     *
+     * @param array $filters
+     * @throws Exception
+     */
+    private function checkFilterResults(array $filters): void
+    {
+        // Если нет фильтров или фильтр слишком общий - предупреждаем
+        if (empty($filters) || (count($filters) === 1 && isset($filters['status']))) {
+            $count = KeyActivate::count();
+
+            if ($count > self::MAX_FILTER_RESULTS) {
+                throw new Exception('Too many results');
+            }
+        }
+    }
+
+    /**
+     * Log memory usage for debugging
+     *
+     * @param string $point
+     */
+    private function logMemoryUsage(string $point): void
+    {
+        if (app()->environment('local')) {
+            Log::debug("Memory at {$point}: " .
+                round(memory_get_usage() / 1024 / 1024, 2) . " MB / " .
+                round(memory_get_peak_usage() / 1024 / 1024, 2) . " MB (peak)"
+            );
+        }
+    }
+
+    /**
+     * Get key statistics (for debugging)
+     *
+     * @return JsonResponse
+     */
+    public function statistics(): JsonResponse
+    {
+        try {
+            $stats = [
+                'total' => KeyActivate::count(),
+                'active' => KeyActivate::where('status', KeyActivate::ACTIVE)->count(),
+                'expired' => KeyActivate::where('status', KeyActivate::EXPIRED)->count(),
+                'paid' => KeyActivate::where('status', KeyActivate::PAID)->count(),
+                'deleted' => KeyActivate::where('status', KeyActivate::DELETED)->count(),
+                'memory_usage' => round(memory_get_usage() / 1024 / 1024, 2) . ' MB',
+                'memory_peak' => round(memory_get_peak_usage() / 1024 / 1024, 2) . ' MB',
+            ];
+
+            return response()->json(['success' => true, 'data' => $stats]);
+        } catch (Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
 }
