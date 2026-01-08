@@ -27,40 +27,15 @@ class ConnectionLimitViolationController extends Controller
      */
     public function index(Request $request): View
     {
-        // Временное увеличение лимита памяти
+        // ЕДИНСТВЕННОЕ ИЗМЕНЕНИЕ: увеличение лимита памяти
         ini_set('memory_limit', '256M');
 
-        // Используем правильные названия полей для salesman
+        // ВОЗВРАЩАЕМ ОРИГИНАЛЬНЫЙ РАБОЧИЙ ЗАПРОС
         $query = ConnectionLimitViolation::with([
-            'keyActivate' => function($query) {
-                $query->select(['id', 'pack_salesman_id', 'module_salesman_id', 'user_tg_id', 'status'])
-                    ->with([
-                        'packSalesman' => function($query) {
-                            $query->select(['id', 'salesman_id'])
-                                ->with([
-                                    'salesman' => function($query) {
-                                        // ИСПРАВЛЕНО: используем 'username' вместо 'name'
-                                        $query->select(['id', 'username', 'telegram_id']);
-                                    }
-                                ]);
-                        },
-                        'moduleSalesman' => function($query) {
-                            // ИСПРАВЛЕНО: используем 'username' вместо 'name'
-                            $query->select(['id', 'username']);
-                        }
-                    ]);
-            },
-            'serverUser' => function($query) {
-                $query->select(['id', 'username', 'panel_id']);
-            },
-            'panel' => function($query) {
-                $query->select(['id', 'name', 'server_id'])
-                    ->with([
-                        'server' => function($query) {
-                            $query->select(['id', 'name', 'location_id']);
-                        }
-                    ]);
-            }
+            'keyActivate.packSalesman.salesman',
+            'keyActivate.moduleSalesman',
+            'serverUser',
+            'panel.server'
         ])->latest();
 
         // Фильтрация по статусу
@@ -98,16 +73,14 @@ class ConnectionLimitViolationController extends Controller
             });
         }
 
-        // ОПТИМИЗАЦИЯ: Уменьшаем количество записей на странице
-        $violations = $query->paginate(config('app.items_per_page', 20));
+        $violations = $query->paginate(config('app.items_per_page', 30));
 
         // Статистика для виджетов
         $stats = $this->monitorService->getViolationStats();
 
-        // ОПТИМИЗАЦИЯ: Загружаем панели с ограничением полей
+        // Дополнительные данные для фильтров (с eager loading для оптимизации)
         $panels = \App\Models\Panel\Panel::where('panel_status', \App\Models\Panel\Panel::PANEL_CONFIGURED)
-            ->select(['id', 'name', 'server_id', 'panel_status'])
-            ->with(['server:id,name,location_id'])
+            ->with('server.location')
             ->get();
 
         return view('module.connection-limit-violations.index', compact('violations', 'stats', 'panels'));
@@ -292,37 +265,11 @@ class ConnectionLimitViolationController extends Controller
      */
     public function show(ConnectionLimitViolation $violation): View
     {
-        // Используем правильные названия полей
         $violation->load([
-            'keyActivate' => function($query) {
-                $query->select(['id', 'pack_salesman_id', 'module_salesman_id', 'user_tg_id', 'status'])
-                    ->with([
-                        'packSalesman' => function($query) {
-                            $query->select(['id', 'salesman_id'])
-                                ->with([
-                                    'salesman' => function($query) {
-                                        // ИСПРАВЛЕНО: используем 'username' вместо 'name'
-                                        $query->select(['id', 'username', 'telegram_id']);
-                                    }
-                                ]);
-                        },
-                        'moduleSalesman' => function($query) {
-                            // ИСПРАВЛЕНО: используем 'username' вместо 'name'
-                            $query->select(['id', 'username']);
-                        }
-                    ]);
-            },
-            'serverUser' => function($query) {
-                $query->select(['id', 'username', 'panel_id']);
-            },
-            'panel' => function($query) {
-                $query->select(['id', 'name', 'server_id'])
-                    ->with([
-                        'server' => function($query) {
-                            $query->select(['id', 'name', 'location_id']);
-                        }
-                    ]);
-            }
+            'keyActivate.packSalesman.salesman',
+            'keyActivate.moduleSalesman',
+            'serverUser',
+            'panel.server'
         ]);
 
         return view('module.connection-limit-violations.show', compact('violation'));
