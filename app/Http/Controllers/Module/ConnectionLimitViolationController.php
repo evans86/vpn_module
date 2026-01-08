@@ -136,15 +136,10 @@ class ConnectionLimitViolationController extends Controller
                 'memory_usage' => round(memory_get_usage() / 1024 / 1024, 2) . ' MB'
             ]);
 
-            // Возвращаем страницу с минимальными данными при ошибке
+            // Возвращаем страницу с правильной структурой статистики
             return view('module.connection-limit-violations.index', [
                 'violations' => new \Illuminate\Pagination\LengthAwarePaginator([], 0, 20),
-                'stats' => [
-                    'total' => 0,
-                    'active' => 0,
-                    'resolved' => 0,
-                    'ignored' => 0
-                ],
+                'stats' => $this->getEmptyStats(), // Используем метод для пустой статистики
                 'panels' => [],
                 'error' => 'Произошла ошибка при загрузке данных. Попробуйте обновить страницу или уточнить фильтры.'
             ]);
@@ -179,6 +174,20 @@ class ConnectionLimitViolationController extends Controller
                     ->value('count')
             ];
         });
+    }
+
+    /**
+     * Пустая статистика для случая ошибки
+     */
+    private function getEmptyStats(): array
+    {
+        return [
+            'total' => 0,
+            'active' => 0,
+            'resolved' => 0,
+            'ignored' => 0,
+            'today' => 0
+        ];
     }
 
     /**
