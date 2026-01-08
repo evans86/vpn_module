@@ -8,6 +8,7 @@ use App\Services\VPN\ConnectionLimitMonitorService;
 use App\Services\VPN\ViolationManualService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\DB;
 
 class ConnectionLimitViolationController extends Controller
 {
@@ -27,12 +28,27 @@ class ConnectionLimitViolationController extends Controller
      */
     public function index(Request $request): View
     {
-        $query = ConnectionLimitViolation::with([
-            'keyActivate.packSalesman.salesman',
-            'keyActivate.moduleSalesman',
-            'serverUser',
-            'panel.server'
-        ])->latest();
+        // Временное увеличение лимита памяти
+        ini_set('memory_limit', '256M');
+
+        // ОПТИМИЗАЦИЯ: Выбираем только необходимые поля в основном запросе
+        $query = ConnectionLimitViolation::query();
+
+        // ОПТИМИЗАЦИЯ: Загружаем отношения с выбором конкретных полей
+        $query->with([
+            'keyActivate:id,pack_salesman_id,module_salesman_id,user_tg_id,status' => [
+                'packSalesman:id,salesman_id' => [
+                    'salesman:id,name,telegram_id'
+                ],
+                'moduleSalesman:id,name'
+            ],
+            'serverUser:id,username,panel_id',
+            'panel:id,name,server_id' => [
+                'server:id,name,location_id'
+            ]
+        ]);
+
+        $query->latest();
 
         // Фильтрация по статусу
         if ($request->filled('status')) {
@@ -69,14 +85,16 @@ class ConnectionLimitViolationController extends Controller
             });
         }
 
-        $violations = $query->paginate(config('app.items_per_page', 30));
+        // ОПТИМИЗАЦИЯ: Уменьшаем количество записей на странице
+        $violations = $query->paginate(config('app.items_per_page', 20));
 
         // Статистика для виджетов
         $stats = $this->monitorService->getViolationStats();
 
-        // Дополнительные данные для фильтров (с eager loading для оптимизации)
+        // ОПТИМИЗАЦИЯ: Загружаем панели с ограничением полей
         $panels = \App\Models\Panel\Panel::where('panel_status', \App\Models\Panel\Panel::PANEL_CONFIGURED)
-            ->with('server.location')
+            ->select(['id', 'name', 'server_id', 'panel_status'])
+            ->with(['server:id,name,location_id'])
             ->get();
 
         return view('module.connection-limit-violations.index', compact('violations', 'stats', 'panels'));
@@ -261,11 +279,18 @@ class ConnectionLimitViolationController extends Controller
      */
     public function show(ConnectionLimitViolation $violation): View
     {
+        // ОПТИМИЗАЦИЯ: Выбираем только нужные поля в отношениях
         $violation->load([
-            'keyActivate.packSalesman.salesman',
-            'keyActivate.moduleSalesman',
-            'serverUser',
-            'panel.server'
+            'keyActivate:id,pack_salesman_id,module_salesman_id,user_tg_id,status' => [
+                'packSalesman:id,salesman_id' => [
+                    'salesman:id,name,telegram_id'
+                ],
+                'moduleSalesman:id,name'
+            ],
+            'serverUser:id,username,panel_id',
+            'panel:id,name,server_id' => [
+                'server:id,name,location_id'
+            ]
         ]);
 
         return view('module.connection-limit-violations.show', compact('violation'));
