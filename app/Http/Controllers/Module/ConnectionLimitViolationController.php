@@ -30,7 +30,7 @@ class ConnectionLimitViolationController extends Controller
         // Временное увеличение лимита памяти
         ini_set('memory_limit', '256M');
 
-        // Используем старый синтаксис, но добавляем оптимизацию через select
+        // Используем правильные названия полей для salesman
         $query = ConnectionLimitViolation::with([
             'keyActivate' => function($query) {
                 $query->select(['id', 'pack_salesman_id', 'module_salesman_id', 'user_tg_id', 'status'])
@@ -39,12 +39,14 @@ class ConnectionLimitViolationController extends Controller
                             $query->select(['id', 'salesman_id'])
                                 ->with([
                                     'salesman' => function($query) {
-                                        $query->select(['id', 'name', 'telegram_id']);
+                                        // ИСПРАВЛЕНО: используем 'username' вместо 'name'
+                                        $query->select(['id', 'username', 'telegram_id']);
                                     }
                                 ]);
                         },
                         'moduleSalesman' => function($query) {
-                            $query->select(['id', 'name']);
+                            // ИСПРАВЛЕНО: используем 'username' вместо 'name'
+                            $query->select(['id', 'username']);
                         }
                     ]);
             },
@@ -290,6 +292,7 @@ class ConnectionLimitViolationController extends Controller
      */
     public function show(ConnectionLimitViolation $violation): View
     {
+        // Используем правильные названия полей
         $violation->load([
             'keyActivate' => function($query) {
                 $query->select(['id', 'pack_salesman_id', 'module_salesman_id', 'user_tg_id', 'status'])
@@ -298,12 +301,14 @@ class ConnectionLimitViolationController extends Controller
                             $query->select(['id', 'salesman_id'])
                                 ->with([
                                     'salesman' => function($query) {
-                                        $query->select(['id', 'name', 'telegram_id']);
+                                        // ИСПРАВЛЕНО: используем 'username' вместо 'name'
+                                        $query->select(['id', 'username', 'telegram_id']);
                                     }
                                 ]);
                         },
                         'moduleSalesman' => function($query) {
-                            $query->select(['id', 'name']);
+                            // ИСПРАВЛЕНО: используем 'username' вместо 'name'
+                            $query->select(['id', 'username']);
                         }
                     ]);
             },
