@@ -167,40 +167,79 @@ class FixExpiredKeysCommand extends Command
 
         // Проверяем каждый ключ через API панели на наличие трафика
         if ($potentialKeysToFix->count() > 0) {
+            $this->info("🔍 Проверка остатка трафика для {$potentialKeysToFix->count()} ключей через API Marzban...");
             Log::info("Проверка остатка трафика для {$potentialKeysToFix->count()} ключей через API Marzban", [
                 'source' => 'fix_expired_keys_command'
             ]);
         }
 
         $keysToFix = collect();
+        $checkedCount = 0;
+        $apiErrorCount = 0;
+        
         foreach ($potentialKeysToFix as $key) {
             try {
-                if ($key->keyActivateUser && $key->keyActivateUser->serverUser) {
-                    $serverUser = $key->keyActivateUser->serverUser;
-                    if ($serverUser->panel) {
-                        $panelStrategy = new \App\Services\Panel\PanelStrategy($serverUser->panel->panel);
-                        $subscribeInfo = $panelStrategy->getSubscribeInfo(
-                            $serverUser->panel->id,
-                            $serverUser->id
-                        );
-
-                        // Проверяем остаток трафика
-                        $dataLimit = $subscribeInfo['data_limit'] ?? 0;
-                        $usedTraffic = $subscribeInfo['used_traffic'] ?? 0;
-                        $remainingTraffic = $dataLimit - $usedTraffic;
-
-                        // Если трафик исчерпан - не исправляем
-                        if ($remainingTraffic <= 0) {
-                            $expiredDueToTraffic++;
-                            continue;
-                        }
-                    }
+                $checkedCount++;
+                
+                if (!$key->keyActivateUser || !$key->keyActivateUser->serverUser) {
+                    // Нет привязки - пропускаем (на всякий случай)
+                    Log::warning("Ключ без ServerUser попал в проверку", [
+                        'key_id' => $key->id,
+                        'source' => 'fix_expired_keys_command'
+                    ]);
+                    continue;
                 }
+                
+                $serverUser = $key->keyActivateUser->serverUser;
+                if (!$serverUser->panel) {
+                    Log::warning("Ключ без привязки к панели попал в проверку", [
+                        'key_id' => $key->id,
+                        'server_user_id' => $serverUser->id,
+                        'source' => 'fix_expired_keys_command'
+                    ]);
+                    continue;
+                }
+                
+                $panelStrategy = new \App\Services\Panel\PanelStrategy($serverUser->panel->panel);
+                $subscribeInfo = $panelStrategy->getSubscribeInfo(
+                    $serverUser->panel->id,
+                    $serverUser->id
+                );
+
+                // Проверяем остаток трафика
+                $dataLimit = $subscribeInfo['data_limit'] ?? 0;
+                $usedTraffic = $subscribeInfo['used_traffic'] ?? 0;
+                $remainingTraffic = $dataLimit - $usedTraffic;
+
+                // Если трафик исчерпан - не исправляем
+                if ($remainingTraffic <= 0) {
+                    $expiredDueToTraffic++;
+                    Log::info("Ключ исключен: трафик исчерпан", [
+                        'key_id' => $key->id,
+                        'data_limit' => $dataLimit,
+                        'used_traffic' => $usedTraffic,
+                        'source' => 'fix_expired_keys_command'
+                    ]);
+                    continue;
+                }
+                
+                // Трафик есть - добавляем в список для исправления
                 $keysToFix->push($key);
+                
             } catch (\Exception $e) {
                 // Если не удалось проверить - добавляем в список (безопасный подход)
+                $apiErrorCount++;
+                Log::warning("Не удалось проверить трафик для ключа через API, добавляем в список для исправления", [
+                    'key_id' => $key->id,
+                    'error' => $e->getMessage(),
+                    'source' => 'fix_expired_keys_command'
+                ]);
                 $keysToFix->push($key);
             }
+        }
+        
+        if ($checkedCount > 0) {
+            $this->info("   Проверено: {$checkedCount}, Трафик исчерпан: {$expiredDueToTraffic}, Ошибки API: {$apiErrorCount}");
         }
 
         // Статистика по категориям

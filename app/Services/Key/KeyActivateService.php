@@ -452,7 +452,15 @@ class KeyActivateService
             }
 
             if (!$serverUser) {
-                throw new RuntimeException('Не удалось создать пользователя. ' . ($lastError ? $lastError->getMessage() : 'Неизвестная ошибка'));
+                $errorMessage = 'Не удалось создать пользователя на панели';
+                if ($lastError) {
+                    $errorMessage .= ': ' . $lastError->getMessage();
+                } elseif (!empty($attemptedPanelIds)) {
+                    $errorMessage .= '. Попытки на панелях: ' . implode(', ', $attemptedPanelIds);
+                } else {
+                    $errorMessage .= '. Нет доступных панелей';
+                }
+                throw new RuntimeException($errorMessage);
             }
 
             // Обновляем данные активации
@@ -605,7 +613,15 @@ class KeyActivateService
             }
 
             if (!$serverUser) {
-                throw new RuntimeException('Не удалось создать пользователя. ' . ($lastError ? $lastError->getMessage() : 'Неизвестная ошибка'));
+                $errorMessage = 'Не удалось создать пользователя на панели';
+                if ($lastError) {
+                    $errorMessage .= ': ' . $lastError->getMessage();
+                } elseif (!empty($attemptedPanelIds)) {
+                    $errorMessage .= '. Попытки на панелях: ' . implode(', ', $attemptedPanelIds);
+                } else {
+                    $errorMessage .= '. Нет доступных панелей';
+                }
+                throw new RuntimeException($errorMessage);
             }
 
             // Обновляем данные активации
