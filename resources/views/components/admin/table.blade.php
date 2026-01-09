@@ -1,7 +1,7 @@
 @props(['headers' => [], 'responsive' => true, 'class' => ''])
 
-<div class="{{ $responsive ? 'overflow-x-auto w-full' : 'w-full' }}">
-    <table class="w-full divide-y divide-gray-200 {{ $class }}">
+<div class="{{ $responsive ? 'overflow-x-auto overflow-y-visible w-full' : 'w-full' }}" style="overflow-y: visible !important;">
+    <table class="w-full divide-y divide-gray-200 {{ $class }}" style="overflow: visible;">
         @if(!empty($headers))
             <thead class="bg-gray-50">
                 <tr>
@@ -13,7 +13,7 @@
                 </tr>
             </thead>
         @endif
-        <tbody class="bg-white divide-y divide-gray-200">
+        <tbody class="bg-white divide-y divide-gray-200" style="overflow: visible;">
             {{ $slot }}
         </tbody>
     </table>

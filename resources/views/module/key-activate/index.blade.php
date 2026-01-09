@@ -3,6 +3,32 @@
 @section('title', 'Ключи активации')
 @section('page-title', 'Ключи активации')
 
+@push('styles')
+<style>
+    /* Исправление для выпадающего меню действий */
+    .table-wrapper {
+        overflow: visible !important;
+    }
+    
+    /* Убираем overflow-x с таблицы только когда меню открыто */
+    .table-responsive {
+        overflow-x: auto;
+        overflow-y: visible;
+    }
+    
+    /* Для последней колонки убираем overflow */
+    td:last-child {
+        overflow: visible !important;
+    }
+    
+    /* Dropdown menu должен быть выше всего */
+    .dropdown-menu-actions {
+        position: absolute;
+        z-index: 9999 !important;
+    }
+</style>
+@endpush
+
 @section('content')
     <div class="space-y-6">
         <x-admin.card title="Ключи активации">
@@ -145,7 +171,7 @@
                                     {{ $key->getStatusText() }}
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" style="overflow: visible !important;">
                                 <div class="relative inline-block text-left" x-data="{ open: false }">
                                     <button @click="open = !open" 
                                             class="text-gray-400 hover:text-gray-600 focus:outline-none">
@@ -156,7 +182,8 @@
                                          @click.away="open = false"
                                          x-cloak
                                          x-transition
-                                         class="absolute right-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 @if($isLastRows)origin-bottom-right bottom-full mb-2 @elseorigin-top-right top-full mt-2 @endif">
+                                         class="dropdown-menu-actions absolute right-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 @if($isLastRows)origin-bottom-right bottom-full mb-2 @elseorigin-top-right top-full mt-2 @endif"
+                                         style="z-index: 9999 !important;">
                                         <div class="py-1">
                                             @if($key->status === \App\Models\KeyActivate\KeyActivate::EXPIRED && $key->user_tg_id)
                                                 <button type="button"
