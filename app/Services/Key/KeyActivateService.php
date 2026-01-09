@@ -658,27 +658,63 @@ class KeyActivateService
     public function checkAndUpdateStatus(KeyActivate $key): KeyActivate
     {
         $originalStatus = $key->status;
+        $currentTime = time();
 
         try {
-            // Проверяем срок активации для оплаченных ключей
+            $statusChanged = false;
 
-            $key->status = KeyActivate::EXPIRED;
-            $key->save();
+            // Проверяем срок активации для оплаченных ключей (deleted_at)
+            if ($key->status === KeyActivate::PAID && $key->deleted_at && $currentTime > $key->deleted_at) {
+                $key->status = KeyActivate::EXPIRED;
+                $statusChanged = true;
 
-            // Отправляем уведомление продавцу о деактивации ключа
-            if ($key->pack_salesman_id) {
-                $packSalesman = $this->packSalesmanRepository->findByIdOrFail($key->pack_salesman_id);
-                $this->notificationService->sendKeyDeactivatedNotification($packSalesman->salesman->telegram_id, $key->id);
+                $this->logger->info('Статус ключа обновлен на EXPIRED (истек срок активации для оплаченного ключа)', [
+                    'source' => 'key_activate',
+                    'action' => 'update_status',
+                    'key_id' => $key->id,
+                    'old_status' => $originalStatus,
+                    'new_status' => $key->status,
+                    'deleted_at' => $key->deleted_at,
+                    'current_time' => $currentTime
+                ]);
             }
 
-            $this->logger->info('Статус ключа обновлен на EXPIRED (истек срок активации)', [
-                'source' => 'key_activate',
-                'action' => 'update_status',
-                'key_id' => $key->id,
-                'old_status' => $originalStatus,
-                'new_status' => $key->status,
-                'deleted_at' => $key->deleted_at
-            ]);
+            // Проверяем срок действия для активных ключей (finish_at)
+            if ($key->status === KeyActivate::ACTIVE && $key->finish_at && $currentTime > $key->finish_at) {
+                $key->status = KeyActivate::EXPIRED;
+                $statusChanged = true;
+
+                $this->logger->info('Статус ключа обновлен на EXPIRED (истек срок действия активного ключа)', [
+                    'source' => 'key_activate',
+                    'action' => 'update_status',
+                    'key_id' => $key->id,
+                    'old_status' => $originalStatus,
+                    'new_status' => $key->status,
+                    'finish_at' => $key->finish_at,
+                    'current_time' => $currentTime
+                ]);
+            }
+
+            // Сохраняем только если статус изменился
+            if ($statusChanged) {
+                $key->save();
+
+                // Отправляем уведомление продавцу о деактивации ключа
+                if ($key->pack_salesman_id) {
+                    $packSalesman = $this->packSalesmanRepository->findByIdOrFail($key->pack_salesman_id);
+                    $this->notificationService->sendKeyDeactivatedNotification($packSalesman->salesman->telegram_id, $key->id);
+                }
+            } else {
+                $this->logger->debug('Статус ключа не требует обновления', [
+                    'source' => 'key_activate',
+                    'action' => 'check_status',
+                    'key_id' => $key->id,
+                    'status' => $key->status,
+                    'finish_at' => $key->finish_at,
+                    'deleted_at' => $key->deleted_at,
+                    'current_time' => $currentTime
+                ]);
+            }
 
             return $key;
         } catch (Exception $e) {
