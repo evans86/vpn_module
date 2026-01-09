@@ -340,16 +340,35 @@ class KeyActivateController extends Controller
 
             // Загружаем ключ со всеми необходимыми полями и отношениями
             error_log("Loading key: " . $validated['key_id']);
-            /** @var KeyActivate $key */
-            $key = KeyActivate::with(['keyActivateUser.serverUser.panel', 'packSalesman.salesman.panel'])
-                ->findOrFail($validated['key_id']);
+            Log::emergency('🔄 Начинаем загрузку ключа', ['key_id' => $validated['key_id']]);
             
-            error_log("Key loaded: " . $key->id . ", status: " . $key->status);
-            Log::emergency('📦 Ключ загружен', [
-                'key_id' => $key->id,
-                'status' => $key->status,
-                'user_tg_id' => $key->user_tg_id
-            ]);
+            try {
+                /** @var KeyActivate $key */
+                $key = KeyActivate::with(['keyActivateUser.serverUser.panel', 'packSalesman.salesman.panel'])
+                    ->findOrFail($validated['key_id']);
+                
+                error_log("Key loaded: " . $key->id . ", status: " . $key->status);
+                Log::emergency('📦 Ключ загружен', [
+                    'key_id' => $key->id,
+                    'status' => $key->status,
+                    'user_tg_id' => $key->user_tg_id
+                ]);
+            } catch (\Throwable $loadException) {
+                error_log("ERROR loading key: " . $loadException->getMessage());
+                error_log("Exception class: " . get_class($loadException));
+                error_log("File: " . $loadException->getFile() . ":" . $loadException->getLine());
+                
+                Log::emergency('❌ ОШИБКА ЗАГРУЗКИ КЛЮЧА', [
+                    'key_id' => $validated['key_id'],
+                    'error' => $loadException->getMessage(),
+                    'error_class' => get_class($loadException),
+                    'file' => $loadException->getFile(),
+                    'line' => $loadException->getLine(),
+                    'trace' => substr($loadException->getTraceAsString(), 0, 500)
+                ]);
+                
+                throw $loadException;
+            }
 
             // Проверяем, что ключ просрочен
             error_log("Checking key status: " . $key->status . " (EXPIRED = " . KeyActivate::EXPIRED . ")");
