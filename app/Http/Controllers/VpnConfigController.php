@@ -24,11 +24,6 @@ class VpnConfigController extends Controller
      * @var KeyActivateRepository
      */
     private KeyActivateRepository $keyActivateRepository;
-    
-    /**
-     * @var \App\Services\Key\KeyActivateService
-     */
-    private $keyActivateService;
     /**
      * @var KeyActivateUserRepository
      */
@@ -41,14 +36,12 @@ class VpnConfigController extends Controller
     public function __construct(
         KeyActivateRepository $keyActivateRepository,
         KeyActivateUserRepository $keyActivateUserRepository,
-        ServerUserRepository $serverUserRepository,
-        \App\Services\Key\KeyActivateService $keyActivateService
+        ServerUserRepository $serverUserRepository
     )
     {
         $this->keyActivateRepository = $keyActivateRepository;
         $this->keyActivateUserRepository = $keyActivateUserRepository;
         $this->serverUserRepository = $serverUserRepository;
-        $this->keyActivateService = $keyActivateService;
     }
 
     public function show(string $key_activate_id): Response
@@ -58,20 +51,20 @@ class VpnConfigController extends Controller
             if ($key_activate_id === 'error') {
                 return $this->showError();
             }
-            
+
             // Сначала находим KeyActivate по ID (это ID из таблицы key_activate)
             $keyActivate = $this->keyActivateRepository->findById($key_activate_id);
-            
+
             // Если KeyActivate не найден
             if (!$keyActivate) {
                 // Демо-страница ТОЛЬКО в локальной среде с включенным debug
                 // Во всех остальных случаях (включая продакшен) показываем ошибку
                 $showDemo = app()->environment('local') && config('app.debug', false);
-                
+
                 if ($showDemo) {
                     return $this->showDemoPage($key_activate_id);
                 }
-                
+
                 // В продакшене или при любых сомнениях показываем ошибку
                 if (request()->wantsJson()) {
                     return response()->json([
@@ -79,55 +72,55 @@ class VpnConfigController extends Controller
                         'message' => 'Configuration not found'
                     ], 404);
                 }
-                
+
                 return response()->view('vpn.error', [
                     'message' => 'Конфигурация VPN не найдена. Пожалуйста, проверьте правильность ссылки или обратитесь в поддержку.'
                 ]);
             }
-            
+
             // Загружаем отношения для KeyActivate
             $keyActivate->load(['packSalesman', 'packSalesman.salesman']);
-            
+
             // Ищем KeyActivateUser напрямую через репозиторий по key_activate_id
             $keyActivateUser = $this->keyActivateUserRepository->findByKeyActivateIdWithRelations($key_activate_id);
-            
+
             // Если KeyActivateUser не найден
             if (!$keyActivateUser) {
                 Log::warning('KeyActivateUser not found for KeyActivate', [
                     'key_activate_id' => $key_activate_id,
                     'source' => 'vpn'
                 ]);
-                
+
                 if (app()->environment('local') && config('app.debug', false)) {
                     return $this->showDemoPage($key_activate_id);
                 }
-                
+
                 return response()->view('vpn.error', [
                     'message' => 'Конфигурация VPN не найдена. Пожалуйста, проверьте правильность ссылки или обратитесь в поддержку.'
                 ]);
             }
-            
+
             // Отношения уже загружены через findByKeyActivateIdWithRelations
-            
+
             // Получаем информацию о пользователе сервера
             $serverUser = $keyActivateUser->serverUser;
-            
+
             // Если отношение не загружено, пытаемся загрузить явно
             if (!$serverUser && $keyActivateUser->server_user_id) {
                 $keyActivateUser->load('serverUser');
                 $serverUser = $keyActivateUser->serverUser;
             }
-            
+
             // Если всё ещё не найден, пытаемся получить через репозиторий
             if (!$serverUser && $keyActivateUser->server_user_id) {
                 $serverUser = $this->serverUserRepository->findById($keyActivateUser->server_user_id);
-                
+
                 // Если найден через репозиторий, устанавливаем отношение
                 if ($serverUser) {
                     $keyActivateUser->setRelation('serverUser', $serverUser);
                 }
             }
-            
+
             // Если всё ещё не найден, логируем и показываем ошибку
             if (!$serverUser) {
                 Log::error('Server user not found for KeyActivateUser', [
@@ -137,11 +130,11 @@ class VpnConfigController extends Controller
                     'key_activate_user_data' => $keyActivateUser->toArray(),
                     'source' => 'vpn'
                 ]);
-                
+
                 if (app()->environment('local') && config('app.debug', false)) {
                     return $this->showDemoPage($key_activate_id);
                 }
-                
+
                 return response()->view('vpn.error', [
                     'message' => 'Конфигурация VPN не найдена. Пожалуйста, проверьте правильность ссылки или обратитесь в поддержку.'
                 ]);
@@ -191,7 +184,7 @@ class VpnConfigController extends Controller
         } catch (\App\Exceptions\KeyReplacedException $e) {
             // Ключ был перевыпущен - показываем страницу ошибки с информацией о новом ключе
             $newKeyId = $e->getNewKeyId();
-            
+
             Log::info('Key was replaced, showing error page with new key link', [
                 'old_key_id' => $key_activate_id,
                 'new_key_id' => $newKeyId,
@@ -221,7 +214,7 @@ class VpnConfigController extends Controller
             if (str_contains($e->getMessage(), '404') || str_contains($e->getMessage(), 'User not found')) {
                 // Ищем KeyActivate по ID
                 $keyActivate = $this->keyActivateRepository->findById($key_activate_id);
-                
+
                 if ($keyActivate) {
                     // Проверяем, был ли ключ перевыпущен
                     $replacedViolation = \App\Models\VPN\ConnectionLimitViolation::where('key_activate_id', $keyActivate->id)
@@ -269,7 +262,7 @@ class VpnConfigController extends Controller
 
     /**
      * Получить актуальные ссылки пользователя из панели
-     * 
+     *
      * @param ServerUser $serverUser Пользователь сервера
      * @return array Массив ссылок
      */
@@ -281,13 +274,13 @@ class VpnConfigController extends Controller
             if (!$panel) {
                 throw new \RuntimeException('Panel not found for server user');
             }
-            
+
             $panelStrategyFactory = new \App\Services\Panel\PanelStrategyFactory();
             $panelStrategy = $panelStrategyFactory->create($panel->panel);
-            
+
             // Обновляем токен через стратегию
             $panel = $panelStrategy->updateToken($panel->id);
-            
+
             $marzbanApi = new MarzbanAPI($panel->api_address);
 
             // Получаем актуальные данные пользователя из Marzban
@@ -327,7 +320,7 @@ class VpnConfigController extends Controller
             if (str_contains($e->getMessage(), '404') || str_contains($e->getMessage(), 'User not found')) {
                 // Ищем KeyActivateUser по server_user_id
                 $keyActivateUser = KeyActivateUser::where('server_user_id', $serverUser->id)->first();
-                
+
                 if ($keyActivateUser && $keyActivateUser->key_activate_id) {
                     // Проверяем, был ли ключ перевыпущен
                     $replacedViolation = \App\Models\VPN\ConnectionLimitViolation::where('key_activate_id', $keyActivateUser->key_activate_id)
@@ -424,7 +417,7 @@ class VpnConfigController extends Controller
         if (!app()->environment('local')) {
             abort(404);
         }
-        
+
         return response()->view('vpn.error', [
             'message' => 'Конфигурация не найдена. Ключ может быть неактивен или удален.'
         ]);
@@ -463,7 +456,7 @@ class VpnConfigController extends Controller
         // Можно изменить violation_count через параметр ?violation=1,2,3 в URL для просмотра разных состояний
         $violationCount = request()->get('violation', 2); // По умолчанию показываем 2-е нарушение
         $violationCount = in_array((int)$violationCount, [1, 2, 3]) ? (int)$violationCount : 2;
-        
+
         $demoViolation = new \App\Models\VPN\ConnectionLimitViolation([
             'violation_count' => $violationCount,
             'actual_connections' => 5,
@@ -511,7 +504,7 @@ class VpnConfigController extends Controller
 
             // Используем те же ключи, но помечаем как новые
             $newKeyFormattedKeys = $formattedKeys;
-            
+
             // Информация о новом ключе (те же данные, но можно изменить)
             $newKeyUserInfo = $userInfo;
         }
@@ -523,11 +516,11 @@ class VpnConfigController extends Controller
         ]);
 
         return response()->view('vpn.config', compact(
-            'userInfo', 
-            'formattedKeys', 
-            'botLink', 
-            'netcheckUrl', 
-            'isDemoMode', 
+            'userInfo',
+            'formattedKeys',
+            'botLink',
+            'netcheckUrl',
+            'isDemoMode',
             'violations',
             'replacedViolation',
             'newKeyActivate',
@@ -544,25 +537,21 @@ class VpnConfigController extends Controller
         try {
             // Обновляем модель из базы данных, чтобы получить актуальные данные
             $keyActivate->refresh();
-            
+
             // Загружаем отношения заново
             $keyActivate->load(['packSalesman', 'packSalesman.salesman']);
-            
+
             $panel_strategy = new PanelStrategy($serverUser->panel->panel);
             $info = $panel_strategy->getSubscribeInfo($serverUser->panel->id, $serverUser->id);
 
             Log::info('Panel info retrieved:', ['info' => $info, 'source' => 'vpn']);
-
-            // ПРОВЕРКА СТАТУСА КЛЮЧА при просмотре конфигурации
-            // Используем метод из сервиса вместо дублирования логики
-            $keyActivate = $this->keyActivateService->checkAndUpdateStatus($keyActivate);
 
             // Получаем данные из KeyActivate (который уже загружен с отношениями)
             $packSalesman = $keyActivate->packSalesman ?? null;
             $salesman = $packSalesman->salesman ?? null;
 
             $finishAt = $keyActivate->finish_at ?? null;
-            
+
             Log::info('KeyActivate data retrieved', [
                 'key_activate_id' => $keyActivate->id,
                 'finish_at' => $finishAt,
@@ -570,7 +559,7 @@ class VpnConfigController extends Controller
                 'finish_at_value' => $finishAt,
                 'source' => 'vpn'
             ]);
-            
+
             $daysRemaining = null;
             if ($finishAt && $finishAt > 0) {
                 $daysRemaining = ceil(($finishAt - time()) / \App\Constants\TimeConstants::SECONDS_IN_DAY);
@@ -591,7 +580,7 @@ class VpnConfigController extends Controller
 
             // Добавляем ссылку на бота
             $botLink = $salesman->bot_link ?? '#';
-            
+
             // Добавляем ссылку на страницу проверки качества сети
             $netcheckUrl = route('netcheck.index');
             $isDemoMode = false; // Это реальная страница, не демо
@@ -617,34 +606,34 @@ class VpnConfigController extends Controller
             if ($replacedViolation && $replacedViolation->replaced_key_id) {
                 // Находим новый ключ
                 $newKeyActivate = $this->keyActivateRepository->findById($replacedViolation->replaced_key_id);
-                
+
                 if ($newKeyActivate) {
                     // Загружаем отношения для нового ключа
                     $newKeyActivate->load(['packSalesman', 'packSalesman.salesman']);
-                    
+
                     // Ищем KeyActivateUser для нового ключа
                     $newKeyActivateUser = $this->keyActivateUserRepository->findByKeyActivateIdWithRelations($newKeyActivate->id);
-                    
+
                     if ($newKeyActivateUser && $newKeyActivateUser->serverUser) {
                         $newServerUser = $newKeyActivateUser->serverUser;
-                        
+
                         // Получаем актуальные ключи для нового ключа
                         try {
                             $newConnectionKeys = $this->getFreshUserLinks($newServerUser);
-                            
+
                             if ($newConnectionKeys) {
                                 $newKeyFormattedKeys = $this->formatConnectionKeys($newConnectionKeys);
-                                
+
                                 // Получаем информацию о подписке для нового ключа
                                 $panel_strategy = new PanelStrategy($newServerUser->panel->panel);
                                 $newInfo = $panel_strategy->getSubscribeInfo($newServerUser->panel->id, $newServerUser->id);
-                                
+
                                 $newFinishAt = $newKeyActivate->finish_at ?? null;
                                 $newDaysRemaining = null;
                                 if ($newFinishAt && $newFinishAt > 0) {
                                     $newDaysRemaining = ceil(($newFinishAt - time()) / \App\Constants\TimeConstants::SECONDS_IN_DAY);
                                 }
-                                
+
                                 $newKeyUserInfo = [
                                     'username' => $newServerUser->id,
                                     'status' => $newInfo['status'] ?? 'unknown',
@@ -668,11 +657,11 @@ class VpnConfigController extends Controller
 
             Log::warning('Returning browser page');
             return response()->view('vpn.config', compact(
-                'userInfo', 
-                'formattedKeys', 
-                'botLink', 
-                'netcheckUrl', 
-                'isDemoMode', 
+                'userInfo',
+                'formattedKeys',
+                'botLink',
+                'netcheckUrl',
+                'isDemoMode',
                 'violations',
                 'replacedViolation',
                 'newKeyActivate',

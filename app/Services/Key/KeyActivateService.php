@@ -716,10 +716,10 @@ class KeyActivateService
                 $key->save();
 
                 // Отправляем уведомление продавцу о деактивации ключа
-                if ($key->pack_salesman_id) {
-                    $packSalesman = $this->packSalesmanRepository->findByIdOrFail($key->pack_salesman_id);
-                    $this->notificationService->sendKeyDeactivatedNotification($packSalesman->salesman->telegram_id, $key->id);
-                }
+//                if ($key->pack_salesman_id) {
+//                    $packSalesman = $this->packSalesmanRepository->findByIdOrFail($key->pack_salesman_id);
+//                    $this->notificationService->sendKeyDeactivatedNotification($packSalesman->salesman->telegram_id, $key->id);
+//                }
             } else {
                 $this->logger->debug('Статус ключа не требует обновления', [
                     'source' => 'key_activate',
@@ -764,7 +764,7 @@ class KeyActivateService
                 'key_id' => $key->id,
                 'status' => $key->status
             ]);
-            
+
             // Проверяем, что ключ просрочен
             if ($key->status !== KeyActivate::EXPIRED) {
                 throw new RuntimeException('Ключ не может быть перевыпущен. Только просроченные ключи могут быть перевыпущены.');
@@ -780,7 +780,7 @@ class KeyActivateService
                 'action' => 'renew',
                 'key_id' => $key->id
             ]);
-            
+
             // Загружаем связи
             $key->load(['keyActivateUser.serverUser.panel', 'packSalesman.salesman']);
 
@@ -819,7 +819,7 @@ class KeyActivateService
                 'action' => 'renew',
                 'key_id' => $key->id
             ]);
-            
+
             // Определяем панель для создания нового пользователя
             $panel = null;
             if ($key->packSalesman && $key->packSalesman->salesman && $key->packSalesman->salesman->panel_id) {
@@ -869,7 +869,7 @@ class KeyActivateService
                 'traffic_limit' => $trafficLimit,
                 'finish_at' => $finishAt
             ]);
-            
+
             // Создаем стратегию для работы с панелью
             $panelStrategy = new PanelStrategy($panel->panel ?? Panel::MARZBAN);
 
@@ -883,7 +883,7 @@ class KeyActivateService
                     $key->id,
                     ['max_connections' => 3]
                 );
-                
+
                 $this->logger->info('renew() пользователь создан на панели', [
                     'source' => 'key_activate',
                     'action' => 'renew',
@@ -934,7 +934,7 @@ class KeyActivateService
         } catch (\Throwable $e) {
             $errorMessage = $e->getMessage();
             $errorClass = get_class($e);
-            
+
             $this->logger->error('Ошибка при перевыпуске ключа (catch в renew)', [
                 'source' => 'key_activate',
                 'action' => 'renew',
@@ -953,7 +953,7 @@ class KeyActivateService
             } else {
                 $detailedMessage .= ' (тип: ' . $errorClass . ')';
             }
-            
+
             throw new RuntimeException($detailedMessage);
         }
     }
