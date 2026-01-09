@@ -32,16 +32,22 @@ class VpnConfigController extends Controller
      * @var ServerUserRepository
      */
     private ServerUserRepository $serverUserRepository;
+    /**
+     * @var \App\Services\Key\KeyActivateService
+     */
+    private $keyActivateService;
 
     public function __construct(
         KeyActivateRepository $keyActivateRepository,
         KeyActivateUserRepository $keyActivateUserRepository,
-        ServerUserRepository $serverUserRepository
+        ServerUserRepository $serverUserRepository,
+        \App\Services\Key\KeyActivateService $keyActivateService
     )
     {
         $this->keyActivateRepository = $keyActivateRepository;
         $this->keyActivateUserRepository = $keyActivateUserRepository;
         $this->serverUserRepository = $serverUserRepository;
+        $this->keyActivateService = $keyActivateService;
     }
 
     public function show(string $key_activate_id): Response
@@ -541,10 +547,32 @@ class VpnConfigController extends Controller
             // Загружаем отношения заново
             $keyActivate->load(['packSalesman', 'packSalesman.salesman']);
 
+            // ШАГ 1: Проверяем finish_at из БД (локальная дата, может быть изменена в админке)
+            Log::info('🔍 Проверка finish_at перед получением данных из Marzban', [
+                'key_id' => $keyActivate->id,
+                'current_status' => $keyActivate->status,
+                'finish_at' => $keyActivate->finish_at,
+                'finish_at_date' => $keyActivate->finish_at ? date('Y-m-d H:i:s', $keyActivate->finish_at) : null,
+                'source' => 'vpn'
+            ]);
+            
+            $keyActivate = $this->keyActivateService->checkAndUpdateStatus($keyActivate);
+
+            // ШАГ 2: Получаем данные из Marzban API (expire из панели)
             $panel_strategy = new PanelStrategy($serverUser->panel->panel);
             $info = $panel_strategy->getSubscribeInfo($serverUser->panel->id, $serverUser->id);
 
             Log::info('Panel info retrieved:', ['info' => $info, 'source' => 'vpn']);
+
+            // ШАГ 3: Если статус ключа был обновлен в getUserSubscribeInfo, перезагружаем модель
+            if (isset($info['key_status_updated']) && $info['key_status_updated'] === true) {
+                $keyActivate->refresh();
+                Log::info('🔄 KeyActivate перезагружен из БД после обновления статуса из Marzban', [
+                    'key_id' => $keyActivate->id,
+                    'new_status' => $keyActivate->status,
+                    'source' => 'vpn'
+                ]);
+            }
 
             // Получаем данные из KeyActivate (который уже загружен с отношениями)
             $packSalesman = $keyActivate->packSalesman ?? null;
@@ -611,6 +639,9 @@ class VpnConfigController extends Controller
                     // Загружаем отношения для нового ключа
                     $newKeyActivate->load(['packSalesman', 'packSalesman.salesman']);
 
+                    // Проверяем finish_at нового ключа перед запросом к Marzban
+                    $newKeyActivate = $this->keyActivateService->checkAndUpdateStatus($newKeyActivate);
+
                     // Ищем KeyActivateUser для нового ключа
                     $newKeyActivateUser = $this->keyActivateUserRepository->findByKeyActivateIdWithRelations($newKeyActivate->id);
 
@@ -627,6 +658,16 @@ class VpnConfigController extends Controller
                                 // Получаем информацию о подписке для нового ключа
                                 $panel_strategy = new PanelStrategy($newServerUser->panel->panel);
                                 $newInfo = $panel_strategy->getSubscribeInfo($newServerUser->panel->id, $newServerUser->id);
+
+                                // Если статус нового ключа был обновлен в getUserSubscribeInfo, перезагружаем модель
+                                if (isset($newInfo['key_status_updated']) && $newInfo['key_status_updated'] === true) {
+                                    $newKeyActivate->refresh();
+                                    Log::info('🔄 Новый KeyActivate перезагружен после обновления статуса из Marzban', [
+                                        'key_id' => $newKeyActivate->id,
+                                        'new_status' => $newKeyActivate->status,
+                                        'source' => 'vpn'
+                                    ]);
+                                }
 
                                 $newFinishAt = $newKeyActivate->finish_at ?? null;
                                 $newDaysRemaining = null;
