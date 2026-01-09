@@ -21,7 +21,7 @@
                             </p>
                         </div>
                     </div>
-                    <a href="{{ route('vpn.config.error') }}" 
+                    <a href="{{ route('vpn.config.error') }}"
                        class="ml-4 inline-flex items-center px-3 py-1.5 border border-yellow-300 rounded-md text-xs font-medium text-yellow-800 bg-yellow-100 hover:bg-yellow-200 transition-colors whitespace-nowrap">
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
@@ -45,7 +45,7 @@
                         <div class="ml-4 flex-1">
                             <h3 class="text-xl font-bold mb-2">✅ Ключ был перевыпущен</h3>
                             <p class="text-white/90 mb-3">
-                                Ваш ключ доступа был автоматически перевыпущен из-за превышения лимита подключений. 
+                                Ваш ключ доступа был автоматически перевыпущен из-за превышения лимита подключений.
                                 Ниже отображается новый ключ. Пожалуйста, обновите конфигурацию в вашем VPN-клиенте.
                             </p>
                             @if($replacedViolation->key_replaced_at)
@@ -58,7 +58,7 @@
                 </div>
             </div>
         @endif
-        
+
         <!-- Hero Section -->
         <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">
             <div class="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -66,7 +66,7 @@
                     <h1 class="text-2xl md:text-3xl font-bold mb-2">Конфигурация VPN</h1>
                     <p class="text-blue-100 text-sm md:text-base">Управление подключением и проверка качества сети</p>
                 </div>
-                <a href="{{ $netcheckUrl ?? route('netcheck.index') }}" 
+                <a href="{{ $netcheckUrl ?? route('netcheck.index') }}"
                    class="inline-flex items-center px-4 py-2 bg-white text-indigo-700 rounded-lg font-semibold hover:bg-blue-50 transition-colors shadow-lg">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -144,10 +144,10 @@
                 // Используем данные нового ключа, если он был перевыпущен
                 $displayUserInfo = (isset($newKeyUserInfo) && $newKeyUserInfo) ? $newKeyUserInfo : $userInfo;
                 $displayFormattedKeys = (isset($newKeyFormattedKeys) && $newKeyFormattedKeys) ? $newKeyFormattedKeys : $formattedKeys;
-                
+
                 // Определяем какой ключ отображается (новый или старый)
                 $displayedKey = (isset($newKeyActivate) && $newKeyActivate) ? $newKeyActivate : $keyActivate;
-                
+
                 // ВАЖНО: Проверяем статус ключа из БАЗЫ ДАННЫХ, а не из Marzban API!
                 // Marzban может вернуть status='active' даже если ключ просрочен в Laravel БД
                 $isKeyExpired = $displayedKey->status === \App\Models\KeyActivate\KeyActivate::EXPIRED;
@@ -170,7 +170,7 @@
                                     // Определяем статус на основе БД Laravel, а не Marzban API
                                     $statusText = 'Неизвестен';
                                     $statusClass = 'bg-gray-100 text-gray-800 border border-gray-200';
-                                    
+
                                     if ($isKeyExpired) {
                                         $statusText = '✗ Просрочен';
                                         $statusClass = 'bg-red-100 text-red-800 border border-red-200';
@@ -192,7 +192,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200">
                         <div class="space-y-4">
                             <div>
@@ -246,13 +246,6 @@
                             Срок действия истек: <strong>{{ date('d.m.Y H:i', $displayUserInfo['expiration_date']) }}</strong>
                         </div>
                     @endif
-                    <a href="{{ $botLink ?? '#' }}" 
-                       class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-bold hover:from-red-700 hover:to-red-800 transition-all shadow-lg hover:shadow-xl">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
-                        </svg>
-                        Перейти в бот для покупки
-                    </a>
                 </div>
             @elseif($isKeyActive && $displayUserInfo['status'] === 'active')
                 <!-- Ключ активен И Marzban тоже активен - показываем протоколы -->
