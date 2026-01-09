@@ -8,42 +8,42 @@
         <x-admin.card title="Ключи активации">
             <!-- Filters -->
             <x-admin.filter-form action="{{ route('admin.module.key-activate.index') }}">
-                <x-admin.filter-input
-                    name="id"
-                    label="ID ключа"
-                    value="{{ request('id') }}"
+                <x-admin.filter-input 
+                    name="id" 
+                    label="ID ключа" 
+                    value="{{ request('id') }}" 
                     placeholder="Введите ID" />
-
-                <x-admin.filter-input
-                    name="pack_id"
-                    label="ID пакета"
-                    value="{{ request('pack_id') }}"
+                
+                <x-admin.filter-input 
+                    name="pack_id" 
+                    label="ID пакета" 
+                    value="{{ request('pack_id') }}" 
                     placeholder="Введите ID пакета" />
-
-                <x-admin.filter-select
-                    name="status"
+                
+                <x-admin.filter-select 
+                    name="status" 
                     label="Статус"
                     :options="$statuses"
                     value="{{ request('status') }}" />
-
-                <x-admin.filter-input
-                    name="user_tg_id"
-                    label="Telegram ID покупателя"
-                    value="{{ request('user_tg_id') }}"
+                
+                <x-admin.filter-input 
+                    name="user_tg_id" 
+                    label="Telegram ID покупателя" 
+                    value="{{ request('user_tg_id') }}" 
                     placeholder="Введите Telegram ID"
                     type="number" />
-
-                <x-admin.filter-input
-                    name="telegram_id"
-                    label="Telegram ID продавца"
-                    value="{{ request('telegram_id') }}"
+                
+                <x-admin.filter-input 
+                    name="telegram_id" 
+                    label="Telegram ID продавца" 
+                    value="{{ request('telegram_id') }}" 
                     placeholder="Введите Telegram ID" />
             </x-admin.filter-form>
 
             <!-- Table -->
             @if($activate_keys->isEmpty())
-                <x-admin.empty-state
-                    icon="fa-key"
+                <x-admin.empty-state 
+                    icon="fa-key" 
                     title="Ключи не найдены"
                     description="Попробуйте изменить параметры фильтрации" />
             @else
@@ -121,7 +121,7 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm">
                                 @if($key->user_tg_id)
-                                    <a href="https://t.me/{{ $key->user_tg_id }}"
+                                    <a href="https://t.me/{{ $key->user_tg_id }}" 
                                        target="_blank"
                                        class="text-indigo-600 hover:text-indigo-800">
                                         {{ $key->user_tg_id }}
@@ -147,12 +147,12 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <div class="relative inline-block text-left" x-data="{ open: false }">
-                                    <button @click="open = !open"
+                                    <button @click="open = !open" 
                                             class="text-gray-400 hover:text-gray-600 focus:outline-none">
                                         <i class="fas fa-cog"></i>
                                     </button>
-
-                                    <div x-show="open"
+                                    
+                                    <div x-show="open" 
                                          @click.away="open = false"
                                          x-cloak
                                          x-transition
@@ -223,14 +223,14 @@
             <p class="text-sm text-gray-600">Вы уверены, что хотите продолжить?</p>
         </div>
         <x-slot name="footer">
-            <button type="button"
-                    class="btn btn-primary"
+            <button type="button" 
+                    class="btn btn-primary" 
                     id="confirm-renew-key">
                 <span class="spinner spinner-border-sm d-none" role="status"></span>
                 Да, перевыпустить
             </button>
-            <button type="button"
-                    class="btn btn-secondary"
+            <button type="button" 
+                    class="btn btn-secondary" 
                     onclick="window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'renewKeyModal' } }))">
                 Отмена
             </button>
@@ -258,8 +258,8 @@
                 <span class="spinner spinner-border-sm d-none" role="status"></span>
                 Перенести
             </button>
-            <button type="button"
-                    class="btn btn-secondary"
+            <button type="button" 
+                    class="btn btn-secondary" 
                     onclick="window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'transferKeyModal' } }))">
                 Отмена
             </button>
@@ -411,7 +411,29 @@
                         }, 1000);
                     },
                     error: function (xhr) {
-                        const errorMessage = xhr.responseJSON?.message || 'Неизвестная ошибка';
+                        console.error('Renew key error:', xhr);
+                        
+                        let errorMessage = 'Неизвестная ошибка';
+                        
+                        if (xhr.responseJSON) {
+                            // Есть JSON ответ
+                            errorMessage = xhr.responseJSON.message || errorMessage;
+                            
+                            // Добавляем debug info если есть
+                            if (xhr.responseJSON.debug) {
+                                console.error('Debug info:', xhr.responseJSON.debug);
+                                errorMessage += ' (см. консоль для деталей)';
+                            }
+                        } else if (xhr.responseText) {
+                            // Есть текстовый ответ (возможно HTML ошибка)
+                            console.error('Response text:', xhr.responseText);
+                            errorMessage = 'Ошибка сервера (HTTP ' + xhr.status + '). См. консоль для деталей.';
+                        } else if (xhr.status === 0) {
+                            errorMessage = 'Ошибка сети. Проверьте подключение к интернету.';
+                        } else {
+                            errorMessage = 'HTTP ошибка ' + xhr.status + ': ' + xhr.statusText;
+                        }
+                        
                         toastr.error('Ошибка при перевыпуске ключа: ' + errorMessage);
                     },
                     complete: function () {

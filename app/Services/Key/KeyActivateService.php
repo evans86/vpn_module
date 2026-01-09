@@ -758,6 +758,13 @@ class KeyActivateService
     public function renew(KeyActivate $key): KeyActivate
     {
         try {
+            $this->logger->info('renew() начало выполнения', [
+                'source' => 'key_activate',
+                'action' => 'renew',
+                'key_id' => $key->id,
+                'status' => $key->status
+            ]);
+            
             // Проверяем, что ключ просрочен
             if ($key->status !== KeyActivate::EXPIRED) {
                 throw new RuntimeException('Ключ не может быть перевыпущен. Только просроченные ключи могут быть перевыпущены.');
@@ -768,6 +775,12 @@ class KeyActivateService
                 throw new RuntimeException('Нельзя перевыпустить ключ без привязки к пользователю Telegram');
             }
 
+            $this->logger->info('renew() загрузка связей', [
+                'source' => 'key_activate',
+                'action' => 'renew',
+                'key_id' => $key->id
+            ]);
+            
             // Загружаем связи
             $key->load(['keyActivateUser.serverUser.panel', 'packSalesman.salesman']);
 
@@ -801,15 +814,38 @@ class KeyActivateService
                 }
             }
 
+            $this->logger->info('renew() определение панели', [
+                'source' => 'key_activate',
+                'action' => 'renew',
+                'key_id' => $key->id
+            ]);
+            
             // Определяем панель для создания нового пользователя
             $panel = null;
             if ($key->packSalesman && $key->packSalesman->salesman && $key->packSalesman->salesman->panel_id) {
                 $panel = $key->packSalesman->salesman->panel;
+                $this->logger->info('renew() используется панель продавца', [
+                    'source' => 'key_activate',
+                    'action' => 'renew',
+                    'key_id' => $key->id,
+                    'panel_id' => $panel->id
+                ]);
             } else {
                 $panel = $this->panelRepository->getOptimizedMarzbanPanel();
+                $this->logger->info('renew() используется оптимизированная панель', [
+                    'source' => 'key_activate',
+                    'action' => 'renew',
+                    'key_id' => $key->id,
+                    'panel_id' => $panel ? $panel->id : null
+                ]);
             }
 
             if (!$panel) {
+                $this->logger->error('renew() активная панель не найдена', [
+                    'source' => 'key_activate',
+                    'action' => 'renew',
+                    'key_id' => $key->id
+                ]);
                 throw new RuntimeException('Активная панель Marzban не найдена');
             }
 
@@ -825,18 +861,46 @@ class KeyActivateService
                 $finishAt = Carbon::now()->addMonth()->startOfMonth()->timestamp;
             }
 
+            $this->logger->info('renew() создание пользователя на панели', [
+                'source' => 'key_activate',
+                'action' => 'renew',
+                'key_id' => $key->id,
+                'panel_id' => $panel->id,
+                'traffic_limit' => $trafficLimit,
+                'finish_at' => $finishAt
+            ]);
+            
             // Создаем стратегию для работы с панелью
             $panelStrategy = new PanelStrategy($panel->panel ?? Panel::MARZBAN);
 
             // Создаем нового пользователя на сервере с теми же параметрами
-            $serverUser = $panelStrategy->addServerUser(
-                $panel->id,
-                $key->user_tg_id,
-                $trafficLimit,
-                $finishAt,
-                $key->id,
-                ['max_connections' => 3]
-            );
+            try {
+                $serverUser = $panelStrategy->addServerUser(
+                    $panel->id,
+                    $key->user_tg_id,
+                    $trafficLimit,
+                    $finishAt,
+                    $key->id,
+                    ['max_connections' => 3]
+                );
+                
+                $this->logger->info('renew() пользователь создан на панели', [
+                    'source' => 'key_activate',
+                    'action' => 'renew',
+                    'key_id' => $key->id,
+                    'server_user_id' => $serverUser->id
+                ]);
+            } catch (\Throwable $e) {
+                $this->logger->error('renew() ошибка создания пользователя на панели', [
+                    'source' => 'key_activate',
+                    'action' => 'renew',
+                    'key_id' => $key->id,
+                    'panel_id' => $panel->id,
+                    'error' => $e->getMessage(),
+                    'error_class' => get_class($e)
+                ]);
+                throw $e;
+            }
 
             // Обновляем данные активации - возвращаем ключ в статус ACTIVE
             $activatedKey = $this->keyActivateRepository->updateActivationData(
@@ -867,16 +931,30 @@ class KeyActivateService
             }
 
             return $activatedKey;
-        } catch (Exception $e) {
-            $this->logger->error('Ошибка при перевыпуске ключа', [
+        } catch (\Throwable $e) {
+            $errorMessage = $e->getMessage();
+            $errorClass = get_class($e);
+            
+            $this->logger->error('Ошибка при перевыпуске ключа (catch в renew)', [
                 'source' => 'key_activate',
                 'action' => 'renew',
                 'key_id' => $key->id,
-                'error' => $e->getMessage(),
+                'error' => $errorMessage,
+                'error_class' => $errorClass,
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString()
             ]);
 
-            throw new RuntimeException('Ошибка при перевыпуске ключа: ' . $e->getMessage());
+            // Формируем понятное сообщение об ошибке
+            $detailedMessage = 'Ошибка при перевыпуске ключа';
+            if (!empty($errorMessage)) {
+                $detailedMessage .= ': ' . $errorMessage;
+            } else {
+                $detailedMessage .= ' (тип: ' . $errorClass . ')';
+            }
+            
+            throw new RuntimeException($detailedMessage);
         }
     }
 

@@ -354,7 +354,22 @@ class KeyActivateController extends Controller
                 'finish_at' => $key->finish_at
             ]);
 
-            $renewedKey = $this->keyActivateService->renew($key);
+            try {
+                $renewedKey = $this->keyActivateService->renew($key);
+            } catch (\Throwable $serviceException) {
+                $this->logger->error('Ошибка в KeyActivateService->renew()', [
+                    'source' => 'key_activate',
+                    'action' => 'renew',
+                    'user_id' => auth()->id(),
+                    'key_id' => $key->id,
+                    'error' => $serviceException->getMessage(),
+                    'error_class' => get_class($serviceException),
+                    'file' => $serviceException->getFile(),
+                    'line' => $serviceException->getLine(),
+                    'trace' => $serviceException->getTraceAsString()
+                ]);
+                throw $serviceException;
+            }
 
             $this->logger->info('Перевыпуск ключа выполнен успешно', [
                 'source' => 'key_activate',
@@ -374,19 +389,38 @@ class KeyActivateController extends Controller
                 ]
             ]);
 
-        } catch (Exception $e) {
-            $this->logger->error('Ошибка при перевыпуске ключа', [
+        } catch (\Throwable $e) {
+            $errorMessage = $e->getMessage();
+            $errorClass = get_class($e);
+            
+            $this->logger->error('Ошибка при перевыпуске ключа (главный catch)', [
                 'source' => 'key_activate',
                 'action' => 'renew',
                 'user_id' => auth()->id(),
                 'key_id' => $request->input('key_id'),
-                'error' => $e->getMessage(),
+                'error' => $errorMessage,
+                'error_class' => $errorClass,
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString()
             ]);
 
+            // Более понятное сообщение для пользователя
+            $userMessage = 'Ошибка при перевыпуске ключа';
+            if (!empty($errorMessage)) {
+                $userMessage .= ': ' . $errorMessage;
+            } else {
+                $userMessage .= ' (тип ошибки: ' . $errorClass . ')';
+            }
+
             return response()->json([
                 'success' => false,
-                'message' => 'Ошибка при перевыпуске ключа: ' . $e->getMessage()
+                'message' => $userMessage,
+                'debug' => [
+                    'error_class' => $errorClass,
+                    'file' => basename($e->getFile()),
+                    'line' => $e->getLine()
+                ]
             ], 500);
         }
     }
