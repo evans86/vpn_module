@@ -319,23 +319,14 @@ class KeyActivateController extends Controller
      */
     public function renew(Request $request): JsonResponse
     {
-        // Глобальный обработчик ЛЮБЫХ ошибок
-        set_error_handler(function($errno, $errstr, $errfile, $errline) {
-            Log::error('PHP Error в renew()', [
-                'errno' => $errno,
-                'errstr' => $errstr,
-                'errfile' => $errfile,
-                'errline' => $errline
-            ]);
-        });
-        
         try {
             $validated = $request->validate([
                 'key_id' => 'required|uuid|exists:key_activate,id'
             ]);
 
-            // ОПТИМИЗАЦИЯ: Выбираем только необходимые поля
-            $key = KeyActivate::select(['id', 'status', 'user_tg_id', 'traffic_limit', 'finish_at'])
+            // Загружаем ключ со всеми необходимыми полями и отношениями
+            /** @var KeyActivate $key */
+            $key = KeyActivate::with(['keyActivateUser.serverUser.panel', 'packSalesman.salesman.panel'])
                 ->findOrFail($validated['key_id']);
 
             // Проверяем, что ключ просрочен
@@ -451,9 +442,6 @@ class KeyActivateController extends Controller
                     'line' => $e->getLine()
                 ]
             ], 500);
-        } finally {
-            // Восстанавливаем обработчик ошибок
-            restore_error_handler();
         }
     }
 

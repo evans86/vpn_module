@@ -775,14 +775,21 @@ class KeyActivateService
                 throw new RuntimeException('Нельзя перевыпустить ключ без привязки к пользователю Telegram');
             }
 
-            $this->logger->info('renew() загрузка связей', [
+            $this->logger->info('renew() проверка связей', [
                 'source' => 'key_activate',
                 'action' => 'renew',
-                'key_id' => $key->id
+                'key_id' => $key->id,
+                'has_key_activate_user' => $key->relationLoaded('keyActivateUser'),
+                'has_pack_salesman' => $key->relationLoaded('packSalesman')
             ]);
 
-            // Загружаем связи
-            $key->load(['keyActivateUser.serverUser.panel', 'packSalesman.salesman']);
+            // Загружаем связи если они не загружены
+            if (!$key->relationLoaded('keyActivateUser')) {
+                $key->load('keyActivateUser.serverUser.panel');
+            }
+            if (!$key->relationLoaded('packSalesman')) {
+                $key->load('packSalesman.salesman.panel');
+            }
 
             // Удаляем старого пользователя сервера, если он существует
             if ($key->keyActivateUser && $key->keyActivateUser->serverUser) {
