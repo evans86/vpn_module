@@ -338,37 +338,41 @@ class KeyActivateController extends Controller
 
             Log::emergency('🔍 Валидация пройдена', ['key_id' => $validated['key_id']]);
 
-            // Загружаем ключ со всеми необходимыми полями и отношениями
-            error_log("Loading key: " . $validated['key_id']);
-            Log::emergency('🔄 Начинаем загрузку ключа', ['key_id' => $validated['key_id']]);
+            // Загружаем ключ БЕЗ отношений сначала
+            error_log("Loading key WITHOUT relations: " . $validated['key_id']);
+            Log::emergency('🔄 Начинаем загрузку ключа БЕЗ отношений', ['key_id' => $validated['key_id']]);
             
+            /** @var KeyActivate $key */
+            $key = KeyActivate::findOrFail($validated['key_id']);
+            
+            error_log("Key loaded (basic): " . $key->id . ", status: " . $key->status);
+            Log::emergency('📦 Базовый ключ загружен', [
+                'key_id' => $key->id,
+                'status' => $key->status,
+                'user_tg_id' => $key->user_tg_id,
+                'pack_salesman_id' => $key->pack_salesman_id
+            ]);
+            
+            // Теперь загружаем отношения по одному
+            error_log("Loading keyActivateUser relation");
+            Log::emergency('🔄 Загружаем keyActivateUser');
             try {
-                /** @var KeyActivate $key */
-                $key = KeyActivate::with(['keyActivateUser.serverUser.panel', 'packSalesman.salesman.panel'])
-                    ->findOrFail($validated['key_id']);
-                
-                error_log("Key loaded: " . $key->id . ", status: " . $key->status);
-                Log::emergency('📦 Ключ загружен', [
-                    'key_id' => $key->id,
-                    'status' => $key->status,
-                    'user_tg_id' => $key->user_tg_id
-                ]);
-            } catch (\Throwable $loadException) {
-                error_log("ERROR loading key: " . $loadException->getMessage());
-                error_log("Exception class: " . get_class($loadException));
-                error_log("File: " . $loadException->getFile() . ":" . $loadException->getLine());
-                
-                Log::emergency('❌ ОШИБКА ЗАГРУЗКИ КЛЮЧА', [
-                    'key_id' => $validated['key_id'],
-                    'error' => $loadException->getMessage(),
-                    'error_class' => get_class($loadException),
-                    'file' => $loadException->getFile(),
-                    'line' => $loadException->getLine(),
-                    'trace' => substr($loadException->getTraceAsString(), 0, 500)
-                ]);
-                
-                throw $loadException;
+                $key->load('keyActivateUser');
+                Log::emergency('✅ keyActivateUser загружен', ['has_relation' => $key->keyActivateUser !== null]);
+            } catch (\Throwable $e) {
+                Log::emergency('❌ Ошибка загрузки keyActivateUser', ['error' => $e->getMessage()]);
             }
+            
+            error_log("Loading packSalesman relation");
+            Log::emergency('🔄 Загружаем packSalesman');
+            try {
+                $key->load('packSalesman.salesman');
+                Log::emergency('✅ packSalesman загружен', ['has_relation' => $key->packSalesman !== null]);
+            } catch (\Throwable $e) {
+                Log::emergency('❌ Ошибка загрузки packSalesman', ['error' => $e->getMessage()]);
+            }
+            
+            Log::emergency('🎯 Все отношения обработаны');
 
             // Проверяем, что ключ просрочен
             error_log("Checking key status: " . $key->status . " (EXPIRED = " . KeyActivate::EXPIRED . ")");
