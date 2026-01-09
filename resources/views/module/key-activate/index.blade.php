@@ -6,25 +6,18 @@
 @push('styles')
 <style>
     /* Исправление для выпадающего меню действий */
-    .table-wrapper {
-        overflow: visible !important;
-    }
-    
-    /* Убираем overflow-x с таблицы только когда меню открыто */
-    .table-responsive {
-        overflow-x: auto;
-        overflow-y: visible;
-    }
-    
-    /* Для последней колонки убираем overflow */
-    td:last-child {
-        overflow: visible !important;
-    }
+    /* Используем position: fixed для dropdown, поэтому overflow не проблема */
     
     /* Dropdown menu должен быть выше всего */
     .dropdown-menu-actions {
-        position: absolute;
+        position: fixed !important;
         z-index: 9999 !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    }
+    
+    /* Анимация появления */
+    .dropdown-menu-actions[x-cloak] {
+        display: none;
     }
 </style>
 @endpush
@@ -171,9 +164,14 @@
                                     {{ $key->getStatusText() }}
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" style="overflow: visible !important;">
-                                <div class="relative inline-block text-left" x-data="{ open: false }">
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" style="overflow: visible !important; position: relative;">
+                                <div class="relative inline-block text-left" x-data="{ open: false, buttonRect: null }" x-init="$watch('open', value => {
+                                    if (value) {
+                                        buttonRect = $refs.button.getBoundingClientRect();
+                                    }
+                                })">
                                     <button @click="open = !open" 
+                                            x-ref="button"
                                             class="text-gray-400 hover:text-gray-600 focus:outline-none">
                                         <i class="fas fa-cog"></i>
                                     </button>
@@ -182,8 +180,16 @@
                                          @click.away="open = false"
                                          x-cloak
                                          x-transition
-                                         class="dropdown-menu-actions absolute right-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 @if($isLastRows)origin-bottom-right bottom-full mb-2 @elseorigin-top-right top-full mt-2 @endif"
-                                         style="z-index: 9999 !important;">
+                                         class="dropdown-menu-actions fixed w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
+                                         style="z-index: 9999 !important;"
+                                         x-bind:style="{
+                                             @if($isLastRows)
+                                             top: (buttonRect ? (buttonRect.top - 200) + 'px' : 'auto'),
+                                             @else
+                                             top: (buttonRect ? (buttonRect.bottom + 8) + 'px' : 'auto'),
+                                             @endif
+                                             right: (buttonRect ? (window.innerWidth - buttonRect.right) + 'px' : '0')
+                                         }">
                                         <div class="py-1">
                                             @if($key->status === \App\Models\KeyActivate\KeyActivate::EXPIRED && $key->user_tg_id)
                                                 <button type="button"
