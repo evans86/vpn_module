@@ -24,6 +24,11 @@ class VpnConfigController extends Controller
      * @var KeyActivateRepository
      */
     private KeyActivateRepository $keyActivateRepository;
+    
+    /**
+     * @var \App\Services\Key\KeyActivateService
+     */
+    private $keyActivateService;
     /**
      * @var KeyActivateUserRepository
      */
@@ -36,12 +41,14 @@ class VpnConfigController extends Controller
     public function __construct(
         KeyActivateRepository $keyActivateRepository,
         KeyActivateUserRepository $keyActivateUserRepository,
-        ServerUserRepository $serverUserRepository
+        ServerUserRepository $serverUserRepository,
+        \App\Services\Key\KeyActivateService $keyActivateService
     )
     {
         $this->keyActivateRepository = $keyActivateRepository;
         $this->keyActivateUserRepository = $keyActivateUserRepository;
         $this->serverUserRepository = $serverUserRepository;
+        $this->keyActivateService = $keyActivateService;
     }
 
     public function show(string $key_activate_id): Response
@@ -545,6 +552,10 @@ class VpnConfigController extends Controller
             $info = $panel_strategy->getSubscribeInfo($serverUser->panel->id, $serverUser->id);
 
             Log::info('Panel info retrieved:', ['info' => $info, 'source' => 'vpn']);
+
+            // ПРОВЕРКА СТАТУСА КЛЮЧА при просмотре конфигурации
+            // Используем метод из сервиса вместо дублирования логики
+            $keyActivate = $this->keyActivateService->checkAndUpdateStatus($keyActivate);
 
             // Получаем данные из KeyActivate (который уже загружен с отношениями)
             $packSalesman = $keyActivate->packSalesman ?? null;

@@ -319,6 +319,16 @@ class KeyActivateController extends Controller
      */
     public function renew(Request $request): JsonResponse
     {
+        // Глобальный обработчик ЛЮБЫХ ошибок
+        set_error_handler(function($errno, $errstr, $errfile, $errline) {
+            Log::error('PHP Error в renew()', [
+                'errno' => $errno,
+                'errstr' => $errstr,
+                'errfile' => $errfile,
+                'errline' => $errline
+            ]);
+        });
+        
         try {
             $validated = $request->validate([
                 'key_id' => 'required|uuid|exists:key_activate,id'
@@ -393,7 +403,10 @@ class KeyActivateController extends Controller
             $errorMessage = $e->getMessage();
             $errorClass = get_class($e);
             
-            $this->logger->error('Ошибка при перевыпуске ключа (главный catch)', [
+            // МНОЖЕСТВЕННОЕ ЛОГИРОВАНИЕ для гарантии
+            
+            // 1. Laravel Log
+            Log::error('ОШИБКА ПЕРЕВЫПУСКА (Laravel Log)', [
                 'source' => 'key_activate',
                 'action' => 'renew',
                 'user_id' => auth()->id(),
@@ -404,6 +417,22 @@ class KeyActivateController extends Controller
                 'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString()
             ]);
+            
+            // 2. DatabaseLogger
+            $this->logger->error('ОШИБКА ПЕРЕВЫПУСКА (DatabaseLogger)', [
+                'source' => 'key_activate',
+                'action' => 'renew',
+                'user_id' => auth()->id(),
+                'key_id' => $request->input('key_id'),
+                'error' => $errorMessage,
+                'error_class' => $errorClass,
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+            
+            // 3. PHP error_log (на случай если Laravel логи не пишутся)
+            error_log("[RENEW ERROR] {$errorClass}: {$errorMessage} in {$e->getFile()}:{$e->getLine()}");
+            error_log("[RENEW ERROR TRACE] " . $e->getTraceAsString());
 
             // Более понятное сообщение для пользователя
             $userMessage = 'Ошибка при перевыпуске ключа';
@@ -422,6 +451,9 @@ class KeyActivateController extends Controller
                     'line' => $e->getLine()
                 ]
             ], 500);
+        } finally {
+            // Восстанавливаем обработчик ошибок
+            restore_error_handler();
         }
     }
 
