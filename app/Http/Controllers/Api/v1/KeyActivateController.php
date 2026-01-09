@@ -77,7 +77,7 @@ class KeyActivateController extends Controller
                 'traffic_limit' => $activatedKey->traffic_limit,
                 'traffic_limit_gb' => round($activatedKey->traffic_limit / 1024 / 1024 / 1024, 1),
                 'finish_at' => $activatedKey->finish_at,
-                'activated_at' => $activatedKey->activated_at,
+                // 'activated_at' => $activatedKey->activated_at, // поле не существует в БД
                 'status' => $activatedKey->status,
                 'status_text' => $activatedKey->getStatusText(),
             ]);
@@ -130,7 +130,7 @@ class KeyActivateController extends Controller
                     'traffic_limit' => $hasExistingKey->traffic_limit,
                     'traffic_limit_gb' => \App\Constants\ProductConstants::FREE_KEY_SIZE_GB,
                     'finish_at' => $hasExistingKey->finish_at,
-                    'activated_at' => $hasExistingKey->activated_at,
+                    // 'activated_at' => $hasExistingKey->activated_at, // поле не существует в БД
                     'status' => $hasExistingKey->status,
                     'status_text' => $hasExistingKey->getStatusText(),
                     'is_free' => true,
@@ -148,7 +148,7 @@ class KeyActivateController extends Controller
                 'traffic_limit' => $activatedKey->traffic_limit,
                 'traffic_limit_gb' => 5,
                 'finish_at' => $activatedKey->finish_at,
-                'activated_at' => $activatedKey->activated_at,
+                // 'activated_at' => $activatedKey->activated_at, // поле не существует в БД
                 'status' => $activatedKey->status,
                 'status_text' => $activatedKey->getStatusText(),
                 'is_free' => true,

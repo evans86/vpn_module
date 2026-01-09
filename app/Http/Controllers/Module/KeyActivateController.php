@@ -284,7 +284,7 @@ class KeyActivateController extends Controller
                     'status' => $activatedKey->status,
                     'user_tg_id' => $activatedKey->user_tg_id,
                     'deleted_at' => $activatedKey->deleted_at,
-                    'activated_at' => $activatedKey->activated_at
+                    // 'activated_at' => $activatedKey->activated_at // поле не существует в БД
                 ]
             ]);
         } catch (RuntimeException $e) {

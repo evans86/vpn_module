@@ -18,8 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property int|null $pack_salesman_id кто продавец ключа из бота
  * @property int|null $module_salesman_id кто продавец ключа из модуля
  * @property int|null $finish_at дата окончания
- * @property int|null $activated_at дата активации
- * @property int|null $user_tg_id кто активировал ключ
+ * @property int|null $user_tg_id кто активировал ключ (наличие означает активацию)
  * @property int|null $deleted_at срок, до которого нужно активировать
  * @property int|null $status статус
  * @property PackSalesman|null $packSalesman
@@ -43,7 +42,6 @@ class KeyActivate extends Model
         'status' => 'integer',
         'finish_at' => 'integer',
         'deleted_at' => 'integer',
-        'activated_at' => 'integer',
     ];
 
     /**

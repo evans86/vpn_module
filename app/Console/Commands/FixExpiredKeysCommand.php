@@ -134,17 +134,18 @@ class FixExpiredKeysCommand extends Command
             ->toArray();
 
         // Все EXPIRED ключи с не истекшим сроком
+        // Используем user_tg_id для проверки активации (activated_at в БД нет)
         $allWrongExpired = KeyActivate::where('status', KeyActivate::EXPIRED)
             ->whereNotNull('finish_at')
             ->where('finish_at', '>', $currentTime)
-            ->whereNotNull('activated_at')
+            ->whereNotNull('user_tg_id')
             ->count();
 
         // Ключи замененные из-за нарушений (их НЕ трогаем)
         $replacedDueToViolations = KeyActivate::where('status', KeyActivate::EXPIRED)
             ->whereNotNull('finish_at')
             ->where('finish_at', '>', $currentTime)
-            ->whereNotNull('activated_at')
+            ->whereNotNull('user_tg_id')
             ->whereIn('id', $replacedKeyIds)
             ->count();
 
@@ -152,7 +153,7 @@ class FixExpiredKeysCommand extends Command
         $keysToFix = KeyActivate::where('status', KeyActivate::EXPIRED)
             ->whereNotNull('finish_at')
             ->where('finish_at', '>', $currentTime)
-            ->whereNotNull('activated_at')
+            ->whereNotNull('user_tg_id')
             ->whereNotIn('id', $replacedKeyIds)
             ->get();
 
@@ -295,7 +296,7 @@ class FixExpiredKeysCommand extends Command
         return KeyActivate::where('status', KeyActivate::EXPIRED)
             ->whereNotNull('finish_at')
             ->where('finish_at', '>', $currentTime)
-            ->whereNotNull('activated_at')
+            ->whereNotNull('user_tg_id')
             ->whereNotIn('id', $replacedKeyIds)
             ->count();
     }
