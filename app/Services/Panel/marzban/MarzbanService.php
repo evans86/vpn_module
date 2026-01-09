@@ -279,9 +279,29 @@ class MarzbanService
                 'status' => $userData['status'],
             ];
 
-            if ($userData['status'] !== 'active') {
-                $serverUser->keyActivateUser->keyActivate->status = KeyActivate::EXPIRED;
-                $serverUser->keyActivateUser->keyActivate->save();
+            // Проверяем реальное истечение срока по timestamp
+            if (isset($userData['expire']) && $userData['expire'] > 0) {
+                $currentTime = time();
+                $expireTime = $userData['expire'];
+
+                // Ставим EXPIRED только если срок действительно истек
+                if ($currentTime > $expireTime) {
+                    $keyActivate = $serverUser->keyActivateUser->keyActivate;
+
+                    // Обновляем только если статус был ACTIVE
+                    if ($keyActivate->status === KeyActivate::ACTIVE) {
+                        $keyActivate->status = KeyActivate::EXPIRED;
+                        $keyActivate->save();
+
+                        Log::info('Ключ помечен как EXPIRED по истечению срока из Marzban', [
+                            'key_id' => $keyActivate->id,
+                            'user_id' => $user_id,
+                            'expire_time' => $expireTime,
+                            'current_time' => $currentTime,
+                            'source' => 'panel'
+                        ]);
+                    }
+                }
             }
 
             return $info;
@@ -499,7 +519,7 @@ class MarzbanService
 
             // Генерация приватного и публичного ключа
             $x25519Output = $ssh->exec('docker exec marzban-marzban-1 xray x25519 2>&1');
-            
+
             if ($ssh->getExitStatus() !== 0) {
                 throw new RuntimeException("Failed to generate x25519 keys: {$x25519Output}");
             }
@@ -510,9 +530,9 @@ class MarzbanService
             // или "XXX\nYYY" (без префиксов)
             $privateKey = null;
             $publicKey = null;
-            
+
             $lines = array_filter(array_map('trim', explode("\n", $x25519Output)));
-            
+
             foreach ($lines as $line) {
                 // Ищем строки с префиксами "Private key:" или "Public key:"
                 if (preg_match('/Private\s+key[:\s]+(.+)/i', $line, $matches)) {
@@ -682,81 +702,81 @@ class MarzbanService
     private function buildStableInbounds(): array
     {
         return [
-                [
-                    "tag" => "VLESS-WS",
-                    "listen" => "0.0.0.0",
-                    "port" => 2095,
-                    "protocol" => "vless",
-                    "settings" => [
-                        "clients" => [],
-                        "decryption" => "none",
-                        "level" => 0
-                    ],
-                    "streamSettings" => [
-                        "network" => "ws",
-                        "security" => "none",
-                        "wsSettings" => [
-                            "path" => "/vless"
-                        ]
-                    ],
-                    "sniffing" => [
-                        "enabled" => true,
-                        "destOverride" => ["http", "tls"]
+            [
+                "tag" => "VLESS-WS",
+                "listen" => "0.0.0.0",
+                "port" => 2095,
+                "protocol" => "vless",
+                "settings" => [
+                    "clients" => [],
+                    "decryption" => "none",
+                    "level" => 0
+                ],
+                "streamSettings" => [
+                    "network" => "ws",
+                    "security" => "none",
+                    "wsSettings" => [
+                        "path" => "/vless"
                     ]
                 ],
-                [
-                    "tag" => "VMESS-WS",
-                    "listen" => "0.0.0.0",
-                    "port" => 2096,
-                    "protocol" => "vmess",
-                    "settings" => [
-                        "clients" => [],
-                        "level" => 0
-                    ],
-                    "streamSettings" => [
-                        "network" => "ws",
-                        "security" => "none",
-                        "wsSettings" => [
-                            "path" => "/vmess"
-                        ]
-                    ],
-                    "sniffing" => [
-                        "enabled" => true,
-                        "destOverride" => ["http", "tls"]
-                    ]
-                ],
-                [
-                    "tag" => "TROJAN-WS",
-                    "listen" => "0.0.0.0",
-                    "port" => 2097,
-                    "protocol" => "trojan",
-                    "settings" => [
-                        "clients" => [],
-                        "level" => 0
-                    ],
-                    "streamSettings" => [
-                        "network" => "ws",
-                        "security" => "none",
-                        "wsSettings" => [
-                            "path" => "/trojan"
-                        ]
-                    ],
-                    "sniffing" => [
-                        "enabled" => true,
-                        "destOverride" => ["http", "tls"]
-                    ]
-                ],
-                [
-                    "tag" => "Shadowsocks-TCP",
-                    "listen" => "0.0.0.0",
-                    "port" => 2098,
-                    "protocol" => "shadowsocks",
-                    "settings" => [
-                        "clients" => [],
-                        "network" => "tcp,udp",
-                        "level" => 0
-                    ]
+                "sniffing" => [
+                    "enabled" => true,
+                    "destOverride" => ["http", "tls"]
                 ]
+            ],
+            [
+                "tag" => "VMESS-WS",
+                "listen" => "0.0.0.0",
+                "port" => 2096,
+                "protocol" => "vmess",
+                "settings" => [
+                    "clients" => [],
+                    "level" => 0
+                ],
+                "streamSettings" => [
+                    "network" => "ws",
+                    "security" => "none",
+                    "wsSettings" => [
+                        "path" => "/vmess"
+                    ]
+                ],
+                "sniffing" => [
+                    "enabled" => true,
+                    "destOverride" => ["http", "tls"]
+                ]
+            ],
+            [
+                "tag" => "TROJAN-WS",
+                "listen" => "0.0.0.0",
+                "port" => 2097,
+                "protocol" => "trojan",
+                "settings" => [
+                    "clients" => [],
+                    "level" => 0
+                ],
+                "streamSettings" => [
+                    "network" => "ws",
+                    "security" => "none",
+                    "wsSettings" => [
+                        "path" => "/trojan"
+                    ]
+                ],
+                "sniffing" => [
+                    "enabled" => true,
+                    "destOverride" => ["http", "tls"]
+                ]
+            ],
+            [
+                "tag" => "Shadowsocks-TCP",
+                "listen" => "0.0.0.0",
+                "port" => 2098,
+                "protocol" => "shadowsocks",
+                "settings" => [
+                    "clients" => [],
+                    "network" => "tcp,udp",
+                    "level" => 0
+                ]
+            ]
         ];
     }
 
@@ -910,7 +930,7 @@ class MarzbanService
                 'config_size' => strlen($configJson),
                 'source' => 'panel'
             ]);
-            
+
             // Детальное логирование для отладки (только первые 2000 символов)
             Log::debug('Configuration JSON (first 2000 chars)', [
                 'panel_id' => $panel->id,
@@ -921,17 +941,17 @@ class MarzbanService
             // Применение конфигурации с retry механизмом
             $maxRetries = 2;
             $retryDelay = 2; // секунды
-            
+
             for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
-        try {
-            $marzbanApi->modifyConfig($panel->auth_token, $json_config);
+                try {
+                    $marzbanApi->modifyConfig($panel->auth_token, $json_config);
                     break; // Успешно, выходим из цикла
                 } catch (RuntimeException $e) {
                     // Если это последняя попытка или ошибка не связана с сервером, пробрасываем дальше
                     if ($attempt === $maxRetries || !str_contains($e->getMessage(), 'Сервер Marzban недоступен')) {
                         throw $e;
                     }
-                    
+
                     // Логируем попытку повтора
                     Log::warning('Retrying configuration update', [
                         'panel_id' => $panel->id,
@@ -939,7 +959,7 @@ class MarzbanService
                         'max_retries' => $maxRetries,
                         'source' => 'panel'
                     ]);
-                    
+
                     // Ждем перед следующей попыткой
                     sleep($retryDelay);
                 }
@@ -982,7 +1002,7 @@ class MarzbanService
 
     /**
      * Обновление конфигурации панели - стабильный вариант (без REALITY)
-     * 
+     *
      * Использует только проверенные протоколы для максимальной стабильности
      *
      * @param int $panel_id
@@ -1006,7 +1026,7 @@ class MarzbanService
 
     /**
      * Обновление конфигурации панели - с REALITY (лучший обход блокировок)
-     * 
+     *
      * Автоматически генерирует и сохраняет REALITY ключи при необходимости
      * Включает REALITY протоколы + стабильные протоколы для обратной совместимости
      * При ошибке генерации ключей использует fallback на стабильный конфиг
@@ -1050,7 +1070,7 @@ class MarzbanService
 
             // Применяем стабильный конфиг вместо REALITY
             $this->updateConfigurationStable($panel_id);
-            
+
             // Пробрасываем исключение с информацией о fallback
             throw new RuntimeException(
                 'Не удалось применить REALITY конфигурацию. ' .
@@ -1061,7 +1081,7 @@ class MarzbanService
 
     /**
      * Обновление конфигурации панели (legacy метод для обратной совместимости)
-     * 
+     *
      * По умолчанию использует REALITY конфигурацию
      *
      * @param int $panel_id
@@ -1107,11 +1127,11 @@ class MarzbanService
 
         // Проверка REALITY настроек
         foreach ($config['inbounds'] as $inbound) {
-            if (isset($inbound['streamSettings']['security']) 
+            if (isset($inbound['streamSettings']['security'])
                 && $inbound['streamSettings']['security'] === 'reality') {
-                
+
                 $realitySettings = $inbound['streamSettings']['realitySettings'] ?? [];
-                
+
                 if (empty($realitySettings['privateKey'])) {
                     throw new RuntimeException('REALITY private key is required');
                 }
