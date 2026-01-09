@@ -144,6 +144,15 @@
                 // Используем данные нового ключа, если он был перевыпущен
                 $displayUserInfo = (isset($newKeyUserInfo) && $newKeyUserInfo) ? $newKeyUserInfo : $userInfo;
                 $displayFormattedKeys = (isset($newKeyFormattedKeys) && $newKeyFormattedKeys) ? $newKeyFormattedKeys : $formattedKeys;
+                
+                // Определяем какой ключ отображается (новый или старый)
+                $displayedKey = (isset($newKeyActivate) && $newKeyActivate) ? $newKeyActivate : $keyActivate;
+                
+                // ВАЖНО: Проверяем статус ключа из БАЗЫ ДАННЫХ, а не из Marzban API!
+                // Marzban может вернуть status='active' даже если ключ просрочен в Laravel БД
+                $isKeyExpired = $displayedKey->status === \App\Models\KeyActivate\KeyActivate::EXPIRED;
+                $isKeyActive = $displayedKey->status === \App\Models\KeyActivate\KeyActivate::ACTIVE;
+                $isKeyPaid = $displayedKey->status === \App\Models\KeyActivate\KeyActivate::PAID;
             @endphp
             <div class="mb-8">
                 <h2 class="text-2xl font-bold mb-6 text-gray-900 flex items-center">
@@ -157,8 +166,24 @@
                         <div class="space-y-4">
                             <div class="flex items-center justify-between">
                                 <span class="text-gray-600 font-medium">Статус:</span>
-                                <span class="px-3 py-1.5 rounded-full text-sm font-semibold {{ $displayUserInfo['status'] === 'active' ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200' }}">
-                                    {{ $displayUserInfo['status'] === 'active' ? '✓ Активен' : '✗ Неактивен' }}
+                                @php
+                                    // Определяем статус на основе БД Laravel, а не Marzban API
+                                    $statusText = 'Неизвестен';
+                                    $statusClass = 'bg-gray-100 text-gray-800 border border-gray-200';
+                                    
+                                    if ($isKeyExpired) {
+                                        $statusText = '✗ Просрочен';
+                                        $statusClass = 'bg-red-100 text-red-800 border border-red-200';
+                                    } elseif ($isKeyActive) {
+                                        $statusText = '✓ Активен';
+                                        $statusClass = 'bg-green-100 text-green-800 border border-green-200';
+                                    } elseif ($isKeyPaid) {
+                                        $statusText = '⏳ Оплачен';
+                                        $statusClass = 'bg-blue-100 text-blue-800 border border-blue-200';
+                                    }
+                                @endphp
+                                <span class="px-3 py-1.5 rounded-full text-sm font-semibold {{ $statusClass }}">
+                                    {{ $statusText }}
                                 </span>
                             </div>
                             <div class="flex items-center justify-between">
@@ -206,7 +231,31 @@
             </div>
 
             <!-- Connection Keys Section -->
-            @if($displayUserInfo['status'] === 'active')
+            @if($isKeyExpired)
+                <!-- Ключ просрочен - показываем сообщение -->
+                <div class="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-2xl shadow-lg p-8 text-center">
+                    <svg class="w-20 h-20 mx-auto text-red-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <h3 class="text-2xl font-bold text-red-700 mb-3">Срок действия ключа истек</h3>
+                    <p class="text-red-600 text-lg mb-6">
+                        Ключ доступа больше не активен. Для продолжения использования VPN необходимо приобрести новый ключ.
+                    </p>
+                    @if(isset($displayUserInfo['expiration_date']) && $displayUserInfo['expiration_date'])
+                        <div class="text-sm text-red-500 mb-6">
+                            Срок действия истек: <strong>{{ date('d.m.Y H:i', $displayUserInfo['expiration_date']) }}</strong>
+                        </div>
+                    @endif
+                    <a href="{{ $botLink ?? '#' }}" 
+                       class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-bold hover:from-red-700 hover:to-red-800 transition-all shadow-lg hover:shadow-xl">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+                        </svg>
+                        Перейти в бот для покупки
+                    </a>
+                </div>
+            @elseif($isKeyActive && $displayUserInfo['status'] === 'active')
+                <!-- Ключ активен И Marzban тоже активен - показываем протоколы -->
                 <div>
                     <h2 class="text-2xl font-bold mb-6 text-gray-900 flex items-center">
                         <svg class="w-6 h-6 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

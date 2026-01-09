@@ -555,7 +555,7 @@ class VpnConfigController extends Controller
                 'finish_at_date' => $keyActivate->finish_at ? date('Y-m-d H:i:s', $keyActivate->finish_at) : null,
                 'source' => 'vpn'
             ]);
-            
+
             $keyActivate = $this->keyActivateService->checkAndUpdateStatus($keyActivate);
 
             // ШАГ 2: Получаем данные из Marzban API (expire из панели)
@@ -602,6 +602,21 @@ class VpnConfigController extends Controller
                 'expiration_date' => $finishAt,
                 'days_remaining' => $daysRemaining
             ];
+
+            Log::info('📊 Сформированы данные для отображения', [
+                'key_id' => $keyActivate->id,
+                'key_status_db' => $keyActivate->status,
+                'key_status_name' => $keyActivate->status === \App\Models\KeyActivate\KeyActivate::EXPIRED ? 'EXPIRED' :
+                                    ($keyActivate->status === \App\Models\KeyActivate\KeyActivate::ACTIVE ? 'ACTIVE' : 'OTHER'),
+                'marzban_status' => $info['status'] ?? 'unknown',
+                'used_traffic_bytes' => $info['used_traffic'] ?? 0,
+                'used_traffic_gb' => isset($info['used_traffic']) ? round($info['used_traffic'] / (1024*1024*1024), 2) : 0,
+                'data_limit_gb' => isset($info['data_limit']) ? round($info['data_limit'] / (1024*1024*1024), 2) : 0,
+                'finish_at' => $finishAt,
+                'finish_at_date' => $finishAt ? date('Y-m-d H:i:s', $finishAt) : null,
+                'days_remaining' => $daysRemaining,
+                'source' => 'vpn'
+            ]);
 
             // Форматируем ключи для отображения
             $formattedKeys = $this->formatConnectionKeys($connectionKeys);
@@ -698,6 +713,7 @@ class VpnConfigController extends Controller
 
             Log::warning('Returning browser page');
             return response()->view('vpn.config', compact(
+                'keyActivate',      // ← ДОБАВЛЕНО: передаем ключ со статусом из БД
                 'userInfo',
                 'formattedKeys',
                 'botLink',
