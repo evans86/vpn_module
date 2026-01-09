@@ -139,6 +139,19 @@ class FixExpiredKeysCommand extends Command
             ->whereNotNull('finish_at')
             ->where('finish_at', '>', $currentTime)
             ->whereNotNull('user_tg_id')
+            ->whereHas('keyActivateUser') // ВАЖНО: должен быть привязанный пользователь на панели
+            ->count();
+
+        // Подсчет ключей с исчерпанным трафиком требует проверки через API панели
+        // Это будет сделано при детальной проверке каждого ключа
+        $expiredDueToTraffic = 0;
+
+        // Ключи без привязки к панели Marzban (их НЕ трогаем)
+        $withoutServerUser = KeyActivate::where('status', KeyActivate::EXPIRED)
+            ->whereNotNull('finish_at')
+            ->where('finish_at', '>', $currentTime)
+            ->whereNotNull('user_tg_id')
+            ->whereDoesntHave('keyActivateUser') // нет связи с панелью
             ->count();
 
         // Ключи замененные из-за нарушений (их НЕ трогаем)
@@ -146,16 +159,56 @@ class FixExpiredKeysCommand extends Command
             ->whereNotNull('finish_at')
             ->where('finish_at', '>', $currentTime)
             ->whereNotNull('user_tg_id')
+            ->whereHas('keyActivateUser')
             ->whereIn('id', $replacedKeyIds)
             ->count();
 
-        // Ключи которые нужно исправить (исключая замененные)
-        $keysToFix = KeyActivate::where('status', KeyActivate::EXPIRED)
+        // Ключи которые потенциально нужно исправить (исключая замененные и без привязки к панели)
+        $potentialKeysToFix = KeyActivate::where('status', KeyActivate::EXPIRED)
             ->whereNotNull('finish_at')
             ->where('finish_at', '>', $currentTime)
             ->whereNotNull('user_tg_id')
+            ->whereHas('keyActivateUser') // ВАЖНО: должна быть связь с панелью
             ->whereNotIn('id', $replacedKeyIds)
             ->get();
+
+        // Проверяем каждый ключ через API панели на наличие трафика
+        if ($potentialKeysToFix->count() > 0) {
+            Log::info("Проверка остатка трафика для {$potentialKeysToFix->count()} ключей через API Marzban", [
+                'source' => 'fix_expired_keys_command'
+            ]);
+        }
+
+        $keysToFix = collect();
+        foreach ($potentialKeysToFix as $key) {
+            try {
+                if ($key->keyActivateUser && $key->keyActivateUser->serverUser) {
+                    $serverUser = $key->keyActivateUser->serverUser;
+                    if ($serverUser->panel) {
+                        $panelStrategy = new \App\Services\Panel\PanelStrategy($serverUser->panel->panel);
+                        $subscribeInfo = $panelStrategy->getSubscribeInfo(
+                            $serverUser->panel->id,
+                            $serverUser->id
+                        );
+
+                        // Проверяем остаток трафика
+                        $dataLimit = $subscribeInfo['data_limit'] ?? 0;
+                        $usedTraffic = $subscribeInfo['used_traffic'] ?? 0;
+                        $remainingTraffic = $dataLimit - $usedTraffic;
+
+                        // Если трафик исчерпан - не исправляем
+                        if ($remainingTraffic <= 0) {
+                            $expiredDueToTraffic++;
+                            continue;
+                        }
+                    }
+                }
+                $keysToFix->push($key);
+            } catch (\Exception $e) {
+                // Если не удалось проверить - добавляем в список (безопасный подход)
+                $keysToFix->push($key);
+            }
+        }
 
         // Статистика по категориям
         $categories = $keysToFix->groupBy(function ($key) use ($currentTime) {
@@ -173,6 +226,8 @@ class FixExpiredKeysCommand extends Command
 
         return [
             'all_wrong_expired' => $allWrongExpired,
+            'without_server_user' => $withoutServerUser,
+            'expired_due_to_traffic' => $expiredDueToTraffic,
             'replaced_due_to_violations' => $replacedDueToViolations,
             'wrong_expired' => $keysToFix->count(),
             'keys_to_fix' => $keysToFix,
@@ -192,6 +247,8 @@ class FixExpiredKeysCommand extends Command
             ['Метрика', 'Значение'],
             [
                 ['Всего EXPIRED с не истекшим сроком', $analysis['all_wrong_expired']],
+                ['  ├─ Нет привязки к панели (не трогаем)', $analysis['without_server_user']],
+                ['  ├─ Исчерпан трафик (не трогаем)', $analysis['expired_due_to_traffic']],
                 ['  ├─ Заменены из-за нарушений (не трогаем)', $analysis['replaced_due_to_violations']],
                 ['  └─ Нужно исправить', $analysis['wrong_expired']],
                 ['', ''],
@@ -293,10 +350,12 @@ class FixExpiredKeysCommand extends Command
             ->unique()
             ->toArray();
 
+        // Простой подсчет без проверки трафика (для быстрой финальной проверки)
         return KeyActivate::where('status', KeyActivate::EXPIRED)
             ->whereNotNull('finish_at')
             ->where('finish_at', '>', $currentTime)
             ->whereNotNull('user_tg_id')
+            ->whereHas('keyActivateUser') // должна быть связь с панелью
             ->whereNotIn('id', $replacedKeyIds)
             ->count();
     }

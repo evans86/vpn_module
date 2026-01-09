@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * @property string $id
- * @property int|null $traffic_limit лимит трафика на пользователя (сколько осталось)
+ * @property int|null $traffic_limit НАЧАЛЬНЫЙ лимит трафика (data_limit для панели, НЕ остаток!)
  * @property int|null $pack_salesman_id кто продавец ключа из бота
  * @property int|null $module_salesman_id кто продавец ключа из модуля
  * @property int|null $finish_at дата окончания
@@ -24,6 +24,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property PackSalesman|null $packSalesman
  * @property Salesman|null $moduleSalesman
  * @property KeyActivateUser|null $keyActivateUser
+ * 
+ * ВАЖНО: Реальный остаток трафика (data_limit - used_traffic) хранится на панели Marzban,
+ * а НЕ в этом поле! Это поле содержит НАЧАЛЬНОЕ значение лимита.
  */
 class KeyActivate extends Model
 {
