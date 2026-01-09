@@ -135,24 +135,17 @@ class FixExpiredKeysCommand extends Command
 
         // Все EXPIRED ключи с не истекшим сроком
         // Используем user_tg_id для проверки активации (activated_at в БД нет)
+        // Рассматриваем ТОЛЬКО ключи с привязкой к панели (whereHas keyActivateUser)
         $allWrongExpired = KeyActivate::where('status', KeyActivate::EXPIRED)
             ->whereNotNull('finish_at')
             ->where('finish_at', '>', $currentTime)
             ->whereNotNull('user_tg_id')
-            ->whereHas('keyActivateUser') // ВАЖНО: должен быть привязанный пользователь на панели
+            ->whereHas('keyActivateUser') // ВАЖНО: только с привязкой к панели
             ->count();
 
         // Подсчет ключей с исчерпанным трафиком требует проверки через API панели
         // Это будет сделано при детальной проверке каждого ключа
         $expiredDueToTraffic = 0;
-
-        // Ключи без привязки к панели Marzban (их НЕ трогаем)
-        $withoutServerUser = KeyActivate::where('status', KeyActivate::EXPIRED)
-            ->whereNotNull('finish_at')
-            ->where('finish_at', '>', $currentTime)
-            ->whereNotNull('user_tg_id')
-            ->whereDoesntHave('keyActivateUser') // нет связи с панелью
-            ->count();
 
         // Ключи замененные из-за нарушений (их НЕ трогаем)
         $replacedDueToViolations = KeyActivate::where('status', KeyActivate::EXPIRED)
@@ -226,7 +219,6 @@ class FixExpiredKeysCommand extends Command
 
         return [
             'all_wrong_expired' => $allWrongExpired,
-            'without_server_user' => $withoutServerUser,
             'expired_due_to_traffic' => $expiredDueToTraffic,
             'replaced_due_to_violations' => $replacedDueToViolations,
             'wrong_expired' => $keysToFix->count(),
@@ -247,7 +239,6 @@ class FixExpiredKeysCommand extends Command
             ['Метрика', 'Значение'],
             [
                 ['Всего EXPIRED с не истекшим сроком', $analysis['all_wrong_expired']],
-                ['  ├─ Нет привязки к панели (не трогаем)', $analysis['without_server_user']],
                 ['  ├─ Исчерпан трафик (не трогаем)', $analysis['expired_due_to_traffic']],
                 ['  ├─ Заменены из-за нарушений (не трогаем)', $analysis['replaced_due_to_violations']],
                 ['  └─ Нужно исправить', $analysis['wrong_expired']],
