@@ -319,84 +319,31 @@ class KeyActivateController extends Controller
      */
     public function renew(Request $request): JsonResponse
     {
-        // КРИТИЧНО: Логируем САМЫМ ПЕРВЫМ действием
-        error_log("=== RENEW START ===");
-        error_log("Request data: " . json_encode($request->all()));
-        
-        Log::emergency('🚨 RENEW КОНТРОЛЛЕР ВЫЗВАН', [
-            'request_data' => $request->all(),
-            'user_id' => auth()->id(),
-            'timestamp' => date('Y-m-d H:i:s')
-        ]);
-        
         try {
-            error_log("Validation start");
             $validated = $request->validate([
                 'key_id' => 'required|uuid|exists:key_activate,id'
             ]);
-            error_log("Validation passed: " . json_encode($validated));
 
-            Log::emergency('🔍 Валидация пройдена', ['key_id' => $validated['key_id']]);
-
-            // Загружаем ключ БЕЗ отношений сначала
-            error_log("Loading key WITHOUT relations: " . $validated['key_id']);
-            Log::emergency('🔄 Начинаем загрузку ключа БЕЗ отношений', ['key_id' => $validated['key_id']]);
-            
+            // Загружаем ключ с необходимыми отношениями
             /** @var KeyActivate $key */
             $key = KeyActivate::findOrFail($validated['key_id']);
-            
-            error_log("Key loaded (basic): " . $key->id . ", status: " . $key->status);
-            Log::emergency('📦 Базовый ключ загружен', [
-                'key_id' => $key->id,
-                'status' => $key->status,
-                'user_tg_id' => $key->user_tg_id,
-                'pack_salesman_id' => $key->pack_salesman_id
-            ]);
-            
-            // Теперь загружаем отношения по одному
-            error_log("Loading keyActivateUser relation");
-            Log::emergency('🔄 Загружаем keyActivateUser');
-            try {
-                $key->load('keyActivateUser');
-                Log::emergency('✅ keyActivateUser загружен', ['has_relation' => $key->keyActivateUser !== null]);
-            } catch (\Throwable $e) {
-                Log::emergency('❌ Ошибка загрузки keyActivateUser', ['error' => $e->getMessage()]);
-            }
-            
-            error_log("Loading packSalesman relation");
-            Log::emergency('🔄 Загружаем packSalesman');
-            try {
-                $key->load('packSalesman.salesman');
-                Log::emergency('✅ packSalesman загружен', ['has_relation' => $key->packSalesman !== null]);
-            } catch (\Throwable $e) {
-                Log::emergency('❌ Ошибка загрузки packSalesman', ['error' => $e->getMessage()]);
-            }
-            
-            Log::emergency('🎯 Все отношения обработаны');
+            $key->load('keyActivateUser', 'packSalesman.salesman');
 
             // Проверяем, что ключ просрочен
-            error_log("Checking key status: " . $key->status . " (EXPIRED = " . KeyActivate::EXPIRED . ")");
             if ($key->status !== KeyActivate::EXPIRED) {
-                error_log("Status check FAILED - key is not expired");
-                Log::emergency('❌ Ключ не просрочен', ['status' => $key->status]);
                 return response()->json([
                     'success' => false,
                     'message' => 'Ключ не может быть перевыпущен. Только просроченные ключи могут быть перевыпущены.'
                 ], 400);
             }
-            error_log("Status check passed - key is expired");
 
             // Проверяем, что есть user_tg_id
-            error_log("Checking user_tg_id: " . ($key->user_tg_id ?? 'NULL'));
             if (!$key->user_tg_id) {
-                error_log("user_tg_id check FAILED");
-                Log::emergency('❌ Нет user_tg_id', ['key_id' => $key->id]);
                 return response()->json([
                     'success' => false,
                     'message' => 'Нельзя перевыпустить ключ без привязки к пользователю Telegram'
                 ], 400);
             }
-            error_log("user_tg_id check passed");
 
             $this->logger->info('Начало перевыпуска ключа', [
                 'source' => 'key_activate',
@@ -408,31 +355,9 @@ class KeyActivateController extends Controller
                 'finish_at' => $key->finish_at
             ]);
 
-            error_log("Calling KeyActivateService->renew()");
-            Log::emergency('🔄 Вызов сервиса renew', ['key_id' => $key->id]);
-            
             try {
                 $renewedKey = $this->keyActivateService->renew($key);
-                error_log("Service renew SUCCESS");
-                Log::emergency('✅ Сервис renew выполнен успешно', ['key_id' => $renewedKey->id]);
             } catch (\Throwable $serviceException) {
-                error_log("Service renew FAILED: " . $serviceException->getMessage());
-                error_log("Exception class: " . get_class($serviceException));
-                error_log("File: " . $serviceException->getFile() . ":" . $serviceException->getLine());
-                error_log("Trace: " . $serviceException->getTraceAsString());
-                
-                Log::emergency('❌❌❌ ОШИБКА В СЕРВИСЕ RENEW', [
-                    'source' => 'key_activate',
-                    'action' => 'renew',
-                    'user_id' => auth()->id(),
-                    'key_id' => $key->id,
-                    'error' => $serviceException->getMessage(),
-                    'error_class' => get_class($serviceException),
-                    'file' => $serviceException->getFile(),
-                    'line' => $serviceException->getLine(),
-                    'trace' => substr($serviceException->getTraceAsString(), 0, 1000)
-                ]);
-                
                 $this->logger->error('Ошибка в KeyActivateService->renew()', [
                     'source' => 'key_activate',
                     'action' => 'renew',
@@ -441,7 +366,8 @@ class KeyActivateController extends Controller
                     'error' => $serviceException->getMessage(),
                     'error_class' => get_class($serviceException),
                     'file' => $serviceException->getFile(),
-                    'line' => $serviceException->getLine()
+                    'line' => $serviceException->getLine(),
+                    'trace' => $serviceException->getTraceAsString()
                 ]);
                 throw $serviceException;
             }
@@ -465,61 +391,21 @@ class KeyActivateController extends Controller
             ]);
 
         } catch (\Throwable $e) {
-            error_log("=== CATCH IN CONTROLLER ===");
-            error_log("Error: " . $e->getMessage());
-            error_log("Class: " . get_class($e));
-            error_log("File: " . $e->getFile() . ":" . $e->getLine());
-            
-            $errorMessage = $e->getMessage();
-            $errorClass = get_class($e);
-            
-            // МНОЖЕСТВЕННОЕ ЛОГИРОВАНИЕ для гарантии
-            
-            // 1. Laravel Log
-            Log::emergency('❌❌❌ ОШИБКА ПЕРЕВЫПУСКА В КОНТРОЛЛЕРЕ', [
+            $this->logger->error('Ошибка при перевыпуске ключа', [
                 'source' => 'key_activate',
                 'action' => 'renew',
                 'user_id' => auth()->id(),
                 'key_id' => $request->input('key_id'),
-                'error' => $errorMessage,
-                'error_class' => $errorClass,
+                'error' => $e->getMessage(),
+                'error_class' => get_class($e),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString()
             ]);
-            
-            // 2. DatabaseLogger
-            $this->logger->error('ОШИБКА ПЕРЕВЫПУСКА (DatabaseLogger)', [
-                'source' => 'key_activate',
-                'action' => 'renew',
-                'user_id' => auth()->id(),
-                'key_id' => $request->input('key_id'),
-                'error' => $errorMessage,
-                'error_class' => $errorClass,
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ]);
-            
-            // 3. PHP error_log (на случай если Laravel логи не пишутся)
-            error_log("[RENEW ERROR] {$errorClass}: {$errorMessage} in {$e->getFile()}:{$e->getLine()}");
-            error_log("[RENEW ERROR TRACE] " . $e->getTraceAsString());
-
-            // Более понятное сообщение для пользователя
-            $userMessage = 'Ошибка при перевыпуске ключа';
-            if (!empty($errorMessage)) {
-                $userMessage .= ': ' . $errorMessage;
-            } else {
-                $userMessage .= ' (тип ошибки: ' . $errorClass . ')';
-            }
 
             return response()->json([
                 'success' => false,
-                'message' => $userMessage,
-                'debug' => [
-                    'error_class' => $errorClass,
-                    'file' => basename($e->getFile()),
-                    'line' => $e->getLine()
-                ]
+                'message' => 'Ошибка при перевыпуске ключа: ' . $e->getMessage()
             ], 500);
         }
     }
