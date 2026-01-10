@@ -90,7 +90,7 @@ class VpnConfigController extends Controller
             // Загружаем отношения для KeyActivate (только нужные поля)
             $keyActivate->load([
                 'packSalesman' => function($query) {
-                    $query->select('id', 'key_activate_id', 'salesman_id', 'pack_id');
+                    $query->select('id', 'salesman_id', 'pack_id');
                 },
                 'packSalesman.salesman' => function($query) {
                     $query->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id');
@@ -676,7 +676,7 @@ class VpnConfigController extends Controller
                     // Загружаем отношения для нового ключа (только нужные поля)
                     $newKeyActivate->load([
                         'packSalesman' => function($query) {
-                            $query->select('id', 'key_activate_id', 'salesman_id', 'pack_id');
+                            $query->select('id', 'salesman_id', 'pack_id');
                         },
                         'packSalesman.salesman' => function($query) {
                             $query->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id');
