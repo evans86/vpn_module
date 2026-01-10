@@ -52,6 +52,9 @@ class VpnConfigController extends Controller
 
     public function show(string $key_activate_id): Response
     {
+        // Увеличиваем лимит памяти для отображения конфигурации
+        ini_set('memory_limit', '256M');
+
         try {
             // Если запрошен роут /config/error, перенаправляем на метод showError
             if ($key_activate_id === 'error') {
@@ -84,8 +87,15 @@ class VpnConfigController extends Controller
                 ]);
             }
 
-            // Загружаем отношения для KeyActivate
-            $keyActivate->load(['packSalesman', 'packSalesman.salesman']);
+            // Загружаем отношения для KeyActivate (только нужные поля)
+            $keyActivate->load([
+                'packSalesman' => function($query) {
+                    $query->select('id', 'key_activate_id', 'salesman_id', 'pack_id');
+                },
+                'packSalesman.salesman' => function($query) {
+                    $query->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id');
+                }
+            ]);
 
             // Ищем KeyActivateUser напрямую через репозиторий по key_activate_id
             $keyActivateUser = $this->keyActivateUserRepository->findByKeyActivateIdWithRelations($key_activate_id);
@@ -111,10 +121,13 @@ class VpnConfigController extends Controller
             // Получаем информацию о пользователе сервера
             $serverUser = $keyActivateUser->serverUser;
 
-            // Если отношение не загружено, пытаемся загрузить явно
+            // Если отношение не загружено, загружаем напрямую (без load)
             if (!$serverUser && $keyActivateUser->server_user_id) {
-                $keyActivateUser->load('serverUser');
-                $serverUser = $keyActivateUser->serverUser;
+                $serverUser = ServerUser::with('panel:id,panel,api_address,auth_token,panel_login,panel_password,token_died_time')
+                    ->find($keyActivateUser->server_user_id);
+                if ($serverUser) {
+                    $keyActivateUser->setRelation('serverUser', $serverUser);
+                }
             }
 
             // Если всё ещё не найден, пытаемся получить через репозиторий
@@ -544,8 +557,17 @@ class VpnConfigController extends Controller
             // Обновляем модель из базы данных, чтобы получить актуальные данные
             $keyActivate->refresh();
 
-            // Загружаем отношения заново
-            $keyActivate->load(['packSalesman', 'packSalesman.salesman']);
+            // Загружаем отношения заново (только нужные поля)
+            if (!$keyActivate->relationLoaded('packSalesman')) {
+                $keyActivate->load([
+                    'packSalesman' => function($query) {
+                        $query->select('id', 'key_activate_id', 'salesman_id', 'pack_id');
+                    },
+                    'packSalesman.salesman' => function($query) {
+                        $query->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id');
+                    }
+                ]);
+            }
 
             // ШАГ 1: Проверяем finish_at из БД (локальная дата, может быть изменена в админке)
             Log::info('🔍 Проверка finish_at перед получением данных из Marzban', [
@@ -651,8 +673,15 @@ class VpnConfigController extends Controller
                 $newKeyActivate = $this->keyActivateRepository->findById($replacedViolation->replaced_key_id);
 
                 if ($newKeyActivate) {
-                    // Загружаем отношения для нового ключа
-                    $newKeyActivate->load(['packSalesman', 'packSalesman.salesman']);
+                    // Загружаем отношения для нового ключа (только нужные поля)
+                    $newKeyActivate->load([
+                        'packSalesman' => function($query) {
+                            $query->select('id', 'key_activate_id', 'salesman_id', 'pack_id');
+                        },
+                        'packSalesman.salesman' => function($query) {
+                            $query->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id');
+                        }
+                    ]);
 
                     // Проверяем finish_at нового ключа перед запросом к Marzban
                     $newKeyActivate = $this->keyActivateService->checkAndUpdateStatus($newKeyActivate);

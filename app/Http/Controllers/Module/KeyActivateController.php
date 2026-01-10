@@ -319,15 +319,17 @@ class KeyActivateController extends Controller
      */
     public function renew(Request $request): JsonResponse
     {
+        // Временно увеличиваем лимит памяти для этой операции
+        ini_set('memory_limit', '256M');
+        
         try {
             $validated = $request->validate([
                 'key_id' => 'required|uuid|exists:key_activate,id'
             ]);
 
-            // Загружаем ключ с необходимыми отношениями
+            // Загружаем ключ БЕЗ отношений (они загрузятся в сервисе по необходимости)
             /** @var KeyActivate $key */
             $key = KeyActivate::findOrFail($validated['key_id']);
-            $key->load('keyActivateUser', 'packSalesman.salesman');
 
             // Проверяем, что ключ просрочен
             if ($key->status !== KeyActivate::EXPIRED) {
