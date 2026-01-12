@@ -71,6 +71,19 @@ abstract class AbstractTelegramBot
             // Получаем update через Telegram SDK
             $this->update = $this->telegram->getWebhookUpdate();
 
+            // Игнорируем обновления типов, которые не нужно обрабатывать
+            // (chat_member, my_chat_member, channel_post, edited_channel_post и т.д.)
+            if (!$this->update->getMessage() && !$this->update->getCallbackQuery()) {
+                Log::debug('Ignoring unsupported update type', [
+                    'update_id' => $this->update->updateId ?? null,
+                    'has_chat_member' => $this->update->has('chat_member'),
+                    'has_my_chat_member' => $this->update->has('my_chat_member'),
+                    'has_channel_post' => $this->update->has('channel_post'),
+                    'source' => 'telegram'
+                ]);
+                return; // Выходим из метода, не обрабатывая
+            }
+
             // Получаем chat_id
             if ($this->update->getMessage()) {
                 $this->chatId = $this->update->getMessage()->getChat()->getId();
