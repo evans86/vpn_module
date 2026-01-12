@@ -74,20 +74,30 @@ abstract class AbstractTelegramBot
             // Получаем chat_id
             if ($this->update->getMessage()) {
                 $this->chatId = $this->update->getMessage()->getChat()->getId();
-                $this->username = $this->update->getMessage()->getFrom()->getUsername();
-                $this->firstName = $this->update->getMessage()->getFrom()->getFirstName();
+                $from = $this->update->getMessage()->getFrom();
+                $this->username = $from ? $from->getUsername() : null;
+                $this->firstName = $from ? $from->getFirstName() : null;
             } elseif ($this->update->getCallbackQuery()) {
                 $this->chatId = $this->update->getCallbackQuery()->getMessage()->getChat()->getId();
-                $this->username = $this->update->getCallbackQuery()->getFrom()->getUsername();
-                $this->firstName = $this->update->getCallbackQuery()->getFrom()->getFirstName();
+                $from = $this->update->getCallbackQuery()->getFrom();
+                $this->username = $from ? $from->getUsername() : null;
+                $this->firstName = $from ? $from->getFirstName() : null;
             }
 
-            Log::info('Bot initialized', [
-                'chat_id' => $this->chatId,
-                'username' => $this->username,
-                'first_name' => $this->firstName,
-                'source' => 'telegram'
-            ]);
+            // Логируем только если удалось получить chat_id
+            if ($this->chatId) {
+                Log::info('Bot initialized', [
+                    'chat_id' => $this->chatId,
+                    'username' => $this->username ?? 'N/A',
+                    'first_name' => $this->firstName ?? 'N/A',
+                    'source' => 'telegram'
+                ]);
+            } else {
+                Log::debug('Bot webhook received, but chat_id not found', [
+                    'update_type' => $this->update ? get_class($this->update) : 'null',
+                    'source' => 'telegram'
+                ]);
+            }
 
             $this->processUpdate();
         } catch (Exception $e) {
