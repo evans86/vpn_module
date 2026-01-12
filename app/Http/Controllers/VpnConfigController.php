@@ -123,7 +123,7 @@ class VpnConfigController extends Controller
 
             // Если отношение не загружено, загружаем напрямую (без load)
             if (!$serverUser && $keyActivateUser->server_user_id) {
-                $serverUser = ServerUser::with('panel:id,panel,api_address,auth_token,panel_login,panel_password,token_died_time')
+                $serverUser = ServerUser::with('panel:id,panel,panel_adress,auth_token,panel_login,panel_password,token_died_time')
                     ->find($keyActivateUser->server_user_id);
                 if ($serverUser) {
                     $keyActivateUser->setRelation('serverUser', $serverUser);
@@ -561,7 +561,7 @@ class VpnConfigController extends Controller
             if (!$keyActivate->relationLoaded('packSalesman')) {
                 $keyActivate->load([
                     'packSalesman' => function($query) {
-                        $query->select('id', 'key_activate_id', 'salesman_id', 'pack_id');
+                        $query->select('id', 'salesman_id', 'pack_id');
                     },
                     'packSalesman.salesman' => function($query) {
                         $query->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id');
