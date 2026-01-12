@@ -73,28 +73,57 @@ abstract class AbstractTelegramBot
 
             // Игнорируем обновления типов, которые не нужно обрабатывать
             // (chat_member, my_chat_member, channel_post, edited_channel_post и т.д.)
-            if (!$this->update->getMessage() && !$this->update->getCallbackQuery()) {
+            $message = $this->update->getMessage();
+            $callbackQuery = $this->update->getCallbackQuery();
+            
+            // Проверяем, что это действительно сообщение или callback, а не другой тип
+            $hasValidMessage = $message && is_object($message) && method_exists($message, 'getChat');
+            $hasValidCallback = $callbackQuery && is_object($callbackQuery) && method_exists($callbackQuery, 'getFrom');
+            
+            if (!$hasValidMessage && !$hasValidCallback) {
                 Log::debug('Ignoring unsupported update type', [
                     'update_id' => $this->update->updateId ?? null,
                     'has_chat_member' => $this->update->has('chat_member'),
                     'has_my_chat_member' => $this->update->has('my_chat_member'),
                     'has_channel_post' => $this->update->has('channel_post'),
+                    'message_type' => $message ? get_class($message) : 'null',
+                    'callback_type' => $callbackQuery ? get_class($callbackQuery) : 'null',
                     'source' => 'telegram'
                 ]);
                 return; // Выходим из метода, не обрабатывая
             }
 
-            // Получаем chat_id
-            if ($this->update->getMessage()) {
-                $this->chatId = $this->update->getMessage()->getChat()->getId();
-                $from = $this->update->getMessage()->getFrom();
-                $this->username = $from ? $from->getUsername() : null;
-                $this->firstName = $from ? $from->getFirstName() : null;
-            } elseif ($this->update->getCallbackQuery()) {
-                $this->chatId = $this->update->getCallbackQuery()->getMessage()->getChat()->getId();
-                $from = $this->update->getCallbackQuery()->getFrom();
-                $this->username = $from ? $from->getUsername() : null;
-                $this->firstName = $from ? $from->getFirstName() : null;
+            // Получаем chat_id с проверкой типов
+            
+            if ($message && is_object($message) && method_exists($message, 'getChat')) {
+                try {
+                    $this->chatId = $message->getChat()->getId();
+                    $from = $message->getFrom();
+                    $this->username = $from ? $from->getUsername() : null;
+                    $this->firstName = $from ? $from->getFirstName() : null;
+                } catch (\Exception $e) {
+                    Log::debug('Failed to extract data from message', [
+                        'error' => $e->getMessage(),
+                        'message_type' => get_class($message),
+                        'source' => 'telegram'
+                    ]);
+                }
+            } elseif ($callbackQuery && is_object($callbackQuery) && method_exists($callbackQuery, 'getMessage')) {
+                try {
+                    $callbackMessage = $callbackQuery->getMessage();
+                    if ($callbackMessage && method_exists($callbackMessage, 'getChat')) {
+                        $this->chatId = $callbackMessage->getChat()->getId();
+                    }
+                    $from = $callbackQuery->getFrom();
+                    $this->username = $from ? $from->getUsername() : null;
+                    $this->firstName = $from ? $from->getFirstName() : null;
+                } catch (\Exception $e) {
+                    Log::debug('Failed to extract data from callback query', [
+                        'error' => $e->getMessage(),
+                        'callback_type' => get_class($callbackQuery),
+                        'source' => 'telegram'
+                    ]);
+                }
             }
 
             // Логируем только если удалось получить chat_id
