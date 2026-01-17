@@ -681,6 +681,11 @@ class KeyActivateService
 
             // Проверяем срок активации для оплаченных ключей (deleted_at)
             if ($key->status === KeyActivate::PAID && $key->deleted_at && $currentTime > $key->deleted_at) {
+                // Загружаем связь если не загружена
+                if (!$key->relationLoaded('keyActivateUser')) {
+                    $key->load('keyActivateUser.serverUser');
+                }
+                
                 $key->status = KeyActivate::EXPIRED;
                 $statusChanged = true;
 
@@ -708,6 +713,11 @@ class KeyActivateService
                     'pack_salesman_id' => $key->pack_salesman_id,
                     'module_salesman_id' => $key->module_salesman_id,
                     'traffic_limit' => $key->traffic_limit,
+                    'has_key_activate_user' => $key->keyActivateUser ? true : false,
+                    'key_activate_user_id' => $key->keyActivateUser ? $key->keyActivateUser->id : null,
+                    'key_activate_user_server_user_id' => ($key->keyActivateUser && $key->keyActivateUser->serverUser) ? $key->keyActivateUser->serverUser->id : null,
+                    'note' => 'Для ключей со статусом PAID связь keyActivateUser может отсутствовать (ключ не был активирован)',
+                    'warning' => '⚠️ ВАЖНО: При смене статуса на EXPIRED связь keyActivateUser НЕ должна удаляться!',
                     'method' => 'checkAndUpdateStatus',
                     'file' => __FILE__,
                     'line' => __LINE__
@@ -716,6 +726,11 @@ class KeyActivateService
 
             // Проверяем срок действия для активных ключей (finish_at)
             if ($key->status === KeyActivate::ACTIVE && $key->finish_at && $currentTime > $key->finish_at) {
+                // Загружаем связь если не загружена
+                if (!$key->relationLoaded('keyActivateUser')) {
+                    $key->load('keyActivateUser.serverUser');
+                }
+                
                 $key->status = KeyActivate::EXPIRED;
                 $statusChanged = true;
 
@@ -744,8 +759,10 @@ class KeyActivateService
                     'module_salesman_id' => $key->module_salesman_id,
                     'traffic_limit' => $key->traffic_limit,
                     'has_key_activate_user' => $key->keyActivateUser ? true : false,
+                    'key_activate_user_id' => $key->keyActivateUser ? $key->keyActivateUser->id : null,
                     'server_user_id' => ($key->keyActivateUser && $key->keyActivateUser->serverUser) ? $key->keyActivateUser->serverUser->id : null,
                     'panel_id' => ($key->keyActivateUser && $key->keyActivateUser->serverUser) ? $key->keyActivateUser->serverUser->panel_id : null,
+                    'warning' => '⚠️ ВАЖНО: При смене статуса на EXPIRED связь keyActivateUser НЕ должна удаляться!',
                     'method' => 'checkAndUpdateStatus',
                     'file' => __FILE__,
                     'line' => __LINE__

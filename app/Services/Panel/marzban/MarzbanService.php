@@ -364,6 +364,11 @@ class MarzbanService
                         $daysOverdue = round(($currentTime - $expireTime) / 86400, 1);
                         $dbDaysOverdue = $finishAtFromDb ? round(($currentTime - $finishAtFromDb) / 86400, 1) : null;
 
+                        // Загружаем связь если не загружена
+                        if (!$keyActivate->relationLoaded('keyActivateUser')) {
+                            $keyActivate->load('keyActivateUser');
+                        }
+                        
                         Log::critical('🚫 СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (срок истек по данным Marzban И БД)', [
                             'source' => 'panel',
                             'action' => 'update_status_to_expired',
@@ -388,6 +393,10 @@ class MarzbanService
                             'module_salesman_id' => $keyActivate->module_salesman_id,
                             'traffic_limit' => $keyActivate->traffic_limit,
                             'server_user_id' => $serverUser->id,
+                            'has_key_activate_user' => $keyActivate->keyActivateUser ? true : false,
+                            'key_activate_user_id' => $keyActivate->keyActivateUser ? $keyActivate->keyActivateUser->id : null,
+                            'key_activate_user_server_user_id' => ($keyActivate->keyActivateUser && $keyActivate->keyActivateUser->serverUser) ? $keyActivate->keyActivateUser->serverUser->id : null,
+                            'warning' => '⚠️ ВАЖНО: При смене статуса на EXPIRED связь keyActivateUser НЕ должна удаляться!',
                             'method' => 'getUserSubscribeInfo',
                             'file' => __FILE__,
                             'line' => __LINE__
@@ -585,7 +594,25 @@ class MarzbanService
 
             // Удаляем связанную запись KeyActivateUser
             if ($serverUser->keyActivateUser) {
-                Log::info('Deleting KeyActivateUser', ['key_activate_user_id' => $serverUser->keyActivateUser->id, 'source' => 'panel']);
+                $keyActivateId = $serverUser->keyActivateUser->key_activate_id;
+                $keyActivate = $serverUser->keyActivateUser->keyActivate;
+                
+                Log::critical('⚠️ УДАЛЕНИЕ СВЯЗИ keyActivateUser (при удалении пользователя сервера)', [
+                    'source' => 'panel',
+                    'action' => 'delete_key_activate_user',
+                    'key_activate_user_id' => $serverUser->keyActivateUser->id,
+                    'key_activate_id' => $keyActivateId,
+                    'server_user_id' => $user_id,
+                    'panel_id' => $panel_id,
+                    'key_status' => $keyActivate ? $keyActivate->status : 'unknown',
+                    'key_status_text' => $keyActivate ? $this->getStatusTextByCode($keyActivate->status) : 'unknown',
+                    'key_user_tg_id' => $keyActivate ? $keyActivate->user_tg_id : null,
+                    'reason' => 'Удаление пользователя сервера через deleteServerUser()',
+                    'method' => 'deleteServerUser',
+                    'file' => __FILE__,
+                    'line' => __LINE__
+                ]);
+                
                 $serverUser->keyActivateUser->delete();
             }
 
@@ -1487,6 +1514,28 @@ class MarzbanService
                 'user_id' => $serverUser_id
             ]);
             throw new RuntimeException('Failed to transfer user: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Получить текстовое представление статуса по коду
+     *
+     * @param int $statusCode
+     * @return string
+     */
+    private function getStatusTextByCode(int $statusCode): string
+    {
+        switch ($statusCode) {
+            case KeyActivate::EXPIRED:
+                return 'EXPIRED (Просрочен)';
+            case KeyActivate::ACTIVE:
+                return 'ACTIVE (Активирован)';
+            case KeyActivate::PAID:
+                return 'PAID (Оплачен)';
+            case KeyActivate::DELETED:
+                return 'DELETED (Удален)';
+            default:
+                return "Unknown ({$statusCode})";
         }
     }
 }
