@@ -218,7 +218,7 @@ class PersonalController extends Controller
                     $q->select('id', 'key_activate_id', 'server_user_id');
                 },
                 'keyActivateUser.serverUser' => function($q) {
-                    $q->select('id', 'panel_id', 'user_id');
+                    $q->select('id', 'panel_id');
                 },
                 'keyActivateUser.serverUser.panel' => function($q) {
                     $q->select('id', 'panel', 'panel_adress', 'auth_token', 'panel_login', 'panel_password', 'token_died_time');
