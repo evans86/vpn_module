@@ -206,7 +206,7 @@ class PersonalController extends Controller
                     $q->select('id', 'salesman_id', 'pack_id');
                 },
                 'packSalesman.pack' => function($q) {
-                    $q->select('id', 'name', 'period', 'price');
+                    $q->select('id', 'title', 'period', 'price');
                 },
                 'packSalesman.salesman' => function($q) {
                     $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id');
