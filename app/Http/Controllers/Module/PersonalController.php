@@ -190,7 +190,11 @@ class PersonalController extends Controller
         $moduleKeysIds = $salesman->moduleKeyActivates()->pluck('id')->toArray();
 
         // Ключи из бота (через pack_salesman) - получаем ID напрямую
-        $botKeysIds = $salesman->botKeyActivates()->pluck('id')->toArray();
+        // Используем select() чтобы явно указать таблицу для избежания неоднозначности
+        $botKeysIds = $salesman->botKeyActivates()
+            ->select('key_activate.id as id')
+            ->pluck('id')
+            ->toArray();
 
         // Объединяем ID
         $allKeysIds = array_unique(array_merge($moduleKeysIds, $botKeysIds));
