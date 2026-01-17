@@ -684,14 +684,33 @@ class KeyActivateService
                 $key->status = KeyActivate::EXPIRED;
                 $statusChanged = true;
 
-                $this->logger->info('Статус ключа обновлен на EXPIRED (истек срок активации для оплаченного ключа)', [
+                $daysOverdue = round(($currentTime - $key->deleted_at) / 86400, 1);
+                $deletedAtDate = date('Y-m-d H:i:s', $key->deleted_at);
+                $currentDate = date('Y-m-d H:i:s', $currentTime);
+
+                $this->logger->critical('🚫 СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (истек срок активации для оплаченного ключа)', [
                     'source' => 'key_activate',
-                    'action' => 'update_status',
+                    'action' => 'update_status_to_expired',
                     'key_id' => $key->id,
+                    'user_tg_id' => $key->user_tg_id,
                     'old_status' => $originalStatus,
+                    'old_status_text' => $this->getStatusTextByCode($originalStatus),
                     'new_status' => $key->status,
+                    'new_status_text' => 'EXPIRED',
+                    'reason' => 'Истек срок активации (deleted_at) для оплаченного ключа',
                     'deleted_at' => $key->deleted_at,
-                    'current_time' => $currentTime
+                    'deleted_at_date' => $deletedAtDate,
+                    'current_time' => $currentTime,
+                    'current_date' => $currentDate,
+                    'days_overdue' => $daysOverdue,
+                    'finish_at' => $key->finish_at,
+                    'finish_at_date' => $key->finish_at ? date('Y-m-d H:i:s', $key->finish_at) : null,
+                    'pack_salesman_id' => $key->pack_salesman_id,
+                    'module_salesman_id' => $key->module_salesman_id,
+                    'traffic_limit' => $key->traffic_limit,
+                    'method' => 'checkAndUpdateStatus',
+                    'file' => __FILE__,
+                    'line' => __LINE__
                 ]);
             }
 
@@ -700,14 +719,36 @@ class KeyActivateService
                 $key->status = KeyActivate::EXPIRED;
                 $statusChanged = true;
 
-                $this->logger->info('Статус ключа обновлен на EXPIRED (истек срок действия активного ключа)', [
+                $daysOverdue = round(($currentTime - $key->finish_at) / 86400, 1);
+                $finishAtDate = date('Y-m-d H:i:s', $key->finish_at);
+                $currentDate = date('Y-m-d H:i:s', $currentTime);
+
+                $this->logger->critical('🚫 СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (истек срок действия активного ключа)', [
                     'source' => 'key_activate',
-                    'action' => 'update_status',
+                    'action' => 'update_status_to_expired',
                     'key_id' => $key->id,
+                    'user_tg_id' => $key->user_tg_id,
                     'old_status' => $originalStatus,
+                    'old_status_text' => $this->getStatusTextByCode($originalStatus),
                     'new_status' => $key->status,
+                    'new_status_text' => 'EXPIRED',
+                    'reason' => 'Истек срок действия (finish_at) для активного ключа',
                     'finish_at' => $key->finish_at,
-                    'current_time' => $currentTime
+                    'finish_at_date' => $finishAtDate,
+                    'current_time' => $currentTime,
+                    'current_date' => $currentDate,
+                    'days_overdue' => $daysOverdue,
+                    'deleted_at' => $key->deleted_at,
+                    'deleted_at_date' => $key->deleted_at ? date('Y-m-d H:i:s', $key->deleted_at) : null,
+                    'pack_salesman_id' => $key->pack_salesman_id,
+                    'module_salesman_id' => $key->module_salesman_id,
+                    'traffic_limit' => $key->traffic_limit,
+                    'has_key_activate_user' => $key->keyActivateUser ? true : false,
+                    'server_user_id' => ($key->keyActivateUser && $key->keyActivateUser->serverUser) ? $key->keyActivateUser->serverUser->id : null,
+                    'panel_id' => ($key->keyActivateUser && $key->keyActivateUser->serverUser) ? $key->keyActivateUser->serverUser->panel_id : null,
+                    'method' => 'checkAndUpdateStatus',
+                    'file' => __FILE__,
+                    'line' => __LINE__
                 ]);
             }
 
@@ -910,6 +951,28 @@ class KeyActivateService
             ]);
 
             throw new RuntimeException("Failed to get key activates: {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * Получить текстовое представление статуса по коду
+     *
+     * @param int $statusCode
+     * @return string
+     */
+    private function getStatusTextByCode(int $statusCode): string
+    {
+        switch ($statusCode) {
+            case KeyActivate::EXPIRED:
+                return 'EXPIRED (Просрочен)';
+            case KeyActivate::ACTIVE:
+                return 'ACTIVE (Активирован)';
+            case KeyActivate::PAID:
+                return 'PAID (Оплачен)';
+            case KeyActivate::DELETED:
+                return 'DELETED (Удален)';
+            default:
+                return "Unknown ({$statusCode})";
         }
     }
 }

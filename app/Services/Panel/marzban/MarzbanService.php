@@ -306,34 +306,91 @@ class MarzbanService
             $keyActivate = $serverUser->keyActivateUser->keyActivate;
             $currentTime = time();
 
+            // КРИТИЧЕСКИ ВАЖНО: Проверяем finish_at из БД ПЕРЕД проверкой expire из Marzban
+            // finish_at - это источник истины для нашего приложения
+            // Если finish_at еще не истек, НЕ деактивируем ключ, даже если Marzban вернул истекший expire
+            $finishAtFromDb = $keyActivate->finish_at;
+            
             // Проверяем реальное истечение срока по timestamp из Marzban
             // Статус может быть 'limited' (превышен трафик) или 'disabled' (временно отключен)
             // но это не значит что ключ просрочен по времени!
             if (isset($userData['expire']) && $userData['expire'] > 0) {
                 $expireTime = $userData['expire'];
+                
+                // КРИТИЧЕСКАЯ ПРОВЕРКА: Если expire из Marzban в миллисекундах, конвертируем в секунды
+                // Marzban может возвращать expire в миллисекундах (если > 2147483647, то это миллисекунды)
+                if ($expireTime > 2147483647) {
+                    $expireTime = intval($expireTime / 1000);
+                    Log::warning('⚠️  Marzban вернул expire в миллисекундах, конвертировали в секунды', [
+                        'key_id' => $keyActivate->id,
+                        'original_expire' => $userData['expire'],
+                        'converted_expire' => $expireTime,
+                        'source' => 'panel'
+                    ]);
+                }
 
-                // Ставим EXPIRED только если срок ДЕЙСТВИТЕЛЬНО истек
+                // Ставим EXPIRED только если:
+                // 1. Срок по Marzban ДЕЙСТВИТЕЛЬНО истек (currentTime > expireTime)
+                // 2. Срок по БД ТОЖЕ истек (finish_at истек или не установлен)
+                // 3. Статус ключа был ACTIVE
                 if ($currentTime > $expireTime) {
-                    // Обновляем только если статус был ACTIVE
-                    if ($keyActivate->status === KeyActivate::ACTIVE) {
+                    // ПРОВЕРЯЕМ finish_at из БД - это источник истины!
+                    $dbExpired = !$finishAtFromDb || ($finishAtFromDb > 0 && $currentTime > $finishAtFromDb);
+                    
+                    if (!$dbExpired) {
+                        // finish_at из БД еще не истек - НЕ деактивируем ключ!
+                        Log::warning('🚫 ПРЕДОТВРАЩЕНА преждевременная деактивация ключа!', [
+                            'key_id' => $keyActivate->id,
+                            'user_id' => $user_id,
+                            'panel_id' => $panel_id,
+                            'marzban_expire' => $expireTime,
+                            'marzban_expire_date' => date('Y-m-d H:i:s', $expireTime),
+                            'db_finish_at' => $finishAtFromDb,
+                            'db_finish_at_date' => $finishAtFromDb ? date('Y-m-d H:i:s', $finishAtFromDb) : null,
+                            'current_time' => $currentTime,
+                            'current_date' => date('Y-m-d H:i:s', $currentTime),
+                            'days_remaining_in_db' => $finishAtFromDb ? ceil(($finishAtFromDb - $currentTime) / 86400) : null,
+                            'reason' => 'finish_at из БД еще не истек, хотя Marzban вернул истекший expire',
+                            'source' => 'panel'
+                        ]);
+                    } elseif ($keyActivate->status === KeyActivate::ACTIVE) {
+                        // И Marzban, и БД показывают истечение - деактивируем
                         $oldStatus = $keyActivate->status;
                         $keyActivate->status = KeyActivate::EXPIRED;
                         $keyActivate->save();
 
                         $info['key_status_updated'] = true; // Отмечаем что статус был обновлен
 
-                        Log::info('✅ Ключ автоматически помечен как EXPIRED (срок истек по данным Marzban)', [
+                        $daysOverdue = round(($currentTime - $expireTime) / 86400, 1);
+                        $dbDaysOverdue = $finishAtFromDb ? round(($currentTime - $finishAtFromDb) / 86400, 1) : null;
+
+                        Log::critical('🚫 СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (срок истек по данным Marzban И БД)', [
+                            'source' => 'panel',
+                            'action' => 'update_status_to_expired',
                             'key_id' => $keyActivate->id,
                             'user_id' => $user_id,
                             'panel_id' => $panel_id,
                             'old_status' => $oldStatus,
+                            'old_status_text' => 'ACTIVE (Активирован)',
                             'new_status' => KeyActivate::EXPIRED,
-                            'expire_time' => $expireTime,
-                            'expire_date' => date('Y-m-d H:i:s', $expireTime),
+                            'new_status_text' => 'EXPIRED (Просрочен)',
+                            'reason' => 'Срок истек по данным Marzban API И по finish_at из БД',
+                            'marzban_expire' => $expireTime,
+                            'marzban_expire_date' => date('Y-m-d H:i:s', $expireTime),
+                            'marzban_days_overdue' => $daysOverdue,
+                            'db_finish_at' => $finishAtFromDb,
+                            'db_finish_at_date' => $finishAtFromDb ? date('Y-m-d H:i:s', $finishAtFromDb) : null,
+                            'db_days_overdue' => $dbDaysOverdue,
                             'current_time' => $currentTime,
                             'current_date' => date('Y-m-d H:i:s', $currentTime),
-                            'difference_days' => round(($currentTime - $expireTime) / 86400, 1),
-                            'source' => 'panel'
+                            'user_tg_id' => $keyActivate->user_tg_id,
+                            'pack_salesman_id' => $keyActivate->pack_salesman_id,
+                            'module_salesman_id' => $keyActivate->module_salesman_id,
+                            'traffic_limit' => $keyActivate->traffic_limit,
+                            'server_user_id' => $serverUser->id,
+                            'method' => 'getUserSubscribeInfo',
+                            'file' => __FILE__,
+                            'line' => __LINE__
                         ]);
                     } else {
                         Log::debug('ℹ️  Ключ уже имеет статус отличный от ACTIVE, пропускаем обновление', [
@@ -344,7 +401,7 @@ class MarzbanService
                         ]);
                     }
                 } else {
-                    Log::debug('⏰ Срок действия ключа еще не истек', [
+                    Log::debug('⏰ Срок действия ключа еще не истек (по данным Marzban)', [
                         'key_id' => $keyActivate->id,
                         'expire_time' => $expireTime,
                         'expire_date' => date('Y-m-d H:i:s', $expireTime),
@@ -358,6 +415,7 @@ class MarzbanService
                     'key_id' => $keyActivate->id ?? 'unknown',
                     'user_id' => $user_id,
                     'expire' => $userData['expire'] ?? 'not set',
+                    'db_finish_at' => $finishAtFromDb,
                     'source' => 'panel'
                 ]);
             }
@@ -1229,6 +1287,12 @@ class MarzbanService
                 'panel_id' => $panel_id,
                 'data_limit' => $data_limit,
                 'expire' => $expire,
+                'expire_date' => date('Y-m-d H:i:s', $expire),
+                'key_finish_at' => $key_activate->finish_at ?? null,
+                'key_finish_at_date' => $key_activate->finish_at ? date('Y-m-d H:i:s', $key_activate->finish_at) : null,
+                'current_time' => time(),
+                'current_date' => date('Y-m-d H:i:s'),
+                'days_until_expire' => ceil(($expire - time()) / 86400),
                 'source' => 'panel',
                 'key_activate_id' => $key_activate_id
             ]);

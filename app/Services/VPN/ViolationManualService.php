@@ -158,11 +158,42 @@ class ViolationManualService
                 }
 
                 // Деактивируем старый ключ
+                $oldStatus = $oldKey->status;
                 $oldKey->status = KeyActivate::EXPIRED;
                 $oldKey->save();
 
                 // Помечаем нарушение как решенное
                 $this->limitMonitorService->resolveViolation($violation);
+
+                $currentTime = time();
+                $currentDate = date('Y-m-d H:i:s', $currentTime);
+
+                Log::critical('🚫 СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (замена ключа из-за нарушения лимита подключений - ручная замена)', [
+                    'source' => 'vpn',
+                    'action' => 'update_status_to_expired',
+                    'key_id' => $oldKey->id,
+                    'user_tg_id' => $oldKey->user_tg_id,
+                    'old_status' => $oldStatus,
+                    'old_status_text' => $this->getStatusTextByCode($oldStatus),
+                    'new_status' => KeyActivate::EXPIRED,
+                    'new_status_text' => 'EXPIRED (Просрочен)',
+                    'reason' => 'Замена ключа из-за нарушения лимита подключений (ручная замена администратором)',
+                    'violation_id' => $violation->id,
+                    'new_key_id' => $newKey->id,
+                    'old_key_finish_at' => $oldKey->finish_at,
+                    'old_key_finish_at_date' => $oldKey->finish_at ? date('Y-m-d H:i:s', $oldKey->finish_at) : null,
+                    'old_key_deleted_at' => $oldKey->deleted_at,
+                    'old_key_deleted_at_date' => $oldKey->deleted_at ? date('Y-m-d H:i:s', $oldKey->deleted_at) : null,
+                    'old_key_traffic_limit' => $oldKey->traffic_limit,
+                    'pack_salesman_id' => $oldKey->pack_salesman_id,
+                    'module_salesman_id' => $oldKey->module_salesman_id,
+                    'current_time' => $currentTime,
+                    'current_date' => $currentDate,
+                    'admin_action' => true,
+                    'method' => 'replaceKeyManually',
+                    'file' => __FILE__,
+                    'line' => __LINE__
+                ]);
 
                 $this->logger->warning('Ключ заменен вручную', [
                     'old_key_id' => $oldKey->id,
@@ -427,8 +458,48 @@ class ViolationManualService
                 }
 
                 // Деактивируем старый ключ
+                $oldStatus = $oldKey->status;
                 $oldKey->status = KeyActivate::EXPIRED;
                 $oldKey->save();
+
+                $currentTimeForLog = time();
+                $currentDateForLog = date('Y-m-d H:i:s', $currentTimeForLog);
+
+                Log::critical('🚫 СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (замена ключа из-за нарушения лимита подключений - автоматическая замена)', [
+                    'source' => 'vpn',
+                    'action' => 'update_status_to_expired',
+                    'key_id' => $oldKey->id,
+                    'user_tg_id' => $oldKey->user_tg_id,
+                    'old_status' => $oldStatus,
+                    'old_status_text' => $this->getStatusTextByCode($oldStatus),
+                    'new_status' => KeyActivate::EXPIRED,
+                    'new_status_text' => 'EXPIRED (Просрочен)',
+                    'reason' => 'Замена ключа из-за нарушения лимита подключений (автоматическая замена)',
+                    'violation_id' => $violation->id,
+                    'new_key_id' => $newKey->id,
+                    'old_key_finish_at' => $oldKey->finish_at,
+                    'old_key_finish_at_date' => $oldKey->finish_at ? date('Y-m-d H:i:s', $oldKey->finish_at) : null,
+                    'old_key_deleted_at' => $oldKey->deleted_at,
+                    'old_key_deleted_at_date' => $oldKey->deleted_at ? date('Y-m-d H:i:s', $oldKey->deleted_at) : null,
+                    'old_key_traffic_limit' => $oldKey->traffic_limit,
+                    'old_key_remaining_traffic' => $remainingTraffic,
+                    'old_key_remaining_time_seconds' => $remainingTime,
+                    'old_key_remaining_time_days' => round($remainingTime / 86400, 1),
+                    'new_key_finish_at' => $newFinishAt,
+                    'new_key_finish_at_date' => date('Y-m-d H:i:s', $newFinishAt),
+                    'new_key_traffic_limit' => $remainingTraffic,
+                    'pack_salesman_id' => $oldKey->pack_salesman_id,
+                    'module_salesman_id' => $oldKey->module_salesman_id,
+                    'current_time' => $currentTimeForLog,
+                    'current_date' => $currentDateForLog,
+                    'has_server_user' => $oldKey->keyActivateUser && $oldKey->keyActivateUser->serverUser ? true : false,
+                    'server_user_id' => ($oldKey->keyActivateUser && $oldKey->keyActivateUser->serverUser) ? $oldKey->keyActivateUser->serverUser->id : null,
+                    'panel_id' => ($oldKey->keyActivateUser && $oldKey->keyActivateUser->serverUser) ? $oldKey->keyActivateUser->serverUser->panel_id : null,
+                    'admin_action' => false,
+                    'method' => 'replaceKeyAutomatically',
+                    'file' => __FILE__,
+                    'line' => __LINE__
+                ]);
 
                 // Удаляем пользователя из панели Marzban для старого ключа
                 // ВАЖНО: Удаляем только из панели, не из БД (чтобы сохранить историю)
@@ -557,6 +628,28 @@ class ViolationManualService
                 'error' => $e->getMessage()
             ]);
             return false;
+        }
+    }
+
+    /**
+     * Получить текстовое представление статуса по коду
+     *
+     * @param int $statusCode
+     * @return string
+     */
+    private function getStatusTextByCode(int $statusCode): string
+    {
+        switch ($statusCode) {
+            case KeyActivate::EXPIRED:
+                return 'EXPIRED (Просрочен)';
+            case KeyActivate::ACTIVE:
+                return 'ACTIVE (Активирован)';
+            case KeyActivate::PAID:
+                return 'PAID (Оплачен)';
+            case KeyActivate::DELETED:
+                return 'DELETED (Удален)';
+            default:
+                return "Unknown ({$statusCode})";
         }
     }
 }
