@@ -1283,6 +1283,12 @@ class MarzbanService
     public function addServerUser(int $panel_id, int $userTgId, int $data_limit, int $expire, string $key_activate_id, array $options = []): ServerUser
     {
         try {
+            // Получаем key_activate ДО использования в логе
+            /**
+             * @var KeyActivate $key_activate
+             */
+            $key_activate = KeyActivate::query()->where('id', $key_activate_id)->firstOrFail();
+
             Log::info('Creating server user', [
                 'panel_id' => $panel_id,
                 'data_limit' => $data_limit,
@@ -1301,11 +1307,6 @@ class MarzbanService
             if (!$panel->server) {
                 throw new RuntimeException('Server not found for panel');
             }
-
-            /**
-             * @var KeyActivate $key_activate
-             */
-            $key_activate = KeyActivate::query()->where('id', $key_activate_id)->firstOrFail();
 
             $marzbanApi = new MarzbanAPI($panel->api_address);
             $userId = Str::uuid();
