@@ -186,11 +186,14 @@ class PersonalController extends Controller
         $salesman = Auth::guard('salesman')->user();
 //                $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
-        // Ключи из модуля (прямая связь)
-        $moduleKeysQuery = $salesman->moduleKeyActivates();
+        // Ключи из модуля (прямая связь) - получаем ID напрямую
+        $moduleKeysIds = $salesman->moduleKeyActivates()->pluck('id')->toArray();
 
-        // Ключи из бота (через pack_salesman)
-        $botKeysQuery = $salesman->botKeyActivates();
+        // Ключи из бота (через pack_salesman) - получаем ID напрямую
+        $botKeysIds = $salesman->botKeyActivates()->pluck('id')->toArray();
+
+        // Объединяем ID
+        $allKeysIds = array_unique(array_merge($moduleKeysIds, $botKeysIds));
 
         // Объединяем два запроса
         $query = KeyActivate::query()
@@ -218,10 +221,7 @@ class PersonalController extends Controller
                 },
                 'user'
             ])
-            ->where(function ($q) use ($moduleKeysQuery, $botKeysQuery) {
-                $q->whereIn('id', $moduleKeysQuery->select('id'))
-                    ->orWhereIn('id', $botKeysQuery->select('id'));
-            });
+            ->whereIn('id', $allKeysIds);
 
         // Применяем фильтры
         if ($request->has('key_search') && !empty($request->key_search)) {
