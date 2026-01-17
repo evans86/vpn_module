@@ -195,38 +195,55 @@ class PersonalController extends Controller
         // Объединяем два запроса
         $query = KeyActivate::query()
             ->with([
-                'packSalesman.pack',
-                'packSalesman.salesman',
-                'moduleSalesman',
-                'keyActivateUser.serverUser.panel',
+                'packSalesman' => function($q) {
+                    $q->select('id', 'salesman_id', 'pack_id');
+                },
+                'packSalesman.pack' => function($q) {
+                    $q->select('id', 'name', 'period', 'price');
+                },
+                'packSalesman.salesman' => function($q) {
+                    $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id');
+                },
+                'moduleSalesman' => function($q) {
+                    $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id');
+                },
+                'keyActivateUser' => function($q) {
+                    $q->select('id', 'key_activate_id', 'server_user_id');
+                },
+                'keyActivateUser.serverUser' => function($q) {
+                    $q->select('id', 'panel_id', 'user_id');
+                },
+                'keyActivateUser.serverUser.panel' => function($q) {
+                    $q->select('id', 'panel', 'panel_adress', 'auth_token', 'panel_login', 'panel_password', 'token_died_time');
+                },
                 'user'
             ])
             ->where(function ($q) use ($moduleKeysQuery, $botKeysQuery) {
-                $q->whereIn('key_activate.id', $moduleKeysQuery->select('key_activate.id'))
-                    ->orWhereIn('key_activate.id', $botKeysQuery->select('key_activate.id'));
+                $q->whereIn('id', $moduleKeysQuery->select('id'))
+                    ->orWhereIn('id', $botKeysQuery->select('id'));
             });
 
         // Применяем фильтры
         if ($request->has('key_search') && !empty($request->key_search)) {
-            $query->where('key_activate.id', 'like', '%' . $request->key_search . '%');
+            $query->where('id', 'like', '%' . $request->key_search . '%');
         }
 
         if ($request->has('telegram_search') && !empty($request->telegram_search)) {
-            $query->where('key_activate.user_tg_id', 'like', '%' . $request->telegram_search . '%');
+            $query->where('user_tg_id', 'like', '%' . $request->telegram_search . '%');
         }
 
         if ($request->has('status_filter') && !empty($request->status_filter)) {
-            $query->where('key_activate.status', $request->status_filter);
+            $query->where('status', $request->status_filter);
         }
 
         if ($request->has('expiry_filter') && !empty($request->expiry_filter)) {
             if ($request->expiry_filter === 'active') {
                 $query->where(function ($q) {
-                    $q->whereNull('key_activate.finish_at')
-                        ->orWhere('key_activate.finish_at', '>', Carbon::now()->timestamp);
+                    $q->whereNull('finish_at')
+                        ->orWhere('finish_at', '>', Carbon::now()->timestamp);
                 });
             } elseif ($request->expiry_filter === 'expired') {
-                $query->where('key_activate.finish_at', '<=', Carbon::now()->timestamp);
+                $query->where('finish_at', '<=', Carbon::now()->timestamp);
             }
         }
 
@@ -238,7 +255,7 @@ class PersonalController extends Controller
             }
         }
 
-        $keys = $query->orderBy('key_activate.created_at', 'desc')->paginate(15);
+        $keys = $query->orderBy('created_at', 'desc')->paginate(15);
 
         $statuses = [
             '' => 'Все статусы',
