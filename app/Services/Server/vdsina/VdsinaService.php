@@ -75,6 +75,11 @@ class VdsinaService
             }
 
             // 3. Проверяем доступность тарифных планов
+            // Требуемые характеристики: 4 GB RAM, 2 cores, 80 GB storage
+            $requiredRam = 4; // GB
+            $requiredCpu = 2; // cores
+            $requiredDisk = 80; // GB
+
             // Сначала получаем список групп серверов
             $serverGroups = $this->vdsinaApi->getServerGroup();
             Log::info('VDSina server groups received', [
@@ -86,42 +91,122 @@ class VdsinaService
                 throw new RuntimeException('Invalid server group response from VDSina');
             }
 
-            // Пытаемся найти план в группе 2, если не найдем - используем первую доступную группу
+            // Функция для проверки соответствия плана требованиям
+            $matchesRequirements = function($plan) use ($requiredRam, $requiredCpu, $requiredDisk) {
+                // Проверяем различные возможные поля в ответе API
+                $ram = null;
+                $cpu = null;
+                $disk = null;
+
+                // Пробуем разные варианты названий полей
+                if (isset($plan['ram'])) {
+                    $ram = $plan['ram'];
+                } elseif (isset($plan['memory'])) {
+                    $ram = $plan['memory'];
+                } elseif (isset($plan['ram_gb'])) {
+                    $ram = $plan['ram_gb'];
+                }
+
+                if (isset($plan['cpu'])) {
+                    $cpu = $plan['cpu'];
+                } elseif (isset($plan['cores'])) {
+                    $cpu = $plan['cores'];
+                } elseif (isset($plan['cpu_cores'])) {
+                    $cpu = $plan['cpu_cores'];
+                }
+
+                if (isset($plan['disk'])) {
+                    $disk = $plan['disk'];
+                } elseif (isset($plan['storage'])) {
+                    $disk = $plan['storage'];
+                } elseif (isset($plan['disk_gb'])) {
+                    $disk = $plan['disk_gb'];
+                } elseif (isset($plan['storage_gb'])) {
+                    $disk = $plan['storage_gb'];
+                }
+
+                // Если значения в мегабайтах, конвертируем в гигабайты
+                if ($ram && $ram > 1000) {
+                    $ram = round($ram / 1024, 1);
+                }
+                if ($disk && $disk > 1000) {
+                    $disk = round($disk / 1024, 1);
+                }
+
+                // Требуем точного соответствия всех характеристик (если они доступны)
+                // Если какое-то поле отсутствует, считаем что план не подходит
+                $matches = false;
+                if ($ram !== null && $cpu !== null && $disk !== null) {
+                    // Точное соответствие с небольшим допуском для округления
+                    $matches = abs($ram - $requiredRam) < 0.5 &&
+                              $cpu == $requiredCpu &&
+                              abs($disk - $requiredDisk) < 0.5;
+                }
+
+                return [
+                    'matches' => $matches,
+                    'ram' => $ram,
+                    'cpu' => $cpu,
+                    'disk' => $disk,
+                    'has_all_fields' => $ram !== null && $cpu !== null && $disk !== null
+                ];
+            };
+
             $serverPlan = null;
-            $serverGroupId = 2; // Пробуем сначала группу 2
-            
-            // Пробуем найти план в группе 2
-            $plans = $this->vdsinaApi->getServerPlan($serverGroupId);
+            $serverGroupId = null;
+
+            // Пробуем сначала группу 2
+            $plans = $this->vdsinaApi->getServerPlan(2);
             Log::info('VDSina server plans received', [
-                'server_group_id' => $serverGroupId,
+                'server_group_id' => 2,
                 'plans' => $plans,
                 'source' => 'server'
             ]);
 
             if (isset($plans['data']) && is_array($plans['data']) && !empty($plans['data'])) {
-                // Ищем базовый тарифный план (id = 3)
+                // Сначала ищем план с ID = 3 (старый способ)
                 foreach ($plans['data'] as $plan) {
                     if (isset($plan['id']) && $plan['id'] == 3) {
-                        $serverPlan = $plan;
-                        break;
+                        $check = $matchesRequirements($plan);
+                        if ($check['matches']) {
+                            $serverPlan = $plan;
+                            $serverGroupId = 2;
+                            Log::info('Found plan with ID=3 matching requirements', [
+                                'plan_id' => $plan['id'],
+                                'ram' => $check['ram'],
+                                'cpu' => $check['cpu'],
+                                'disk' => $check['disk'],
+                                'source' => 'server'
+                            ]);
+                            break;
+                        }
                     }
                 }
 
-                // Если не нашли план с ID = 3, используем первый доступный план
-                if (!$serverPlan && !empty($plans['data'])) {
-                    $serverPlan = $plans['data'][0];
-                    Log::warning('Basic server plan (ID=3) not found, using first available plan', [
-                        'server_group_id' => $serverGroupId,
-                        'used_plan_id' => $serverPlan['id'] ?? 'unknown',
-                        'available_plans' => array_map(function($p) { return $p['id'] ?? 'unknown'; }, $plans['data']),
-                        'source' => 'server'
-                    ]);
+                // Если не нашли план с ID = 3, ищем по характеристикам
+                if (!$serverPlan) {
+                    foreach ($plans['data'] as $plan) {
+                        $check = $matchesRequirements($plan);
+                        if ($check['matches']) {
+                            $serverPlan = $plan;
+                            $serverGroupId = 2;
+                            Log::info('Found plan matching requirements by characteristics', [
+                                'plan_id' => $plan['id'] ?? 'unknown',
+                                'plan_name' => $plan['name'] ?? 'unknown',
+                                'ram' => $check['ram'],
+                                'cpu' => $check['cpu'],
+                                'disk' => $check['disk'],
+                                'source' => 'server'
+                            ]);
+                            break;
+                        }
+                    }
                 }
             }
 
             // Если не нашли план в группе 2, пробуем другие группы
             if (!$serverPlan) {
-                Log::warning('No plans found in server group 2, trying other groups', [
+                Log::warning('No matching plan found in server group 2, trying other groups', [
                     'source' => 'server'
                 ]);
 
@@ -138,42 +223,43 @@ class VdsinaService
                     ]);
 
                     if (isset($groupPlans['data']) && is_array($groupPlans['data']) && !empty($groupPlans['data'])) {
-                        // Ищем план с ID = 3
                         foreach ($groupPlans['data'] as $plan) {
-                            if (isset($plan['id']) && $plan['id'] == 3) {
+                            $check = $matchesRequirements($plan);
+                            if ($check['matches']) {
                                 $serverPlan = $plan;
                                 $serverGroupId = $group['id'];
+                                Log::info('Found matching plan in alternative group', [
+                                    'group_id' => $group['id'],
+                                    'plan_id' => $plan['id'] ?? 'unknown',
+                                    'plan_name' => $plan['name'] ?? 'unknown',
+                                    'ram' => $check['ram'],
+                                    'cpu' => $check['cpu'],
+                                    'disk' => $check['disk'],
+                                    'source' => 'server'
+                                ]);
                                 break 2; // Выходим из обоих циклов
                             }
-                        }
-
-                        // Если не нашли план с ID = 3, используем первый доступный
-                        if (!$serverPlan) {
-                            $serverPlan = $groupPlans['data'][0];
-                            $serverGroupId = $group['id'];
-                            Log::warning('Using first available plan from alternative group', [
-                                'server_group_id' => $serverGroupId,
-                                'used_plan_id' => $serverPlan['id'] ?? 'unknown',
-                                'source' => 'server'
-                            ]);
-                            break;
                         }
                     }
                 }
             }
 
             if (!$serverPlan) {
-                Log::error('No server plans found in any group', [
+                Log::error('No server plan matching requirements found', [
+                    'required_ram' => $requiredRam . ' GB',
+                    'required_cpu' => $requiredCpu . ' cores',
+                    'required_disk' => $requiredDisk . ' GB',
                     'available_groups' => array_map(function($g) { return $g['id'] ?? 'unknown'; }, $serverGroups['data']),
                     'source' => 'server'
                 ]);
-                throw new RuntimeException('Basic server plan not found in VDSina');
+                throw new RuntimeException('Server plan with required characteristics (4 GB RAM, 2 cores, 80 GB storage) not found in VDSina');
             }
 
             Log::info('Server plan selected', [
                 'plan_id' => $serverPlan['id'] ?? 'unknown',
                 'plan_name' => $serverPlan['name'] ?? 'unknown',
                 'server_group_id' => $serverGroupId,
+                'plan_details' => $serverPlan,
                 'source' => 'server'
             ]);
 
