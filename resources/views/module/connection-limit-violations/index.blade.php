@@ -179,7 +179,7 @@
                 name="search" 
                 label="Поиск" 
                 value="{{ request('search') }}" 
-                placeholder="ID ключа или пользователя" />
+                placeholder="ID нарушения, ключа (старого/нового) или пользователя" />
         </x-admin.filter-form>
 
         <!-- Таблица нарушений -->
@@ -208,6 +208,7 @@
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" width="30">
                                         <input type="checkbox" id="selectAll" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
                                     </th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Время</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ключ</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Пользователь</th>
@@ -237,6 +238,16 @@
                                                name="violation_ids[]" 
                                                value="{{ $violation->id }}"
                                                class="violation-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        <div class="font-mono text-xs text-gray-600">
+                                            #{{ $violation->id }}
+                                        </div>
+                                        <button class="mt-1 text-gray-400 hover:text-gray-600 copy-violation-id-btn"
+                                                data-clipboard-text="{{ $violation->id }}"
+                                                title="Копировать ID нарушения">
+                                            <i class="fas fa-copy text-xs"></i>
+                                        </button>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         {{ $violation->created_at->format('d.m.Y H:i') }}
@@ -635,6 +646,25 @@
             });
             clipboard.on('error', function (e) {
                 console.error('Ошибка копирования:', e);
+            });
+
+            // Копирование ID нарушения
+            const clipboardViolation = new ClipboardJS('.copy-violation-id-btn');
+            clipboardViolation.on('success', function (e) {
+                const originalTitle = e.trigger.getAttribute('title');
+                const icon = e.trigger.querySelector('i');
+                const originalClass = icon.className;
+                icon.className = 'fas fa-check text-green-600';
+                e.trigger.setAttribute('title', 'Скопировано!');
+                setTimeout(() => {
+                    icon.className = originalClass;
+                    e.trigger.setAttribute('title', originalTitle);
+                }, 2000);
+                e.clearSelection();
+                showToast('ID нарушения скопирован', 'success');
+            });
+            clipboardViolation.on('error', function (e) {
+                console.error('Ошибка копирования ID нарушения:', e);
             });
 
             // Копирование IP-адресов

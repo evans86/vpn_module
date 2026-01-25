@@ -62,13 +62,16 @@ class ConnectionLimitViolationController extends Controller
             $query->whereDate('created_at', '<=', $request->date_to);
         }
 
-        // Поиск по ID ключа или пользователя
+        // Поиск по ID нарушения, ID ключа (старого или нового), или пользователя
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
-                $q->where('user_tg_id', 'LIKE', "%{$search}%")
+                $q->where('id', 'LIKE', "%{$search}%") // Поиск по ID нарушения
+                    ->orWhere('user_tg_id', 'LIKE', "%{$search}%") // Поиск по ID пользователя
+                    ->orWhere('key_activate_id', 'LIKE', "%{$search}%") // Поиск по старому ключу напрямую
+                    ->orWhere('replaced_key_id', 'LIKE', "%{$search}%") // Поиск по новому ключу (замененному)
                     ->orWhereHas('keyActivate', function($q) use ($search) {
-                        $q->where('id', 'LIKE', "%{$search}%");
+                        $q->where('id', 'LIKE', "%{$search}%"); // Поиск по старому ключу через связь
                     });
             });
         }

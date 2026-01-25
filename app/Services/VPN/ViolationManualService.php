@@ -384,9 +384,32 @@ class ViolationManualService
     public function reissueKey(ConnectionLimitViolation $violation): ?KeyActivate
     {
         try {
+            // Проверяем, что нарушение существует в БД
+            if (!$violation->exists) {
+                throw new \Exception("Нарушение с ID {$violation->id} не существует в БД");
+            }
+
+            // Перезагружаем нарушение из БД для проверки актуальности
+            $violation->refresh();
+            if (!$violation->exists) {
+                throw new \Exception("Нарушение с ID {$violation->id} было удалено из БД");
+            }
+
             // Используем DB::transaction() для автоматического rollback при ошибках
             return DB::transaction(function () use ($violation) {
+                // Еще раз проверяем внутри транзакции
+                $violation->refresh();
+                if (!$violation->exists) {
+                    throw new \Exception("Нарушение с ID {$violation->id} не существует в БД внутри транзакции");
+                }
+
                 $oldKey = $violation->keyActivate;
+                
+                // Проверяем, что ключ существует
+                if (!$oldKey) {
+                    throw new \Exception("Ключ с ID {$violation->key_activate_id} не найден для нарушения {$violation->id}");
+                }
+                
                 $userTgId = $oldKey->user_tg_id;
 
                 if (!$userTgId) {
@@ -464,47 +487,6 @@ class ViolationManualService
                 $oldKey->status = KeyActivate::EXPIRED;
                 $oldKey->save();
 
-                $currentTimeForLog = time();
-                $currentDateForLog = date('Y-m-d H:i:s', $currentTimeForLog);
-
-                Log::critical("🚫 [KEY: {$oldKey->id}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (замена ключа из-за нарушения лимита подключений - автоматическая замена) | KEY_ID: {$oldKey->id} | {$oldKey->id}", [
-                    'source' => 'vpn',
-                    'action' => 'update_status_to_expired',
-                    'key_id' => $oldKey->id,
-                    'search_key' => $oldKey->id, // Для быстрого поиска
-                    'search_tag' => 'KEY_EXPIRED',
-                    'user_tg_id' => $oldKey->user_tg_id,
-                    'old_status' => $oldStatus,
-                    'old_status_text' => $this->getStatusTextByCode($oldStatus),
-                    'new_status' => KeyActivate::EXPIRED,
-                    'new_status_text' => 'EXPIRED (Просрочен)',
-                    'reason' => 'Замена ключа из-за нарушения лимита подключений (автоматическая замена)',
-                    'violation_id' => $violation->id,
-                    'new_key_id' => $newKey->id,
-                    'old_key_finish_at' => $oldKey->finish_at,
-                    'old_key_finish_at_date' => $oldKey->finish_at ? date('Y-m-d H:i:s', $oldKey->finish_at) : null,
-                    'old_key_deleted_at' => $oldKey->deleted_at,
-                    'old_key_deleted_at_date' => $oldKey->deleted_at ? date('Y-m-d H:i:s', $oldKey->deleted_at) : null,
-                    'old_key_traffic_limit' => $oldKey->traffic_limit,
-                    'old_key_remaining_traffic' => $remainingTraffic,
-                    'old_key_remaining_time_seconds' => $remainingTime,
-                    'old_key_remaining_time_days' => round($remainingTime / 86400, 1),
-                    'new_key_finish_at' => $newFinishAt,
-                    'new_key_finish_at_date' => date('Y-m-d H:i:s', $newFinishAt),
-                    'new_key_traffic_limit' => $remainingTraffic,
-                    'pack_salesman_id' => $oldKey->pack_salesman_id,
-                    'module_salesman_id' => $oldKey->module_salesman_id,
-                    'current_time' => $currentTimeForLog,
-                    'current_date' => $currentDateForLog,
-                    'has_server_user' => $oldKey->keyActivateUser && $oldKey->keyActivateUser->serverUser ? true : false,
-                    'server_user_id' => ($oldKey->keyActivateUser && $oldKey->keyActivateUser->serverUser) ? $oldKey->keyActivateUser->serverUser->id : null,
-                    'panel_id' => ($oldKey->keyActivateUser && $oldKey->keyActivateUser->serverUser) ? $oldKey->keyActivateUser->serverUser->panel_id : null,
-                    'admin_action' => false,
-                    'method' => 'replaceKeyAutomatically',
-                    'file' => __FILE__,
-                    'line' => __LINE__
-                ]);
-
                 // Удаляем пользователя из панели Marzban для старого ключа
                 // ВАЖНО: Удаляем только из панели, не из БД (чтобы сохранить историю)
                 try {
@@ -550,12 +532,94 @@ class ViolationManualService
                 // violation_count остается как есть - это история нарушений
                 $violation->status = ConnectionLimitViolation::STATUS_RESOLVED;
                 $violation->resolved_at = now();
-                $violation->save();
+                $violationSaved = $violation->save();
+
+                // Проверяем, что нарушение действительно сохранилось
+                if (!$violationSaved) {
+                    throw new \Exception('Не удалось сохранить информацию о замене ключа в нарушении');
+                }
+
+                // Перезагружаем нарушение из БД для проверки (ВАЖНО: внутри транзакции)
+                $violation->refresh();
+                if (!$violation->exists) {
+                    throw new \Exception('Нарушение не найдено в БД после сохранения');
+                }
+
+                // Сохраняем ID нарушения и другие данные для логирования
+                $violationId = $violation->id;
+                $oldKeyId = $oldKey->id;
+                $newKeyId = $newKey->id;
+                $packSalesmanId = $oldKey->pack_salesman_id;
+                $moduleSalesmanId = $oldKey->module_salesman_id;
+                $oldKeyFinishAt = $oldKey->finish_at;
+                $oldKeyDeletedAt = $oldKey->deleted_at;
+                $oldKeyTrafficLimit = $oldKey->traffic_limit;
+                $hasServerUser = $oldKey->keyActivateUser && $oldKey->keyActivateUser->serverUser ? true : false;
+                $serverUserId = ($oldKey->keyActivateUser && $oldKey->keyActivateUser->serverUser) ? $oldKey->keyActivateUser->serverUser->id : null;
+                $panelId = ($oldKey->keyActivateUser && $oldKey->keyActivateUser->serverUser) ? $oldKey->keyActivateUser->serverUser->panel_id : null;
+
+                // Коммитим транзакцию ПЕРЕД логированием
+                // Это гарантирует, что если транзакция откатится, лог не будет записан
+                // (хотя на самом деле логи пишутся вне транзакции, но мы хотя бы убедимся что данные сохранены)
+
+                $currentTimeForLog = time();
+                $currentDateForLog = date('Y-m-d H:i:s', $currentTimeForLog);
+
+                // Проверяем нарушение еще раз после коммита (если транзакция уже закоммичена)
+                // Но так как мы внутри транзакции, проверяем еще раз перед логированием
+                $violationExists = ConnectionLimitViolation::where('id', $violationId)->exists();
+                if (!$violationExists) {
+                    throw new \Exception("Нарушение с ID {$violationId} не найдено в БД перед логированием");
+                }
+
+                // Логируем ПОСЛЕ успешного сохранения нарушения и проверки его существования
+                Log::critical("🚫 [KEY: {$oldKeyId}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (замена ключа из-за нарушения лимита подключений - автоматическая замена) | KEY_ID: {$oldKeyId} | {$oldKeyId}", [
+                    'source' => 'vpn',
+                    'action' => 'update_status_to_expired',
+                    'key_id' => $oldKey->id,
+                    'search_key' => $oldKey->id, // Для быстрого поиска
+                    'search_tag' => 'KEY_EXPIRED',
+                    'user_tg_id' => $oldKey->user_tg_id,
+                    'old_status' => $oldStatus,
+                    'old_status_text' => $this->getStatusTextByCode($oldStatus),
+                    'new_status' => KeyActivate::EXPIRED,
+                    'new_status_text' => 'EXPIRED (Просрочен)',
+                    'reason' => 'Замена ключа из-за нарушения лимита подключений (автоматическая замена)',
+                    'violation_id' => $violationId,
+                    'violation_exists' => $violationExists, // Проверка что нарушение существует в БД
+                    'violation_status' => $violation->status,
+                    'violation_key_replaced_at' => $violation->key_replaced_at ? $violation->key_replaced_at->format('Y-m-d H:i:s') : null,
+                    'violation_replaced_key_id' => $violation->replaced_key_id,
+                    'new_key_id' => $newKeyId,
+                    'old_key_finish_at' => $oldKeyFinishAt,
+                    'old_key_finish_at_date' => $oldKeyFinishAt ? date('Y-m-d H:i:s', $oldKeyFinishAt) : null,
+                    'old_key_deleted_at' => $oldKeyDeletedAt,
+                    'old_key_deleted_at_date' => $oldKeyDeletedAt ? date('Y-m-d H:i:s', $oldKeyDeletedAt) : null,
+                    'old_key_traffic_limit' => $oldKeyTrafficLimit,
+                    'old_key_remaining_traffic' => $remainingTraffic,
+                    'old_key_remaining_time_seconds' => $remainingTime,
+                    'old_key_remaining_time_days' => round($remainingTime / 86400, 1),
+                    'new_key_finish_at' => $newFinishAt,
+                    'new_key_finish_at_date' => date('Y-m-d H:i:s', $newFinishAt),
+                    'new_key_traffic_limit' => $remainingTraffic,
+                    'pack_salesman_id' => $packSalesmanId,
+                    'module_salesman_id' => $moduleSalesmanId,
+                    'current_time' => $currentTimeForLog,
+                    'current_date' => $currentDateForLog,
+                    'has_server_user' => $hasServerUser,
+                    'server_user_id' => $serverUserId,
+                    'panel_id' => $panelId,
+                    'admin_action' => false,
+                    'method' => 'replaceKeyAutomatically',
+                    'file' => __FILE__,
+                    'line' => __LINE__
+                ]);
 
                 $this->logger->warning('Ключ перевыпущен с учетом оставшегося времени и трафика', [
                     'old_key_id' => $oldKey->id,
                     'new_key_id' => $newKey->id,
                     'violation_id' => $violation->id,
+                    'violation_exists' => $violation->exists,
                     'user_tg_id' => $userTgId,
                     'old_finish_at' => $oldKey->finish_at,
                     'new_finish_at' => $newFinishAt,
@@ -570,8 +634,19 @@ class ViolationManualService
                 return $newKey;
             });
         } catch (\Exception $e) {
+            // Проверяем, существует ли нарушение в БД
+            $violationExists = false;
+            $violationId = $violation->id ?? 'unknown';
+            try {
+                $violationExists = ConnectionLimitViolation::where('id', $violationId)->exists();
+            } catch (\Exception $checkException) {
+                // Игнорируем ошибку проверки
+            }
+
             Log::error('Ошибка перевыпуска ключа', [
-                'violation_id' => $violation->id,
+                'violation_id' => $violationId,
+                'violation_exists_in_db' => $violationExists,
+                'violation_key_activate_id' => $violation->key_activate_id ?? null,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'source' => 'vpn'
