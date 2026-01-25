@@ -97,6 +97,14 @@ class VpnConfigController extends Controller
                 }
             ]);
 
+            // Проверяем, был ли ключ заменен из-за нарушения (даже если ключ просрочен)
+            // Это нужно проверить ДО проверки keyActivateUser, чтобы показать информацию о замене
+            $replacedViolation = \App\Models\VPN\ConnectionLimitViolation::where('key_activate_id', $key_activate_id)
+                ->whereNotNull('key_replaced_at')
+                ->whereNotNull('replaced_key_id')
+                ->orderBy('key_replaced_at', 'desc')
+                ->first();
+
             // Ищем KeyActivateUser напрямую через репозиторий по key_activate_id
             $keyActivateUser = $this->keyActivateUserRepository->findByKeyActivateIdWithRelations($key_activate_id);
 
@@ -106,6 +114,26 @@ class VpnConfigController extends Controller
                     'key_activate_id' => $key_activate_id,
                     'source' => 'vpn'
                 ]);
+
+                // Если ключ был заменен, показываем информацию о замене даже без keyActivateUser
+                if ($replacedViolation && $replacedViolation->replaced_key_id) {
+                    $newKey = $this->keyActivateRepository->findById($replacedViolation->replaced_key_id);
+                    
+                    if ($newKey) {
+                        Log::info('Key was replaced, showing replacement info even without keyActivateUser', [
+                            'old_key_id' => $key_activate_id,
+                            'new_key_id' => $replacedViolation->replaced_key_id,
+                            'violation_id' => $replacedViolation->id,
+                            'source' => 'vpn'
+                        ]);
+
+                        // Показываем страницу ошибки с информацией о новом ключе
+                        return response()->view('vpn.error', [
+                            'message' => 'Ваш ключ доступа был заменен из-за нарушения лимита подключений. Пожалуйста, используйте новый ключ.',
+                            'replacedKeyId' => $replacedViolation->replaced_key_id
+                        ]);
+                    }
+                }
 
                 if (app()->environment('local') && config('app.debug', false)) {
                     return $this->showDemoPage($key_activate_id);

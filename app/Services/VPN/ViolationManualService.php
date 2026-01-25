@@ -5,6 +5,7 @@ namespace App\Services\VPN;
 use App\Models\VPN\ConnectionLimitViolation;
 use App\Models\KeyActivate\KeyActivate;
 use App\Services\Key\KeyActivateService;
+use App\Services\External\MarzbanAPI;
 use App\Logging\DatabaseLogger;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
@@ -487,44 +488,8 @@ class ViolationManualService
                 $oldKey->status = KeyActivate::EXPIRED;
                 $oldKey->save();
 
-                // Удаляем пользователя из панели Marzban для старого ключа
-                // ВАЖНО: Удаляем только из панели, не из БД (чтобы сохранить историю)
-                try {
-                    if ($oldKey->keyActivateUser && $oldKey->keyActivateUser->serverUser) {
-                        $serverUser = $oldKey->keyActivateUser->serverUser;
-                        if ($serverUser->panel) {
-                            // Используем стратегию для работы с панелью (независимо от типа)
-                            $panel = $serverUser->panel;
-                            $panelStrategyFactory = new \App\Services\Panel\PanelStrategyFactory();
-                            $panelStrategy = $panelStrategyFactory->create($panel->panel);
-                            
-                            // Обновляем токен через стратегию
-                            $panel = $panelStrategy->updateToken($panel->id);
-                            
-                            // Удаляем пользователя через стратегию
-                            $panelStrategy->deleteServerUser($panel->id, $serverUser->id);
-                            
-                            $this->logger->info('Пользователь удален из панели при перевыпуске ключа', [
-                                'old_key_id' => $oldKey->id,
-                                'new_key_id' => $newKey->id,
-                                'server_user_id' => $serverUser->id,
-                                'panel_id' => $panel->id,
-                                'panel_type' => $panel->panel
-                            ]);
-                        }
-                    }
-                } catch (\Exception $e) {
-                    // Логируем ошибку, но не прерываем процесс перевыпуска
-                    Log::error('Ошибка при удалении пользователя из панели при перевыпуске ключа', [
-                        'old_key_id' => $oldKey->id,
-                        'new_key_id' => $newKey->id,
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString(),
-                        'source' => 'vpn'
-                    ]);
-                    // Не выбрасываем исключение - перевыпуск ключа должен продолжиться
-                }
-
+                // КРИТИЧЕСКИ ВАЖНО: Сохраняем нарушение ДО удаления пользователя сервера!
+                // Иначе нарушение будет удалено каскадно при удалении server_user
                 // Обновляем информацию о замене ключа в нарушении
                 // НЕ сбрасываем violation_count - сохраняем историю для отображения
                 $violation->key_replaced_at = now();
@@ -543,6 +508,86 @@ class ViolationManualService
                 $violation->refresh();
                 if (!$violation->exists) {
                     throw new \Exception('Нарушение не найдено в БД после сохранения');
+                }
+
+                // Удаляем пользователя из панели Marzban для старого ключа
+                // ВАЖНО: Удаляем только из панели, НЕ из БД (чтобы сохранить историю и нарушение)
+                // НО: deleteServerUser удаляет и из БД тоже, поэтому нужно быть осторожным
+                try {
+                    if ($oldKey->keyActivateUser && $oldKey->keyActivateUser->serverUser) {
+                        $serverUser = $oldKey->keyActivateUser->serverUser;
+                        if ($serverUser->panel) {
+                            // Используем стратегию для работы с панелью (независимо от типа)
+                            $panel = $serverUser->panel;
+                            $panelStrategyFactory = new \App\Services\Panel\PanelStrategyFactory();
+                            $panelStrategy = $panelStrategyFactory->create($panel->panel);
+                            
+                            // Обновляем токен через стратегию
+                            $panel = $panelStrategy->updateToken($panel->id);
+                            
+                            // Удаляем пользователя из панели (но НЕ из БД, чтобы не удалить нарушение каскадно)
+                            // Используем прямой вызов API вместо deleteServerUser, чтобы не удалять из БД
+                            $marzbanApi = new MarzbanAPI($panel->api_address);
+                            $marzbanApi->deleteUser($panel->auth_token, $serverUser->id);
+                            
+                            // Проверяем нарушение ПЕРЕД удалением keyActivateUser
+                            $violationBeforeDelete = ConnectionLimitViolation::where('id', $violation->id)->exists();
+                            
+                            // Удаляем только keyActivateUser, но НЕ serverUser (чтобы нарушение не удалилось каскадно)
+                            if ($oldKey->keyActivateUser) {
+                                $oldKey->keyActivateUser->delete();
+                            }
+                            
+                            // Проверяем нарушение ПОСЛЕ удаления keyActivateUser
+                            $violationAfterDelete = ConnectionLimitViolation::where('id', $violation->id)->exists();
+                            
+                            if (!$violationAfterDelete && $violationBeforeDelete) {
+                                Log::critical('⚠️ КРИТИЧЕСКАЯ ОШИБКА: Нарушение было удалено при удалении keyActivateUser!', [
+                                    'violation_id' => $violation->id,
+                                    'old_key_id' => $oldKey->id,
+                                    'new_key_id' => $newKey->id,
+                                    'server_user_id' => $serverUser->id,
+                                    'source' => 'vpn'
+                                ]);
+                                throw new \Exception("Нарушение с ID {$violation->id} было удалено при удалении keyActivateUser!");
+                            }
+                            
+                            $this->logger->info('Пользователь удален из панели при перевыпуске ключа (serverUser сохранен в БД для истории)', [
+                                'old_key_id' => $oldKey->id,
+                                'new_key_id' => $newKey->id,
+                                'server_user_id' => $serverUser->id,
+                                'panel_id' => $panel->id,
+                                'panel_type' => $panel->panel,
+                                'violation_id' => $violation->id,
+                                'violation_exists_before_delete' => $violationBeforeDelete,
+                                'violation_exists_after_delete' => $violationAfterDelete,
+                                'note' => 'serverUser НЕ удален из БД, чтобы сохранить нарушение'
+                            ]);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // Логируем ошибку, но не прерываем процесс перевыпуска
+                    Log::error('Ошибка при удалении пользователя из панели при перевыпуске ключа', [
+                        'old_key_id' => $oldKey->id,
+                        'new_key_id' => $newKey->id,
+                        'violation_id' => $violation->id,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                        'source' => 'vpn'
+                    ]);
+                    // Не выбрасываем исключение - перевыпуск ключа должен продолжиться
+                }
+
+                // Проверяем нарушение еще раз после удаления пользователя из панели
+                $violation->refresh();
+                if (!$violation->exists) {
+                    throw new \Exception("Нарушение с ID {$violation->id} было удалено после удаления пользователя из панели!");
+                }
+                
+                // Финальная проверка через прямой запрос к БД
+                $violationExistsInDb = ConnectionLimitViolation::where('id', $violation->id)->exists();
+                if (!$violationExistsInDb) {
+                    throw new \Exception("Нарушение с ID {$violation->id} не найдено в БД после всех операций!");
                 }
 
                 // Сохраняем ID нарушения и другие данные для логирования
