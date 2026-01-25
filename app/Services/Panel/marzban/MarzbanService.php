@@ -103,23 +103,86 @@ class MarzbanService
         try {
             Log::info('Installing panel', ['host' => $host, 'source' => 'panel']);
 
-            $commands = [
-                'wget ' . self::INSTALL_SCRIPT_URL,
-                'chmod +x install_marzban.sh',
-                './install_marzban.sh ' . $host
-            ];
+            // Команда 1: Скачивание скрипта
+            Log::info('Downloading installation script', [
+                'url' => self::INSTALL_SCRIPT_URL,
+                'source' => 'panel'
+            ]);
+            
+            $wgetOutput = $ssh->exec('wget -O install_marzban.sh ' . self::INSTALL_SCRIPT_URL . ' 2>&1');
+            $wgetExitStatus = $ssh->getExitStatus();
+            
+            Log::info('Wget command executed', [
+                'exit_status' => $wgetExitStatus,
+                'output' => substr($wgetOutput, 0, 500), // Первые 500 символов
+                'source' => 'panel'
+            ]);
 
-            foreach ($commands as $command) {
-                $result = $ssh->exec($command);
-
-                if ($ssh->getExitStatus() !== 0) {
-                    throw new RuntimeException("Command failed: $command");
-                }
+            if ($wgetExitStatus !== 0) {
+                throw new RuntimeException("Failed to download installation script. Exit code: {$wgetExitStatus}. Output: " . substr($wgetOutput, 0, 1000));
             }
+
+            // Команда 2: Установка прав на выполнение
+            Log::info('Setting execute permissions', ['source' => 'panel']);
+            
+            $chmodOutput = $ssh->exec('chmod +x install_marzban.sh 2>&1');
+            $chmodExitStatus = $ssh->getExitStatus();
+            
+            Log::info('Chmod command executed', [
+                'exit_status' => $chmodExitStatus,
+                'output' => substr($chmodOutput, 0, 500),
+                'source' => 'panel'
+            ]);
+
+            if ($chmodExitStatus !== 0) {
+                throw new RuntimeException("Failed to set execute permissions. Exit code: {$chmodExitStatus}. Output: " . substr($chmodOutput, 0, 1000));
+            }
+
+            // Команда 3: Запуск скрипта установки
+            Log::info('Running installation script', [
+                'host' => $host,
+                'source' => 'panel'
+            ]);
+            
+            // Увеличиваем таймаут для длительной операции установки
+            $ssh->setTimeout(600); // 10 минут
+            
+            $installOutput = $ssh->exec('./install_marzban.sh ' . escapeshellarg($host) . ' 2>&1');
+            $installExitStatus = $ssh->getExitStatus();
+            
+            // Восстанавливаем таймаут
+            $ssh->setTimeout(100000);
+            
+            // Логируем полный вывод (может быть длинным)
+            Log::info('Installation script executed', [
+                'exit_status' => $installExitStatus,
+                'output_length' => strlen($installOutput),
+                'output_preview' => substr($installOutput, 0, 2000), // Первые 2000 символов
+                'output_end' => substr($installOutput, -1000), // Последние 1000 символов
+                'source' => 'panel'
+            ]);
+
+            if ($installExitStatus !== 0) {
+                // Пытаемся получить более подробную информацию об ошибке
+                $errorDetails = $ssh->exec('tail -n 50 /var/log/marzban-install.log 2>&1 || echo "Log file not found"');
+                
+                throw new RuntimeException(
+                    "Installation script failed. Exit code: {$installExitStatus}. " .
+                    "Output (last 2000 chars): " . substr($installOutput, -2000) . ". " .
+                    "Install log: " . substr($errorDetails, 0, 1000)
+                );
+            }
+
+            Log::info('Panel installation completed successfully', [
+                'host' => $host,
+                'source' => 'panel'
+            ]);
+
         } catch (Exception $e) {
             Log::error('Panel installation failed', [
                 'host' => $host,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'source' => 'panel'
             ]);
             throw new RuntimeException('Failed to install panel: ' . $e->getMessage());
