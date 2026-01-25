@@ -75,23 +75,107 @@ class VdsinaService
             }
 
             // 3. Проверяем доступность тарифных планов
-            $plans = $this->vdsinaApi->getServerPlan(2); // ID группы серверов = 2
-            if (!isset($plans['data']) || !is_array($plans['data'])) {
-                throw new RuntimeException('Invalid server plan response from VDSina');
+            // Сначала получаем список групп серверов
+            $serverGroups = $this->vdsinaApi->getServerGroup();
+            Log::info('VDSina server groups received', [
+                'groups' => $serverGroups,
+                'source' => 'server'
+            ]);
+
+            if (!isset($serverGroups['data']) || !is_array($serverGroups['data'])) {
+                throw new RuntimeException('Invalid server group response from VDSina');
             }
 
-            // Ищем базовый тарифный план (id = 3)
+            // Пытаемся найти план в группе 2, если не найдем - используем первую доступную группу
             $serverPlan = null;
-            foreach ($plans['data'] as $plan) {
-                if (isset($plan['id']) && $plan['id'] == 3) {
-                    $serverPlan = $plan;
-                    break;
+            $serverGroupId = 2; // Пробуем сначала группу 2
+            
+            // Пробуем найти план в группе 2
+            $plans = $this->vdsinaApi->getServerPlan($serverGroupId);
+            Log::info('VDSina server plans received', [
+                'server_group_id' => $serverGroupId,
+                'plans' => $plans,
+                'source' => 'server'
+            ]);
+
+            if (isset($plans['data']) && is_array($plans['data']) && !empty($plans['data'])) {
+                // Ищем базовый тарифный план (id = 3)
+                foreach ($plans['data'] as $plan) {
+                    if (isset($plan['id']) && $plan['id'] == 3) {
+                        $serverPlan = $plan;
+                        break;
+                    }
+                }
+
+                // Если не нашли план с ID = 3, используем первый доступный план
+                if (!$serverPlan && !empty($plans['data'])) {
+                    $serverPlan = $plans['data'][0];
+                    Log::warning('Basic server plan (ID=3) not found, using first available plan', [
+                        'server_group_id' => $serverGroupId,
+                        'used_plan_id' => $serverPlan['id'] ?? 'unknown',
+                        'available_plans' => array_map(function($p) { return $p['id'] ?? 'unknown'; }, $plans['data']),
+                        'source' => 'server'
+                    ]);
+                }
+            }
+
+            // Если не нашли план в группе 2, пробуем другие группы
+            if (!$serverPlan) {
+                Log::warning('No plans found in server group 2, trying other groups', [
+                    'source' => 'server'
+                ]);
+
+                foreach ($serverGroups['data'] as $group) {
+                    if (!isset($group['id']) || $group['id'] == 2) {
+                        continue; // Пропускаем группу 2, её уже проверили
+                    }
+
+                    $groupPlans = $this->vdsinaApi->getServerPlan($group['id']);
+                    Log::info('Checking server plans in group', [
+                        'group_id' => $group['id'],
+                        'plans' => $groupPlans,
+                        'source' => 'server'
+                    ]);
+
+                    if (isset($groupPlans['data']) && is_array($groupPlans['data']) && !empty($groupPlans['data'])) {
+                        // Ищем план с ID = 3
+                        foreach ($groupPlans['data'] as $plan) {
+                            if (isset($plan['id']) && $plan['id'] == 3) {
+                                $serverPlan = $plan;
+                                $serverGroupId = $group['id'];
+                                break 2; // Выходим из обоих циклов
+                            }
+                        }
+
+                        // Если не нашли план с ID = 3, используем первый доступный
+                        if (!$serverPlan) {
+                            $serverPlan = $groupPlans['data'][0];
+                            $serverGroupId = $group['id'];
+                            Log::warning('Using first available plan from alternative group', [
+                                'server_group_id' => $serverGroupId,
+                                'used_plan_id' => $serverPlan['id'] ?? 'unknown',
+                                'source' => 'server'
+                            ]);
+                            break;
+                        }
+                    }
                 }
             }
 
             if (!$serverPlan) {
+                Log::error('No server plans found in any group', [
+                    'available_groups' => array_map(function($g) { return $g['id'] ?? 'unknown'; }, $serverGroups['data']),
+                    'source' => 'server'
+                ]);
                 throw new RuntimeException('Basic server plan not found in VDSina');
             }
+
+            Log::info('Server plan selected', [
+                'plan_id' => $serverPlan['id'] ?? 'unknown',
+                'plan_name' => $serverPlan['name'] ?? 'unknown',
+                'server_group_id' => $serverGroupId,
+                'source' => 'server'
+            ]);
 
             // 4. Создаем сервер через API VDSina
             $serverName = 'vpnserver' . time() . $location->code;
