@@ -103,6 +103,9 @@ class MarzbanService
         try {
             Log::info('Installing panel', ['host' => $host, 'source' => 'panel']);
 
+            // Проверка и запуск Docker daemon
+            $this->ensureDockerRunning($ssh);
+
             // Команда 1: Скачивание скрипта
             Log::info('Downloading installation script', [
                 'url' => self::INSTALL_SCRIPT_URL,
@@ -163,14 +166,42 @@ class MarzbanService
             ]);
 
             if ($installExitStatus !== 0) {
-                // Пытаемся получить более подробную информацию об ошибке
-                $errorDetails = $ssh->exec('tail -n 50 /var/log/marzban-install.log 2>&1 || echo "Log file not found"');
-                
-                throw new RuntimeException(
-                    "Installation script failed. Exit code: {$installExitStatus}. " .
-                    "Output (last 2000 chars): " . substr($installOutput, -2000) . ". " .
-                    "Install log: " . substr($errorDetails, 0, 1000)
-                );
+                // Проверяем, связана ли ошибка с Docker
+                if (strpos($installOutput, 'Cannot connect to the Docker daemon') !== false || 
+                    strpos($installOutput, 'docker daemon running') !== false) {
+                    Log::error('Docker daemon issue detected during installation', [
+                        'host' => $host,
+                        'source' => 'panel'
+                    ]);
+                    
+                    // Пытаемся запустить Docker и повторить
+                    $this->ensureDockerRunning($ssh);
+                    
+                    // Повторяем установку
+                    Log::info('Retrying installation after Docker restart', [
+                        'host' => $host,
+                        'source' => 'panel'
+                    ]);
+                    
+                    $installOutput = $ssh->exec('./install_marzban.sh ' . escapeshellarg($host) . ' 2>&1');
+                    $installExitStatus = $ssh->getExitStatus();
+                    
+                    if ($installExitStatus !== 0) {
+                        throw new RuntimeException(
+                            "Installation script failed after Docker restart. Exit code: {$installExitStatus}. " .
+                            "Output (last 2000 chars): " . substr($installOutput, -2000)
+                        );
+                    }
+                } else {
+                    // Пытаемся получить более подробную информацию об ошибке
+                    $errorDetails = $ssh->exec('tail -n 50 /var/log/marzban-install.log 2>&1 || echo "Log file not found"');
+                    
+                    throw new RuntimeException(
+                        "Installation script failed. Exit code: {$installExitStatus}. " .
+                        "Output (last 2000 chars): " . substr($installOutput, -2000) . ". " .
+                        "Install log: " . substr($errorDetails, 0, 1000)
+                    );
+                }
             }
 
             Log::info('Panel installation completed successfully', [
@@ -186,6 +217,85 @@ class MarzbanService
                 'source' => 'panel'
             ]);
             throw new RuntimeException('Failed to install panel: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Проверка и запуск Docker daemon
+     *
+     * @param SSH2 $ssh
+     * @return void
+     * @throws RuntimeException
+     */
+    private function ensureDockerRunning(SSH2 $ssh): void
+    {
+        try {
+            Log::info('Checking Docker daemon status', ['source' => 'panel']);
+
+            // Проверяем, запущен ли Docker daemon
+            $dockerCheck = $ssh->exec('docker info > /dev/null 2>&1; echo $?');
+            $dockerCheck = trim($dockerCheck);
+            
+            if ($dockerCheck === '0') {
+                Log::info('Docker daemon is running', ['source' => 'panel']);
+                return;
+            }
+
+            Log::warning('Docker daemon is not running, attempting to start', ['source' => 'panel']);
+
+            // Пытаемся запустить Docker daemon
+            $startDockerOutput = $ssh->exec('sudo systemctl start docker 2>&1');
+            $startDockerStatus = $ssh->getExitStatus();
+            
+            Log::info('Docker start command executed', [
+                'exit_status' => $startDockerStatus,
+                'output' => substr($startDockerOutput, 0, 500),
+                'source' => 'panel'
+            ]);
+
+            // Ждем немного, чтобы Docker запустился
+            sleep(3);
+
+            // Проверяем снова
+            $dockerCheck = $ssh->exec('docker info > /dev/null 2>&1; echo $?');
+            $dockerCheck = trim($dockerCheck);
+            
+            if ($dockerCheck !== '0') {
+                // Пытаемся включить автозапуск и запустить
+                $enableDockerOutput = $ssh->exec('sudo systemctl enable docker && sudo systemctl start docker 2>&1');
+                $enableDockerStatus = $ssh->getExitStatus();
+                
+                Log::info('Docker enable and start command executed', [
+                    'exit_status' => $enableDockerStatus,
+                    'output' => substr($enableDockerOutput, 0, 500),
+                    'source' => 'panel'
+                ]);
+
+                // Ждем еще немного
+                sleep(3);
+
+                // Финальная проверка
+                $dockerCheck = $ssh->exec('docker info > /dev/null 2>&1; echo $?');
+                $dockerCheck = trim($dockerCheck);
+                
+                if ($dockerCheck !== '0') {
+                    throw new RuntimeException(
+                        "Docker daemon is not running and could not be started. " .
+                        "Please ensure Docker is installed and the user has sudo privileges. " .
+                        "Start output: " . substr($startDockerOutput, 0, 500) . ". " .
+                        "Enable output: " . substr($enableDockerOutput, 0, 500)
+                    );
+                }
+            }
+
+            Log::info('Docker daemon is now running', ['source' => 'panel']);
+
+        } catch (Exception $e) {
+            Log::error('Failed to ensure Docker is running', [
+                'error' => $e->getMessage(),
+                'source' => 'panel'
+            ]);
+            throw new RuntimeException('Docker daemon is required but not available: ' . $e->getMessage());
         }
     }
 
