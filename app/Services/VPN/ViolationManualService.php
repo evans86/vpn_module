@@ -168,7 +168,7 @@ class ViolationManualService
                 $currentTime = time();
                 $currentDate = date('Y-m-d H:i:s', $currentTime);
 
-                Log::critical("🚫 [KEY: {$oldKey->id}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (замена ключа из-за нарушения лимита подключений - ручная замена)", [
+                Log::critical("🚫 [KEY: {$oldKey->id}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (замена ключа из-за нарушения лимита подключений - ручная замена) | KEY_ID: {$oldKey->id} | {$oldKey->id}", [
                     'source' => 'vpn',
                     'action' => 'update_status_to_expired',
                     'key_id' => $oldKey->id,
@@ -467,7 +467,7 @@ class ViolationManualService
                 $currentTimeForLog = time();
                 $currentDateForLog = date('Y-m-d H:i:s', $currentTimeForLog);
 
-                Log::critical("🚫 [KEY: {$oldKey->id}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (замена ключа из-за нарушения лимита подключений - автоматическая замена)", [
+                Log::critical("🚫 [KEY: {$oldKey->id}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (замена ключа из-за нарушения лимита подключений - автоматическая замена) | KEY_ID: {$oldKey->id} | {$oldKey->id}", [
                     'source' => 'vpn',
                     'action' => 'update_status_to_expired',
                     'key_id' => $oldKey->id,

@@ -693,7 +693,7 @@ class KeyActivateService
                 $deletedAtDate = date('Y-m-d H:i:s', $key->deleted_at);
                 $currentDate = date('Y-m-d H:i:s', $currentTime);
 
-                $this->logger->critical("🚫 [KEY: {$key->id}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (истек срок активации для оплаченного ключа)", [
+                $this->logger->critical("🚫 [KEY: {$key->id}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (истек срок активации для оплаченного ключа) | KEY_ID: {$key->id} | {$key->id}", [
                     'source' => 'key_activate',
                     'action' => 'update_status_to_expired',
                     'key_id' => $key->id,
@@ -742,7 +742,7 @@ class KeyActivateService
                 $finishAtDate = date('Y-m-d H:i:s', $key->finish_at);
                 $currentDate = date('Y-m-d H:i:s', $currentTime);
 
-                $this->logger->critical("🚫 [KEY: {$key->id}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (истек срок действия активного ключа)", [
+                $this->logger->critical("🚫 [KEY: {$key->id}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (истек срок действия активного ключа) | KEY_ID: {$key->id} | {$key->id}", [
                     'source' => 'key_activate',
                     'action' => 'update_status_to_expired',
                     'key_id' => $key->id,

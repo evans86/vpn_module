@@ -58,7 +58,8 @@ class LogRepository extends BaseRepository
             // Используем индекс на created_at для оптимизации
             $query->where(function($q) use ($searchTerm) {
                 $q->where('message', 'like', '%' . $searchTerm . '%')
-                  ->orWhere('source', 'like', '%' . $searchTerm . '%');
+                  ->orWhere('source', 'like', '%' . $searchTerm . '%')
+                  ->orWhere('context', 'like', '%' . $searchTerm . '%'); // Поиск в JSON контексте (key_id, search_key и т.д.)
             });
         }
 

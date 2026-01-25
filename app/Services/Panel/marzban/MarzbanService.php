@@ -369,7 +369,7 @@ class MarzbanService
                             $keyActivate->load('keyActivateUser');
                         }
                         
-                        Log::critical("🚫 [KEY: {$keyActivate->id}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (срок истек по данным Marzban И БД)", [
+                        Log::critical("🚫 [KEY: {$keyActivate->id}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (срок истек по данным Marzban И БД) | KEY_ID: {$keyActivate->id} | {$keyActivate->id}", [
                             'source' => 'panel',
                             'action' => 'update_status_to_expired',
                             'key_id' => $keyActivate->id,
@@ -601,7 +601,7 @@ class MarzbanService
                 $keyActivateId = $serverUser->keyActivateUser->key_activate_id;
                 $keyActivate = $serverUser->keyActivateUser->keyActivate;
                 
-                Log::critical("⚠️ [KEY: {$keyActivateId}] УДАЛЕНИЕ СВЯЗИ keyActivateUser (при удалении пользователя сервера)", [
+                Log::critical("⚠️ [KEY: {$keyActivateId}] УДАЛЕНИЕ СВЯЗИ keyActivateUser (при удалении пользователя сервера) | KEY_ID: {$keyActivateId} | {$keyActivateId}", [
                     'source' => 'panel',
                     'action' => 'delete_key_activate_user',
                     'key_activate_user_id' => $serverUser->keyActivateUser->id,
