@@ -369,10 +369,12 @@ class MarzbanService
                             $keyActivate->load('keyActivateUser');
                         }
                         
-                        Log::critical('🚫 СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (срок истек по данным Marzban И БД)', [
+                        Log::critical("🚫 [KEY: {$keyActivate->id}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (срок истек по данным Marzban И БД)", [
                             'source' => 'panel',
                             'action' => 'update_status_to_expired',
                             'key_id' => $keyActivate->id,
+                            'search_key' => $keyActivate->id, // Для быстрого поиска
+                            'search_tag' => 'KEY_EXPIRED',
                             'user_id' => $user_id,
                             'panel_id' => $panel_id,
                             'old_status' => $oldStatus,
@@ -396,6 +398,8 @@ class MarzbanService
                             'has_key_activate_user' => $keyActivate->keyActivateUser ? true : false,
                             'key_activate_user_id' => $keyActivate->keyActivateUser ? $keyActivate->keyActivateUser->id : null,
                             'key_activate_user_server_user_id' => ($keyActivate->keyActivateUser && $keyActivate->keyActivateUser->serverUser) ? $keyActivate->keyActivateUser->serverUser->id : null,
+                            'key_created_at' => $keyActivate->created_at ? $keyActivate->created_at->format('Y-m-d H:i:s') : null,
+                            'key_updated_at' => $keyActivate->updated_at ? $keyActivate->updated_at->format('Y-m-d H:i:s') : null,
                             'warning' => '⚠️ ВАЖНО: При смене статуса на EXPIRED связь keyActivateUser НЕ должна удаляться!',
                             'method' => 'getUserSubscribeInfo',
                             'file' => __FILE__,
@@ -597,11 +601,13 @@ class MarzbanService
                 $keyActivateId = $serverUser->keyActivateUser->key_activate_id;
                 $keyActivate = $serverUser->keyActivateUser->keyActivate;
                 
-                Log::critical('⚠️ УДАЛЕНИЕ СВЯЗИ keyActivateUser (при удалении пользователя сервера)', [
+                Log::critical("⚠️ [KEY: {$keyActivateId}] УДАЛЕНИЕ СВЯЗИ keyActivateUser (при удалении пользователя сервера)", [
                     'source' => 'panel',
                     'action' => 'delete_key_activate_user',
                     'key_activate_user_id' => $serverUser->keyActivateUser->id,
                     'key_activate_id' => $keyActivateId,
+                    'search_key' => $keyActivateId, // Для быстрого поиска
+                    'search_tag' => 'KEY_USER_DELETED',
                     'server_user_id' => $user_id,
                     'panel_id' => $panel_id,
                     'key_status' => $keyActivate ? $keyActivate->status : 'unknown',
