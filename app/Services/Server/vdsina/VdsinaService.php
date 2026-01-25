@@ -154,6 +154,7 @@ class VdsinaService
 
             $serverPlan = null;
             $serverGroupId = null;
+            $allPlansInfo = []; // Для логирования всех планов
 
             // Пробуем сначала группу 2
             $plans = $this->vdsinaApi->getServerPlan(2);
@@ -164,26 +165,42 @@ class VdsinaService
             ]);
 
             if (isset($plans['data']) && is_array($plans['data']) && !empty($plans['data'])) {
-                // Сначала ищем план с ID = 3 (старый способ)
+                // Логируем все планы для диагностики
+                foreach ($plans['data'] as $plan) {
+                    $check = $matchesRequirements($plan);
+                    $allPlansInfo[] = [
+                        'id' => $plan['id'] ?? 'unknown',
+                        'name' => $plan['name'] ?? 'unknown',
+                        'full_data' => $plan,
+                        'ram' => $check['ram'],
+                        'cpu' => $check['cpu'],
+                        'disk' => $check['disk'],
+                        'has_all_fields' => $check['has_all_fields'],
+                        'matches' => $check['matches']
+                    ];
+                }
+
+                // ПРИОРИТЕТ 1: Ищем план с ID = 3 (самый надежный способ)
                 foreach ($plans['data'] as $plan) {
                     if (isset($plan['id']) && $plan['id'] == 3) {
+                        $serverPlan = $plan;
+                        $serverGroupId = 2;
                         $check = $matchesRequirements($plan);
-                        if ($check['matches']) {
-                            $serverPlan = $plan;
-                            $serverGroupId = 2;
-                            Log::info('Found plan with ID=3 matching requirements', [
-                                'plan_id' => $plan['id'],
-                                'ram' => $check['ram'],
-                                'cpu' => $check['cpu'],
-                                'disk' => $check['disk'],
-                                'source' => 'server'
-                            ]);
-                            break;
-                        }
+                        Log::info('Found plan with ID=3 (using as fallback)', [
+                            'plan_id' => $plan['id'],
+                            'plan_name' => $plan['name'] ?? 'unknown',
+                            'ram' => $check['ram'],
+                            'cpu' => $check['cpu'],
+                            'disk' => $check['disk'],
+                            'has_all_fields' => $check['has_all_fields'],
+                            'matches_requirements' => $check['matches'],
+                            'source' => 'server'
+                        ]);
+                        break;
                     }
                 }
 
-                // Если не нашли план с ID = 3, ищем по характеристикам
+                // ПРИОРИТЕТ 2: Если план с ID = 3 не найден, ищем по характеристикам
                 if (!$serverPlan) {
                     foreach ($plans['data'] as $plan) {
                         $check = $matchesRequirements($plan);
@@ -223,14 +240,15 @@ class VdsinaService
                     ]);
 
                     if (isset($groupPlans['data']) && is_array($groupPlans['data']) && !empty($groupPlans['data'])) {
+                        // Сначала ищем план с ID = 3
                         foreach ($groupPlans['data'] as $plan) {
-                            $check = $matchesRequirements($plan);
-                            if ($check['matches']) {
+                            if (isset($plan['id']) && $plan['id'] == 3) {
                                 $serverPlan = $plan;
                                 $serverGroupId = $group['id'];
-                                Log::info('Found matching plan in alternative group', [
+                                $check = $matchesRequirements($plan);
+                                Log::info('Found plan with ID=3 in alternative group', [
                                     'group_id' => $group['id'],
-                                    'plan_id' => $plan['id'] ?? 'unknown',
+                                    'plan_id' => $plan['id'],
                                     'plan_name' => $plan['name'] ?? 'unknown',
                                     'ram' => $check['ram'],
                                     'cpu' => $check['cpu'],
@@ -240,19 +258,41 @@ class VdsinaService
                                 break 2; // Выходим из обоих циклов
                             }
                         }
+
+                        // Если не нашли план с ID = 3, ищем по характеристикам
+                        if (!$serverPlan) {
+                            foreach ($groupPlans['data'] as $plan) {
+                                $check = $matchesRequirements($plan);
+                                if ($check['matches']) {
+                                    $serverPlan = $plan;
+                                    $serverGroupId = $group['id'];
+                                    Log::info('Found matching plan in alternative group by characteristics', [
+                                        'group_id' => $group['id'],
+                                        'plan_id' => $plan['id'] ?? 'unknown',
+                                        'plan_name' => $plan['name'] ?? 'unknown',
+                                        'ram' => $check['ram'],
+                                        'cpu' => $check['cpu'],
+                                        'disk' => $check['disk'],
+                                        'source' => 'server'
+                                    ]);
+                                    break 2; // Выходим из обоих циклов
+                                }
+                            }
+                        }
                     }
                 }
             }
 
             if (!$serverPlan) {
-                Log::error('No server plan matching requirements found', [
+                Log::error('No server plan found', [
                     'required_ram' => $requiredRam . ' GB',
                     'required_cpu' => $requiredCpu . ' cores',
                     'required_disk' => $requiredDisk . ' GB',
                     'available_groups' => array_map(function($g) { return $g['id'] ?? 'unknown'; }, $serverGroups['data']),
+                    'all_plans_info' => $allPlansInfo,
                     'source' => 'server'
                 ]);
-                throw new RuntimeException('Server plan with required characteristics (4 GB RAM, 2 cores, 80 GB storage) not found in VDSina');
+                throw new RuntimeException('Server plan with ID=3 or required characteristics (4 GB RAM, 2 cores, 80 GB storage) not found in VDSina');
             }
 
             Log::info('Server plan selected', [
