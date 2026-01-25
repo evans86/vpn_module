@@ -98,31 +98,56 @@ class VdsinaService
                 $cpu = null;
                 $disk = null;
 
-                // Пробуем разные варианты названий полей
-                if (isset($plan['ram'])) {
-                    $ram = $plan['ram'];
-                } elseif (isset($plan['memory'])) {
-                    $ram = $plan['memory'];
-                } elseif (isset($plan['ram_gb'])) {
-                    $ram = $plan['ram_gb'];
+                // ПРИОРИТЕТ 1: Проверяем вложенную структуру data (как в VDSina API)
+                if (isset($plan['data']['ram']['value'])) {
+                    $ram = (float)$plan['data']['ram']['value'];
+                } elseif (isset($plan['data']['memory']['value'])) {
+                    $ram = (float)$plan['data']['memory']['value'];
                 }
 
-                if (isset($plan['cpu'])) {
-                    $cpu = $plan['cpu'];
-                } elseif (isset($plan['cores'])) {
-                    $cpu = $plan['cores'];
-                } elseif (isset($plan['cpu_cores'])) {
-                    $cpu = $plan['cpu_cores'];
+                if (isset($plan['data']['cpu']['value'])) {
+                    $cpu = (int)$plan['data']['cpu']['value'];
+                } elseif (isset($plan['data']['cores']['value'])) {
+                    $cpu = (int)$plan['data']['cores']['value'];
                 }
 
-                if (isset($plan['disk'])) {
-                    $disk = $plan['disk'];
-                } elseif (isset($plan['storage'])) {
-                    $disk = $plan['storage'];
-                } elseif (isset($plan['disk_gb'])) {
-                    $disk = $plan['disk_gb'];
-                } elseif (isset($plan['storage_gb'])) {
-                    $disk = $plan['storage_gb'];
+                if (isset($plan['data']['disk']['value'])) {
+                    $disk = (float)$plan['data']['disk']['value'];
+                } elseif (isset($plan['data']['storage']['value'])) {
+                    $disk = (float)$plan['data']['storage']['value'];
+                }
+
+                // ПРИОРИТЕТ 2: Проверяем верхний уровень (для других форматов API)
+                if ($ram === null) {
+                    if (isset($plan['ram'])) {
+                        $ram = (float)$plan['ram'];
+                    } elseif (isset($plan['memory'])) {
+                        $ram = (float)$plan['memory'];
+                    } elseif (isset($plan['ram_gb'])) {
+                        $ram = (float)$plan['ram_gb'];
+                    }
+                }
+
+                if ($cpu === null) {
+                    if (isset($plan['cpu'])) {
+                        $cpu = (int)$plan['cpu'];
+                    } elseif (isset($plan['cores'])) {
+                        $cpu = (int)$plan['cores'];
+                    } elseif (isset($plan['cpu_cores'])) {
+                        $cpu = (int)$plan['cpu_cores'];
+                    }
+                }
+
+                if ($disk === null) {
+                    if (isset($plan['disk'])) {
+                        $disk = (float)$plan['disk'];
+                    } elseif (isset($plan['storage'])) {
+                        $disk = (float)$plan['storage'];
+                    } elseif (isset($plan['disk_gb'])) {
+                        $disk = (float)$plan['disk_gb'];
+                    } elseif (isset($plan['storage_gb'])) {
+                        $disk = (float)$plan['storage_gb'];
+                    }
                 }
 
                 // Если значения в мегабайтах, конвертируем в гигабайты
