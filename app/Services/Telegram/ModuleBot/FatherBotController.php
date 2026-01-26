@@ -3,8 +3,11 @@
 namespace App\Services\Telegram\ModuleBot;
 
 use App\Models\KeyActivate\KeyActivate;
+use App\Models\Order\Order;
+use App\Models\OrderSetting\OrderSetting;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
+use App\Services\Order\OrderService;
 use App\Services\Panel\PanelStrategy;
 use Exception;
 use Illuminate\Support\Facades\Cache;
@@ -16,6 +19,8 @@ class FatherBotController extends AbstractTelegramBot
     private const STATE_WAITING_TOKEN = 'waiting_token';
 
     private const STATE_WAITING_HELP_TEXT = 'waiting_help_text';
+
+    private const STATE_WAITING_PAYMENT_PROOF = 'waiting_payment_proof';
 
     public function __construct(string $token)
     {
@@ -98,6 +103,19 @@ class FatherBotController extends AbstractTelegramBot
                     return;
                 }
 
+                // Проверяем состояние ожидания подтверждения оплаты
+                if ($salesman && $salesman->state === self::STATE_WAITING_PAYMENT_PROOF) {
+                    // Проверяем, есть ли фото в сообщении
+                    $photo = $message->getPhoto();
+                    if ($photo && is_array($photo) && !empty($photo)) {
+                        $this->handlePaymentProof($photo);
+                        return;
+                    } else {
+                        $this->sendMessage('❌ Пожалуйста, отправьте скриншот подтверждения оплаты (фото).');
+                        return;
+                    }
+                }
+
                 // Обработка команд меню
                 switch ($text) {
                     case '🤖 Мой бот':
@@ -105,6 +123,9 @@ class FatherBotController extends AbstractTelegramBot
                         break;
                     case '📦 Пакеты':
                         $this->showPacksList();
+                        break;
+                    case '🛒 Купить пакет':
+                        $this->showBuyPackMenu();
                         break;
                     case '🪪 Личный кабинет':
                         $this->showProfile();
@@ -215,6 +236,24 @@ class FatherBotController extends AbstractTelegramBot
                 case 'current_page':
                     // Просто отвечаем на callback query без изменений
                     $this->answerCallbackQuery('Вы уже на этой странице');
+                    break;
+
+                case 'buy_pack':
+                    if (isset($params['pack_id'])) {
+                        $this->showPaymentMethods($params['pack_id']);
+                    }
+                    break;
+
+                case 'select_payment':
+                    if (isset($params['pack_id']) && isset($params['payment_id'])) {
+                        $this->createOrder($params['pack_id'], $params['payment_id']);
+                    }
+                    break;
+
+                case 'cancel_order':
+                    if (isset($params['order_id'])) {
+                        $this->cancelOrder($params['order_id']);
+                    }
                     break;
 
                 default:
@@ -1343,14 +1382,20 @@ class FatherBotController extends AbstractTelegramBot
                 [
                     ['text' => '🪪 Личный кабинет'],
                     ['text' => '🌎 Помощь']
-                ],
-                [
-                    ['text' => '✏️ Изменить текст "❓ Помощь"'],
-                    ['text' => '🔄 Сбросить текст "❓ Помощь"']
                 ]
             ],
             'resize_keyboard' => true,
             'one_time_keyboard' => false
+        ];
+
+        // Добавляем кнопку "Купить пакет" если система включена
+        if (OrderSetting::isSystemEnabled()) {
+            $keyboard['keyboard'][] = [['text' => '🛒 Купить пакет']];
+        }
+
+        $keyboard['keyboard'][] = [
+            ['text' => '✏️ Изменить текст "❓ Помощь"'],
+            ['text' => '🔄 Сбросить текст "❓ Помощь"']
         ];
 
         if ($message) {
@@ -1546,6 +1591,276 @@ class FatherBotController extends AbstractTelegramBot
         } catch (\Exception $e) {
             Log::error('Show profile error: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Показать меню покупки пакетов
+     */
+    protected function showBuyPackMenu(): void
+    {
+        try {
+            if (!OrderSetting::isSystemEnabled()) {
+                $this->sendMessage('❌ Система покупки пакетов временно отключена.');
+                return;
+            }
+
+            $orderService = new OrderService(app(\App\Services\Pack\PackSalesmanService::class));
+            $availablePacks = $orderService->getAvailablePacks();
+
+            if ($availablePacks->isEmpty()) {
+                $this->sendMessage('❌ В данный момент нет доступных пакетов для покупки.');
+                return;
+            }
+
+            $message = "🛒 <b>Доступные пакеты для покупки:</b>\n\n";
+
+            $buttons = [];
+            foreach ($availablePacks as $pack) {
+                $message .= "📦 <b>{$pack->title}</b>\n";
+                $message .= "💰 Цена: " . number_format($pack->price, 0, '.', ' ') . " ₽\n";
+                $message .= "🔑 Ключей: {$pack->count}\n";
+                $message .= "⏱ Период: {$pack->period} дней\n";
+                $message .= "💾 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n\n";
+
+                $buttons[] = [[
+                    'text' => "📦 {$pack->title} - " . number_format($pack->price, 0, '.', ' ') . " ₽",
+                    'callback_data' => json_encode(['action' => 'buy_pack', 'pack_id' => $pack->id])
+                ]];
+            }
+
+            $buttons[] = [[
+                'text' => '❌ Отмена',
+                'callback_data' => json_encode(['action' => 'current_page'])
+            ]];
+
+            $this->sendMessage($message, [
+                'inline_keyboard' => $buttons
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Show buy pack menu error: ' . $e->getMessage(), ['source' => 'telegram']);
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Показать способы оплаты для выбранного пакета
+     */
+    protected function showPaymentMethods(int $packId): void
+    {
+        try {
+            $orderService = new OrderService(app(\App\Services\Pack\PackSalesmanService::class));
+            $pack = \App\Models\Pack\Pack::findOrFail($packId);
+            $paymentMethods = $orderService->getActivePaymentMethods();
+
+            if ($paymentMethods->isEmpty()) {
+                $this->sendMessage('❌ В данный момент нет доступных способов оплаты.');
+                return;
+            }
+
+            $message = "💳 <b>Выберите способ оплаты:</b>\n\n";
+            $message .= "📦 Пакет: <b>{$pack->title}</b>\n";
+            $message .= "💰 Сумма к оплате: <b>" . number_format($pack->price, 0, '.', ' ') . " ₽</b>\n\n";
+
+            $buttons = [];
+            foreach ($paymentMethods as $method) {
+                $icon = $method->getTypeIcon();
+                $buttons[] = [[
+                    'text' => "{$icon} {$method->name}",
+                    'callback_data' => json_encode(['action' => 'select_payment', 'pack_id' => $packId, 'payment_id' => $method->id])
+                ]];
+            }
+
+            $buttons[] = [[
+                'text' => '❌ Отмена',
+                'callback_data' => json_encode(['action' => 'current_page'])
+            ]];
+
+            $this->sendMessage($message, [
+                'inline_keyboard' => $buttons
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Show payment methods error: ' . $e->getMessage(), ['source' => 'telegram']);
+            $this->sendErrorMessage();
+        }
+    }
+
+    /**
+     * Создать заказ
+     */
+    protected function createOrder(int $packId, int $paymentMethodId): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
+            $orderService = new OrderService(app(\App\Services\Pack\PackSalesmanService::class));
+
+            $order = $orderService->create($packId, $salesman->id, $paymentMethodId);
+            $order->load(['pack', 'paymentMethod']);
+
+            $message = "✅ <b>Заказ создан!</b>\n\n";
+            $message .= "🆔 ID заказа: <b>#{$order->id}</b>\n";
+            $message .= "📦 Пакет: <b>{$order->pack->title}</b>\n";
+            $message .= "💰 Сумма: <b>" . number_format($order->amount, 0, '.', ' ') . " ₽</b>\n";
+            $message .= "💳 Способ оплаты: <b>{$order->paymentMethod->name}</b>\n\n";
+
+            $message .= "📋 <b>Реквизиты для оплаты:</b>\n";
+            $message .= "{$order->paymentMethod->details}\n\n";
+
+            if ($order->paymentMethod->instructions) {
+                $message .= "ℹ️ <b>Инструкция:</b>\n";
+                $message .= "{$order->paymentMethod->instructions}\n\n";
+            }
+
+            $message .= "📸 После оплаты отправьте скриншот подтверждения оплаты (фото чека или перевода).";
+
+            // Устанавливаем состояние ожидания подтверждения оплаты
+            $salesman->state = self::STATE_WAITING_PAYMENT_PROOF;
+            $salesman->save();
+
+            // Сохраняем ID заказа в кэше для связи с фото
+            Cache::put("order_pending_proof:{$salesman->id}", $order->id, now()->addHours(24));
+
+            $buttons = [[
+                'text' => '❌ Отменить заказ',
+                'callback_data' => json_encode(['action' => 'cancel_order', 'order_id' => $order->id])
+            ]];
+
+            $this->sendMessage($message, [
+                'inline_keyboard' => $buttons
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Create order error: ' . $e->getMessage(), ['source' => 'telegram']);
+            $this->sendMessage('❌ Ошибка при создании заказа: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Обработать подтверждение оплаты (фото)
+     */
+    protected function handlePaymentProof(array $photo): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
+            $orderId = Cache::get("order_pending_proof:{$salesman->id}");
+
+            if (!$orderId) {
+                $this->sendMessage('❌ Не найден активный заказ. Пожалуйста, создайте новый заказ.');
+                $salesman->state = null;
+                $salesman->save();
+                return;
+            }
+
+            // Получаем файл с наибольшим размером (лучшее качество)
+            $largestPhoto = null;
+            $largestSize = 0;
+            foreach ($photo as $photoSize) {
+                // Проверяем, что это объект PhotoSize
+                if (is_object($photoSize) && method_exists($photoSize, 'getFileSize')) {
+                    $size = $photoSize->getFileSize() ?? 0;
+                    if ($size > $largestSize) {
+                        $largestSize = $size;
+                        $largestPhoto = $photoSize;
+                    }
+                } elseif (is_array($photoSize) && isset($photoSize['file_size'])) {
+                    // Если это массив
+                    $size = $photoSize['file_size'] ?? 0;
+                    if ($size > $largestSize) {
+                        $largestSize = $size;
+                        $largestPhoto = $photoSize;
+                    }
+                }
+            }
+
+            if (!$largestPhoto) {
+                $this->sendMessage('❌ Не удалось обработать фото. Попробуйте отправить еще раз.');
+                return;
+            }
+
+            // Получаем file_id
+            $fileId = null;
+            if (is_object($largestPhoto) && method_exists($largestPhoto, 'getFileId')) {
+                $fileId = $largestPhoto->getFileId();
+            } elseif (is_array($largestPhoto) && isset($largestPhoto['file_id'])) {
+                $fileId = $largestPhoto['file_id'];
+            }
+
+            if (!$fileId) {
+                $this->sendMessage('❌ Не удалось получить ID файла. Попробуйте отправить еще раз.');
+                return;
+            }
+
+            // Скачиваем файл через Telegram Bot API
+            $file = $this->telegram->getFile(['file_id' => $fileId]);
+            $filePath = $file->getFilePath();
+
+            // Скачиваем файл
+            $fileUrl = "https://api.telegram.org/file/bot" . config('telegram.father_bot.token') . "/{$filePath}";
+            $fileContent = file_get_contents($fileUrl);
+
+            // Сохраняем файл
+            $storagePath = storage_path('app/public/order_proofs');
+            if (!is_dir($storagePath)) {
+                mkdir($storagePath, 0755, true);
+            }
+
+            $fileName = "order_{$orderId}_" . time() . ".jpg";
+            $fullPath = "{$storagePath}/{$fileName}";
+            file_put_contents($fullPath, $fileContent);
+
+            // Сохраняем путь относительно storage/app/public
+            $relativePath = "order_proofs/{$fileName}";
+
+            // Обновляем заказ
+            $orderService = new OrderService(app(\App\Services\Pack\PackSalesmanService::class));
+            $orderService->submitPaymentProof($orderId, $relativePath);
+
+            // Сбрасываем состояние
+            $salesman->state = null;
+            $salesman->save();
+            Cache::forget("order_pending_proof:{$salesman->id}");
+
+            $message = "✅ <b>Подтверждение оплаты отправлено!</b>\n\n";
+            $message .= "🆔 ID заказа: <b>#{$orderId}</b>\n\n";
+            $message .= "⏳ Ваш заказ отправлен на проверку администратору.\n";
+            $message .= "Вы получите уведомление после проверки.";
+
+            $this->sendMessage($message);
+        } catch (\Exception $e) {
+            Log::error('Handle payment proof error: ' . $e->getMessage(), ['source' => 'telegram']);
+            $this->sendMessage('❌ Ошибка при обработке подтверждения оплаты: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Отменить заказ
+     */
+    protected function cancelOrder(int $orderId): void
+    {
+        try {
+            $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
+            $order = Order::where('id', $orderId)
+                ->where('salesman_id', $salesman->id)
+                ->firstOrFail();
+
+            if (!$order->canBeCancelled()) {
+                $this->sendMessage('❌ Этот заказ нельзя отменить.');
+                return;
+            }
+
+            $orderService = new OrderService(app(\App\Services\Pack\PackSalesmanService::class));
+            $orderService->cancel($orderId);
+
+            // Сбрасываем состояние если было
+            if ($salesman->state === self::STATE_WAITING_PAYMENT_PROOF) {
+                $salesman->state = null;
+                $salesman->save();
+                Cache::forget("order_pending_proof:{$salesman->id}");
+            }
+
+            $this->sendMessage("✅ Заказ #{$orderId} отменен.");
+        } catch (\Exception $e) {
+            Log::error('Cancel order error: ' . $e->getMessage(), ['source' => 'telegram']);
+            $this->sendMessage('❌ Ошибка при отмене заказа: ' . $e->getMessage());
         }
     }
 }

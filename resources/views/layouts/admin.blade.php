@@ -181,6 +181,12 @@
                     'routes' => ['admin.module.server-monitoring.*']
                 ])
                 @include('layouts.admin.nav-item', [
+                    'route' => 'admin.module.order.index',
+                    'icon' => 'fa-shopping-cart',
+                    'label' => 'Система заказов',
+                    'routes' => ['admin.module.order.*', 'admin.module.payment-method.*', 'admin.module.order-settings.*']
+                ])
+                @include('layouts.admin.nav-item', [
                     'route' => 'admin.module.connection-limit-violations.index',
                     'icon' => 'fa-shield-alt',
                     'label' => 'Лимиты подключений',

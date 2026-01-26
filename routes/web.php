@@ -228,6 +228,28 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::get('/', [TelegramUserController::class, 'index'])->name('index');
                 Route::post('/{id}/toggle-status', [TelegramUserController::class, 'toggleStatus'])->name('toggle-status');
             });
+
+            // Orders
+            Route::prefix('order')->name('order.')->group(function () {
+                Route::get('/', [\App\Http\Controllers\Module\OrderController::class, 'index'])->name('index');
+                Route::get('/{id}', [\App\Http\Controllers\Module\OrderController::class, 'show'])->name('show');
+                Route::post('/{id}/approve', [\App\Http\Controllers\Module\OrderController::class, 'approve'])->name('approve');
+                Route::post('/{id}/reject', [\App\Http\Controllers\Module\OrderController::class, 'reject'])->name('reject');
+            });
+
+            // Payment Methods
+            Route::prefix('payment-method')->name('payment-method.')->group(function () {
+                Route::get('/', [\App\Http\Controllers\Module\PaymentMethodController::class, 'index'])->name('index');
+                Route::post('/', [\App\Http\Controllers\Module\PaymentMethodController::class, 'store'])->name('store');
+                Route::put('/{id}', [\App\Http\Controllers\Module\PaymentMethodController::class, 'update'])->name('update');
+                Route::delete('/{id}', [\App\Http\Controllers\Module\PaymentMethodController::class, 'destroy'])->name('destroy');
+            });
+
+            // Order Settings
+            Route::prefix('order-settings')->name('order-settings.')->group(function () {
+                Route::get('/', [\App\Http\Controllers\Module\OrderSettingsController::class, 'index'])->name('index');
+                Route::post('/', [\App\Http\Controllers\Module\OrderSettingsController::class, 'update'])->name('update');
+            });
         });
 
         // Dashboard
