@@ -55,6 +55,62 @@ class FatherBotController extends AbstractTelegramBot
 
             if ($message) {
                 $text = $message->getText();
+                
+                // Проверяем состояние ожидания подтверждения оплаты ПЕРЕД проверкой текста
+                // так как фото может быть отправлено без текста
+                $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+                
+                if ($salesman && $salesman->state === self::STATE_WAITING_PAYMENT_PROOF) {
+                    // Проверяем, есть ли фото в сообщении
+                    $photo = $message->getPhoto();
+                    
+                    // Преобразуем коллекцию в массив, если нужно
+                    if ($photo && method_exists($photo, 'toArray')) {
+                        $photo = $photo->toArray();
+                    } elseif ($photo && is_object($photo) && method_exists($photo, 'all')) {
+                        $photo = $photo->all();
+                    }
+                    
+                    Log::info('Checking payment proof state', [
+                        'salesman_id' => $salesman->id,
+                        'has_photo' => !empty($photo),
+                        'photo_type' => gettype($photo),
+                        'photo_count' => is_array($photo) ? count($photo) : (is_countable($photo) ? count($photo) : 0),
+                        'has_text' => !empty($text),
+                        'message_has_photo' => $message->has('photo'),
+                        'source' => 'telegram'
+                    ]);
+                    
+                    if ($photo && (is_array($photo) || is_object($photo)) && !empty($photo)) {
+                        // Преобразуем в массив для обработки
+                        $photoArray = is_array($photo) ? $photo : (method_exists($photo, 'toArray') ? $photo->toArray() : [$photo]);
+                        
+                        Log::info('Processing payment proof photo', [
+                            'salesman_id' => $salesman->id,
+                            'photo_sizes' => count($photoArray),
+                            'source' => 'telegram'
+                        ]);
+                        $this->handlePaymentProof($photoArray);
+                        return;
+                    } else {
+                        // Если нет фото, но есть текст - возможно пользователь хочет отменить
+                        if ($text && (str_contains(strtolower($text), 'отмен') || str_contains(strtolower($text), 'cancel'))) {
+                            // Пытаемся найти активный заказ
+                            $orderId = Cache::get("order_pending_proof:{$salesman->id}");
+                            if ($orderId) {
+                                Log::info('Cancelling order from text command', [
+                                    'order_id' => $orderId,
+                                    'salesman_id' => $salesman->id,
+                                    'source' => 'telegram'
+                                ]);
+                                $this->cancelOrder($orderId);
+                                return;
+                            }
+                        }
+                        $this->sendMessage('❌ Пожалуйста, отправьте скриншот подтверждения оплаты (фото).');
+                        return;
+                    }
+                }
 
                 if (!$text) {
                     Log::warning('Received message without text', [
@@ -85,8 +141,6 @@ class FatherBotController extends AbstractTelegramBot
                 }
 
                 // Проверяем состояние ожидания токена
-                $salesman = Salesman::where('telegram_id', $this->chatId)->first();
-
                 if ($salesman && $salesman->state === self::STATE_WAITING_TOKEN) {
                     $this->handleBotToken($text);
                     return;
@@ -101,19 +155,6 @@ class FatherBotController extends AbstractTelegramBot
                 if ($this->isValidKeyFormat($text)) {
                     $this->handleKeyInfoRequest($text);
                     return;
-                }
-
-                // Проверяем состояние ожидания подтверждения оплаты
-                if ($salesman && $salesman->state === self::STATE_WAITING_PAYMENT_PROOF) {
-                    // Проверяем, есть ли фото в сообщении
-                    $photo = $message->getPhoto();
-                    if ($photo && is_array($photo) && !empty($photo)) {
-                        $this->handlePaymentProof($photo);
-                        return;
-                    } else {
-                        $this->sendMessage('❌ Пожалуйста, отправьте скриншот подтверждения оплаты (фото).');
-                        return;
-                    }
                 }
 
                 // Обработка команд меню
@@ -252,7 +293,18 @@ class FatherBotController extends AbstractTelegramBot
 
                 case 'cancel_order':
                     if (isset($params['order_id'])) {
+                        Log::info('Cancel order callback received', [
+                            'order_id' => $params['order_id'],
+                            'salesman_id' => $this->chatId,
+                            'source' => 'telegram'
+                        ]);
                         $this->cancelOrder($params['order_id']);
+                    } else {
+                        Log::warning('Cancel order callback without order_id', [
+                            'params' => $params,
+                            'source' => 'telegram'
+                        ]);
+                        $this->sendMessage('❌ Ошибка: не указан ID заказа.');
                     }
                     break;
 
@@ -1751,10 +1803,26 @@ class FatherBotController extends AbstractTelegramBot
     protected function handlePaymentProof(array $photo): void
     {
         try {
+            Log::info('handlePaymentProof called', [
+                'chat_id' => $this->chatId,
+                'photo_count' => count($photo),
+                'source' => 'telegram'
+            ]);
+            
             $salesman = Salesman::where('telegram_id', $this->chatId)->firstOrFail();
             $orderId = Cache::get("order_pending_proof:{$salesman->id}");
 
+            Log::info('Payment proof order lookup', [
+                'salesman_id' => $salesman->id,
+                'order_id' => $orderId,
+                'source' => 'telegram'
+            ]);
+
             if (!$orderId) {
+                Log::warning('No active order found for payment proof', [
+                    'salesman_id' => $salesman->id,
+                    'source' => 'telegram'
+                ]);
                 $this->sendMessage('❌ Не найден активный заказ. Пожалуйста, создайте новый заказ.');
                 $salesman->state = null;
                 $salesman->save();
