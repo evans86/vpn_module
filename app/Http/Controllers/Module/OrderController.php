@@ -37,7 +37,14 @@ class OrderController extends Controller
             // Данные для вкладки "Заказы"
             $orders = collect();
             if ($currentTab === 'orders') {
-                $query = Order::with(['pack', 'salesman', 'paymentMethod', 'packSalesman'])
+                $query = Order::with([
+                    'pack' => function($q) {
+                        $q->withTrashed(); // Включаем удаленные пакеты
+                    },
+                    'salesman', 
+                    'paymentMethod', 
+                    'packSalesman'
+                ])
                     ->orderBy('created_at', 'desc');
 
                 // Фильтры
@@ -125,7 +132,14 @@ class OrderController extends Controller
     public function show(int $id)
     {
         try {
-            $order = Order::with(['pack', 'salesman', 'paymentMethod', 'packSalesman'])
+            $order = Order::with([
+                'pack' => function($q) {
+                    $q->withTrashed(); // Включаем удаленные пакеты
+                },
+                'salesman', 
+                'paymentMethod', 
+                'packSalesman'
+            ])
                 ->findOrFail($id);
 
             return view('module.order.show', compact('order'));
@@ -196,6 +210,43 @@ class OrderController extends Controller
 
             return redirect()->route('admin.module.order.show', $id)
                 ->with('error', 'Ошибка при отклонении заказа: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Удалить заказ
+     */
+    public function destroy(int $id): RedirectResponse
+    {
+        try {
+            $order = Order::findOrFail($id);
+
+            // Проверяем, можно ли удалить заказ
+            // Нельзя удалять одобренные заказы, так как они уже связаны с пакетами
+            if ($order->status == Order::STATUS_APPROVED) {
+                return redirect()->route('admin.module.order.show', $id)
+                    ->with('error', 'Нельзя удалить одобренный заказ, так как пакет уже выдан продавцу.');
+            }
+
+            $orderId = $order->id;
+            $order->delete();
+
+            $this->logger->info('Order deleted', [
+                'order_id' => $orderId,
+                'source' => 'admin'
+            ]);
+
+            return redirect()->route('admin.module.order.index')
+                ->with('success', 'Заказ #' . $orderId . ' удален');
+        } catch (Exception $e) {
+            $this->logger->error('Error deleting order', [
+                'order_id' => $id,
+                'error' => $e->getMessage(),
+                'source' => 'admin'
+            ]);
+
+            return redirect()->route('admin.module.order.show', $id)
+                ->with('error', 'Ошибка при удалении заказа: ' . $e->getMessage());
         }
     }
 }

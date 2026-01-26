@@ -45,10 +45,9 @@ class OrderSettingsController extends Controller
             // Обновляем статус системы
             OrderSetting::setSystemEnabled($request->has('system_enabled'));
 
-            // Обновляем Telegram ID для уведомлений
-            if ($request->filled('notification_telegram_id')) {
-                OrderSetting::setValue('notification_telegram_id', $request->notification_telegram_id);
-            }
+            // Обновляем Telegram ID для уведомлений (всегда обновляем, даже если пустое, чтобы можно было очистить)
+            $telegramId = $request->input('notification_telegram_id', '');
+            OrderSetting::setValue('notification_telegram_id', $telegramId ?: null);
 
             // Обновляем доступность пакетов
             if ($request->has('pack_availability')) {

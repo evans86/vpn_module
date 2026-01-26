@@ -106,11 +106,12 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                    @if($order->status == Order::STATUS_PENDING) bg-gray-100 text-gray-800
-                                    @elseif($order->status == Order::STATUS_AWAITING_CONFIRMATION) bg-yellow-100 text-yellow-800
-                                    @elseif($order->status == Order::STATUS_APPROVED) bg-green-100 text-green-800
-                                    @elseif($order->status == Order::STATUS_REJECTED) bg-red-100 text-red-800
-                                    @else bg-gray-100 text-gray-800
+                                    @if($order->status == Order::STATUS_PENDING) bg-blue-100 text-blue-800 border border-blue-200
+                                    @elseif($order->status == Order::STATUS_AWAITING_CONFIRMATION) bg-amber-100 text-amber-800 border border-amber-200
+                                    @elseif($order->status == Order::STATUS_APPROVED) bg-emerald-100 text-emerald-800 border border-emerald-200
+                                    @elseif($order->status == Order::STATUS_REJECTED) bg-rose-100 text-rose-800 border border-rose-200
+                                    @elseif($order->status == Order::STATUS_CANCELLED) bg-slate-100 text-slate-800 border border-slate-200
+                                    @else bg-gray-100 text-gray-800 border border-gray-200
                                     @endif">
                                     {{ $order->getStatusText() }}
                                 </span>
@@ -119,10 +120,26 @@
                                 {{ $order->created_at->format('d.m.Y H:i') }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <a href="{{ route('admin.module.order.show', $order->id) }}"
-                                   class="text-indigo-600 hover:text-indigo-900">
-                                    Просмотр
-                                </a>
+                                <div class="flex items-center justify-end gap-2">
+                                    <a href="{{ route('admin.module.order.show', $order->id) }}"
+                                       class="text-indigo-600 hover:text-indigo-900">
+                                        Просмотр
+                                    </a>
+                                    @if($order->status != Order::STATUS_APPROVED)
+                                        <form action="{{ route('admin.module.order.destroy', $order->id) }}" 
+                                              method="POST" 
+                                              class="inline"
+                                              onsubmit="return confirm('Вы уверены, что хотите удалить заказ #{{ $order->id }}? Это действие нельзя отменить.')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" 
+                                                    class="text-red-600 hover:text-red-900"
+                                                    title="Удалить заказ">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     @endforeach

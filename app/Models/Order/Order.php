@@ -46,11 +46,11 @@ class Order extends Model
     ];
 
     /**
-     * Отношение к пакету
+     * Отношение к пакету (включая удаленные)
      */
     public function pack(): BelongsTo
     {
-        return $this->belongsTo(Pack::class, 'pack_id');
+        return $this->belongsTo(Pack::class, 'pack_id')->withTrashed();
     }
 
     /**

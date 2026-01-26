@@ -15,11 +15,12 @@
                 <div>
                     <h3 class="text-sm font-medium text-gray-500 mb-2">Статус</h3>
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
-                                    @if($order->status == Order::STATUS_PENDING) bg-gray-100 text-gray-800
-                                    @elseif($order->status == Order::STATUS_AWAITING_CONFIRMATION) bg-yellow-100 text-yellow-800
-                                    @elseif($order->status == Order::STATUS_APPROVED) bg-green-100 text-green-800
-                                    @elseif($order->status == Order::STATUS_REJECTED) bg-red-100 text-red-800
-                        @else bg-gray-100 text-gray-800
+                                    @if($order->status == Order::STATUS_PENDING) bg-blue-100 text-blue-800 border border-blue-200
+                                    @elseif($order->status == Order::STATUS_AWAITING_CONFIRMATION) bg-amber-100 text-amber-800 border border-amber-200
+                                    @elseif($order->status == Order::STATUS_APPROVED) bg-emerald-100 text-emerald-800 border border-emerald-200
+                                    @elseif($order->status == Order::STATUS_REJECTED) bg-rose-100 text-rose-800 border border-rose-200
+                                    @elseif($order->status == Order::STATUS_CANCELLED) bg-slate-100 text-slate-800 border border-slate-200
+                        @else bg-gray-100 text-gray-800 border border-gray-200
                         @endif">
                         {{ $order->getStatusText() }}
                     </span>
@@ -176,13 +177,28 @@
             </x-admin.card>
         @endif
 
-        <!-- Back Button -->
-        <div class="flex justify-start">
+        <!-- Actions Footer -->
+        <div class="flex justify-between items-center">
             <a href="{{ route('admin.module.order.index') }}"
                class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                 <i class="fas fa-arrow-left mr-2"></i>
                 Назад к списку заказов
             </a>
+            
+            @if($order->status != Order::STATUS_APPROVED)
+                <form action="{{ route('admin.module.order.destroy', $order->id) }}" 
+                      method="POST" 
+                      class="inline"
+                      onsubmit="return confirm('Вы уверены, что хотите удалить заказ #{{ $order->id }}? Это действие нельзя отменить.')">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" 
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                        <i class="fas fa-trash mr-2"></i>
+                        Удалить заказ
+                    </button>
+                </form>
+            @endif
         </div>
     </div>
 @endsection

@@ -271,6 +271,41 @@ abstract class AbstractTelegramBot
     }
 
     /**
+     * Удаление сообщения
+     *
+     * @param int|null $messageId ID сообщения для удаления. Если не указан, удаляется сообщение из callback query
+     */
+    public function deleteMessage(?int $messageId = null): void
+    {
+        try {
+            $msgId = $messageId;
+            
+            // Если messageId не указан, пытаемся получить из callback query
+            if ($msgId === null && $this->update->getCallbackQuery()) {
+                $msgId = $this->update->getCallbackQuery()->getMessage()->getMessageId();
+            }
+            
+            if ($msgId === null) {
+                Log::warning('Cannot delete message: message ID not provided', [
+                    'source' => 'telegram'
+                ]);
+                return;
+            }
+
+            $this->telegram->deleteMessage([
+                'chat_id' => $this->chatId,
+                'message_id' => $msgId
+            ]);
+        } catch (Exception $e) {
+            Log::error('Delete message error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'message_id' => $messageId,
+                'source' => 'telegram'
+            ]);
+        }
+    }
+
+    /**
      * Базовый error
      */
     protected function sendErrorMessage(): void

@@ -275,8 +275,9 @@ class FatherBotController extends AbstractTelegramBot
                     break;
 
                 case 'current_page':
-                    // Просто отвечаем на callback query без изменений
-                    $this->answerCallbackQuery('Вы уже на этой странице');
+                    // Удаляем сообщение при нажатии "Отмена"
+                    $this->deleteMessage();
+                    $this->answerCallbackQuery();
                     break;
 
                 case 'buy_pack':
@@ -1925,6 +1926,9 @@ class FatherBotController extends AbstractTelegramBot
                 $this->sendMessage('❌ Этот заказ нельзя отменить.');
                 return;
             }
+
+            // Удаляем сообщение с заказом перед отменой
+            $this->deleteMessage();
 
             $orderService = new OrderService(app(\App\Services\Pack\PackSalesmanService::class));
             $orderService->cancel($orderId);

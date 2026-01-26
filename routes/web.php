@@ -235,6 +235,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::get('/{id}', [\App\Http\Controllers\Module\OrderController::class, 'show'])->name('show');
                 Route::post('/{id}/approve', [\App\Http\Controllers\Module\OrderController::class, 'approve'])->name('approve');
                 Route::post('/{id}/reject', [\App\Http\Controllers\Module\OrderController::class, 'reject'])->name('reject');
+                Route::delete('/{id}', [\App\Http\Controllers\Module\OrderController::class, 'destroy'])->name('destroy');
             });
 
             // Payment Methods
