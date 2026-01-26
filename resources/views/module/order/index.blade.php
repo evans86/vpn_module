@@ -82,7 +82,7 @@
                                     <a href="{{ route('admin.module.salesman.index', ['username' => $order->salesman->username]) }}"
                                        class="text-indigo-600 hover:text-indigo-800">
                                         @if($order->salesman->username)
-                                            @{{ $order->salesman->username }}
+                                            {{ '@' . $order->salesman->username }}
                                         @else
                                             Продавец #{{ $order->salesman->id }}
                                         @endif
