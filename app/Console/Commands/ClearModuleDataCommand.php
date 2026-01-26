@@ -3,9 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\KeyActivate\KeyActivate;
-use App\Models\PackSalesman\PackSalesman;
-use App\Models\Server\Server;
-use App\Models\Panel\Panel;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 

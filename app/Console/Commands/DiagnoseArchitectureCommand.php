@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
-use ReflectionClass;
 
 class DiagnoseArchitectureCommand extends Command
 {
@@ -85,24 +84,24 @@ class DiagnoseArchitectureCommand extends Command
         ];
 
         $files = $this->getPhpFiles();
-        
+
         // Исключаем команды диагностики и тестирования из проверки
         $excludedFiles = [
             'DiagnoseArchitectureCommand.php',
             'TestRefactoringCommand.php'
         ];
-        
+
         foreach ($files as $file) {
             if (!File::exists($file)) {
                 continue;
             }
-            
+
             // Пропускаем исключенные файлы
             $fileName = basename($file);
             if (in_array($fileName, $excludedFiles)) {
                 continue;
             }
-            
+
             try {
                 $content = File::get($file);
                 foreach ($patterns as $type => $config) {
@@ -110,7 +109,7 @@ class DiagnoseArchitectureCommand extends Command
                     if (isset($config['exclude']) && in_array($fileName, $config['exclude'])) {
                         continue;
                     }
-                    
+
                     if (preg_match($config['pattern'], $content)) {
                         $this->addIssue($file, $config['message'], $config['severity']);
                     }
@@ -178,33 +177,33 @@ class DiagnoseArchitectureCommand extends Command
         ];
 
         $files = $this->getPhpFiles();
-        
+
         // Исключаем команды диагностики и тестирования из проверки
         $excludedFiles = [
             'DiagnoseArchitectureCommand.php',
             'TestRefactoringCommand.php'
         ];
-        
+
         foreach ($files as $file) {
             if (!File::exists($file)) {
                 continue;
             }
-            
+
             $fileName = basename($file);
-            
+
             // Пропускаем исключенные файлы
             if (in_array($fileName, $excludedFiles)) {
                 continue;
             }
-            
+
             try {
                 $content = File::get($file);
-                
+
                 foreach ($patterns as $type => $config) {
                     if (in_array($fileName, $config['exclude'])) {
                         continue;
                     }
-                    
+
                     // Проверяем исключающие паттерны (fallback значения и т.д.)
                     if (isset($config['excludePatterns'])) {
                         $shouldExclude = false;
@@ -218,7 +217,7 @@ class DiagnoseArchitectureCommand extends Command
                             continue;
                         }
                     }
-                    
+
                     if (preg_match($config['pattern'], $content)) {
                         $this->addIssue($file, $config['message'], $config['severity']);
                     }
@@ -284,7 +283,7 @@ class DiagnoseArchitectureCommand extends Command
 
                 // Методы, которые есть в сервисе, но могут отсутствовать в интерфейсе
                 $missingMethods = array_diff($serviceMethodsList, $interfaceMethodsList);
-                
+
                 // Фильтруем служебные методы
                 $missingMethods = array_filter($missingMethods, function($method) {
                     return !in_array($method, ['__construct', 'getArray', 'toArray']);
@@ -298,13 +297,13 @@ class DiagnoseArchitectureCommand extends Command
                     'getArray', // Вспомогательные методы
                     'toArray', // Вспомогательные методы
                 ];
-                
+
                 foreach ($missingMethods as $method) {
                     // Пропускаем исключенные методы
                     if (in_array($method, $excludedMethods)) {
                         continue;
                     }
-                    
+
                     // Проверяем, используется ли метод где-то напрямую
                     if ($this->isMethodUsedDirectly('MarzbanService', $method)) {
                         $this->addWarning(
@@ -335,22 +334,22 @@ class DiagnoseArchitectureCommand extends Command
                 if (!File::exists($file)) {
                     continue;
                 }
-                
+
                 try {
                     $content = File::get($file);
-                    
+
                     // Проверяем только реальный хардкод в запросах, исключая:
                     // 1. Значения по умолчанию в параметрах методов (?? Panel::MARZBAN)
                     // 2. Fallback значения ($panel->panel ?? Panel::MARZBAN)
                     // 3. Значения по умолчанию в объявлениях параметров (?string $panelType = null)
-                    
+
                     // Паттерн ищет хардкод в запросах к БД или сравнениях
                     $hasHardcode = preg_match('/(?:->where\([\'"]panel[\'"]\s*,\s*Panel::MARZBAN|->where\([\'"]provider[\'"]\s*,\s*Server::VDSINA)/i', $content);
-                    
+
                     if ($hasHardcode) {
                         // Проверяем, не является ли это значением по умолчанию
                         $isDefaultValue = preg_match('/(?:\?\s*string\s+\$[^=]*=\s*(?:Panel::MARZBAN|Server::VDSINA)|\\?\\?\s*(?:Panel::MARZBAN|Server::VDSINA)|->panel\s*\\?\\?\s*(?:Panel::MARZBAN|Server::VDSINA))/', $content);
-                        
+
                         if (!$isDefaultValue) {
                             $this->addWarning($file, 'Репозиторий содержит хардкод типов провайдеров/панелей');
                         }
@@ -375,14 +374,14 @@ class DiagnoseArchitectureCommand extends Command
             if (!File::exists($file)) {
                 continue;
             }
-            
+
             try {
                 $content = File::get($file);
                 // Исключаем сам сервис и стратегию
                 if (strpos($file, $serviceClass) !== false || strpos($file, 'Strategy') !== false) {
                     continue;
                 }
-                
+
                 if (preg_match($pattern, $content)) {
                     return true;
                 }
@@ -402,14 +401,14 @@ class DiagnoseArchitectureCommand extends Command
     {
         $files = File::allFiles(app_path());
         $phpFiles = [];
-        
+
         foreach ($files as $file) {
             // File::allFiles возвращает SplFileInfo объекты
             if ($file instanceof \SplFileInfo && $file->getExtension() === 'php') {
                 $phpFiles[] = $file->getPathname();
             }
         }
-        
+
         return $phpFiles;
     }
 
@@ -419,7 +418,7 @@ class DiagnoseArchitectureCommand extends Command
     private function addIssue(string $file, string $message, string $severity = 'error'): void
     {
         $relativePath = str_replace(base_path() . DIRECTORY_SEPARATOR, '', $file);
-        
+
         if ($severity === 'error') {
             $this->issues[] = [
                 'file' => $relativePath,
@@ -509,7 +508,7 @@ class DiagnoseArchitectureCommand extends Command
     private function displaySummary(): void
     {
         $totalIssues = count($this->issues) + count($this->warnings);
-        
+
         $this->line('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         $this->info('📈 Итоговая статистика:');
         $this->line("   Критических проблем: " . count($this->issues));

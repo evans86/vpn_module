@@ -4,8 +4,6 @@ namespace App\Console\Commands;
 
 use App\Models\Panel\Panel;
 use App\Repositories\Panel\PanelRepository;
-use App\Services\External\MarzbanAPI;
-use App\Services\Panel\PanelStrategy;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -28,7 +26,7 @@ class CheckPanelsWithErrors extends Command
         $this->info('Начинаем проверку панелей с ошибками...');
 
         $panelsWithErrors = $this->panelRepository->getPanelsWithErrors();
-        
+
         if ($panelsWithErrors->isEmpty()) {
             $this->info('Панелей с ошибками не найдено.');
             return 0;
@@ -61,7 +59,7 @@ class CheckPanelsWithErrors extends Command
             } catch (\Exception $e) {
                 $this->error("Ошибка при проверке панели ID-{$panel->id}: {$e->getMessage()}");
                 $stillBroken++;
-                
+
                 Log::error('Error checking panel health', [
                     'source' => 'cron',
                     'panel_id' => $panel->id,
@@ -80,7 +78,7 @@ class CheckPanelsWithErrors extends Command
     /**
      * Проверка работоспособности панели
      * Пытается создать тестового пользователя и сразу удалить его
-     * 
+     *
      * @param Panel $panel
      * @return bool
      */
@@ -90,7 +88,7 @@ class CheckPanelsWithErrors extends Command
             // Используем стратегию для работы с панелью
             $panelStrategyFactory = new \App\Services\Panel\PanelStrategyFactory();
             $panelStrategy = $panelStrategyFactory->create($panel->panel);
-            
+
             // Обновляем токен через стратегию
             $panel = $panelStrategy->updateToken($panel->id);
 
@@ -101,7 +99,7 @@ class CheckPanelsWithErrors extends Command
             // Для проверки здоровья создаем тестового пользователя через стратегию
             // ВАЖНО: Это специфичная логика для проверки, но используем стратегию
             $testUserId = 'test-' . Str::uuid();
-            
+
             try {
                 // Создаем тестового пользователя через стратегию
                 $testUser = $panelStrategy->addServerUser(

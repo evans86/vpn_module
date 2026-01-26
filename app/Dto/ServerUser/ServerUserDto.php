@@ -2,13 +2,10 @@
 
 namespace App\Dto\ServerUser;
 
-use Faker\Provider\Uuid;
-use phpseclib\Math\BigInteger;
-
 class ServerUserDto
 {
     public string $id;
-    public BigInteger $panel_id; // какой панели принадлежит пользователь
+    public int $panel_id; // какой панели принадлежит пользователь
     public string $keys;
     public bool $is_free;
 

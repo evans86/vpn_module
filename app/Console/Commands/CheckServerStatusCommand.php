@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Models\Server\Server;
 use App\Services\Server\ServerStrategy;
-use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
