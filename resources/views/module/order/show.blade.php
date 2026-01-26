@@ -50,7 +50,11 @@
                     @if($order->salesman)
                         <a href="{{ route('admin.module.salesman.index', ['username' => $order->salesman->username]) }}"
                            class="text-indigo-600 hover:text-indigo-800">
-                            @{{ $order->salesman->username }}
+                            @if($order->salesman->username)
+                                {{ '@' . $order->salesman->username }}
+                            @else
+                                Продавец #{{ $order->salesman->id }}
+                            @endif
                         </a>
                         <div class="text-sm text-gray-600 mt-1">
                             Telegram ID: {{ $order->salesman->telegram_id }}

@@ -1620,19 +1620,22 @@ class FatherBotController extends AbstractTelegramBot
                 $message .= "📦 <b>{$pack->title}</b>\n";
                 $message .= "💰 Цена: " . number_format($pack->price, 0, '.', ' ') . " ₽\n";
                 $message .= "🔑 Ключей: {$pack->count}\n";
-                $message .= "⏱ Период: {$pack->period} дней\n";
-                $message .= "💾 Трафик: " . number_format($pack->traffic_limit / (1024 * 1024 * 1024), 1) . " GB\n\n";
+                $message .= "⏱ Период: {$pack->period} дней\n\n";
 
-                $buttons[] = [[
-                    'text' => "📦 {$pack->title} - " . number_format($pack->price, 0, '.', ' ') . " ₽",
-                    'callback_data' => json_encode(['action' => 'buy_pack', 'pack_id' => $pack->id])
-                ]];
+                $buttons[] = [
+                    [
+                        'text' => "📦 {$pack->title} - " . number_format($pack->price, 0, '.', ' ') . " ₽",
+                        'callback_data' => json_encode(['action' => 'buy_pack', 'pack_id' => $pack->id])
+                    ]
+                ];
             }
 
-            $buttons[] = [[
-                'text' => '❌ Отмена',
-                'callback_data' => json_encode(['action' => 'current_page'])
-            ]];
+            $buttons[] = [
+                [
+                    'text' => '❌ Отмена',
+                    'callback_data' => json_encode(['action' => 'current_page'])
+                ]
+            ];
 
             $this->sendMessage($message, [
                 'inline_keyboard' => $buttons
@@ -1665,16 +1668,20 @@ class FatherBotController extends AbstractTelegramBot
             $buttons = [];
             foreach ($paymentMethods as $method) {
                 $icon = $method->getTypeIcon();
-                $buttons[] = [[
-                    'text' => "{$icon} {$method->name}",
-                    'callback_data' => json_encode(['action' => 'select_payment', 'pack_id' => $packId, 'payment_id' => $method->id])
-                ]];
+                $buttons[] = [
+                    [
+                        'text' => "{$icon} {$method->name}",
+                        'callback_data' => json_encode(['action' => 'select_payment', 'pack_id' => $packId, 'payment_id' => $method->id])
+                    ]
+                ];
             }
 
-            $buttons[] = [[
-                'text' => '❌ Отмена',
-                'callback_data' => json_encode(['action' => 'current_page'])
-            ]];
+            $buttons[] = [
+                [
+                    'text' => '❌ Отмена',
+                    'callback_data' => json_encode(['action' => 'current_page'])
+                ]
+            ];
 
             $this->sendMessage($message, [
                 'inline_keyboard' => $buttons
@@ -1720,10 +1727,14 @@ class FatherBotController extends AbstractTelegramBot
             // Сохраняем ID заказа в кэше для связи с фото
             Cache::put("order_pending_proof:{$salesman->id}", $order->id, now()->addHours(24));
 
-            $buttons = [[
-                'text' => '❌ Отменить заказ',
-                'callback_data' => json_encode(['action' => 'cancel_order', 'order_id' => $order->id])
-            ]];
+            $buttons = [
+                [
+                    [
+                        'text' => '❌ Отменить заказ',
+                        'callback_data' => json_encode(['action' => 'cancel_order', 'order_id' => $order->id])
+                    ]
+                ]
+            ];
 
             $this->sendMessage($message, [
                 'inline_keyboard' => $buttons
