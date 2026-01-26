@@ -358,12 +358,24 @@
             @endif
         </script>
         @elseif($currentTab === 'settings')
+        <!-- Fixed Save Button at Bottom (only visible on settings tab) -->
+        <div id="settingsSaveButton" class="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-lg" style="margin-left: 0;">
+            <div class="max-w-7xl mx-auto px-6 py-4 flex justify-end">
+                <button type="submit" 
+                        form="orderSettingsForm"
+                        class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <i class="fas fa-save mr-2"></i>
+                    Сохранить настройки
+                </button>
+            </div>
+        </div>
+
         <x-admin.card title="Основные настройки">
-            <form action="{{ route('admin.module.order-settings.update') }}?tab=settings" method="POST">
+            <form action="{{ route('admin.module.order-settings.update') }}?tab=settings" method="POST" id="orderSettingsForm">
                 @csrf
                 <input type="hidden" name="tab" value="settings">
 
-                <div class="space-y-6">
+                <div class="space-y-6 pb-24">
                     <!-- System Enable/Disable -->
                     <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                         <div>
@@ -444,18 +456,36 @@
                             </div>
                         @endif
                     </div>
-
-                    <!-- Submit Button -->
-                    <div class="flex justify-end pt-4 border-t">
-                        <button type="submit" 
-                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                            <i class="fas fa-save mr-2"></i>
-                            Сохранить настройки
-                        </button>
-                    </div>
                 </div>
             </form>
         </x-admin.card>
+
+        <script>
+            // Скрыть кнопку при переключении на другие вкладки
+            document.addEventListener('DOMContentLoaded', function() {
+                const saveButton = document.getElementById('settingsSaveButton');
+                if (!saveButton) return;
+
+                // Слушаем клики по вкладкам
+                const tabs = document.querySelectorAll('a[href*="tab="]');
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', function(e) {
+                        const url = new URL(this.href);
+                        const tabParam = url.searchParams.get('tab') || 'orders';
+                        // Скрываем кнопку перед переходом
+                        if (tabParam !== 'settings') {
+                            saveButton.style.display = 'none';
+                        }
+                    });
+                });
+
+                // Проверяем текущую вкладку при загрузке
+                const currentTab = new URL(window.location.href).searchParams.get('tab') || 'orders';
+                if (currentTab !== 'settings') {
+                    saveButton.style.display = 'none';
+                }
+            });
+        </script>
         @endif
     </div>
 @endsection
