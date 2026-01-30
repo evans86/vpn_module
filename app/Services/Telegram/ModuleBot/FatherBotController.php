@@ -396,23 +396,38 @@ class FatherBotController extends AbstractTelegramBot
     }
 
     /**
-     * @return string
-     * @throws Exception
+     * Генерация URL для авторизации
+     *
+     * @return string|null
      */
-    public function generateAuthUrl(): string
+    public function generateAuthUrl(): ?string
     {
-        $botUsername = ltrim(env('TELEGRAM_FATHER_BOT_NAME'), '@');
-        if (empty($botUsername)) {
-            throw new \Exception('Bot username not configured');
+        try {
+            $botUsername = ltrim(env('TELEGRAM_FATHER_BOT_NAME'), '@');
+            if (empty($botUsername)) {
+                Log::warning('Bot username not configured, cannot generate auth URL', ['source' => 'telegram']);
+                return null;
+            }
+
+            if (!$this->chatId) {
+                Log::warning('Chat ID not available, cannot generate auth URL', ['source' => 'telegram']);
+                return null;
+            }
+
+            $hash = bin2hex(random_bytes(16));
+            Cache::put("telegram_auth:{$hash}", [
+                'user_id' => $this->chatId,
+                'callback_url' => config('app.url') . '/personal/auth/telegram/callback'
+            ], now()->addMinutes(5));
+
+            return "https://t.me/{$botUsername}?start=auth_{$hash}";
+        } catch (\Exception $e) {
+            Log::error('Error generating auth URL: ' . $e->getMessage(), [
+                'source' => 'telegram',
+                'trace' => $e->getTraceAsString()
+            ]);
+            return null;
         }
-
-        $hash = bin2hex(random_bytes(16));
-        Cache::put("telegram_auth:{$hash}", [
-            'user_id' => $this->chatId,
-            'callback_url' => config('app.url') . '/personal/auth/telegram/callback'
-        ], now()->addMinutes(5));
-
-        return "https://t.me/{$botUsername}?start=auth_{$hash}";
     }
 
     /**
