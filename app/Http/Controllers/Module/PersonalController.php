@@ -199,31 +199,43 @@ class PersonalController extends Controller
         // Объединяем ID
         $allKeysIds = array_unique(array_merge($moduleKeysIds, $botKeysIds));
 
-        // Объединяем два запроса
+        // Объединяем два запроса с оптимизацией памяти
         $query = KeyActivate::query()
+            ->select([
+                'id',
+                'traffic_limit',
+                'pack_salesman_id',
+                'module_salesman_id',
+                'finish_at',
+                'activated_at',
+                'user_tg_id',
+                'deleted_at',
+                'status',
+                'created_at',
+                'updated_at'
+            ])
             ->with([
                 'packSalesman' => function($q) {
                     $q->select('id', 'salesman_id', 'pack_id');
                 },
                 'packSalesman.pack' => function($q) {
-                    $q->select('id', 'title', 'period', 'price');
+                    $q->select('id', 'title', 'period', 'price', 'traffic_limit');
                 },
                 'packSalesman.salesman' => function($q) {
-                    $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id');
+                    $q->select('id', 'telegram_id', 'username', 'panel_id');
                 },
                 'moduleSalesman' => function($q) {
-                    $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id');
+                    $q->select('id', 'telegram_id', 'username', 'panel_id');
                 },
                 'keyActivateUser' => function($q) {
                     $q->select('id', 'key_activate_id', 'server_user_id');
                 },
                 'keyActivateUser.serverUser' => function($q) {
-                    $q->select('id', 'panel_id');
+                    $q->select('id', 'panel_id', 'keys', 'is_free');
                 },
                 'keyActivateUser.serverUser.panel' => function($q) {
-                    $q->select('id', 'panel', 'panel_adress', 'auth_token', 'panel_login', 'panel_password', 'token_died_time');
-                },
-                'user'
+                    $q->select('id', 'panel', 'panel_adress', 'panel_status');
+                }
             ])
             ->whereIn('id', $allKeysIds);
 
@@ -259,7 +271,10 @@ class PersonalController extends Controller
             }
         }
 
-        $keys = $query->orderBy('created_at', 'desc')->paginate(15);
+        // Ограничиваем максимальное количество записей на странице для защиты от перегрузки памяти
+        $perPage = min($request->get('per_page', 15), 50); // Максимум 50 записей на странице
+        
+        $keys = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
         $statuses = [
             '' => 'Все статусы',
