@@ -186,57 +186,40 @@ class PersonalController extends Controller
         $salesman = Auth::guard('salesman')->user();
 //                $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
-        // Ключи из модуля (прямая связь) - получаем ID напрямую
-        $moduleKeysIds = $salesman->moduleKeyActivates()->pluck('id')->toArray();
-
-        // Ключи из бота (через pack_salesman) - получаем ID напрямую
-        // Используем select() чтобы явно указать таблицу для избежания неоднозначности
-        $botKeysIds = $salesman->botKeyActivates()
-            ->select('key_activate.id as id')
-            ->pluck('id')
-            ->toArray();
-
-        // Объединяем ID
-        $allKeysIds = array_unique(array_merge($moduleKeysIds, $botKeysIds));
-
-        // Объединяем два запроса с оптимизацией памяти
+        // Используем более эффективный подход с join вместо whereHas
+        // Это избегает проблем с памятью и работает быстрее
         $query = KeyActivate::query()
             ->select([
-                'id',
-                'traffic_limit',
-                'pack_salesman_id',
-                'module_salesman_id',
-                'finish_at',
-                'user_tg_id',
-                'deleted_at',
-                'status',
-                'created_at',
-                'updated_at'
+                'key_activate.id',
+                'key_activate.traffic_limit',
+                'key_activate.pack_salesman_id',
+                'key_activate.module_salesman_id',
+                'key_activate.finish_at',
+                'key_activate.user_tg_id',
+                'key_activate.deleted_at',
+                'key_activate.status',
+                'key_activate.created_at',
+                'key_activate.updated_at'
             ])
+            ->leftJoin('pack_salesman', 'key_activate.pack_salesman_id', '=', 'pack_salesman.id')
+            ->where(function ($q) use ($salesman) {
+                // Ключи из модуля (прямая связь)
+                $q->where('key_activate.module_salesman_id', $salesman->id)
+                    // Ключи из бота (через pack_salesman)
+                    ->orWhere('pack_salesman.salesman_id', $salesman->id);
+            })
+            ->distinct()
             ->with([
                 'packSalesman' => function($q) {
                     $q->select('id', 'salesman_id', 'pack_id');
                 },
                 'packSalesman.pack' => function($q) {
-                    $q->select('id', 'title', 'period', 'price', 'traffic_limit');
+                    $q->select('id', 'name', 'period', 'traffic_limit');
                 },
-                'packSalesman.salesman' => function($q) {
-                    $q->select('id', 'telegram_id', 'username', 'panel_id');
-                },
-                'moduleSalesman' => function($q) {
-                    $q->select('id', 'telegram_id', 'username', 'panel_id');
-                },
-                'keyActivateUser' => function($q) {
-                    $q->select('id', 'key_activate_id', 'server_user_id');
-                },
-                'keyActivateUser.serverUser' => function($q) {
-                    $q->select('id', 'panel_id', 'keys', 'is_free');
-                },
-                'keyActivateUser.serverUser.panel' => function($q) {
-                    $q->select('id', 'panel', 'panel_adress', 'panel_status');
+                'user' => function($q) {
+                    $q->select('telegram_id', 'username', 'first_name');
                 }
-            ])
-            ->whereIn('id', $allKeysIds);
+            ]);
 
         // Применяем фильтры
         if ($request->has('key_search') && !empty($request->key_search)) {
