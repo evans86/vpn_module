@@ -207,7 +207,6 @@ class PersonalController extends Controller
                 'pack_salesman_id',
                 'module_salesman_id',
                 'finish_at',
-                'activated_at',
                 'user_tg_id',
                 'deleted_at',
                 'status',
