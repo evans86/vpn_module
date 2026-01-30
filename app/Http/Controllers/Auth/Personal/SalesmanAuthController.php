@@ -25,7 +25,11 @@ class SalesmanAuthController extends Controller
     {
         try {
             $bot = new FatherBotController(env('TELEGRAM_FATHER_BOT_TOKEN'));
-            return redirect()->away($bot->generateAuthUrl());
+            $authUrl = $bot->generateAuthUrl();
+            if (!$authUrl) {
+                return back()->with('error', 'Имя бота не настроено. Обратитесь к администратору.');
+            }
+            return redirect()->away($authUrl);
         } catch (Exception $e) {
             Log::error('Redirect error: ' . $e->getMessage());
             return back()->with('error', 'Ошибка при создании ссылки авторизации');

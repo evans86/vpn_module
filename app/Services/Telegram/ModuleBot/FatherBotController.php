@@ -360,6 +360,10 @@ class FatherBotController extends AbstractTelegramBot
             }
 
             $botDeepLink = $this->generateAuthUrl();
+            if (!$botDeepLink) {
+                $this->sendMessage("❌ Ошибка: имя бота не настроено. Обратитесь к администратору.");
+                return;
+            }
             $hash = explode('auth_', $botDeepLink)[1];
 
             // Сохраняем в кэше информацию о том, что запрос идет из бота
@@ -1629,16 +1633,22 @@ class FatherBotController extends AbstractTelegramBot
                 $message .= "📅 <b>Регистрация: <code>" . $salesman->created_at->format('d.m.Y H:i') . "</code></b>\n";
             }
 
-            $keyboard = [
-                'inline_keyboard' => [
-                    [
+            // Пытаемся сгенерировать URL для входа в личный кабинет
+            $authUrl = $this->generateAuthUrl();
+            $keyboard = null;
+            
+            if ($authUrl) {
+                $keyboard = [
+                    'inline_keyboard' => [
                         [
-                            'text' => '🔑 Войти в личный кабинет',
-                            'url' => $this->generateAuthUrl()
+                            [
+                                'text' => '🔑 Войти в личный кабинет',
+                                'url' => $authUrl
+                            ]
                         ]
                     ]
-                ]
-            ];
+                ];
+            }
 
             $this->sendMessage($message, $keyboard);
         } catch (\Exception $e) {
