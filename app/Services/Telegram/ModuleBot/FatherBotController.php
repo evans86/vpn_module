@@ -403,14 +403,29 @@ class FatherBotController extends AbstractTelegramBot
     public function generateAuthUrl(): ?string
     {
         try {
-            $botUsername = ltrim(env('TELEGRAM_FATHER_BOT_NAME'), '@');
-            if (empty($botUsername)) {
-                Log::warning('Bot username not configured, cannot generate auth URL', ['source' => 'telegram']);
+            if (!$this->chatId) {
+                Log::warning('Chat ID not available, cannot generate auth URL', ['source' => 'telegram']);
                 return null;
             }
 
-            if (!$this->chatId) {
-                Log::warning('Chat ID not available, cannot generate auth URL', ['source' => 'telegram']);
+            // Пытаемся получить username из env
+            $botUsername = ltrim(env('TELEGRAM_FATHER_BOT_NAME'), '@');
+            
+            // Если не настроен в env, получаем через API (с кэшированием)
+            if (empty($botUsername)) {
+                $botUsername = Cache::remember('telegram_father_bot_username', 3600, function () {
+                    try {
+                        $botInfo = $this->telegram->getMe();
+                        return $botInfo->getUsername();
+                    } catch (\Exception $e) {
+                        Log::error('Failed to get bot username from API: ' . $e->getMessage(), ['source' => 'telegram']);
+                        return null;
+                    }
+                });
+            }
+
+            if (empty($botUsername)) {
+                Log::warning('Bot username not available, cannot generate auth URL', ['source' => 'telegram']);
                 return null;
             }
 
