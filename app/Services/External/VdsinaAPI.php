@@ -13,6 +13,16 @@ class VdsinaAPI
 {
     const BASE_URL = 'https://userapi.vdsina.com/v1/';
     private string $apiKey;
+    
+    /**
+     * Время последнего запроса для rate limiting
+     */
+    private static ?float $lastRequestTime = null;
+    
+    /**
+     * Минимальная задержка между запросами (в секундах)
+     */
+    private const MIN_REQUEST_DELAY = 0.5; // 500ms между запросами
 
     public function __construct($apiKey)
     {
@@ -28,6 +38,16 @@ class VdsinaAPI
     private function makeRequest(string $action, string $method = 'GET', array $data = []): array
     {
         try {
+            // Rate limiting: добавляем задержку между запросами
+            if (self::$lastRequestTime !== null) {
+                $timeSinceLastRequest = microtime(true) - self::$lastRequestTime;
+                if ($timeSinceLastRequest < self::MIN_REQUEST_DELAY) {
+                    $sleepTime = self::MIN_REQUEST_DELAY - $timeSinceLastRequest;
+                    usleep((int)($sleepTime * 1000000)); // Конвертируем в микросекунды
+                }
+            }
+            self::$lastRequestTime = microtime(true);
+
             $options = [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $this->apiKey,
@@ -63,6 +83,16 @@ class VdsinaAPI
             }
 
             if (!isset($data['status']) || $data['status'] !== 'ok') {
+                // Обработка ошибки Blacklisted (403)
+                if (isset($data['status_code']) && $data['status_code'] === 403) {
+                    Log::warning('VDSina API: Rate limit exceeded (Blacklisted)', [
+                        'action' => $action,
+                        'response' => $data,
+                        'source' => 'api'
+                    ]);
+                    throw new RuntimeException('VDSina API rate limit exceeded. Please try again later.');
+                }
+
                 Log::error('API error response from VDSina', [
                     'response' => $data,
                     'status_code' => $data['status_code'] ?? 'unknown',
@@ -77,6 +107,17 @@ class VdsinaAPI
         } catch (GuzzleException $e) {
             $statusCode = $e->getCode();
             $message = $e->getMessage();
+
+            // Обработка 403 ошибки (Blacklisted)
+            if ($statusCode === 403 || strpos($message, '403') !== false || strpos($message, 'Blacklisted') !== false) {
+                Log::warning('VDSina API: Rate limit exceeded (403 Blacklisted)', [
+                    'action' => $action,
+                    'method' => $method,
+                    'error' => $message,
+                    'source' => 'api'
+                ]);
+                throw new RuntimeException('VDSina API rate limit exceeded. Please try again later.');
+            }
 
             Log::error('VDSina API HTTP error', [
                 'action' => $action,
@@ -278,7 +319,6 @@ class VdsinaAPI
                 Log::warning('VDSINA API: No data in server response', ['server_id' => $serverId]);
                 return null;
             }
-            
             $data = $serverData['data'];
             
             // Получаем использованный трафик за текущий месяц
@@ -334,6 +374,16 @@ class VdsinaAPI
                 'last_month' => $lastMonthBytes,
             ];
             
+        } catch (RuntimeException $e) {
+            // Обрабатываем ошибки rate limit gracefully
+            if (strpos($e->getMessage(), 'rate limit') !== false) {
+                Log::warning('Failed to get server traffic from VDSINA (rate limit)', [
+                    'server_id' => $serverId,
+                    'error' => $e->getMessage()
+                ]);
+                return null;
+            }
+            throw $e;
         } catch (Exception $e) {
             Log::error('Failed to get server traffic from VDSINA', [
                 'server_id' => $serverId,

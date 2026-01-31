@@ -827,7 +827,8 @@ class PanelRepository extends BaseRepository
         }
 
         $cacheKey = "server_traffic_{$panel->server->provider_id}";
-        $cacheTtl = config('panel.traffic_cache_ttl', 300);
+        // Увеличиваем время кэширования для уменьшения количества запросов к API
+        $cacheTtl = config('panel.traffic_cache_ttl', 600); // Увеличено с 300 до 600 секунд (10 минут)
 
         return Cache::remember($cacheKey, $cacheTtl, function () use ($panel) {
             try {
@@ -838,12 +839,21 @@ class PanelRepository extends BaseRepository
 
                 return $trafficData;
             } catch (\Exception $e) {
-                Log::error('PANEL_SELECTION [TRAFFIC]: Failed to get traffic data', [
-                    'source' => 'panel',
-                    'server_id' => $panel->server->id,
-                    'provider_id' => $panel->server->provider_id,
-                    'error' => $e->getMessage()
-                ]);
+                // Обрабатываем ошибки rate limit gracefully
+                if (strpos($e->getMessage(), 'rate limit') !== false) {
+                    Log::warning('PANEL_SELECTION [TRAFFIC]: Rate limit exceeded, using cached data', [
+                        'source' => 'panel',
+                        'server_id' => $panel->server->id,
+                        'provider_id' => $panel->server->provider_id
+                    ]);
+                } else {
+                    Log::error('PANEL_SELECTION [TRAFFIC]: Failed to get traffic data', [
+                        'source' => 'panel',
+                        'server_id' => $panel->server->id,
+                        'provider_id' => $panel->server->provider_id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
                 return null;
             }
         });
