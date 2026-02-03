@@ -285,4 +285,46 @@ class SalesmanController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Обновить токен бота продавца
+     *
+     * @param Request $request
+     * @param int $id
+     * @return JsonResponse
+     */
+    public function updateBotToken(Request $request, int $id): JsonResponse
+    {
+        try {
+            $request->validate([
+                'token' => 'required|string'
+            ]);
+
+            Log::info('Updating bot token for salesman', [
+                'source' => 'salesman',
+                'salesman_id' => $id,
+                'user_id' => auth()->id()
+            ]);
+
+            $this->salesmanService->updateBotToken($id, $request->input('token'));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Токен бота успешно обновлен',
+            ]);
+        } catch (Exception $e) {
+            Log::error('Error updating bot token', [
+                'source' => 'salesman',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'salesman_id' => $id,
+                'user_id' => auth()->id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

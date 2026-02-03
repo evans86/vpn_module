@@ -9,6 +9,7 @@ use App\Repositories\Salesman\SalesmanRepository;
 use App\Logging\DatabaseLogger;
 use Exception;
 use RuntimeException;
+use Telegram\Bot\Api;
 
 class SalesmanService
 {
@@ -329,6 +330,58 @@ class SalesmanService
                 'trace' => $e->getTraceAsString()
             ]);
             throw $e;
+        }
+    }
+
+    /**
+     * Обновить токен бота продавца
+     * 
+     * @param int $id
+     * @param string $token
+     * @return SalesmanDto
+     * @throws Exception
+     */
+    public function updateBotToken(int $id, string $token): SalesmanDto
+    {
+        try {
+            $this->logger->info('Updating bot token for salesman', [
+                'source' => 'salesman',
+                'action' => 'update_bot_token',
+                'salesman_id' => $id
+            ]);
+
+            $salesman = $this->salesmanRepository->findById($id);
+
+            // Проверяем токен через Telegram API
+            $telegram = new Api($token);
+            $botInfo = $telegram->getMe();
+
+            // Обновляем токен и ссылку на бота
+            $salesman->token = $token;
+            $salesman->bot_link = 'https://t.me/' . $botInfo->getUsername();
+            $salesman->save();
+
+            // Устанавливаем вебхук для бота продавца
+            $webhookUrl = rtrim('https://vpn-telegram.com', '/') . '/api/telegram/salesman-bot/' . $token . '/init';
+            $telegram->setWebhook(['url' => $webhookUrl]);
+
+            $this->logger->info('Bot token updated successfully', [
+                'source' => 'salesman',
+                'action' => 'update_bot_token_success',
+                'salesman_id' => $id,
+                'bot_username' => $botInfo->getUsername()
+            ]);
+
+            return SalesmanFactory::fromEntity($salesman);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to update bot token', [
+                'source' => 'salesman',
+                'action' => 'update_bot_token_error',
+                'salesman_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw new RuntimeException('Не удалось обновить токен бота: ' . $e->getMessage());
         }
     }
 }

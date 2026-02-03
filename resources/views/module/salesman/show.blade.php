@@ -84,6 +84,12 @@
                                 <i class="fas fa-copy"></i>
                             </button>
                         </div>
+                        <div class="mt-2">
+                            <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 update-token-btn"
+                                    data-salesman-id="{{ $salesman->id }}">
+                                <i class="fas fa-sync-alt mr-2"></i> Обновить токен
+                            </button>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Ссылка на бота</label>
@@ -425,6 +431,41 @@
             // Обработчик клика по кнопке "Привязать" в модальном окне панели
             $('#assignPanelButton').on('click', function () {
                 const salesmanId = $('#salesmanIdForPanel').val();
+
+            // Обновление токена бота
+            $('.update-token-btn').on('click', function() {
+                const salesmanId = $(this).data('salesman-id');
+                const newToken = prompt('Введите новый токен бота:');
+                
+                if (!newToken || newToken.trim() === '') {
+                    return;
+                }
+
+                if (!confirm('Вы уверены, что хотите обновить токен бота? Это может повлиять на работу бота.')) {
+                    return;
+                }
+
+                $.ajax({
+                    url: `/admin/module/salesman/${salesmanId}/update-bot-token`,
+                    method: 'POST',
+                    data: {
+                        token: newToken.trim(),
+                        _token: $('meta[name="csrf-token"]').attr('content')
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            alert('Токен бота успешно обновлен! Страница будет перезагружена.');
+                            location.reload();
+                        } else {
+                            alert('Ошибка: ' + response.message);
+                        }
+                    },
+                    error: function(xhr) {
+                        const error = xhr.responseJSON?.message || 'Произошла ошибка при обновлении токена';
+                        alert('Ошибка: ' + error);
+                    }
+                });
+            });
                 const panelId = $('#panelId').val();
 
                 $.ajax({
