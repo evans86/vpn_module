@@ -431,6 +431,28 @@
             // Обработчик клика по кнопке "Привязать" в модальном окне панели
             $('#assignPanelButton').on('click', function () {
                 const salesmanId = $('#salesmanIdForPanel').val();
+                const panelId = $('#panelId').val();
+
+                $.ajax({
+                    url: `/admin/module/salesman/${salesmanId}/assign-panel`,
+                    method: 'POST',
+                    data: {
+                        panel_id: panelId
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            toastr.success('Панель успешно привязана');
+                            window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'panelModal' } }));
+                            location.reload();
+                        } else {
+                            toastr.error(response.message || 'Произошла ошибка');
+                        }
+                    },
+                    error: function (xhr) {
+                        toastr.error(xhr.responseJSON?.message || 'Произошла ошибка при привязке панели');
+                    }
+                });
+            });
 
             // Обновление токена бота
             $('.update-token-btn').on('click', function() {
@@ -463,28 +485,6 @@
                     error: function(xhr) {
                         const error = xhr.responseJSON?.message || 'Произошла ошибка при обновлении токена';
                         alert('Ошибка: ' + error);
-                    }
-                });
-            });
-                const panelId = $('#panelId').val();
-
-                $.ajax({
-                    url: `/admin/module/salesman/${salesmanId}/assign-panel`,
-                    method: 'POST',
-                    data: {
-                        panel_id: panelId
-                    },
-                    success: function (response) {
-                        if (response.success) {
-                            toastr.success('Панель успешно привязана');
-                            window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'panelModal' } }));
-                            location.reload();
-                        } else {
-                            toastr.error(response.message || 'Произошла ошибка');
-                        }
-                    },
-                    error: function (xhr) {
-                        toastr.error(xhr.responseJSON?.message || 'Произошла ошибка при привязке панели');
                     }
                 });
             });
