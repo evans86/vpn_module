@@ -831,38 +831,81 @@ class PanelRepository extends BaseRepository
      */
     private function selectPanelByTraffic(Collection $panels): ?Panel
     {
+        // Проверяем, заблокирован ли API из-за rate limit
+        $rateLimitBlocked = Cache::get('vdsina_api_rate_limit_blocked', false);
+        $rateLimitBlockedUntil = Cache::get('vdsina_api_rate_limit_blocked_until', 0);
+        
         $panelsWithTraffic = $panels->map(function ($panel) {
             $trafficData = $this->getServerTrafficData($panel);
             
             return [
                 'panel' => $panel,
-                'traffic_used_percent' => $trafficData['used_percent'] ?? 100,
-                'traffic_remaining_percent' => $trafficData['remaining_percent'] ?? 0,
-                'traffic_data' => $trafficData
+                'traffic_used_percent' => $trafficData['used_percent'] ?? null,
+                'traffic_remaining_percent' => $trafficData['remaining_percent'] ?? null,
+                'traffic_data' => $trafficData,
+                'has_traffic_data' => $trafficData !== null
             ];
-        })->filter(function ($item) {
-            // Исключаем панели без данных о трафике или с критической загрузкой (>95%)
-            return isset($item['traffic_data']) && $item['traffic_used_percent'] < 95;
         });
-
-        if ($panelsWithTraffic->isEmpty()) {
-            Log::warning('PANEL_SELECTION [TRAFFIC]: No panels with valid traffic data, falling back to balanced', ['source' => 'panel']);
-            return $this->getConfiguredMarzbanPanel();
+        
+        // Сначала пытаемся найти панели с валидными данными о трафике (не критическая загрузка)
+        $validPanels = $panelsWithTraffic->filter(function ($item) {
+            return $item['has_traffic_data'] 
+                && $item['traffic_used_percent'] !== null 
+                && $item['traffic_used_percent'] < 95;
+        });
+        
+        // Если есть панели с валидными данными - выбираем из них
+        if ($validPanels->isNotEmpty()) {
+            $selectedPanelData = $validPanels->sortBy('traffic_used_percent')->first();
+            $selectedPanel = $selectedPanelData['panel'];
+            
+            Log::info('PANEL_SELECTION [TRAFFIC]: Selected panel based on traffic load', [
+                'panel_id' => $selectedPanel->id,
+                'traffic_used_percent' => $selectedPanelData['traffic_used_percent'],
+                'traffic_remaining_percent' => $selectedPanelData['traffic_remaining_percent'],
+                'server_id' => $selectedPanel->server_id,
+                'server_name' => $selectedPanel->server->name ?? 'N/A'
+            ]);
+            
+            return $selectedPanel;
         }
-
-        // Выбираем панель с наименьшим процентом использования трафика
-        $selectedPanelData = $panelsWithTraffic->sortBy('traffic_used_percent')->first();
-        $selectedPanel = $selectedPanelData['panel'];
-
-        Log::info('PANEL_SELECTION [TRAFFIC]: Selected panel based on traffic load', [
-            'panel_id' => $selectedPanel->id,
-            'traffic_used_percent' => $selectedPanelData['traffic_used_percent'],
-            'traffic_remaining_percent' => $selectedPanelData['traffic_remaining_percent'],
-            'server_id' => $selectedPanel->server_id,
-            'server_name' => $selectedPanel->server->name ?? 'N/A'
-        ]);
-
-        return $selectedPanel;
+        
+        // Если нет валидных панелей, но есть панели с данными (даже с высокой загрузкой) - используем их
+        $panelsWithAnyData = $panelsWithTraffic->filter(function ($item) {
+            return $item['has_traffic_data'] && $item['traffic_used_percent'] !== null;
+        });
+        
+        if ($panelsWithAnyData->isNotEmpty()) {
+            $selectedPanelData = $panelsWithAnyData->sortBy('traffic_used_percent')->first();
+            $selectedPanel = $selectedPanelData['panel'];
+            
+            Log::warning('PANEL_SELECTION [TRAFFIC]: Using panel with high traffic load (no better options)', [
+                'panel_id' => $selectedPanel->id,
+                'traffic_used_percent' => $selectedPanelData['traffic_used_percent'],
+                'server_id' => $selectedPanel->server_id,
+                'server_name' => $selectedPanel->server->name ?? 'N/A',
+                'source' => 'panel'
+            ]);
+            
+            return $selectedPanel;
+        }
+        
+        // Если данных о трафике нет вообще (rate limit или другие проблемы)
+        if ($rateLimitBlocked && $rateLimitBlockedUntil > time()) {
+            Log::warning('PANEL_SELECTION [TRAFFIC]: API blocked due to rate limit, no traffic data available, falling back to balanced', [
+                'blocked_until' => date('Y-m-d H:i:s', $rateLimitBlockedUntil),
+                'panels_count' => $panels->count(),
+                'source' => 'panel'
+            ]);
+        } else {
+            Log::warning('PANEL_SELECTION [TRAFFIC]: No panels with traffic data available, falling back to balanced', [
+                'panels_count' => $panels->count(),
+                'rate_limit_blocked' => $rateLimitBlocked,
+                'source' => 'panel'
+            ]);
+        }
+        
+        return $this->getConfiguredMarzbanPanel();
     }
 
     /**
