@@ -159,7 +159,7 @@
             </div>
 
             <!-- Пагинация -->
-            <div id="paginationContainer" class="mt-4">
+            <div id="paginationContainer">
                 @include('logs.partials.pagination')
             </div>
         </x-admin.card>
