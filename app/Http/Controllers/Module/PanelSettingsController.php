@@ -74,22 +74,33 @@ class PanelSettingsController extends Controller
             if (file_exists($configPath)) {
                 $config = file_get_contents($configPath);
                 
-                // Заменяем значение в конфиге
+                // Заменяем значение в конфиге (более гибкий паттерн)
                 $config = preg_replace(
-                    "/'selection_strategy' => env\('PANEL_SELECTION_STRATEGY', '[^']+'\)/",
-                    "'selection_strategy' => env('PANEL_SELECTION_STRATEGY', '{$newValue}')",
+                    "/('selection_strategy'\s*=>\s*env\('PANEL_SELECTION_STRATEGY',\s*')[^']+(')/",
+                    "$1{$newValue}$2",
                     $config
                 );
+                
+                // Если паттерн не сработал, пробуем другой вариант
+                if (!preg_match("/'selection_strategy' => env\('PANEL_SELECTION_STRATEGY', '{$newValue}'\)/", $config)) {
+                    $config = preg_replace(
+                        "/('selection_strategy'\s*=>\s*env\('PANEL_SELECTION_STRATEGY',\s*')[^)]+\)/",
+                        "$1'{$newValue}')",
+                        $config
+                    );
+                }
                 
                 file_put_contents($configPath, $config);
             }
             
-            // Очищаем кэш конфига и обновляем текущее значение
+            // Очищаем все кэши конфига
             Cache::forget('config.panel');
             Cache::forget('config.panel.selection_strategy');
+            
+            // Обновляем текущее значение в runtime
             config(['panel.selection_strategy' => $newValue]);
-
-            // Очищаем кэш выбора панелей
+            
+            // Очищаем кэш выбора панелей для всех стратегий
             Cache::forget('optimized_marzban_panel_balanced');
             Cache::forget('optimized_marzban_panel_traffic_based');
             Cache::forget('optimized_marzban_panel_intelligent');

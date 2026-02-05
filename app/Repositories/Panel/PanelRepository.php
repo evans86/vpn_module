@@ -352,41 +352,85 @@ class PanelRepository extends BaseRepository
             $intelligentPanel = $this->selectOptimalPanelIntelligent($panels);
 
             // Собираем детальную информацию по каждой панели
+            // Оборачиваем в try-catch для каждой панели, чтобы ошибки не блокировали всю страницу
             $panelsInfo = $panels->map(function ($panel) use ($balancedPanel, $trafficPanel, $intelligentPanel) {
-            $totalUsers = $this->getTotalUsersCount($panel->id);
-            $activeUsers = $this->getActiveUsersFromStats($panel->id);
-            $latestStats = $this->getLatestPanelStats($panel->id);
-            $trafficData = $this->getServerTrafficData($panel);
-            
-            $cpuUsage = $latestStats['cpu_usage'] ?? 0;
-            $memoryUsed = $latestStats['mem_used'] ?? 0;
-            $memoryTotal = $latestStats['mem_total'] ?? 1;
-            $memoryUsage = ($memoryTotal > 0) ? ($memoryUsed / $memoryTotal) * 100 : 0;
+                try {
+                    $totalUsers = $this->getTotalUsersCount($panel->id);
+                    $activeUsers = $this->getActiveUsersFromStats($panel->id);
+                    $latestStats = $this->getLatestPanelStats($panel->id);
+                    
+                    // Получаем данные о трафике с обработкой ошибок
+                    $trafficData = null;
+                    try {
+                        $trafficData = $this->getServerTrafficData($panel);
+                    } catch (\Exception $e) {
+                        // Логируем ошибку, но продолжаем работу
+                        Log::warning('Failed to get traffic data for panel in comparison', [
+                            'panel_id' => $panel->id,
+                            'error' => $e->getMessage(),
+                            'source' => 'panel'
+                        ]);
+                    }
+                    
+                    $cpuUsage = $latestStats['cpu_usage'] ?? 0;
+                    $memoryUsed = $latestStats['mem_used'] ?? 0;
+                    $memoryTotal = $latestStats['mem_total'] ?? 1;
+                    $memoryUsage = ($memoryTotal > 0) ? ($memoryUsed / $memoryTotal) * 100 : 0;
 
-            // Score для интеллектуальной системы
-            $intelligentScore = $this->calculatePanelScore($panel, $activeUsers, $latestStats);
+                    // Score для интеллектуальной системы
+                    $intelligentScore = $this->calculatePanelScore($panel, $activeUsers, $latestStats);
 
-            return [
-                'id' => $panel->id,
-                'address' => $panel->panel_adress,
-                'server_name' => $panel->server->name ?? 'N/A',
-                'server_id' => $panel->server_id,
-                'total_users' => $totalUsers,
-                'active_users' => $activeUsers,
-                'cpu_usage' => round($cpuUsage, 1),
-                'memory_usage' => round($memoryUsage, 1),
-                'traffic_used_percent' => $trafficData['used_percent'] ?? null,
-                'traffic_used_gb' => $trafficData ? round($trafficData['used'] / (1024 * 1024 * 1024), 2) : null,
-                'traffic_limit_gb' => $trafficData ? round($trafficData['limit'] / (1024 * 1024 * 1024), 2) : null,
-                'traffic_remaining_percent' => $trafficData['remaining_percent'] ?? null,
-                'intelligent_score' => round($intelligentScore, 1),
-                'last_activity' => $this->getLastUserCreationTime($panel->id),
-                'is_balanced_selected' => $balancedPanel && $balancedPanel->id === $panel->id,
-                'is_traffic_selected' => $trafficPanel && $trafficPanel->id === $panel->id,
-                'is_intelligent_selected' => $intelligentPanel && $intelligentPanel->id === $panel->id,
-                'has_fresh_stats' => $this->isStatsFresh($panel->id),
-                'has_traffic_data' => $trafficData !== null,
-            ];
+                    return [
+                        'id' => $panel->id,
+                        'address' => $panel->panel_adress,
+                        'server_name' => $panel->server->name ?? 'N/A',
+                        'server_id' => $panel->server_id,
+                        'total_users' => $totalUsers,
+                        'active_users' => $activeUsers,
+                        'cpu_usage' => round($cpuUsage, 1),
+                        'memory_usage' => round($memoryUsage, 1),
+                        'traffic_used_percent' => $trafficData['used_percent'] ?? null,
+                        'traffic_used_gb' => $trafficData ? round($trafficData['used'] / (1024 * 1024 * 1024), 2) : null,
+                        'traffic_limit_gb' => $trafficData ? round($trafficData['limit'] / (1024 * 1024 * 1024), 2) : null,
+                        'traffic_remaining_percent' => $trafficData['remaining_percent'] ?? null,
+                        'intelligent_score' => round($intelligentScore, 1),
+                        'last_activity' => $this->getLastUserCreationTime($panel->id),
+                        'is_balanced_selected' => $balancedPanel && $balancedPanel->id === $panel->id,
+                        'is_traffic_selected' => $trafficPanel && $trafficPanel->id === $panel->id,
+                        'is_intelligent_selected' => $intelligentPanel && $intelligentPanel->id === $panel->id,
+                        'has_fresh_stats' => $this->isStatsFresh($panel->id),
+                        'has_traffic_data' => $trafficData !== null,
+                    ];
+                } catch (\Exception $e) {
+                    // Если произошла ошибка при обработке панели, возвращаем минимальные данные
+                    Log::warning('Error processing panel in comparison', [
+                        'panel_id' => $panel->id,
+                        'error' => $e->getMessage(),
+                        'source' => 'panel'
+                    ]);
+                    
+                    return [
+                        'id' => $panel->id,
+                        'address' => $panel->panel_adress,
+                        'server_name' => $panel->server->name ?? 'N/A',
+                        'server_id' => $panel->server_id,
+                        'total_users' => 0,
+                        'active_users' => 0,
+                        'cpu_usage' => 0,
+                        'memory_usage' => 0,
+                        'traffic_used_percent' => null,
+                        'traffic_used_gb' => null,
+                        'traffic_limit_gb' => null,
+                        'traffic_remaining_percent' => null,
+                        'intelligent_score' => 0,
+                        'last_activity' => null,
+                        'is_balanced_selected' => false,
+                        'is_traffic_selected' => false,
+                        'is_intelligent_selected' => false,
+                        'has_fresh_stats' => false,
+                        'has_traffic_data' => false,
+                    ];
+                }
             });
 
             // Статистика по стратегиям
@@ -828,35 +872,65 @@ class PanelRepository extends BaseRepository
 
         $cacheKey = "server_traffic_{$panel->server->provider_id}";
         // Увеличиваем время кэширования для уменьшения количества запросов к API
-        $cacheTtl = config('panel.traffic_cache_ttl', 600); // Увеличено с 300 до 600 секунд (10 минут)
+        $cacheTtl = config('panel.traffic_cache_ttl', 1800); // 30 минут вместо 10
 
-        return Cache::remember($cacheKey, $cacheTtl, function () use ($panel) {
-            try {
-                $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
-                $trafficData = $vdsinaApi->getServerTraffic((int)$panel->server->provider_id);
-
-                // Traffic data retrieved
-
-                return $trafficData;
-            } catch (\Exception $e) {
-                // Обрабатываем ошибки rate limit gracefully
-                if (strpos($e->getMessage(), 'rate limit') !== false) {
-                    Log::warning('PANEL_SELECTION [TRAFFIC]: Rate limit exceeded, using cached data', [
-                        'source' => 'panel',
-                        'server_id' => $panel->server->id,
-                        'provider_id' => $panel->server->provider_id
-                    ]);
-                } else {
-                    Log::error('PANEL_SELECTION [TRAFFIC]: Failed to get traffic data', [
-                        'source' => 'panel',
-                        'server_id' => $panel->server->id,
-                        'provider_id' => $panel->server->provider_id,
-                        'error' => $e->getMessage()
-                    ]);
-                }
-                return null;
+        // Сначала проверяем, есть ли уже кэшированные данные
+        $cachedData = Cache::get($cacheKey);
+        
+        // Если кэш есть и он еще свежий (больше 5 минут осталось), возвращаем его
+        // Это позволяет избежать лишних запросов к API
+        if ($cachedData !== null) {
+            $cacheAge = Cache::get("{$cacheKey}_age", 0);
+            $cacheMaxAge = $cacheTtl - 300; // 5 минут до истечения
+            if ($cacheAge < $cacheMaxAge) {
+                return $cachedData;
             }
-        });
+        }
+        
+        // Пытаемся получить свежие данные
+        try {
+            $vdsinaApi = new VdsinaAPI(config('services.api_keys.vdsina_key'));
+            $trafficData = $vdsinaApi->getServerTraffic((int)$panel->server->provider_id);
+
+            if ($trafficData !== null) {
+                // Сохраняем в кэш
+                Cache::put($cacheKey, $trafficData, $cacheTtl);
+                Cache::put("{$cacheKey}_age", time(), $cacheTtl);
+                return $trafficData;
+            }
+        } catch (\Exception $e) {
+            // Обрабатываем ошибки rate limit gracefully
+            $isRateLimit = strpos($e->getMessage(), 'rate limit') !== false 
+                || strpos($e->getMessage(), 'Blacklisted') !== false
+                || strpos($e->getMessage(), '403') !== false;
+            
+            if ($isRateLimit) {
+                Log::warning('PANEL_SELECTION [TRAFFIC]: Rate limit exceeded, using cached data if available', [
+                    'source' => 'panel',
+                    'server_id' => $panel->server->id,
+                    'provider_id' => $panel->server->provider_id
+                ]);
+            } else {
+                Log::error('PANEL_SELECTION [TRAFFIC]: Failed to get traffic data', [
+                    'source' => 'panel',
+                    'server_id' => $panel->server->id,
+                    'provider_id' => $panel->server->provider_id,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+        
+        // Если получили ошибку, но есть старые кэшированные данные - используем их
+        if ($cachedData !== null) {
+            Log::info('PANEL_SELECTION [TRAFFIC]: Using stale cached data due to API error', [
+                'source' => 'panel',
+                'server_id' => $panel->server->id,
+                'provider_id' => $panel->server->provider_id
+            ]);
+            return $cachedData;
+        }
+        
+        return null;
     }
 
     // ==================== МЕТОДЫ ДЛЯ СТАТИСТИКИ ПО МЕСЯЦАМ ====================

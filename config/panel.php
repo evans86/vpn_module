@@ -41,7 +41,7 @@ return [
     |
     */
 
-    'traffic_cache_ttl' => env('TRAFFIC_CACHE_TTL', 300), // 5 минут
+    'traffic_cache_ttl' => env('TRAFFIC_CACHE_TTL', 1800), // 30 минут
 ];
 
 

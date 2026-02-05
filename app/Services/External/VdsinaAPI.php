@@ -376,7 +376,11 @@ class VdsinaAPI
             
         } catch (RuntimeException $e) {
             // Обрабатываем ошибки rate limit gracefully
-            if (strpos($e->getMessage(), 'rate limit') !== false) {
+            $isRateLimit = strpos($e->getMessage(), 'rate limit') !== false 
+                || strpos($e->getMessage(), 'Blacklisted') !== false
+                || strpos($e->getMessage(), '403') !== false;
+            
+            if ($isRateLimit) {
                 Log::warning('Failed to get server traffic from VDSINA (rate limit)', [
                     'server_id' => $serverId,
                     'error' => $e->getMessage()
