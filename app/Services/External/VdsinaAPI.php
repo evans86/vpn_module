@@ -6,6 +6,7 @@ use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 use InvalidArgumentException;
 
@@ -84,11 +85,21 @@ class VdsinaAPI
 
             if (!isset($data['status']) || $data['status'] !== 'ok') {
                 // Обработка ошибки Blacklisted (403)
+                // Согласно поддержке VDSina, блокировка снимается автоматически через 4 часа
                 if (isset($data['status_code']) && $data['status_code'] === 403) {
-                    Log::warning('VDSina API: Rate limit exceeded (Blacklisted)', [
+                    // Устанавливаем блокировку на 4 часа
+                    $blockDuration = 14400; // 4 часа в секундах
+                    $blockUntil = time() + $blockDuration;
+                    Cache::put('vdsina_api_rate_limit_blocked', true, $blockDuration);
+                    Cache::put('vdsina_api_rate_limit_blocked_until', $blockUntil, $blockDuration);
+                    
+                    Log::warning('VDSina API: Rate limit exceeded (403 Blacklisted), blocking API requests for 4 hours', [
                         'action' => $action,
                         'response' => $data,
-                        'source' => 'api'
+                        'source' => 'api',
+                        'blocked_until' => date('Y-m-d H:i:s', $blockUntil),
+                        'block_duration_hours' => 4,
+                        'message' => 'VDSina API will auto-unblock after 4 hours from last problematic request. Do not send new requests.'
                     ]);
                     throw new RuntimeException('VDSina API rate limit exceeded. Please try again later.');
                 }
@@ -109,12 +120,22 @@ class VdsinaAPI
             $message = $e->getMessage();
 
             // Обработка 403 ошибки (Blacklisted)
+            // Согласно поддержке VDSina, блокировка снимается автоматически через 4 часа
             if ($statusCode === 403 || strpos($message, '403') !== false || strpos($message, 'Blacklisted') !== false) {
-                Log::warning('VDSina API: Rate limit exceeded (403 Blacklisted)', [
+                // Устанавливаем блокировку на 4 часа
+                $blockDuration = 14400; // 4 часа в секундах
+                $blockUntil = time() + $blockDuration;
+                Cache::put('vdsina_api_rate_limit_blocked', true, $blockDuration);
+                Cache::put('vdsina_api_rate_limit_blocked_until', $blockUntil, $blockDuration);
+                
+                Log::warning('VDSina API: Rate limit exceeded (403 Blacklisted), blocking API requests for 4 hours', [
                     'action' => $action,
                     'method' => $method,
                     'error' => $message,
-                    'source' => 'api'
+                    'source' => 'api',
+                    'blocked_until' => date('Y-m-d H:i:s', $blockUntil),
+                    'block_duration_hours' => 4,
+                    'message' => 'VDSina API will auto-unblock after 4 hours from last problematic request. Do not send new requests.'
                 ]);
                 throw new RuntimeException('VDSina API rate limit exceeded. Please try again later.');
             }

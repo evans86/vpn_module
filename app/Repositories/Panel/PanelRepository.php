@@ -852,9 +852,24 @@ class PanelRepository extends BaseRepository
      */
     private function selectPanelByTraffic(Collection $panels, bool $useCacheOnly = false): ?Panel
     {
-        // Проверяем, заблокирован ли API из-за rate limit
+        // Проверяем, заблокирован ли API из-за rate limit (403 Blacklisted)
+        // Согласно поддержке VDSina, блокировка снимается автоматически через 4 часа
         $rateLimitBlocked = Cache::get('vdsina_api_rate_limit_blocked', false);
         $rateLimitBlockedUntil = Cache::get('vdsina_api_rate_limit_blocked_until', 0);
+        
+        // Если блокировка активна, используем только кэш (не делаем запросы к API)
+        if ($rateLimitBlocked && $rateLimitBlockedUntil > time()) {
+            $useCacheOnly = true; // Принудительно используем только кэш
+            $remainingTime = $rateLimitBlockedUntil - time();
+            $remainingHours = round($remainingTime / 3600, 1);
+            
+            Log::info('PANEL_SELECTION [TRAFFIC]: API blocked (403 Blacklisted), using cache only mode', [
+                'source' => 'panel',
+                'blocked_until' => date('Y-m-d H:i:s', $rateLimitBlockedUntil),
+                'remaining_hours' => $remainingHours,
+                'message' => 'VDSina API will auto-unblock after 4 hours from last problematic request'
+            ]);
+        }
         
         $panelsWithTraffic = $panels->map(function ($panel) use ($useCacheOnly) {
             // Если режим "только кэш", используем специальный метод, который не делает запросы к API
@@ -989,23 +1004,48 @@ class PanelRepository extends BaseRepository
         // Увеличиваем время кэширования для уменьшения количества запросов к API
         $cacheTtl = config('panel.traffic_cache_ttl', 1800); // 30 минут вместо 10
 
-        // Проверяем глобальный флаг блокировки API из-за rate limit
+        // Проверяем глобальный флаг блокировки API из-за rate limit (403 Blacklisted)
+        // Согласно поддержке VDSina, блокировка снимается автоматически через 4 часа
         $rateLimitBlocked = Cache::get('vdsina_api_rate_limit_blocked', false);
         $rateLimitBlockedUntil = Cache::get('vdsina_api_rate_limit_blocked_until', 0);
         
-        // Если блокировка активна и еще не истекла, используем только кэш
+        // Если блокировка активна, НЕ делаем запросы к API, используем только кэш
         if ($rateLimitBlocked && $rateLimitBlockedUntil > time()) {
+            $remainingTime = $rateLimitBlockedUntil - time();
+            $remainingHours = round($remainingTime / 3600, 1);
+            
             $cachedData = Cache::get($cacheKey);
             if ($cachedData !== null) {
-                Log::info('PANEL_SELECTION [TRAFFIC]: Using cached data due to active rate limit block', [
+                Log::info('PANEL_SELECTION [TRAFFIC]: API blocked (403 Blacklisted), using cached data only (no new requests)', [
                     'source' => 'panel',
                     'server_id' => $panel->server->id,
                     'provider_id' => $panel->server->provider_id,
-                    'blocked_until' => date('Y-m-d H:i:s', $rateLimitBlockedUntil)
+                    'blocked_until' => date('Y-m-d H:i:s', $rateLimitBlockedUntil),
+                    'remaining_hours' => $remainingHours,
+                    'message' => 'VDSina API will auto-unblock after 4 hours from last problematic request'
                 ]);
                 return $cachedData;
             }
+            
+            // Если кэша нет, возвращаем null (НЕ делаем запрос к API)
+            Log::warning('PANEL_SELECTION [TRAFFIC]: API blocked but no cached data available', [
+                'source' => 'panel',
+                'server_id' => $panel->server->id,
+                'provider_id' => $panel->server->provider_id,
+                'blocked_until' => date('Y-m-d H:i:s', $rateLimitBlockedUntil),
+                'remaining_hours' => $remainingHours
+            ]);
             return null;
+        }
+        
+        // Если блокировка истекла, снимаем флаги
+        if ($rateLimitBlocked && $rateLimitBlockedUntil <= time()) {
+            Cache::forget('vdsina_api_rate_limit_blocked');
+            Cache::forget('vdsina_api_rate_limit_blocked_until');
+            Log::info('PANEL_SELECTION [TRAFFIC]: Rate limit block expired, API requests allowed again', [
+                'source' => 'panel',
+                'server_id' => $panel->server->id
+            ]);
         }
 
         // Сначала проверяем, есть ли уже кэшированные данные
@@ -1044,16 +1084,18 @@ class PanelRepository extends BaseRepository
                 || strpos($e->getMessage(), '403') !== false;
             
             if ($isRateLimit) {
-                // Устанавливаем блокировку на 30 минут
-                $blockUntil = time() + 1800; // 30 минут
-                Cache::put('vdsina_api_rate_limit_blocked', true, 1800);
-                Cache::put('vdsina_api_rate_limit_blocked_until', $blockUntil, 1800);
+                // Устанавливаем блокировку на 4 часа (согласно ответу поддержки VDSina)
+                $blockDuration = 14400; // 4 часа в секундах
+                $blockUntil = time() + $blockDuration;
+                Cache::put('vdsina_api_rate_limit_blocked', true, $blockDuration);
+                Cache::put('vdsina_api_rate_limit_blocked_until', $blockUntil, $blockDuration);
                 
-                Log::warning('PANEL_SELECTION [TRAFFIC]: Rate limit exceeded, blocking API requests for 30 minutes', [
+                Log::warning('PANEL_SELECTION [TRAFFIC]: Rate limit exceeded (403 Blacklisted), blocking API requests for 4 hours', [
                     'source' => 'panel',
                     'server_id' => $panel->server->id,
                     'provider_id' => $panel->server->provider_id,
-                    'blocked_until' => date('Y-m-d H:i:s', $blockUntil)
+                    'blocked_until' => date('Y-m-d H:i:s', $blockUntil),
+                    'block_duration_hours' => 4
                 ]);
             } else {
                 Log::error('PANEL_SELECTION [TRAFFIC]: Failed to get traffic data', [
