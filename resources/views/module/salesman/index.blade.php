@@ -45,46 +45,51 @@
                 <x-admin.table :headers="['#', 'Telegram ID', 'Username', 'Токен', 'Ссылка на бота', 'Статус', 'Действия']">
                     @foreach($salesmen as $salesman)
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">
                                 {{ $salesman->id }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{ $salesman->telegram_id }}
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
+                                <span class="hidden sm:inline">{{ $salesman->telegram_id }}</span>
+                                <span class="sm:hidden">{{ Str::limit((string)$salesman->telegram_id, 8) }}</span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {{ $salesman->username ?? 'N/A' }}
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
+                                <span class="hidden sm:inline">{{ $salesman->username ?? 'N/A' }}</span>
+                                <span class="sm:hidden">{{ Str::limit($salesman->username ?? 'N/A', 10) }}</span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
                                 <div class="flex items-center">
-                                    <span class="font-mono text-xs">{{ Str::limit($salesman->token, 20) }}</span>
-                                    <button class="ml-2 text-gray-400 hover:text-gray-600"
+                                    <span class="font-mono text-xs hidden sm:inline">{{ Str::limit($salesman->token, 20) }}</span>
+                                    <span class="font-mono text-xs sm:hidden">{{ Str::limit($salesman->token, 10) }}</span>
+                                    <button class="ml-1 sm:ml-2 text-gray-400 hover:text-gray-600"
                                             data-clipboard-text="{{ $salesman->token }}"
                                             title="Копировать токен">
                                         <i class="fas fa-copy text-xs"></i>
                                     </button>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm">
                                 @if($salesman->bot_link)
                                     <a href="{{ $salesman->bot_link }}" 
                                        target="_blank" 
                                        class="text-indigo-600 hover:text-indigo-800">
-                                        {{ Str::limit($salesman->bot_link, 30) }}
+                                        <span class="hidden sm:inline">{{ Str::limit($salesman->bot_link, 30) }}</span>
+                                        <span class="sm:hidden">{{ Str::limit($salesman->bot_link, 15) }}</span>
                                         <i class="fas fa-external-link-alt ml-1 text-xs"></i>
                                     </a>
                                 @else
                                     <span class="text-gray-400">—</span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <button class="btn btn-sm status-toggle {{ $salesman->status ? 'btn-success' : 'btn-danger' }}"
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
+                                <button class="btn btn-xs sm:btn-sm status-toggle {{ $salesman->status ? 'btn-success' : 'btn-danger' }}"
                                         data-id="{{ $salesman->id }}">
-                                    {{ $salesman->status ? 'Активен' : 'Неактивен' }}
+                                    <span class="hidden sm:inline">{{ $salesman->status ? 'Активен' : 'Неактивен' }}</span>
+                                    <span class="sm:hidden">{{ $salesman->status ? '✓' : '✗' }}</span>
                                 </button>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
                                 <a href="{{ route('admin.module.salesman.show', $salesman->id) }}"
-                                   class="btn btn-sm btn-primary"
+                                   class="btn btn-xs sm:btn-sm btn-primary"
                                    title="Подробная информация">
                                     <i class="fas fa-eye"></i>
                                 </a>

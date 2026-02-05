@@ -37,7 +37,7 @@
                 <x-admin.table :headers="['ID', 'Сервер', 'Панель', 'Telegram ID', 'Дата создания']">
                     @foreach($serverUsers as $user)
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm">
                                 <div class="flex items-center">
                                     <span class="font-mono text-xs">{{ substr($user->id, 0, 8) }}...</span>
                                     <button class="ml-2 text-gray-400 hover:text-gray-600"
@@ -47,40 +47,43 @@
                                     </button>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm">
                                 @if($user->panel && $user->panel->server)
                                     <a href="{{ route('admin.module.server.index', ['server_id' => $user->panel->server->id]) }}"
                                        class="text-indigo-600 hover:text-indigo-800">
-                                        {{ $user->panel->server->name }}
+                                        {{ Str::limit($user->panel->server->name, 20) }}
                                     </a>
                                 @else
                                     <span class="text-gray-400">Нет сервера</span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 text-sm">
+                            <td class="px-3 sm:px-6 py-4 text-xs sm:text-sm">
                                 @if($user->panel)
                                     <a href="{{ route('admin.module.panel.index', ['panel_id' => $user->panel->id]) }}"
                                        class="text-indigo-600 hover:text-indigo-800"
                                        title="{{ $user->panel->panel_adress }}">
-                                        {{ Str::limit($user->panel->panel_adress, 30) }}
+                                        <span class="hidden sm:inline">{{ Str::limit($user->panel->panel_adress, 30) }}</span>
+                                        <span class="sm:hidden">{{ Str::limit($user->panel->panel_adress, 15) }}</span>
                                     </a>
                                 @else
                                     <span class="text-gray-400">Нет панели</span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm">
                                 @if($user->telegram_id)
                                     <a href="https://t.me/{{ $user->telegram_id }}" 
                                        target="_blank"
                                        class="text-indigo-600 hover:text-indigo-800">
-                                        {{ $user->telegram_id }}
+                                        <span class="hidden sm:inline">{{ $user->telegram_id }}</span>
+                                        <span class="sm:hidden">{{ Str::limit((string)$user->telegram_id, 8) }}</span>
                                     </a>
                                 @else
                                     <span class="text-gray-400">—</span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{ $user->created_at->format('d.m.Y H:i') }}
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
+                                <span class="hidden sm:inline">{{ $user->created_at->format('d.m.Y H:i') }}</span>
+                                <span class="sm:hidden">{{ $user->created_at->format('d.m.Y') }}</span>
                             </td>
                         </tr>
                     @endforeach

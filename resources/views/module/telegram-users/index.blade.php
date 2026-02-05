@@ -33,22 +33,26 @@
                 <x-admin.table :headers="['#', 'Telegram ID', 'Имя пользователя', 'Продавец', 'Статус']">
                     @foreach($users as $user)
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">
                                 {{ $user->id }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{ $user->telegram_id }}
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
+                                <span class="hidden sm:inline">{{ $user->telegram_id }}</span>
+                                <span class="sm:hidden">{{ Str::limit((string)$user->telegram_id, 8) }}</span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {{ $user->username ?? 'N/A' }}
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
+                                <span class="hidden sm:inline">{{ $user->username ?? 'N/A' }}</span>
+                                <span class="sm:hidden">{{ Str::limit($user->username ?? 'N/A', 10) }}</span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{ $user->salesman->bot_link ?? 'Нет' }}
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
+                                <span class="hidden sm:inline">{{ $user->salesman->bot_link ?? 'Нет' }}</span>
+                                <span class="sm:hidden">{{ Str::limit($user->salesman->bot_link ?? 'Нет', 15) }}</span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <button class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white status-toggle {{ $user->status ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700' }} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
+                                <button class="inline-flex items-center px-2 sm:px-3 py-1 sm:py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white status-toggle {{ $user->status ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700' }} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                                         data-id="{{ $user->id }}">
-                                    {{ $user->status ? 'Активен' : 'Неактивен' }}
+                                    <span class="hidden sm:inline">{{ $user->status ? 'Активен' : 'Неактивен' }}</span>
+                                    <span class="sm:hidden">{{ $user->status ? '✓' : '✗' }}</span>
                                 </button>
                             </td>
                         </tr>

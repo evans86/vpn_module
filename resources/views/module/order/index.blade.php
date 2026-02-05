@@ -64,48 +64,52 @@
                 <x-admin.table :headers="['ID', 'Пакет', 'Продавец', 'Способ оплаты', 'Сумма', 'Статус', 'Дата создания', 'Действия']">
                     @foreach($orders as $order)
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">
                                 #{{ $order->id }}
                             </td>
-                            <td class="px-6 py-4 text-sm">
+                            <td class="px-3 sm:px-6 py-4 text-xs sm:text-sm">
                                 @if($order->pack)
                                     <a href="{{ route('admin.module.pack.index', ['title' => $order->pack->title]) }}"
                                        class="text-indigo-600 hover:text-indigo-800">
-                                        {{ $order->pack->title }}
+                                        <span class="hidden sm:inline">{{ $order->pack->title }}</span>
+                                        <span class="sm:hidden">{{ Str::limit($order->pack->title, 15) }}</span>
                                     </a>
                                 @else
-                                    <span class="text-red-600">Пакет удален</span>
+                                    <span class="text-red-600 text-xs">Пакет удален</span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 text-sm">
+                            <td class="px-3 sm:px-6 py-4 text-xs sm:text-sm">
                                 @if($order->salesman)
                                     <a href="{{ route('admin.module.salesman.index', ['username' => $order->salesman->username]) }}"
                                        class="text-indigo-600 hover:text-indigo-800">
                                         @if($order->salesman->username)
-                                            {{ '@' . $order->salesman->username }}
+                                            <span class="hidden sm:inline">{{ '@' . $order->salesman->username }}</span>
+                                            <span class="sm:hidden">{{ Str::limit('@' . $order->salesman->username, 10) }}</span>
                                         @else
-                                            Продавец #{{ $order->salesman->id }}
+                                            <span class="hidden sm:inline">Продавец #{{ $order->salesman->id }}</span>
+                                            <span class="sm:hidden">#{{ $order->salesman->id }}</span>
                                         @endif
                                     </a>
-                                    <div class="text-xs text-gray-500 mt-1">
+                                    <div class="text-xs text-gray-500 mt-1 hidden sm:block">
                                         ID: {{ $order->salesman->telegram_id }}
                                     </div>
                                 @else
-                                    <span class="text-red-600">Продавец удален</span>
+                                    <span class="text-red-600 text-xs">Продавец удален</span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-900">
+                            <td class="px-3 sm:px-6 py-4 text-xs sm:text-sm text-gray-900">
                                 @if($order->paymentMethod)
-                                    {{ $order->paymentMethod->getTypeIcon() }} {{ $order->paymentMethod->name }}
+                                    <span class="hidden sm:inline">{{ $order->paymentMethod->getTypeIcon() }} {{ $order->paymentMethod->name }}</span>
+                                    <span class="sm:hidden">{{ $order->paymentMethod->getTypeIcon() }} {{ Str::limit($order->paymentMethod->name, 8) }}</span>
                                 @else
                                     <span class="text-gray-400">—</span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
                                 {{ number_format($order->amount, 0, '.', ' ') }} ₽
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
+                                <span class="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium
                                     @if($order->status == Order::STATUS_PENDING) bg-blue-100 text-blue-800 border border-blue-200
                                     @elseif($order->status == Order::STATUS_AWAITING_CONFIRMATION) bg-amber-100 text-amber-800 border border-amber-200
                                     @elseif($order->status == Order::STATUS_APPROVED) bg-emerald-100 text-emerald-800 border border-emerald-200
@@ -113,17 +117,20 @@
                                     @elseif($order->status == Order::STATUS_CANCELLED) bg-slate-100 text-slate-800 border border-slate-200
                                     @else bg-gray-100 text-gray-800 border border-gray-200
                                     @endif">
-                                    {{ $order->getStatusText() }}
+                                    <span class="hidden sm:inline">{{ $order->getStatusText() }}</span>
+                                    <span class="sm:hidden">{{ Str::limit($order->getStatusText(), 8) }}</span>
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{ $order->created_at->format('d.m.Y H:i') }}
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
+                                <span class="hidden sm:inline">{{ $order->created_at->format('d.m.Y H:i') }}</span>
+                                <span class="sm:hidden">{{ $order->created_at->format('d.m.Y') }}</span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <div class="flex items-center justify-end gap-2">
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
+                                <div class="flex items-center justify-end gap-1 sm:gap-2">
                                     <a href="{{ route('admin.module.order.show', $order->id) }}"
                                        class="text-indigo-600 hover:text-indigo-900">
-                                        Просмотр
+                                        <span class="hidden sm:inline">Просмотр</span>
+                                        <i class="sm:hidden fas fa-eye"></i>
                                     </a>
                                     @if($order->status != Order::STATUS_APPROVED)
                                         <form action="{{ route('admin.module.order.destroy', $order->id) }}" 
@@ -135,7 +142,7 @@
                                             <button type="submit" 
                                                     class="text-red-600 hover:text-red-900"
                                                     title="Удалить заказ">
-                                                <i class="fas fa-trash"></i>
+                                                <i class="fas fa-trash text-xs sm:text-sm"></i>
                                             </button>
                                         </form>
                                     @endif
@@ -146,9 +153,7 @@
                 </x-admin.table>
 
                 <!-- Pagination -->
-                <div class="mt-4">
-                    {{ $orders->links() }}
-                </div>
+                <x-admin.pagination-wrapper :paginator="$orders" />
             @endif
         </x-admin.card>
         @elseif($currentTab === 'payment-methods')

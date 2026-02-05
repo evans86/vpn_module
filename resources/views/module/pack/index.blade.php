@@ -56,35 +56,39 @@
                 <x-admin.table :headers="['ID', 'Название', 'Тип', 'Цена', 'Период', 'Трафик', 'Ключи', 'Статус', 'Действия']">
                     @foreach($packs as $pack)
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">
                                 {{ $pack->id }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {{ $pack->title }}
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
+                                <span class="hidden sm:inline">{{ $pack->title }}</span>
+                                <span class="sm:hidden">{{ Str::limit($pack->title, 15) }}</span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $pack->module_key ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800' }}">
-                                    {{ $pack->module_key ? 'Модуль' : 'Бот' }}
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
+                                <span class="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium {{ $pack->module_key ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800' }}">
+                                    <span class="hidden sm:inline">{{ $pack->module_key ? 'Модуль' : 'Бот' }}</span>
+                                    <span class="sm:hidden">{{ $pack->module_key ? 'М' : 'Б' }}</span>
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
                                 {{ $pack->price }} ₽
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{ $pack->period }} дней
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
+                                <span class="hidden sm:inline">{{ $pack->period }} дней</span>
+                                <span class="sm:hidden">{{ $pack->period }}д</span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
                                 {{ number_format($pack->traffic_limit / (1024*1024*1024), 1) }} GB
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
                                 {{ $pack->count }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $pack->status ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
-                                    {{ $pack->status ? 'Активен' : 'Неактивен' }}
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
+                                <span class="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium {{ $pack->status ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                    <span class="hidden sm:inline">{{ $pack->status ? 'Активен' : 'Неактивен' }}</span>
+                                    <span class="sm:hidden">{{ $pack->status ? '✓' : '✗' }}</span>
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
                                 <form action="{{ route('admin.module.pack.destroy', $pack) }}" 
                                       method="POST" 
                                       class="inline"
@@ -92,7 +96,7 @@
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="text-red-600 hover:text-red-800">
-                                        <i class="fas fa-trash"></i>
+                                        <i class="fas fa-trash text-xs sm:text-sm"></i>
                                     </button>
                                 </form>
                             </td>

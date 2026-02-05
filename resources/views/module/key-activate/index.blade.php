@@ -79,7 +79,7 @@
                             $isLastRows = $totalKeys <= 3 || $currentIndex > ($totalKeys - 3);
                         @endphp
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm">
                                 <div class="flex items-center">
                                     <span class="font-mono text-xs">{{ substr($key->id, 0, 8) }}...</span>
                                     <button class="ml-2 text-gray-400 hover:text-gray-600"
