@@ -259,7 +259,7 @@ class KeyActivateService
 
             $panel = $key->packSalesman->salesman->panel_id
                 ? $key->packSalesman->salesman->panel
-                : $this->panelRepository->getOptimizedMarzbanPanel();
+                : $this->panelRepository->getOptimizedMarzbanPanel(null, true); // Используем только кэш для быстрой активации
 
             if (!$panel) {
                 throw new RuntimeException('Активная панель Marzban не найдена');
@@ -383,13 +383,13 @@ class KeyActivateService
                                 $panel = $key->packSalesman->salesman->panel;
                             } else {
                                 // На последующих попытках используем общий алгоритм
-                                $panel = $this->panelRepository->getOptimizedMarzbanPanel();
+                                $panel = $this->panelRepository->getOptimizedMarzbanPanel(null, true); // Используем только кэш для быстрой активации
                             }
                         } else {
-                            $panel = $this->panelRepository->getOptimizedMarzbanPanel();
+                            $panel = $this->panelRepository->getOptimizedMarzbanPanel(null, true); // Используем только кэш для быстрой активации
                         }
                     } else {
-                        $panel = $this->panelRepository->getOptimizedMarzbanPanel();
+                        $panel = $this->panelRepository->getOptimizedMarzbanPanel(null, true); // Используем только кэш для быстрой активации
                     }
 
                     if (!$panel) {
@@ -543,13 +543,13 @@ class KeyActivateService
                                 $panel = $key->packSalesman->salesman->panel;
                             } else {
                                 // На последующих попытках используем общий алгоритм
-                                $panel = $this->panelRepository->getOptimizedMarzbanPanel();
+                                $panel = $this->panelRepository->getOptimizedMarzbanPanel(null, true); // Используем только кэш для быстрой активации
                             }
                         } else {
-                            $panel = $this->panelRepository->getOptimizedMarzbanPanel();
+                            $panel = $this->panelRepository->getOptimizedMarzbanPanel(null, true); // Используем только кэш для быстрой активации
                         }
                     } else {
-                        $panel = $this->panelRepository->getOptimizedMarzbanPanel();
+                        $panel = $this->panelRepository->getOptimizedMarzbanPanel(null, true); // Используем только кэш для быстрой активации
                     }
 
                     if (!$panel) {
@@ -877,7 +877,7 @@ class KeyActivateService
             if ($key->packSalesman && $key->packSalesman->salesman && $key->packSalesman->salesman->panel_id) {
                 $panel = $key->packSalesman->salesman->panel;
             } else {
-                $panel = $this->panelRepository->getOptimizedMarzbanPanel();
+                $panel = $this->panelRepository->getOptimizedMarzbanPanel(null, true); // Используем только кэш для быстрой активации
             }
 
             if (!$panel) {

@@ -201,9 +201,10 @@ class PanelRepository extends BaseRepository
      * Получить оптимизированную панель с минимальной нагрузкой
      * 
      * @param string|null $panelType Тип панели (по умолчанию Panel::MARZBAN для обратной совместимости)
+     * @param bool $useCacheOnly Если true, использует только кэшированные данные (для быстрой активации ключей)
      * @return Panel|null
      */
-    public function getOptimizedMarzbanPanel(?string $panelType = null): ?Panel
+    public function getOptimizedMarzbanPanel(?string $panelType = null, bool $useCacheOnly = false): ?Panel
     {
         // Используем Panel::MARZBAN по умолчанию для обратной совместимости
         $panelType = $panelType ?? Panel::MARZBAN;
@@ -229,32 +230,47 @@ class PanelRepository extends BaseRepository
 
         // Получаем стратегию выбора из конфига
         $strategy = config('panel.selection_strategy', 'intelligent');
+        
+        // Если нужно использовать только кэш (для быстрой активации), используем balanced стратегию
+        // которая не требует запросов к API
+        if ($useCacheOnly && ($strategy === 'traffic_based' || $strategy === 'intelligent')) {
+            Log::info('PANEL_SELECTION: Using balanced strategy for fast key activation (cache only mode)', [
+                'original_strategy' => $strategy,
+                'source' => 'panel'
+            ]);
+            $strategy = 'balanced';
+        }
 
         // Уменьшено время кэширования до 15 секунд для лучшей актуальности
         $cacheKey = "optimized_marzban_panel_{$strategy}";
-        return Cache::remember($cacheKey, 15, function () use ($panels, $strategy) {
-            return $this->selectPanelByStrategy($panels, $strategy);
+        return Cache::remember($cacheKey, 15, function () use ($panels, $strategy, $useCacheOnly) {
+            return $this->selectPanelByStrategy($panels, $strategy, $useCacheOnly);
         });
     }
 
     /**
      * Выбор панели в зависимости от стратегии
+     * 
+     * @param Collection $panels
+     * @param string $strategy
+     * @param bool $useCacheOnly Если true, использует только кэшированные данные (не делает запросы к API)
+     * @return Panel|null
      */
-    private function selectPanelByStrategy(Collection $panels, string $strategy): ?Panel
+    private function selectPanelByStrategy(Collection $panels, string $strategy, bool $useCacheOnly = false): ?Panel
     {
         switch ($strategy) {
             case 'balanced':
-                // Старая система - равномерное распределение
+                // Старая система - равномерное распределение (быстро, не требует API)
                 return $this->getConfiguredMarzbanPanel();
                 
             case 'traffic_based':
                 // Новая система - на основе трафика сервера
-                return $this->selectPanelByTraffic($panels);
+                return $this->selectPanelByTraffic($panels, $useCacheOnly);
                 
             case 'intelligent':
             default:
                 // Интеллектуальная система - комплексный анализ
-                $panel = $this->selectOptimalPanelIntelligent($panels);
+                $panel = $this->selectOptimalPanelIntelligent($panels, $useCacheOnly);
                 
                 // Если статистика устарела или отсутствует - используем fallback
                 if ($panel && !$this->isStatsFresh($panel->id)) {
@@ -499,8 +515,12 @@ class PanelRepository extends BaseRepository
 
     /**
      * Интеллектуальный выбор панели
+     * 
+     * @param Collection $panels
+     * @param bool $useCacheOnly Если true, использует только кэшированные данные (не делает запросы к API)
+     * @return Panel|null
      */
-    private function selectOptimalPanelIntelligent(Collection $panels): ?Panel
+    private function selectOptimalPanelIntelligent(Collection $panels, bool $useCacheOnly = false): ?Panel
     {
         $scoredPanels = $panels->map(function ($panel) {
             // Проверяем наличие актуальной статистики
@@ -827,16 +847,20 @@ class PanelRepository extends BaseRepository
      * Выбирает панель на сервере с наименьшим процентом использования трафика
      * 
      * @param Collection $panels
+     * @param bool $useCacheOnly Если true, использует только кэшированные данные (не делает запросы к API)
      * @return Panel|null
      */
-    private function selectPanelByTraffic(Collection $panels): ?Panel
+    private function selectPanelByTraffic(Collection $panels, bool $useCacheOnly = false): ?Panel
     {
         // Проверяем, заблокирован ли API из-за rate limit
         $rateLimitBlocked = Cache::get('vdsina_api_rate_limit_blocked', false);
         $rateLimitBlockedUntil = Cache::get('vdsina_api_rate_limit_blocked_until', 0);
         
-        $panelsWithTraffic = $panels->map(function ($panel) {
-            $trafficData = $this->getServerTrafficData($panel);
+        $panelsWithTraffic = $panels->map(function ($panel) use ($useCacheOnly) {
+            // Если режим "только кэш", используем специальный метод, который не делает запросы к API
+            $trafficData = $useCacheOnly 
+                ? $this->getServerTrafficDataFromCache($panel)
+                : $this->getServerTrafficData($panel);
             
             return [
                 'panel' => $panel,
@@ -914,6 +938,33 @@ class PanelRepository extends BaseRepository
      * @param Panel $panel
      * @return array|null
      */
+    /**
+     * Получить данные о трафике сервера только из кэша (без запросов к API)
+     * Используется для быстрой активации ключей
+     * 
+     * @param Panel $panel Панель
+     * @param string|null $provider Провайдер сервера (по умолчанию Server::VDSINA для обратной совместимости)
+     * @return array|null
+     */
+    private function getServerTrafficDataFromCache(Panel $panel, ?string $provider = null): ?array
+    {
+        // Используем Server::VDSINA по умолчанию для обратной совместимости
+        $provider = $provider ?? Server::VDSINA;
+        
+        if (!$panel->server || $panel->server->provider !== $provider) {
+            return null;
+        }
+
+        if (!$panel->server->provider_id) {
+            return null;
+        }
+
+        $cacheKey = "server_traffic_{$panel->server->provider_id}";
+        
+        // Только читаем из кэша, не делаем запросов к API
+        return Cache::get($cacheKey);
+    }
+
     /**
      * Получить данные о трафике сервера
      * 
