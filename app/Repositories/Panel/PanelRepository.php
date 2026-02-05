@@ -342,14 +342,35 @@ class PanelRepository extends BaseRepository
                 return ['error' => 'Нет доступных панелей'];
             }
 
-            // Получаем выбор каждой стратегии (без кэширования для актуальности)
+            // Получаем выбор каждой стратегии
+            // Используем кэш для ускорения, но с коротким временем жизни
             $balancedPanel = $this->getConfiguredMarzbanPanel();
             
-            // Для traffic_based получаем панели напрямую, минуя кэш
-            $trafficPanel = $this->selectPanelByTraffic($panels);
+            // Для traffic_based получаем панели, но с обработкой ошибок rate limit
+            $trafficPanel = null;
+            try {
+                $trafficPanel = $this->selectPanelByTraffic($panels);
+            } catch (\Exception $e) {
+                Log::warning('Failed to select panel by traffic in comparison', [
+                    'error' => $e->getMessage(),
+                    'source' => 'panel'
+                ]);
+                // Fallback на balanced при ошибке
+                $trafficPanel = $balancedPanel;
+            }
             
-            // Для intelligent также получаем напрямую
-            $intelligentPanel = $this->selectOptimalPanelIntelligent($panels);
+            // Для intelligent также получаем с обработкой ошибок
+            $intelligentPanel = null;
+            try {
+                $intelligentPanel = $this->selectOptimalPanelIntelligent($panels);
+            } catch (\Exception $e) {
+                Log::warning('Failed to select panel intelligently in comparison', [
+                    'error' => $e->getMessage(),
+                    'source' => 'panel'
+                ]);
+                // Fallback на balanced при ошибке
+                $intelligentPanel = $balancedPanel;
+            }
 
             // Собираем детальную информацию по каждой панели
             // Оборачиваем в try-catch для каждой панели, чтобы ошибки не блокировали всю страницу
@@ -874,15 +895,34 @@ class PanelRepository extends BaseRepository
         // Увеличиваем время кэширования для уменьшения количества запросов к API
         $cacheTtl = config('panel.traffic_cache_ttl', 1800); // 30 минут вместо 10
 
+        // Проверяем глобальный флаг блокировки API из-за rate limit
+        $rateLimitBlocked = Cache::get('vdsina_api_rate_limit_blocked', false);
+        $rateLimitBlockedUntil = Cache::get('vdsina_api_rate_limit_blocked_until', 0);
+        
+        // Если блокировка активна и еще не истекла, используем только кэш
+        if ($rateLimitBlocked && $rateLimitBlockedUntil > time()) {
+            $cachedData = Cache::get($cacheKey);
+            if ($cachedData !== null) {
+                Log::info('PANEL_SELECTION [TRAFFIC]: Using cached data due to active rate limit block', [
+                    'source' => 'panel',
+                    'server_id' => $panel->server->id,
+                    'provider_id' => $panel->server->provider_id,
+                    'blocked_until' => date('Y-m-d H:i:s', $rateLimitBlockedUntil)
+                ]);
+                return $cachedData;
+            }
+            return null;
+        }
+
         // Сначала проверяем, есть ли уже кэшированные данные
         $cachedData = Cache::get($cacheKey);
         
-        // Если кэш есть и он еще свежий (больше 5 минут осталось), возвращаем его
+        // Если кэш есть и он еще свежий (больше 10 минут осталось), возвращаем его
         // Это позволяет избежать лишних запросов к API
         if ($cachedData !== null) {
             $cacheAge = Cache::get("{$cacheKey}_age", 0);
-            $cacheMaxAge = $cacheTtl - 300; // 5 минут до истечения
-            if ($cacheAge < $cacheMaxAge) {
+            $cacheMaxAge = $cacheTtl - 600; // 10 минут до истечения
+            if ($cacheAge > 0 && (time() - $cacheAge) < $cacheMaxAge) {
                 return $cachedData;
             }
         }
@@ -896,6 +936,11 @@ class PanelRepository extends BaseRepository
                 // Сохраняем в кэш
                 Cache::put($cacheKey, $trafficData, $cacheTtl);
                 Cache::put("{$cacheKey}_age", time(), $cacheTtl);
+                
+                // Снимаем блокировку, если она была
+                Cache::forget('vdsina_api_rate_limit_blocked');
+                Cache::forget('vdsina_api_rate_limit_blocked_until');
+                
                 return $trafficData;
             }
         } catch (\Exception $e) {
@@ -905,10 +950,16 @@ class PanelRepository extends BaseRepository
                 || strpos($e->getMessage(), '403') !== false;
             
             if ($isRateLimit) {
-                Log::warning('PANEL_SELECTION [TRAFFIC]: Rate limit exceeded, using cached data if available', [
+                // Устанавливаем блокировку на 30 минут
+                $blockUntil = time() + 1800; // 30 минут
+                Cache::put('vdsina_api_rate_limit_blocked', true, 1800);
+                Cache::put('vdsina_api_rate_limit_blocked_until', $blockUntil, 1800);
+                
+                Log::warning('PANEL_SELECTION [TRAFFIC]: Rate limit exceeded, blocking API requests for 30 minutes', [
                     'source' => 'panel',
                     'server_id' => $panel->server->id,
-                    'provider_id' => $panel->server->provider_id
+                    'provider_id' => $panel->server->provider_id,
+                    'blocked_until' => date('Y-m-d H:i:s', $blockUntil)
                 ]);
             } else {
                 Log::error('PANEL_SELECTION [TRAFFIC]: Failed to get traffic data', [

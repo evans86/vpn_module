@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Repositories\Panel\PanelRepository;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -16,6 +17,8 @@ class PanelSettingsController extends Controller
      */
     public function index()
     {
+        // Очищаем кэш конфига перед чтением, чтобы получить актуальное значение
+        Cache::forget('config.panel.selection_strategy');
         $currentStrategy = config('panel.selection_strategy', 'intelligent');
         $strategies = [
             'balanced' => [
@@ -35,13 +38,17 @@ class PanelSettingsController extends Controller
             ]
         ];
 
-        // Получаем статистику и сравнение стратегий
+        // Получаем статистику и сравнение стратегий с кэшированием
         $panelRepository = app(\App\Repositories\Panel\PanelRepository::class);
-        $comparison = $panelRepository->compareAllStrategies();
-        
+
+        // Кэшируем сравнение на 5 минут, чтобы не делать запросы к API при каждой загрузке
+        $comparison = Cache::remember('panel_strategies_comparison', 300, function () use ($panelRepository) {
+            return $panelRepository->compareAllStrategies();
+        });
+
         // Получаем панели с ошибками
         $panelsWithErrors = $panelRepository->getPanelsWithErrors();
-        
+
         // Получаем историю ошибок для каждой панели
         $errorHistory = [];
         foreach ($panelsWithErrors as $panel) {
@@ -66,21 +73,21 @@ class PanelSettingsController extends Controller
         try {
             $oldValue = config('panel.selection_strategy', 'intelligent');
             $newValue = $validated['strategy'];
-            
+
             // Обновляем конфиг через .env или кэш
             // В продакшене лучше использовать БД или Redis для хранения настроек
             $configPath = config_path('panel.php');
-            
+
             if (file_exists($configPath)) {
                 $config = file_get_contents($configPath);
-                
+
                 // Заменяем значение в конфиге (более гибкий паттерн)
                 $config = preg_replace(
                     "/('selection_strategy'\s*=>\s*env\('PANEL_SELECTION_STRATEGY',\s*')[^']+(')/",
                     "$1{$newValue}$2",
                     $config
                 );
-                
+
                 // Если паттерн не сработал, пробуем другой вариант
                 if (!preg_match("/'selection_strategy' => env\('PANEL_SELECTION_STRATEGY', '{$newValue}'\)/", $config)) {
                     $config = preg_replace(
@@ -89,21 +96,31 @@ class PanelSettingsController extends Controller
                         $config
                     );
                 }
-                
+
                 file_put_contents($configPath, $config);
             }
-            
+
             // Очищаем все кэши конфига
             Cache::forget('config.panel');
             Cache::forget('config.panel.selection_strategy');
-            
+
+            // Очищаем кэш конфига Laravel через Artisan
+            try {
+                Artisan::call('config:clear');
+            } catch (\Exception $e) {
+                Log::warning('Failed to clear config cache via Artisan', ['error' => $e->getMessage()]);
+            }
+
             // Обновляем текущее значение в runtime
             config(['panel.selection_strategy' => $newValue]);
-            
+
             // Очищаем кэш выбора панелей для всех стратегий
             Cache::forget('optimized_marzban_panel_balanced');
             Cache::forget('optimized_marzban_panel_traffic_based');
             Cache::forget('optimized_marzban_panel_intelligent');
+
+            // Очищаем кэш сравнения стратегий
+            Cache::forget('panel_strategies_comparison');
 
             Log::info('Panel selection strategy updated', [
                 'old_strategy' => $oldValue ?? 'intelligent',
