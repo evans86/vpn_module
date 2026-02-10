@@ -231,14 +231,14 @@ class PanelRepository extends BaseRepository
         // Получаем стратегию выбора из конфига
         $strategy = config('panel.selection_strategy', 'intelligent');
         
-        // Если нужно использовать только кэш (для быстрой активации), используем balanced стратегию
-        // которая не требует запросов к API
-        if ($useCacheOnly && ($strategy === 'traffic_based' || $strategy === 'intelligent')) {
-            Log::info('PANEL_SELECTION: Using balanced strategy for fast key activation (cache only mode)', [
-                'original_strategy' => $strategy,
+        // Используем выбранную стратегию даже в режиме useCacheOnly
+        // Методы selectPanelByTraffic и selectOptimalPanelIntelligent уже поддерживают useCacheOnly
+        // и будут использовать кэшированные данные для быстрой работы
+        if ($useCacheOnly) {
+            Log::info('PANEL_SELECTION: Using selected strategy with cache-only mode for fast key activation', [
+                'strategy' => $strategy,
                 'source' => 'panel'
             ]);
-            $strategy = 'balanced';
         }
 
         // Уменьшено время кэширования до 15 секунд для лучшей актуальности
@@ -272,16 +272,25 @@ class PanelRepository extends BaseRepository
                 // Интеллектуальная система - комплексный анализ
                 $panel = $this->selectOptimalPanelIntelligent($panels, $useCacheOnly);
                 
-                // Если статистика устарела или отсутствует - используем fallback
-                if ($panel && !$this->isStatsFresh($panel->id)) {
-                    Log::warning('PANEL_SELECTION [INTELLIGENT]: Statistics outdated, falling back to balanced', [
-                        'source' => 'panel',
-                        'panel_id' => $panel->id
-                    ]);
-                    return $this->getConfiguredMarzbanPanel();
+                // Используем выбранную панель даже если статистика устарела
+                // Метод selectOptimalPanelIntelligent уже использует fallback на данные из БД
+                // если статистика недоступна, поэтому не нужно дополнительно переключаться на balanced
+                if ($panel) {
+                    $hasFreshStats = $this->isStatsFresh($panel->id);
+                    if (!$hasFreshStats) {
+                        Log::info('PANEL_SELECTION [INTELLIGENT]: Using panel with stale/DB stats (selected strategy preserved)', [
+                            'source' => 'panel',
+                            'panel_id' => $panel->id
+                        ]);
+                    }
+                    return $panel;
                 }
                 
-                return $panel;
+                // Fallback на balanced только если вообще не удалось выбрать панель
+                Log::warning('PANEL_SELECTION [INTELLIGENT]: No panel selected, falling back to balanced', [
+                    'source' => 'panel'
+                ]);
+                return $this->getConfiguredMarzbanPanel();
         }
     }
 
@@ -929,21 +938,40 @@ class PanelRepository extends BaseRepository
             return $selectedPanel;
         }
         
-        // Если данных о трафике нет вообще (rate limit или другие проблемы)
-        if ($rateLimitBlocked && $rateLimitBlockedUntil > time()) {
-            Log::warning('PANEL_SELECTION [TRAFFIC]: API blocked due to rate limit, no traffic data available, falling back to balanced', [
-                'blocked_until' => date('Y-m-d H:i:s', $rateLimitBlockedUntil),
-                'panels_count' => $panels->count(),
+        // Если данных о трафике нет вообще, используем альтернативный метод выбора
+        // на основе количества активных пользователей из БД (сохраняем выбранную стратегию)
+        Log::warning('PANEL_SELECTION [TRAFFIC]: No traffic data available, using fallback based on active users count', [
+            'panels_count' => $panels->count(),
+            'rate_limit_blocked' => $rateLimitBlocked,
+            'use_cache_only' => $useCacheOnly,
+            'source' => 'panel'
+        ]);
+        
+        // Выбираем панель с минимальным количеством активных пользователей
+        $panelsWithUsers = $panels->map(function ($panel) {
+            return [
+                'panel' => $panel,
+                'active_users' => $this->getActiveUsersCount($panel->id),
+                'total_users' => $this->getTotalUsersCount($panel->id)
+            ];
+        });
+        
+        $selectedPanelData = $panelsWithUsers->sortBy('active_users')->first();
+        
+        if ($selectedPanelData) {
+            Log::info('PANEL_SELECTION [TRAFFIC]: Selected panel using fallback (active users count)', [
+                'panel_id' => $selectedPanelData['panel']->id,
+                'active_users' => $selectedPanelData['active_users'],
+                'total_users' => $selectedPanelData['total_users'],
                 'source' => 'panel'
             ]);
-        } else {
-            Log::warning('PANEL_SELECTION [TRAFFIC]: No panels with traffic data available, falling back to balanced', [
-                'panels_count' => $panels->count(),
-                'rate_limit_blocked' => $rateLimitBlocked,
-                'source' => 'panel'
-            ]);
+            return $selectedPanelData['panel'];
         }
         
+        // Только в крайнем случае используем balanced
+        Log::warning('PANEL_SELECTION [TRAFFIC]: No panels available, falling back to balanced', [
+            'source' => 'panel'
+        ]);
         return $this->getConfiguredMarzbanPanel();
     }
 
