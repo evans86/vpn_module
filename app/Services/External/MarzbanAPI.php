@@ -192,11 +192,17 @@ class MarzbanAPI
      * @throws GuzzleException
      * @throws Exception
      */
-    public function createUser(string $token, string $userId, int $data_limit, int $expire, int $maxConnections = 3)
+    public function createUser(string $token, string $userId, int $data_limit, int $expire, ?int $maxConnections = null)
     {
         try {
             $action = 'user';
 
+            // Используем значение из конфига, если не передано
+            if ($maxConnections === null) {
+                $maxConnections = config('panel.max_connections', 4);
+            }
+
+            // Определяем level: если max_connections <= 3, то level = 0, иначе level = 1
             $level = $maxConnections <= 3 ? 0 : 1;
 
             $requestParam = [

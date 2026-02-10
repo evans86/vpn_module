@@ -1516,7 +1516,7 @@ class MarzbanService
 
             $marzbanApi = new MarzbanAPI($panel->api_address);
             $userId = Str::uuid();
-            $maxConnections = $options['max_connections'] ?? 3;
+            $maxConnections = $options['max_connections'] ?? config('panel.max_connections', 4);
 
             $userData = $marzbanApi->createUser(
                 $panel->auth_token,

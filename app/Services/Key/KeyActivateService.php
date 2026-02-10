@@ -292,7 +292,7 @@ class KeyActivateService
                 $key->traffic_limit,
                 $finishAt,
                 $key->id,
-                ['max_connections' => 3] // ← ДОБАВЛЯЕМ ЛИМИТ
+                ['max_connections' => config('panel.max_connections', 4)]
             );
 
             // Обновляем данные активации
@@ -414,7 +414,7 @@ class KeyActivateService
                         $key->traffic_limit,
                         $finishAt,
                         $key->id,
-                        ['max_connections' => 3]
+                        ['max_connections' => config('panel.max_connections', 4)]
                     );
 
                     // Если успешно, выходим из цикла
@@ -575,7 +575,7 @@ class KeyActivateService
                         $key->traffic_limit,
                         $finishAt,
                         $key->id,
-                        ['max_connections' => 3]
+                        ['max_connections' => config('panel.max_connections', 4)]
                     );
 
                     // Если успешно, выходим из цикла
@@ -906,7 +906,7 @@ class KeyActivateService
                 $trafficLimit,
                 $finishAt,
                 $key->id,
-                ['max_connections' => 3]
+                ['max_connections' => config('panel.max_connections', 4)]
             );
 
             // Обновляем данные активации - возвращаем ключ в статус ACTIVE
