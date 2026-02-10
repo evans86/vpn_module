@@ -153,7 +153,9 @@ class FatherBotController extends AbstractTelegramBot
 
                 // Проверяем, является ли сообщение ключом VPN
                 if ($this->isValidKeyFormat($text)) {
-                    $this->handleKeyInfoRequest($text);
+                    // Нормализуем ключ перед обработкой
+                    $normalizedKey = $this->normalizeKeyText($text);
+                    $this->handleKeyInfoRequest($normalizedKey);
                     return;
                 }
 

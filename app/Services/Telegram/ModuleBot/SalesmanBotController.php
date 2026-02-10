@@ -21,7 +21,11 @@ class SalesmanBotController extends AbstractTelegramBot
         // Находим продавца по токену
         $this->salesman = $this->salesmanRepository->findByToken($token);
         if (!$this->salesman) {
-            Log::error('Salesman not found for token: ' . substr($token, 0, 10) . '...', ['source' => 'telegram']);
+            // Логируем как warning, так как это может быть нормальная ситуация (старые вебхуки от удаленных/измененных ботов)
+            Log::warning('Salesman not found for token: ' . substr($token, 0, 10) . '...', [
+                'source' => 'telegram',
+                'reason' => 'Token may be revoked, changed, or salesman deleted. This is normal for old webhooks.'
+            ]);
             throw new RuntimeException('Salesman not found');
         }
 
@@ -110,8 +114,22 @@ class SalesmanBotController extends AbstractTelegramBot
                 default:
                     // Проверяем, похож ли текст на ключ
                     if ($this->isValidKeyFormat($text)) {
-                        $this->handleKeyActivation($text);
+                        // Нормализуем ключ перед обработкой
+                        $normalizedKey = $this->normalizeKeyText($text);
+                        $this->handleKeyActivation($normalizedKey);
                     } else {
+                        // Логируем для отладки, если текст похож на ключ, но не прошел валидацию
+                        $trimmedText = trim($text);
+                        if (preg_match('/[0-9a-f-]{20,}/i', $trimmedText)) {
+                            Log::warning('Key format validation failed', [
+                                'original_text' => $text,
+                                'text_length' => strlen($text),
+                                'text_hex' => bin2hex($text),
+                                'trimmed_text' => $trimmedText,
+                                'chat_id' => $this->chatId,
+                                'source' => 'telegram'
+                            ]);
+                        }
                         $this->sendMessage('❌ Неизвестная команда. Воспользуйтесь меню для выбора действия.');
                     }
             }

@@ -315,6 +315,42 @@ abstract class AbstractTelegramBot
 
     protected function isValidKeyFormat(string $text): bool
     {
-        return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $text) === 1;
+        // Нормализуем текст: удаляем пробелы в начале и конце, невидимые символы
+        $normalized = $this->normalizeKeyText($text);
+        
+        // Проверяем формат UUID
+        return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $normalized) === 1;
+    }
+
+    /**
+     * Нормализация текста ключа: удаление пробелов и невидимых символов
+     */
+    protected function normalizeKeyText(string $text): string
+    {
+        // Удаляем пробелы в начале и конце
+        $text = trim($text);
+        
+        // Удаляем невидимые символы (zero-width spaces, non-breaking spaces и т.д.)
+        $text = preg_replace('/[\x{200B}-\x{200D}\x{FEFF}\x{00A0}]/u', '', $text);
+        
+        // Удаляем все пробелы и другие whitespace символы внутри текста
+        $text = preg_replace('/\s+/', '', $text);
+        
+        // Если текст уже в правильном формате UUID с дефисами, возвращаем его
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $text)) {
+            return $text;
+        }
+        
+        // Удаляем все дефисы (на случай, если они в неправильных местах)
+        $textWithoutDashes = str_replace('-', '', $text);
+        
+        // Восстанавливаем правильный формат UUID (добавляем дефисы в правильных местах)
+        // Формат: 8-4-4-4-12 символов
+        if (preg_match('/^([0-9a-f]{8})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{12})$/i', $textWithoutDashes, $matches)) {
+            return sprintf('%s-%s-%s-%s-%s', $matches[1], $matches[2], $matches[3], $matches[4], $matches[5]);
+        }
+        
+        // Если не удалось нормализовать, возвращаем исходный текст (для обратной совместимости)
+        return $text;
     }
 }
