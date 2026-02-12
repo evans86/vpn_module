@@ -89,6 +89,49 @@ class PanelRepository extends BaseRepository
             ->with('server.location')
             ->get();
 
+        // Исключаем панели по различным критериям
+        $excludedLocations = array_map('intval', array_filter(config('panel.excluded_locations', [])));
+        $excludedServerIPs = array_filter(config('panel.excluded_server_ips', []));
+        $excludedServerIDs = array_map('intval', array_filter(config('panel.excluded_server_ids', [])));
+        
+        if (!empty($excludedLocations) || !empty($excludedServerIPs) || !empty($excludedServerIDs)) {
+            $panels = $panels->filter(function ($panel) use ($excludedLocations, $excludedServerIPs, $excludedServerIDs) {
+                // Проверяем локацию
+                if (!empty($excludedLocations) && $panel->server && $panel->server->location_id) {
+                    if (in_array($panel->server->location_id, $excludedLocations)) {
+                        return false;
+                    }
+                }
+                
+                // Проверяем IP-адрес сервера
+                if (!empty($excludedServerIPs) && $panel->server && $panel->server->ip) {
+                    $serverIP = is_numeric($panel->server->ip) ? long2ip($panel->server->ip) : $panel->server->ip;
+                    if (in_array($serverIP, $excludedServerIPs)) {
+                        return false;
+                    }
+                }
+                
+                // Проверяем ID сервера
+                if (!empty($excludedServerIDs) && $panel->server && $panel->server->id) {
+                    if (in_array($panel->server->id, $excludedServerIDs)) {
+                        return false;
+                    }
+                }
+                
+                return true;
+            });
+            
+            if ($panels->isEmpty()) {
+                Log::warning('PANEL_SELECTION [OLD]: No available panels after filtering', [
+                    'excluded_locations' => $excludedLocations,
+                    'excluded_server_ips' => $excludedServerIPs,
+                    'excluded_server_ids' => $excludedServerIDs,
+                    'source' => 'panel'
+                ]);
+                return null;
+            }
+        }
+
         if ($panels->isEmpty()) {
             Log::info('PANEL_SELECTION: No configured panels available', ['source' => 'panel']);
             return null;
@@ -222,6 +265,57 @@ class PanelRepository extends BaseRepository
             })
             ->with('server.location')
             ->get();
+
+        // Исключаем панели по различным критериям
+        $excludedLocations = array_map('intval', array_filter(config('panel.excluded_locations', [])));
+        $excludedServerIPs = array_filter(config('panel.excluded_server_ips', []));
+        $excludedServerIDs = array_map('intval', array_filter(config('panel.excluded_server_ids', [])));
+        
+        if (!empty($excludedLocations) || !empty($excludedServerIPs) || !empty($excludedServerIDs)) {
+            $panels = $panels->filter(function ($panel) use ($excludedLocations, $excludedServerIPs, $excludedServerIDs) {
+                // Проверяем локацию
+                if (!empty($excludedLocations) && $panel->server && $panel->server->location_id) {
+                    if (in_array($panel->server->location_id, $excludedLocations)) {
+                        return false;
+                    }
+                }
+                
+                // Проверяем IP-адрес сервера
+                if (!empty($excludedServerIPs) && $panel->server && $panel->server->ip) {
+                    $serverIP = is_numeric($panel->server->ip) ? long2ip($panel->server->ip) : $panel->server->ip;
+                    if (in_array($serverIP, $excludedServerIPs)) {
+                        return false;
+                    }
+                }
+                
+                // Проверяем ID сервера
+                if (!empty($excludedServerIDs) && $panel->server && $panel->server->id) {
+                    if (in_array($panel->server->id, $excludedServerIDs)) {
+                        return false;
+                    }
+                }
+                
+                return true;
+            });
+            
+            if ($panels->isEmpty()) {
+                Log::warning('PANEL_SELECTION: No available panels after filtering', [
+                    'excluded_locations' => $excludedLocations,
+                    'excluded_server_ips' => $excludedServerIPs,
+                    'excluded_server_ids' => $excludedServerIDs,
+                    'source' => 'panel'
+                ]);
+                return null;
+            }
+            
+            Log::info('PANEL_SELECTION: Filtered panels by exclusion rules', [
+                'excluded_locations' => $excludedLocations,
+                'excluded_server_ips' => $excludedServerIPs,
+                'excluded_server_ids' => $excludedServerIDs,
+                'panels_after_filter' => $panels->count(),
+                'source' => 'panel'
+            ]);
+        }
 
         if ($panels->isEmpty()) {
             Log::warning('PANEL_SELECTION: No available panels after filtering', ['source' => 'panel']);

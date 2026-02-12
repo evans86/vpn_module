@@ -134,17 +134,11 @@ class KeyActivateController extends Controller
      */
     public function show(KeyActivate $key): View
     {
-        // ОПТИМИЗАЦИЯ: Загружаем отношения с выбором только нужных полей
+        // Загружаем отношения
         $key->load([
-            'packSalesman:id,pack_id,salesman_id' => [
-                'pack:id,title,price,period',
-                'salesman:id,name,telegram_id'
-            ],
-            'keyActivateUser:id,server_user_id,key_activate_id' => [
-                'serverUser:id,panel_id,username' => [
-                    'panel:id,name,panel'
-                ]
-            ]
+            'packSalesman.pack',
+            'packSalesman.salesman',
+            'keyActivateUser.serverUser.panel'
         ]);
         return view('module.key-activate.show', compact('key'));
     }
@@ -161,13 +155,9 @@ class KeyActivateController extends Controller
             /**
              * @var KeyActivate $key
              */
-            // ОПТИМИЗАЦИЯ: Выбираем только необходимые поля и отношения
+            // Загружаем отношения для удаления
             $key = KeyActivate::with([
-                'keyActivateUser:id,server_user_id,key_activate_id' => [
-                    'serverUser:id,panel_id,username' => [
-                        'panel:id,panel'
-                    ]
-                ]
+                'keyActivateUser.serverUser.panel'
             ])->findOrFail($id);
 
             $this->logger->info('Начало удаления ключа активации', [
