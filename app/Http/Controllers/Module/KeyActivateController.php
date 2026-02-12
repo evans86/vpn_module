@@ -151,20 +151,24 @@ class KeyActivateController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
+        // Увеличиваем лимит памяти для операции удаления
+        $originalMemoryLimit = ini_get('memory_limit');
+        ini_set('memory_limit', '256M');
+
         try {
             Log::info('KeyActivateController::destroy - Начало удаления ключа', [
                 'key_id' => $id,
-                'user_id' => auth()->id()
+                'user_id' => auth()->id(),
+                'memory_limit' => ini_get('memory_limit')
             ]);
 
             /**
              * @var KeyActivate $key
              */
-            // Загружаем отношения для удаления
+            // Загружаем только необходимые данные без полной загрузки отношений
             try {
-                $key = KeyActivate::with([
-                    'keyActivateUser.serverUser.panel'
-                ])->findOrFail($id);
+                $key = KeyActivate::select('id', 'status', 'user_tg_id')
+                    ->findOrFail($id);
             } catch (\Exception $e) {
                 Log::error('KeyActivateController::destroy - Ошибка при загрузке ключа', [
                     'key_id' => $id,
@@ -174,23 +178,45 @@ class KeyActivateController extends Controller
                 throw $e;
             }
 
+            // Загружаем данные о связанном пользователе сервера отдельным запросом
+            $keyActivateUser = \App\Models\KeyActivateUser\KeyActivateUser::where('key_activate_id', $id)
+                ->select('id', 'server_user_id', 'key_activate_id')
+                ->first();
+
+            $serverUser = null;
+            $panel = null;
+
+            if ($keyActivateUser) {
+                $serverUser = \App\Models\ServerUser\ServerUser::where('id', $keyActivateUser->server_user_id)
+                    ->select('id', 'panel_id')
+                    ->first();
+
+                if ($serverUser) {
+                    $panel = \App\Models\Panel\Panel::where('id', $serverUser->panel_id)
+                        ->select('id', 'panel')
+                        ->first();
+                }
+            }
+
             $this->logger->info('Начало удаления ключа активации', [
                 'key_id' => $id,
-                'key_activate_user_exists' => $key->keyActivateUser ? 'yes' : 'no',
-                'server_user_exists' => $key->keyActivateUser && $key->keyActivateUser->serverUser ? 'yes' : 'no'
+                'key_activate_user_exists' => $keyActivateUser ? 'yes' : 'no',
+                'server_user_exists' => $serverUser ? 'yes' : 'no'
             ]);
 
             Log::info('KeyActivateController::destroy - Ключ загружен', [
                 'key_id' => $id,
-                'has_key_activate_user' => $key->keyActivateUser ? 'yes' : 'no',
-                'has_server_user' => $key->keyActivateUser && $key->keyActivateUser->serverUser ? 'yes' : 'no',
-                'has_panel' => $key->keyActivateUser && $key->keyActivateUser->serverUser && $key->keyActivateUser->serverUser->panel ? 'yes' : 'no'
+                'has_key_activate_user' => $keyActivateUser ? 'yes' : 'no',
+                'has_server_user' => $serverUser ? 'yes' : 'no',
+                'has_panel' => $panel ? 'yes' : 'no',
+                'memory_usage' => round(memory_get_usage() / 1024 / 1024, 2) . ' MB'
             ]);
 
+            // Очищаем память после загрузки данных
+            unset($keyActivateUser);
+
             // Если есть связанный пользователь на сервере, удаляем его
-            if ($key->keyActivateUser && $key->keyActivateUser->serverUser && $key->keyActivateUser->serverUser->panel) {
-                $serverUser = $key->keyActivateUser->serverUser;
-                $panel = $serverUser->panel;
+            if ($serverUser && $panel) {
 
                 Log::info('KeyActivateController::destroy - Удаление пользователя из панели', [
                     'key_id' => $id,
@@ -212,8 +238,12 @@ class KeyActivateController extends Controller
                     Log::info('KeyActivateController::destroy - Пользователь удален из панели', [
                         'key_id' => $id,
                         'panel_id' => $panel->id,
-                        'server_user_id' => $serverUser->id
+                        'server_user_id' => $serverUser->id,
+                        'memory_usage' => round(memory_get_usage() / 1024 / 1024, 2) . ' MB'
                     ]);
+
+                    // Очищаем память после удаления из панели
+                    unset($panel, $serverUser);
                 } catch (Exception $e) {
                     Log::error('KeyActivateController::destroy - Ошибка при удалении пользователя из панели', [
                         'key_id' => $id,
@@ -238,15 +268,24 @@ class KeyActivateController extends Controller
                 ]);
             }
 
-            // Удаляем KeyActivate
+            // Очищаем память перед удалением ключа
+            unset($serverUser, $panel);
+
+            // Удаляем KeyActivate через прямой запрос для экономии памяти
             try {
-                $key->delete();
+                $deleted = \App\Models\KeyActivate\KeyActivate::where('id', $id)->delete();
+                
+                if (!$deleted) {
+                    throw new RuntimeException('Failed to delete key activate');
+                }
+
                 $this->logger->info('KeyActivate удален', [
                     'key_id' => $id
                 ]);
 
                 Log::info('KeyActivateController::destroy - Ключ успешно удален', [
-                    'key_id' => $id
+                    'key_id' => $id,
+                    'memory_usage' => round(memory_get_usage() / 1024 / 1024, 2) . ' MB'
                 ]);
             } catch (Exception $e) {
                 Log::error('KeyActivateController::destroy - Ошибка при удалении KeyActivate', [
@@ -263,8 +302,14 @@ class KeyActivateController extends Controller
                 throw $e;
             }
 
+            // Восстанавливаем лимит памяти
+            ini_set('memory_limit', $originalMemoryLimit);
+
             return response()->json(['message' => 'Ключ успешно удален']);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            // Восстанавливаем лимит памяти
+            ini_set('memory_limit', $originalMemoryLimit);
+
             Log::error('KeyActivateController::destroy - Ключ не найден', [
                 'key_id' => $id,
                 'error' => $e->getMessage()
@@ -272,6 +317,9 @@ class KeyActivateController extends Controller
 
             return response()->json(['message' => 'Ключ не найден'], 404);
         } catch (Exception $e) {
+            // Восстанавливаем лимит памяти
+            ini_set('memory_limit', $originalMemoryLimit);
+
             Log::error('KeyActivateController::destroy - Общая ошибка при удалении ключа', [
                 'source' => 'key_activate',
                 'action' => 'delete',
@@ -280,7 +328,9 @@ class KeyActivateController extends Controller
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'file' => $e->getFile(),
-                'line' => $e->getLine()
+                'line' => $e->getLine(),
+                'memory_usage' => round(memory_get_usage() / 1024 / 1024, 2) . ' MB',
+                'memory_limit' => ini_get('memory_limit')
             ]);
 
             $this->logger->error('Общая ошибка при удалении ключа активации', [

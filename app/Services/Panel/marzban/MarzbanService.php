@@ -766,36 +766,45 @@ class MarzbanService
             $deleteResult = $marzbanApi->deleteUser($panel->auth_token, $user_id);
             Log::info('Marzban API delete result', ['result' => $deleteResult, 'source' => 'panel']);
 
-            // Удаляем запись из БД
-            $serverUser = ServerUser::query()->where('id', $user_id)->firstOrFail();
+            // Удаляем запись из БД - загружаем только необходимые поля
+            $serverUser = ServerUser::select('id')->where('id', $user_id)->firstOrFail();
 
-            // Удаляем связанную запись KeyActivateUser
-            if ($serverUser->keyActivateUser) {
-                $keyActivateId = $serverUser->keyActivateUser->key_activate_id;
-                $keyActivate = $serverUser->keyActivateUser->keyActivate;
+            // Удаляем связанную запись KeyActivateUser через прямой запрос
+            $keyActivateUser = \App\Models\KeyActivateUser\KeyActivateUser::where('server_user_id', $user_id)
+                ->select('id', 'key_activate_id')
+                ->first();
+
+            if ($keyActivateUser) {
+                $keyActivateId = $keyActivateUser->key_activate_id;
+                
+                // Получаем статус ключа отдельным запросом
+                $keyStatus = \App\Models\KeyActivate\KeyActivate::where('id', $keyActivateId)
+                    ->value('status');
                 
                 Log::critical("⚠️ [KEY: {$keyActivateId}] УДАЛЕНИЕ СВЯЗИ keyActivateUser (при удалении пользователя сервера) | KEY_ID: {$keyActivateId} | {$keyActivateId}", [
                     'source' => 'panel',
                     'action' => 'delete_key_activate_user',
-                    'key_activate_user_id' => $serverUser->keyActivateUser->id,
+                    'key_activate_user_id' => $keyActivateUser->id,
                     'key_activate_id' => $keyActivateId,
                     'search_key' => $keyActivateId, // Для быстрого поиска
                     'search_tag' => 'KEY_USER_DELETED',
                     'server_user_id' => $user_id,
                     'panel_id' => $panel_id,
-                    'key_status' => $keyActivate ? $keyActivate->status : 'unknown',
-                    'key_status_text' => $keyActivate ? $this->getStatusTextByCode($keyActivate->status) : 'unknown',
-                    'key_user_tg_id' => $keyActivate ? $keyActivate->user_tg_id : null,
+                    'key_status' => $keyStatus ?? 'unknown',
+                    'key_status_text' => $keyStatus ? $this->getStatusTextByCode($keyStatus) : 'unknown',
                     'reason' => 'Удаление пользователя сервера через deleteServerUser()',
                     'method' => 'deleteServerUser',
                     'file' => __FILE__,
                     'line' => __LINE__
                 ]);
                 
-                $serverUser->keyActivateUser->delete();
+                // Удаляем через прямой запрос
+                \App\Models\KeyActivateUser\KeyActivateUser::where('id', $keyActivateUser->id)->delete();
             }
 
-            if (!$serverUser->delete()) {
+            // Удаляем через прямой запрос
+            $deleted = ServerUser::where('id', $user_id)->delete();
+            if (!$deleted) {
                 throw new RuntimeException('Failed to delete user record from database');
             }
 
