@@ -1000,10 +1000,54 @@ class MarzbanService
                 "error" => "/var/lib/marzban/error.log",
                 "dnsLog" => true
             ],
+            "dns" => [
+                "servers" => [
+                    "1.1.1.1",
+                    "8.8.8.8",
+                    [
+                        "address" => "1.1.1.1",
+                        "port" => 53,
+                        "domains" => [
+                            "geosite:cn"
+                        ]
+                    ],
+                    [
+                        "address" => "8.8.8.8",
+                        "port" => 53,
+                        "domains" => [
+                            "geosite:google"
+                        ]
+                    ]
+                ],
+                "queryStrategy" => "UseIPv4"
+            ],
+            "routing" => [
+                "domainStrategy" => "IPIfNonMatch",
+                "rules" => [
+                    [
+                        "type" => "field",
+                        "domain" => [
+                            "geosite:cn"
+                        ],
+                        "outboundTag" => "DIRECT"
+                    ],
+                    [
+                        "type" => "field",
+                        "ip" => [
+                            "geoip:cn",
+                            "geoip:private"
+                        ],
+                        "outboundTag" => "DIRECT"
+                    ]
+                ]
+            ],
             "outbounds" => [
                 [
                     "protocol" => "freedom",
-                    "tag" => "DIRECT"
+                    "tag" => "DIRECT",
+                    "settings" => [
+                        "domainStrategy" => "UseIPv4"
+                    ]
                 ]
             ],
             "policy" => [
