@@ -152,13 +152,27 @@ class KeyActivateController extends Controller
     public function destroy(string $id): JsonResponse
     {
         try {
+            Log::info('KeyActivateController::destroy - Начало удаления ключа', [
+                'key_id' => $id,
+                'user_id' => auth()->id()
+            ]);
+
             /**
              * @var KeyActivate $key
              */
             // Загружаем отношения для удаления
-            $key = KeyActivate::with([
-                'keyActivateUser.serverUser.panel'
-            ])->findOrFail($id);
+            try {
+                $key = KeyActivate::with([
+                    'keyActivateUser.serverUser.panel'
+                ])->findOrFail($id);
+            } catch (\Exception $e) {
+                Log::error('KeyActivateController::destroy - Ошибка при загрузке ключа', [
+                    'key_id' => $id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+                throw $e;
+            }
 
             $this->logger->info('Начало удаления ключа активации', [
                 'key_id' => $id,
@@ -166,10 +180,24 @@ class KeyActivateController extends Controller
                 'server_user_exists' => $key->keyActivateUser && $key->keyActivateUser->serverUser ? 'yes' : 'no'
             ]);
 
+            Log::info('KeyActivateController::destroy - Ключ загружен', [
+                'key_id' => $id,
+                'has_key_activate_user' => $key->keyActivateUser ? 'yes' : 'no',
+                'has_server_user' => $key->keyActivateUser && $key->keyActivateUser->serverUser ? 'yes' : 'no',
+                'has_panel' => $key->keyActivateUser && $key->keyActivateUser->serverUser && $key->keyActivateUser->serverUser->panel ? 'yes' : 'no'
+            ]);
+
             // Если есть связанный пользователь на сервере, удаляем его
             if ($key->keyActivateUser && $key->keyActivateUser->serverUser && $key->keyActivateUser->serverUser->panel) {
                 $serverUser = $key->keyActivateUser->serverUser;
                 $panel = $serverUser->panel;
+
+                Log::info('KeyActivateController::destroy - Удаление пользователя из панели', [
+                    'key_id' => $id,
+                    'panel_id' => $panel->id,
+                    'server_user_id' => $serverUser->id,
+                    'panel_type' => $panel->panel
+                ]);
 
                 try {
                     $panelStrategy = new PanelStrategy($panel->panel);
@@ -180,7 +208,21 @@ class KeyActivateController extends Controller
                         'panel_id' => $panel->id,
                         'server_user_id' => $serverUser->id
                     ]);
+
+                    Log::info('KeyActivateController::destroy - Пользователь удален из панели', [
+                        'key_id' => $id,
+                        'panel_id' => $panel->id,
+                        'server_user_id' => $serverUser->id
+                    ]);
                 } catch (Exception $e) {
+                    Log::error('KeyActivateController::destroy - Ошибка при удалении пользователя из панели', [
+                        'key_id' => $id,
+                        'panel_id' => $panel->id,
+                        'server_user_id' => $serverUser->id,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ]);
+
                     $this->logger->error('Ошибка при удалении пользователя из панели', [
                         'key_id' => $id,
                         'panel_id' => $panel->id,
@@ -190,6 +232,10 @@ class KeyActivateController extends Controller
                     ]);
                     throw $e; // Прерываем процесс, если не удалось удалить пользователя из панели
                 }
+            } else {
+                Log::info('KeyActivateController::destroy - Нет связанного пользователя на сервере, пропускаем удаление из панели', [
+                    'key_id' => $id
+                ]);
             }
 
             // Удаляем KeyActivate
@@ -198,7 +244,17 @@ class KeyActivateController extends Controller
                 $this->logger->info('KeyActivate удален', [
                     'key_id' => $id
                 ]);
+
+                Log::info('KeyActivateController::destroy - Ключ успешно удален', [
+                    'key_id' => $id
+                ]);
             } catch (Exception $e) {
+                Log::error('KeyActivateController::destroy - Ошибка при удалении KeyActivate', [
+                    'key_id' => $id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+
                 $this->logger->error('Ошибка при удалении KeyActivate', [
                     'key_id' => $id,
                     'error' => $e->getMessage(),
@@ -208,7 +264,25 @@ class KeyActivateController extends Controller
             }
 
             return response()->json(['message' => 'Ключ успешно удален']);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            Log::error('KeyActivateController::destroy - Ключ не найден', [
+                'key_id' => $id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json(['message' => 'Ключ не найден'], 404);
         } catch (Exception $e) {
+            Log::error('KeyActivateController::destroy - Общая ошибка при удалении ключа', [
+                'source' => 'key_activate',
+                'action' => 'delete',
+                'user_id' => auth()->id(),
+                'key_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+
             $this->logger->error('Общая ошибка при удалении ключа активации', [
                 'source' => 'key_activate',
                 'action' => 'delete',
