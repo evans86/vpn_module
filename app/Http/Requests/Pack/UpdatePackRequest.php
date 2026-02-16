@@ -26,10 +26,11 @@ class UpdatePackRequest extends FormRequest
         return [
             'title' => 'required|string',
             'price' => 'required|integer|min:0',
+            'api_id' => 'nullable|integer|min:1',
             'period' => 'required|integer|min:1',
             'traffic_limit' => 'required|integer|min:1',
             'count' => 'required|integer|min:1',
-            'activate_time' => 'required|integer|min:1',
+            'activate_time' => 'nullable|integer|min:1',
             'status' => 'required|boolean'
         ];
     }
@@ -47,8 +48,10 @@ class UpdatePackRequest extends FormRequest
 
         // Конвертируем GB в байты
         $validated['traffic_limit'] = $validated['traffic_limit'] * 1024 * 1024 * 1024;
-        // Конвертируем часы в секунды
-        $validated['activate_time'] = $validated['activate_time'] * 3600;
+        // Конвертируем часы в секунды (если поле передано)
+        if (isset($validated['activate_time'])) {
+            $validated['activate_time'] = $validated['activate_time'] * 3600;
+        }
 
         return $validated;
     }

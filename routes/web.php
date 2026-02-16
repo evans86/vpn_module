@@ -179,8 +179,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::prefix('pack')->name('pack.')->group(function () {
                 Route::get('/', [PackController::class, 'index'])->name('index');
                 Route::post('/', [PackController::class, 'store'])->name('store');
-                Route::put('/{pack}', [PackController::class, 'update'])->name('update');
-                Route::delete('/{pack}', [PackController::class, 'destroy'])->name('destroy');
+                Route::put('/{id}', [PackController::class, 'update'])->name('update');
+                Route::delete('/{id}', [PackController::class, 'destroy'])->name('destroy');
             });
 
             // Pack-Salesman

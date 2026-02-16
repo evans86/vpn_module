@@ -118,7 +118,7 @@ class PackController extends Controller
                 'pack_data' => array_diff_key($data, array_flip(['password']))
             ]);
 
-            return redirect()->route('module.pack.index')
+            return redirect()->route('admin.module.pack.index')
                 ->with('success', 'Пакет успешно обновлен');
         } catch (RuntimeException $e) {
             $this->logger->error('Ошибка при обновлении пакета', [

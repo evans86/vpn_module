@@ -41,7 +41,8 @@ class Pack extends Model
         'traffic_limit',
         'count',
         'activate_time',
-        'status'
+        'status',
+        'api_id'
     ];
 
     /**

@@ -7,6 +7,7 @@ use App\Http\Controllers\Telegram\WebhookController;
 use App\Http\Controllers\Api\v1\BotModuleController;
 use App\Http\Controllers\Api\v1\KeyActivateController;
 use App\Http\Controllers\Api\v1\PackSalesmanController;
+use App\Http\Controllers\Api\v1\BotTWebhookController;
 
 /*
 |--------------------------------------------------------------------------
@@ -52,4 +53,13 @@ Route::prefix('v1/key-activate')->group(function () {
     Route::get('user-key', [KeyActivateController::class, 'getUserKey']); // +-
     Route::get('user-keys', [KeyActivateController::class, 'getUserKeys']); // +-
     Route::get('vpn-instructions', [KeyActivateController::class, 'getVpnInstructions']); // +-
+});
+
+// BOT-T Webhook Routes
+Route::prefix('v1/bott')->group(function () {
+    // URL вебхука (уведомление после оплаты заказа)
+    Route::post('webhook/order-payment', [BotTWebhookController::class, 'handleOrderPayment']);
+    
+    // URL вебхука (проверка товара перед выдачей клиенту)
+    Route::post('webhook/validate-product', [BotTWebhookController::class, 'validateProduct']);
 });

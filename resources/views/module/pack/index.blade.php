@@ -53,11 +53,20 @@
                     </x-slot>
                 </x-admin.empty-state>
             @else
-                <x-admin.table :headers="['ID', 'Название', 'Тип', 'Цена', 'Период', 'Трафик', 'Ключи', 'Статус', 'Действия']">
+                <x-admin.table :headers="['ID', 'API ID', 'Название', 'Тип', 'Цена', 'Период', 'Трафик', 'Ключи', 'Статус', 'Действия']">
                     @foreach($packs as $pack)
                         <tr class="hover:bg-gray-50">
                             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">
                                 {{ $pack->id }}
+                            </td>
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
+                                @if($pack->api_id)
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                                        {{ $pack->api_id }}
+                                    </span>
+                                @else
+                                    <span class="text-gray-400">—</span>
+                                @endif
                             </td>
                             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
                                 <span class="hidden sm:inline">{{ $pack->title }}</span>
@@ -89,7 +98,13 @@
                                 </span>
                             </td>
                             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
-                                <form action="{{ route('admin.module.pack.destroy', $pack) }}" 
+                                <div class="flex items-center justify-end gap-2">
+                                    <button type="button" 
+                                            class="text-indigo-600 hover:text-indigo-800"
+                                            onclick="openEditModal({{ $pack->id }}, '{{ $pack->title }}', {{ $pack->price }}, {{ $pack->api_id ?? 'null' }}, {{ $pack->module_key }}, {{ $pack->period }}, {{ $pack->traffic_limit / (1024*1024*1024) }}, {{ $pack->count }}, {{ $pack->status ? 1 : 0 }})">
+                                        <i class="fas fa-edit text-xs sm:text-sm"></i>
+                                    </button>
+                                <form action="{{ route('admin.module.pack.destroy', $pack->id) }}" 
                                       method="POST" 
                                       class="inline"
                                       onsubmit="return confirm('Вы уверены, что хотите удалить этот пакет?')">
@@ -99,6 +114,7 @@
                                         <i class="fas fa-trash text-xs sm:text-sm"></i>
                                     </button>
                                 </form>
+                                </div>
                             </td>
                         </tr>
                     @endforeach
@@ -137,6 +153,22 @@
                            name="title" 
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" 
                            required>
+                </div>
+                
+                <div>
+                    <label for="api_id" class="block text-sm font-medium text-gray-700 mb-1">
+                        API ID (для интеграции с BOT-T)
+                        <span class="text-xs text-gray-500">(необязательно)</span>
+                    </label>
+                    <input type="number" 
+                           id="api_id" 
+                           name="api_id" 
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" 
+                           placeholder="ID категории из BOT-T"
+                           min="1">
+                    <p class="mt-1 text-xs text-gray-500">
+                        Укажите API ID категории из BOT-T для автоматической выдачи ключей после оплаты
+                    </p>
                 </div>
                 
                 <div>
@@ -200,4 +232,134 @@
             </button>
         </x-slot>
     </x-admin.modal>
+
+    <!-- Modal: Edit Pack -->
+    <x-admin.modal id="editPackModal" title="Редактировать пакет" size="lg">
+        <form id="editPackForm" method="POST">
+            @csrf
+            @method('PUT')
+            <div class="space-y-4">
+                <div>
+                    <label for="edit_price" class="block text-sm font-medium text-gray-700 mb-1">
+                        Цена (₽)
+                    </label>
+                    <input type="number" 
+                           id="edit_price" 
+                           name="price" 
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" 
+                           required 
+                           min="0">
+                </div>
+                
+                <div>
+                    <label for="edit_title" class="block text-sm font-medium text-gray-700 mb-1">
+                        Название
+                    </label>
+                    <input type="text" 
+                           id="edit_title" 
+                           name="title" 
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" 
+                           required>
+                </div>
+                
+                <div>
+                    <label for="edit_api_id" class="block text-sm font-medium text-gray-700 mb-1">
+                        API ID (для интеграции с BOT-T)
+                        <span class="text-xs text-gray-500">(необязательно)</span>
+                    </label>
+                    <input type="number" 
+                           id="edit_api_id" 
+                           name="api_id" 
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" 
+                           placeholder="ID категории из BOT-T"
+                           min="1">
+                    <p class="mt-1 text-xs text-gray-500">
+                        Укажите API ID категории из BOT-T для автоматической выдачи ключей после оплаты
+                    </p>
+                </div>
+                
+                <div>
+                    <label for="edit_module_key" class="block text-sm font-medium text-gray-700 mb-1">
+                        Тип пакета
+                    </label>
+                    <select id="edit_module_key" name="module_key" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" required>
+                        <option value="0">Для бота</option>
+                        <option value="1">Для модуля</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="edit_period" class="block text-sm font-medium text-gray-700 mb-1">
+                        Период действия (дней)
+                    </label>
+                    <input type="number" 
+                           id="edit_period" 
+                           name="period" 
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" 
+                           required 
+                           min="1">
+                </div>
+                
+                <div>
+                    <label for="edit_traffic_limit" class="block text-sm font-medium text-gray-700 mb-1">
+                        Лимит трафика (GB)
+                    </label>
+                    <input type="number" 
+                           id="edit_traffic_limit" 
+                           name="traffic_limit" 
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" 
+                           required 
+                           min="1">
+                </div>
+                
+                <div>
+                    <label for="edit_count" class="block text-sm font-medium text-gray-700 mb-1">
+                        Количество ключей
+                    </label>
+                    <input type="number" 
+                           id="edit_count" 
+                           name="count" 
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" 
+                           required 
+                           min="1">
+                </div>
+
+                <div>
+                    <label for="edit_status" class="block text-sm font-medium text-gray-700 mb-1">
+                        Статус
+                    </label>
+                    <select id="edit_status" name="status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" required>
+                        <option value="1">Активен</option>
+                        <option value="0">Неактивен</option>
+                    </select>
+                </div>
+            </div>
+        </form>
+        <x-slot name="footer">
+            <button type="submit" form="editPackForm" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                Сохранить
+            </button>
+            <button type="button" 
+                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" 
+                    onclick="window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'editPackModal' } }))">
+                Отмена
+            </button>
+        </x-slot>
+    </x-admin.modal>
+
+    <script>
+        function openEditModal(id, title, price, apiId, moduleKey, period, trafficLimit, count, status) {
+            document.getElementById('editPackForm').action = '{{ route("admin.module.pack.update", ":id") }}'.replace(':id', id);
+            document.getElementById('edit_title').value = title;
+            document.getElementById('edit_price').value = price;
+            document.getElementById('edit_api_id').value = apiId || '';
+            document.getElementById('edit_module_key').value = moduleKey;
+            document.getElementById('edit_period').value = period;
+            document.getElementById('edit_traffic_limit').value = trafficLimit;
+            document.getElementById('edit_count').value = count;
+            document.getElementById('edit_status').value = status;
+            
+            window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'editPackModal' } }));
+        }
+    </script>
 @endsection
