@@ -114,27 +114,13 @@ class BotTService
                     'order_id' => $orderId,
                     'product_id' => $productId,
                     'category_api_id' => $categoryApiId,
-                    'category' => $orderData['category'] ?? null
-                ]);
-
-                return [
-                    'success' => false,
-                    'error' => "Pack not found. Tried product_id={$productId}, category_api_id={$categoryApiId}. Please ensure pack api_id matches one of these values."
-                ];
-            }
-
-            if (!$pack) {
-                Log::warning('BOT-T: Pack not found by category API ID', [
-                    'source' => 'bott',
-                    'category_api_id' => $categoryApiId,
-                    'order_id' => $orderId,
                     'category' => $orderData['category'] ?? null,
                     'available_packs' => Pack::select('id', 'api_id', 'title')->get()->toArray()
                 ]);
 
                 return [
                     'success' => false,
-                    'error' => "Pack not found for category API ID: {$categoryApiId}. Please ensure that the category API ID in BOT-T matches the pack api_id in VPN system."
+                    'error' => "Pack not found. Tried product_id={$productId}, category_api_id={$categoryApiId}. Please ensure pack api_id matches one of these values."
                 ];
             }
 
@@ -146,24 +132,62 @@ class BotTService
             }
 
             // Находим или создаем salesman по telegram_id
+            Log::info('BOT-T: Finding or creating salesman', [
+                'source' => 'bott',
+                'order_id' => $orderId,
+                'telegram_id' => $userTelegramId
+            ]);
+            
             $salesman = $this->findOrCreateSalesman($userTelegramId, $orderData['user'] ?? []);
             if (!$salesman) {
+                Log::error('BOT-T: Failed to find or create salesman', [
+                    'source' => 'bott',
+                    'order_id' => $orderId,
+                    'telegram_id' => $userTelegramId
+                ]);
                 return [
                     'success' => false,
                     'error' => 'Failed to find or create salesman'
                 ];
             }
 
+            Log::info('BOT-T: Salesman found/created', [
+                'source' => 'bott',
+                'order_id' => $orderId,
+                'salesman_id' => $salesman->id,
+                'telegram_id' => $salesman->telegram_id
+            ]);
+
             // Создаем PackSalesman
+            Log::info('BOT-T: Creating PackSalesman', [
+                'source' => 'bott',
+                'order_id' => $orderId,
+                'pack_id' => $pack->id,
+                'salesman_id' => $salesman->id
+            ]);
+            
             $packSalesman = $this->packSalesmanService->create(
                 $pack->id,
                 $salesman->id,
                 PackSalesman::PAID
             );
 
+            Log::info('BOT-T: PackSalesman created', [
+                'source' => 'bott',
+                'order_id' => $orderId,
+                'pack_salesman_id' => $packSalesman->id
+            ]);
+
             // Создаем ключи согласно количеству в заказе
             $keysCreated = 0;
             $keys = [];
+
+            Log::info('BOT-T: Creating keys', [
+                'source' => 'bott',
+                'order_id' => $orderId,
+                'count' => $count,
+                'pack_salesman_id' => $packSalesman->id
+            ]);
 
             for ($i = 0; $i < $count; $i++) {
                 try {
@@ -171,23 +195,52 @@ class BotTService
                         $pack->traffic_limit,
                         $packSalesman->id,
                         null,
-                        null,
                         null
                     );
                     $keys[] = $key;
                     $keysCreated++;
+                    Log::info('BOT-T: Key created', [
+                        'source' => 'bott',
+                        'order_id' => $orderId,
+                        'key_id' => $key->id,
+                        'key_number' => $i + 1,
+                        'total_keys' => $count
+                    ]);
                 } catch (Exception $e) {
                     Log::error('BOT-T: Error creating key', [
                         'source' => 'bott',
                         'order_id' => $orderId,
                         'pack_salesman_id' => $packSalesman->id,
-                        'error' => $e->getMessage()
+                        'key_number' => $i + 1,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
                     ]);
                 }
             }
 
+            Log::info('BOT-T: Keys creation completed', [
+                'source' => 'bott',
+                'order_id' => $orderId,
+                'keys_created' => $keysCreated,
+                'expected_count' => $count
+            ]);
+
             // Отправляем ключи пользователю через FatherBot
-            $this->sendKeysToUser($userTelegramId, $keys, $pack, $orderId);
+            if (count($keys) > 0) {
+                Log::info('BOT-T: Sending keys to user', [
+                    'source' => 'bott',
+                    'order_id' => $orderId,
+                    'telegram_id' => $userTelegramId,
+                    'keys_count' => count($keys)
+                ]);
+                $this->sendKeysToUser($userTelegramId, $keys, $pack, $orderId);
+            } else {
+                Log::warning('BOT-T: No keys to send', [
+                    'source' => 'bott',
+                    'order_id' => $orderId,
+                    'telegram_id' => $userTelegramId
+                ]);
+            }
 
             Log::info('BOT-T: Order processed successfully', [
                 'source' => 'bott',
