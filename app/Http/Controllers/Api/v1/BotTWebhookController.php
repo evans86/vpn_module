@@ -33,17 +33,50 @@ class BotTWebhookController extends Controller
             ]);
 
             // Валидация данных заказа
+            // Согласно реальным данным BOT-T, category - это объект с полями id, api_id, category_id и т.д.
             $validator = Validator::make($request->all(), [
-                'id' => 'required|integer',
+                'id' => 'required',
                 'count' => 'required|integer|min:1',
                 'category' => 'required|array',
-                'category.api_id' => 'required|integer',
                 'user' => 'required|array',
                 'user.telegram_id' => 'required|integer',
                 'product' => 'required|array',
                 'status' => 'required|string',
                 'amount' => 'required|integer'
             ]);
+            
+            if ($validator->fails()) {
+                Log::warning('BOT-T Webhook: Validation failed', [
+                    'source' => 'bott_webhook',
+                    'errors' => $validator->errors()->toArray(),
+                    'request_data' => $request->all()
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Invalid request data',
+                    'errors' => $validator->errors()
+                ], 400);
+            }
+            
+            // Проверяем наличие category.id или category.api_id (хотя бы одного)
+            $category = $request->input('category', []);
+            $hasCategoryId = isset($category['id']);
+            $hasCategoryApiId = isset($category['api_id']);
+            
+            if (!$hasCategoryId && !$hasCategoryApiId) {
+                Log::warning('BOT-T Webhook: Category ID or API ID is missing', [
+                    'source' => 'bott_webhook',
+                    'category' => $category,
+                    'request_data' => $request->all()
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Category ID or API ID is required',
+                    'category_structure' => $category
+                ], 400);
+            }
 
             if ($validator->fails()) {
                 Log::warning('BOT-T Webhook: Validation failed', [
@@ -60,9 +93,27 @@ class BotTWebhookController extends Controller
             }
 
             $orderData = $request->all();
+            
+            Log::info('BOT-T Webhook: Starting order processing', [
+                'source' => 'bott_webhook',
+                'order_id' => $orderData['id'] ?? 'unknown',
+                'category_id' => $orderData['category']['id'] ?? null,
+                'category_api_id' => $orderData['category']['api_id'] ?? null,
+                'user_telegram_id' => $orderData['user']['telegram_id'] ?? null,
+                'count' => $orderData['count'] ?? null
+            ]);
 
             // Обрабатываем заказ
             $result = $this->botTService->processOrder($orderData);
+            
+            Log::info('BOT-T Webhook: Order processing result', [
+                'source' => 'bott_webhook',
+                'order_id' => $orderData['id'] ?? 'unknown',
+                'success' => $result['success'] ?? false,
+                'error' => $result['error'] ?? null,
+                'pack_salesman_id' => $result['pack_salesman_id'] ?? null,
+                'keys_created' => $result['keys_created'] ?? 0
+            ]);
 
             if ($result['success']) {
                 Log::info('BOT-T Webhook: Order processed successfully', [
