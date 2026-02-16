@@ -55,12 +55,19 @@ class BotTService
                 'full_data' => $orderData,
                 'category' => $orderData['category'] ?? null,
                 'product' => $orderData['product'] ?? null,
+                'product_id_field' => $orderData['product_id'] ?? null,
+                'all_keys' => array_keys($orderData),
             ]);
             
             // Пробуем получить api_id из разных мест
             $categoryApiId = $orderData['category']['api_id'] ?? null;
             $productApiId = $orderData['product']['api_id'] ?? null;
-            $productId = $orderData['product']['id'] ?? null;
+            // Пробуем разные варианты получения ID товара
+            $productId = $orderData['product']['id'] 
+                      ?? $orderData['product_id'] 
+                      ?? $orderData['productId'] 
+                      ?? $orderData['product']['product_id']
+                      ?? null;
             
             $userTelegramId = $orderData['user']['telegram_id'] ?? null;
             $count = $orderData['count'] ?? 1;
@@ -118,12 +125,17 @@ class BotTService
                     'product_api_id' => $productApiId,
                     'product_id' => $productId,
                     'order_id' => $orderId,
+                    'full_order_data' => $orderData,
                     'available_packs' => Pack::select('id', 'api_id', 'title')->get()->toArray()
                 ]);
 
+                $errorMessage = "Pack not found. ";
+                $errorMessage .= "Tried: product_id={$productId}, product_api_id={$productApiId}, category_api_id={$categoryApiId}. ";
+                $errorMessage .= "Please check logs for full request structure.";
+
                 return [
                     'success' => false,
-                    'error' => "Pack not found for product ID: {$productId} (tried product_id: {$productId}, product_api_id: {$productApiId}, category_api_id: {$categoryApiId})"
+                    'error' => $errorMessage
                 ];
             }
 
