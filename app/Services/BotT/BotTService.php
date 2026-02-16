@@ -59,29 +59,33 @@ class BotTService
                 'all_keys' => array_keys($orderData),
             ]);
             
-            // Пробуем получить api_id из разных мест
-            $categoryApiId = $orderData['category']['api_id'] ?? null;
-            $productApiId = $orderData['product']['api_id'] ?? null;
-            // Пробуем разные варианты получения ID товара
-            $productId = $orderData['product']['id'] 
-                      ?? $orderData['product_id'] 
-                      ?? $orderData['productId'] 
-                      ?? $orderData['product']['product_id']
-                      ?? null;
+            // Согласно документации BOT-T и реальным данным:
+            // - category содержит api_id в корне объекта (не category.api_id)
+            // - category.id - это ID товара (2719564)
+            // - category.api_id - это API ID, установленный в категории/товаре
+            // - product содержит только type и data, без id
             
+            // Пробуем получить api_id из разных мест в структуре category
+            $categoryApiId = $orderData['category']['api_id'] 
+                          ?? $orderData['api_id'] 
+                          ?? null;
+            
+            // Также пробуем использовать ID товара напрямую (category.id)
+            $productId = $orderData['category']['id'] 
+                      ?? $orderData['id'] 
+                      ?? null;
             $userTelegramId = $orderData['user']['telegram_id'] ?? null;
             $count = $orderData['count'] ?? 1;
 
-            // Пробуем найти пакет по разным ID (приоритет: product.id > product.api_id > category.api_id)
+            // Приоритет поиска: productId (ID товара) > categoryApiId (API ID категории)
             $pack = null;
-            $usedApiId = null;
             
-            // Вариант 1: ID товара напрямую (ПРИОРИТЕТ #1)
+            // Вариант 1: Используем ID товара напрямую (ПРИОРИТЕТ #1)
+            // Это ID товара из BOT-T (например, 2719564)
             if ($productId) {
-                $pack = $this->findPackByApiId($productId);
+                $pack = $this->findPackByApiId((int)$productId);
                 if ($pack) {
-                    $usedApiId = $productId;
-                    Log::info('BOT-T: Pack found by product ID', [
+                    Log::info('BOT-T: Pack found by product ID (category.id)', [
                         'source' => 'bott',
                         'product_id' => $productId,
                         'pack_id' => $pack->id,
@@ -90,28 +94,14 @@ class BotTService
                 }
             }
             
-            // Вариант 2: api_id из товара (ПРИОРИТЕТ #2)
-            if (!$pack && $productApiId) {
-                $pack = $this->findPackByApiId($productApiId);
-                if ($pack) {
-                    $usedApiId = $productApiId;
-                    Log::info('BOT-T: Pack found by product API ID', [
-                        'source' => 'bott',
-                        'api_id' => $productApiId,
-                        'pack_id' => $pack->id,
-                        'pack_title' => $pack->title
-                    ]);
-                }
-            }
-            
-            // Вариант 3: api_id из категории (ПРИОРИТЕТ #3 - fallback)
+            // Вариант 2: Используем API ID категории (ПРИОРИТЕТ #2)
+            // Это api_id, установленный в категории/товаре BOT-T
             if (!$pack && $categoryApiId) {
-                $pack = $this->findPackByApiId($categoryApiId);
+                $pack = $this->findPackByApiId((int)$categoryApiId);
                 if ($pack) {
-                    $usedApiId = $categoryApiId;
                     Log::info('BOT-T: Pack found by category API ID', [
                         'source' => 'bott',
-                        'api_id' => $categoryApiId,
+                        'category_api_id' => $categoryApiId,
                         'pack_id' => $pack->id,
                         'pack_title' => $pack->title
                     ]);
@@ -119,23 +109,32 @@ class BotTService
             }
 
             if (!$pack) {
-                Log::warning('BOT-T: Pack not found by any API ID', [
+                Log::error('BOT-T: Pack not found', [
                     'source' => 'bott',
-                    'category_api_id' => $categoryApiId,
-                    'product_api_id' => $productApiId,
-                    'product_id' => $productId,
                     'order_id' => $orderId,
-                    'full_order_data' => $orderData,
-                    'available_packs' => Pack::select('id', 'api_id', 'title')->get()->toArray()
+                    'product_id' => $productId,
+                    'category_api_id' => $categoryApiId,
+                    'category' => $orderData['category'] ?? null
                 ]);
-
-                $errorMessage = "Pack not found. ";
-                $errorMessage .= "Tried: product_id={$productId}, product_api_id={$productApiId}, category_api_id={$categoryApiId}. ";
-                $errorMessage .= "Please check logs for full request structure.";
 
                 return [
                     'success' => false,
-                    'error' => $errorMessage
+                    'error' => "Pack not found. Tried product_id={$productId}, category_api_id={$categoryApiId}. Please ensure pack api_id matches one of these values."
+                ];
+            }
+
+            if (!$pack) {
+                Log::warning('BOT-T: Pack not found by category API ID', [
+                    'source' => 'bott',
+                    'category_api_id' => $categoryApiId,
+                    'order_id' => $orderId,
+                    'category' => $orderData['category'] ?? null,
+                    'available_packs' => Pack::select('id', 'api_id', 'title')->get()->toArray()
+                ]);
+
+                return [
+                    'success' => false,
+                    'error' => "Pack not found for category API ID: {$categoryApiId}. Please ensure that the category API ID in BOT-T matches the pack api_id in VPN system."
                 ];
             }
 
@@ -259,27 +258,85 @@ class BotTService
     /**
      * Найти пакет по API ID
      * 
-     * @param int $apiId API ID из категории BOT-T
+     * @param int $apiId API ID из категории BOT-T или ID товара
      * @return Pack|null
      */
     private function findPackByApiId(int $apiId): ?Pack
     {
-        // Вариант 1: Если есть поле api_id в таблице pack
+        Log::info('BOT-T: Searching pack by API ID', [
+            'source' => 'bott',
+            'api_id' => $apiId
+        ]);
+
+        // Вариант 1: Если есть поле api_id в таблице pack (прямое совпадение)
         $pack = Pack::where('api_id', $apiId)->first();
         
         if ($pack) {
+            Log::info('BOT-T: Pack found by direct api_id match', [
+                'source' => 'bott',
+                'api_id' => $apiId,
+                'pack_id' => $pack->id,
+                'pack_title' => $pack->title
+            ]);
             return $pack;
         }
 
         // Вариант 2: Используем конфигурацию для маппинга
+        // Формат 1: category.api_id => pack_id
+        // Формат 2: category.api_id => pack_api_id (если значение начинается с "api:")
         $packMapping = config('bott.pack_mapping', []);
         if (isset($packMapping[$apiId])) {
-            $packId = $packMapping[$apiId];
-            return $this->packRepository->findById($packId);
+            $mappedValue = $packMapping[$apiId];
+            
+            // Если значение начинается с "api:", ищем по api_id пакета
+            if (is_string($mappedValue) && strpos($mappedValue, 'api:') === 0) {
+                $packApiId = (int) substr($mappedValue, 4);
+                $pack = Pack::where('api_id', $packApiId)->first();
+                if ($pack) {
+                    Log::info('BOT-T: Pack found by config mapping (api_id)', [
+                        'source' => 'bott',
+                        'category_api_id' => $apiId,
+                        'mapped_pack_api_id' => $packApiId,
+                        'pack_id' => $pack->id,
+                        'pack_title' => $pack->title
+                    ]);
+                    return $pack;
+                }
+            } else {
+                // Иначе ищем по ID пакета
+                $packId = (int) $mappedValue;
+                $pack = $this->packRepository->findById($packId);
+                if ($pack) {
+                    Log::info('BOT-T: Pack found by config mapping (pack_id)', [
+                        'source' => 'bott',
+                        'category_api_id' => $apiId,
+                        'mapped_pack_id' => $packId,
+                        'pack_title' => $pack->title
+                    ]);
+                    return $pack;
+                }
+            }
         }
 
         // Вариант 3: Если api_id совпадает с id пакета (fallback)
-        return $this->packRepository->findById($apiId);
+        $pack = $this->packRepository->findById($apiId);
+        if ($pack) {
+            Log::info('BOT-T: Pack found by ID match (fallback)', [
+                'source' => 'bott',
+                'api_id' => $apiId,
+                'pack_id' => $pack->id,
+                'pack_title' => $pack->title
+            ]);
+            return $pack;
+        }
+
+        Log::warning('BOT-T: Pack not found by any method', [
+            'source' => 'bott',
+            'api_id' => $apiId,
+            'available_packs' => Pack::select('id', 'api_id', 'title')->get()->toArray()
+        ]);
+
+        return null;
     }
 
     /**
