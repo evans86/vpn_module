@@ -1009,32 +1009,31 @@ class MarzbanService
                         "port" => 53,
                         "domains" => [
                             "geosite:cn"
-                        ]
+                        ],
+                        "skipFallback" => false
                     ],
                     [
                         "address" => "8.8.8.8",
                         "port" => 53,
                         "domains" => [
                             "geosite:google"
-                        ]
+                        ],
+                        "skipFallback" => false
                     ]
                 ],
-                "queryStrategy" => "UseIPv4"
+                "queryStrategy" => "UseIPv4",
+                "disableCache" => false,
+                "disableFallback" => false,
+                "disableFallbackIfMatch" => false
             ],
             "routing" => [
                 "domainStrategy" => "IPIfNonMatch",
                 "rules" => [
-                    [
-                        "type" => "field",
-                        "domain" => [
-                            "geosite:cn"
-                        ],
-                        "outboundTag" => "DIRECT"
-                    ],
+                    // Правила для обхода блокировок: пропускаем трафик через VPN
+                    // Убраны правила для geosite:cn, чтобы не блокировать трафик
                     [
                         "type" => "field",
                         "ip" => [
-                            "geoip:cn",
                             "geoip:private"
                         ],
                         "outboundTag" => "DIRECT"
@@ -1053,10 +1052,10 @@ class MarzbanService
             "policy" => [
                 "levels" => [
                     [
-                        "handshake" => 4,
+                        "handshake" => 8,
                         "connIdle" => 300,
-                        "uplinkOnly" => 1,
-                        "downlinkOnly" => 1,
+                        "uplinkOnly" => 2,
+                        "downlinkOnly" => 2,
                         "statsUserUplink" => true,
                         "statsUserDownlink" => true
                     ]
@@ -1151,6 +1150,48 @@ class MarzbanService
                         "network" => "tcp,udp",
                         "level" => 0
                     ]
+                ],
+                // VLESS TCP с HTTP/1.1 заголовками для обхода ML-анализа (старый стандарт)
+                [
+                    "tag" => "VLESS TCP HTTP/1.1",
+                    "listen" => "0.0.0.0",
+                    "port" => 2099,
+                    "protocol" => "vless",
+                    "settings" => [
+                        "clients" => [],
+                        "decryption" => "none",
+                        "level" => 0
+                    ],
+                    "streamSettings" => [
+                        "network" => "tcp",
+                        "tcpSettings" => [
+                            "acceptProxyProtocol" => false,
+                            "header" => [
+                                "type" => "http",
+                                "request" => [
+                                    "version" => "1.1",
+                                    "method" => "GET",
+                                    "path" => ["/"],
+                                    "headers" => [
+                                        "Host" => ["www.microsoft.com"],
+                                        "User-Agent" => [
+                                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                                        ],
+                                        "Accept" => ["text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"],
+                                        "Accept-Language" => ["en-US,en;q=0.9"],
+                                        "Accept-Encoding" => ["gzip, deflate"],
+                                        "Connection" => ["keep-alive"],
+                                        "Upgrade-Insecure-Requests" => ["1"]
+                                    ]
+                                ]
+                            ]
+                        ],
+                        "security" => "none"
+                    ],
+                    "sniffing" => [
+                        "enabled" => true,
+                        "destOverride" => ["http", "tls"]
+                    ]
                 ]
         ];
     }
@@ -1180,12 +1221,24 @@ class MarzbanService
                 ],
                 "streamSettings" => [
                     "network" => "tcp",
+                    "tcpSettings" => [
+                        "acceptProxyProtocol" => false,
+                        "header" => [
+                            "type" => "none"
+                        ]
+                    ],
                     "security" => "reality",
                     "realitySettings" => [
                         "show" => false,
                         "dest" => "www.microsoft.com:443",
                         "xver" => 0,
-                        "serverNames" => ["www.microsoft.com", "microsoft.com", "login.microsoftonline.com"],
+                        "serverNames" => [
+                            "www.microsoft.com",
+                            "microsoft.com",
+                            "login.microsoftonline.com",
+                            "outlook.office.com",
+                            "office.com"
+                        ],
                         "privateKey" => $privateKey,
                         "shortIds" => ["", $shortId]
                     ]
@@ -1216,7 +1269,13 @@ class MarzbanService
                         "show" => false,
                         "dest" => "www.apple.com:443",
                         "xver" => 0,
-                        "serverNames" => ["www.apple.com", "apple.com", "cdn-apple.com"],
+                        "serverNames" => [
+                            "www.apple.com",
+                            "apple.com",
+                            "cdn-apple.com",
+                            "icloud.com",
+                            "appleid.apple.com"
+                        ],
                         "privateKey" => $privateKey,
                         "shortIds" => ["", $grpcShortId]
                     ]
@@ -1242,9 +1301,15 @@ class MarzbanService
                     "security" => "reality",
                     "realitySettings" => [
                         "show" => false,
-                        "dest" => "www.cloudflare.com:443",
+                        "dest" => "www.google.com:443",
                         "xver" => 0,
-                        "serverNames" => ["www.cloudflare.com", "cloudflare.com", "one.one.one.one"],
+                        "serverNames" => [
+                            "www.google.com",
+                            "google.com",
+                            "accounts.google.com",
+                            "mail.google.com",
+                            "drive.google.com"
+                        ],
                         "privateKey" => $privateKey,
                         "shortIds" => ["", $xhttpShortId]
                     ]
