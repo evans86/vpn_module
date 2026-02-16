@@ -161,7 +161,10 @@ class BotTService
                 }
             }
 
-            // Не отправляем ключи пользователю - он сможет посмотреть их сам
+            // Отправляем уведомление пользователю о успешной активации пакета
+            if ($keysCreated > 0) {
+                $this->sendOrderConfirmation($userTelegramId, $pack, $keysCreated, $orderId);
+            }
 
             Log::info('BOT-T: Order processed successfully', [
                 'source' => 'bott',
@@ -337,38 +340,22 @@ class BotTService
     }
 
     /**
-     * Отправка ключей пользователю через FatherBot
+     * Отправка уведомления пользователю о успешной активации пакета
      * 
      * @param int $telegramId Telegram ID пользователя
-     * @param array $keys Массив созданных ключей
      * @param Pack $pack Пакет
+     * @param int $keysCount Количество созданных ключей
      * @param int $orderId ID заказа из BOT-T
      * @return void
      */
-    private function sendKeysToUser(int $telegramId, array $keys, Pack $pack, int $orderId): void
+    private function sendOrderConfirmation(int $telegramId, Pack $pack, int $keysCount, int $orderId): void
     {
         try {
             $telegram = new Api(config('telegram.father_bot.token'));
 
-            $message = "✅ Ваш заказ #{$orderId} успешно оплачен!\n\n";
-            $message .= "📦 Пакет: {$pack->title}\n";
-            $message .= "🔑 Количество ключей: " . count($keys) . "\n";
-            $message .= "⏱ Период действия: {$pack->period} дней\n";
-            
-            if ($pack->traffic_limit > 0) {
-                $trafficGb = round($pack->traffic_limit / (1024 * 1024 * 1024), 1);
-                $message .= "💾 Лимит трафика: {$trafficGb} GB\n";
-            }
-            
-            $message .= "\n🔑 Ваши ключи активации:\n\n";
-
-            foreach ($keys as $index => $key) {
-                $keyNumber = $index + 1;
-                $message .= "{$keyNumber}. <code>{$key->id}</code>\n";
-                $message .= "   🔗 https://vpn-telegram.com/config/{$key->id}\n\n";
-            }
-
-            $message .= "💡 Для активации ключа отправьте его боту или перейдите по ссылке выше.";
+            $message = "✅ Ваш пакет на \"{$keysCount}\" ключей успешно активирован!\n\n";
+            $message .= "📦 Количество ключей: {$keysCount}\n";
+            $message .= "⏱ Период действия: {$pack->period} дней";
 
             $telegram->sendMessage([
                 'chat_id' => $telegramId,
@@ -376,14 +363,14 @@ class BotTService
                 'parse_mode' => 'HTML'
             ]);
 
-            Log::info('BOT-T: Keys sent to user', [
+            Log::info('BOT-T: Order confirmation sent to user', [
                 'source' => 'bott',
                 'telegram_id' => $telegramId,
                 'order_id' => $orderId,
-                'keys_count' => count($keys)
+                'keys_count' => $keysCount
             ]);
         } catch (Exception $e) {
-            Log::error('BOT-T: Failed to send keys to user', [
+            Log::error('BOT-T: Failed to send order confirmation', [
                 'source' => 'bott',
                 'telegram_id' => $telegramId,
                 'order_id' => $orderId,
