@@ -1151,9 +1151,10 @@ class MarzbanService
                         "level" => 0
                     ]
                 ],
-                // VLESS TCP с HTTP/1.1 заголовками для обхода ML-анализа (старый стандарт)
+                // VLESS TCP с HTTP/1.1 обфускацией для обхода ML-анализа (старый стандарт)
+                // Использует HTTP/1.1 вместо HTTP/2, что пропускается ML-моделью как обычный веб-трафик
                 [
-                    "tag" => "VLESS TCP HTTP/1.1",
+                    "tag" => "VLESS TCP HTTP/1.1 Obfuscated",
                     "listen" => "0.0.0.0",
                     "port" => 2099,
                     "protocol" => "vless",
@@ -1171,20 +1172,58 @@ class MarzbanService
                                 "request" => [
                                     "version" => "1.1",
                                     "method" => "GET",
-                                    "path" => ["/"],
+                                    "path" => ["/", "/index.html", "/home"],
                                     "headers" => [
-                                        "Host" => ["www.microsoft.com"],
+                                        "Host" => ["www.microsoft.com", "microsoft.com"],
                                         "User-Agent" => [
-                                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0"
                                         ],
-                                        "Accept" => ["text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"],
-                                        "Accept-Language" => ["en-US,en;q=0.9"],
-                                        "Accept-Encoding" => ["gzip, deflate"],
+                                        "Accept" => ["text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"],
+                                        "Accept-Language" => ["en-US,en;q=0.9", "ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3"],
+                                        "Accept-Encoding" => ["gzip, deflate, br"],
                                         "Connection" => ["keep-alive"],
-                                        "Upgrade-Insecure-Requests" => ["1"]
+                                        "Upgrade-Insecure-Requests" => ["1"],
+                                        "Sec-Fetch-Dest" => ["document"],
+                                        "Sec-Fetch-Mode" => ["navigate"],
+                                        "Sec-Fetch-Site" => ["none"],
+                                        "Cache-Control" => ["max-age=0"]
+                                    ]
+                                ],
+                                "response" => [
+                                    "version" => "1.1",
+                                    "status" => "200",
+                                    "reason" => "OK",
+                                    "headers" => [
+                                        "Content-Type" => ["text/html; charset=utf-8"],
+                                        "Connection" => ["keep-alive"]
                                     ]
                                 ]
                             ]
+                        ],
+                        "security" => "none"
+                    ],
+                    "sniffing" => [
+                        "enabled" => true,
+                        "destOverride" => ["http", "tls"]
+                    ]
+                ],
+                // VLESS HTTP Upgrade - альтернативный протокол для обхода (имитирует HTTP запрос)
+                [
+                    "tag" => "VLESS HTTP Upgrade",
+                    "listen" => "0.0.0.0",
+                    "port" => 2100,
+                    "protocol" => "vless",
+                    "settings" => [
+                        "clients" => [],
+                        "decryption" => "none",
+                        "level" => 0
+                    ],
+                    "streamSettings" => [
+                        "network" => "httpupgrade",
+                        "httpupgradeSettings" => [
+                            "path" => "/",
+                            "host" => "www.microsoft.com"
                         ],
                         "security" => "none"
                     ],
