@@ -47,14 +47,83 @@ class BotTService
     {
         try {
             $orderId = $orderData['id'];
+            
+            // Логируем всю структуру данных для отладки
+            Log::info('BOT-T: Full order data structure', [
+                'source' => 'bott',
+                'order_id' => $orderId,
+                'full_data' => $orderData,
+                'category' => $orderData['category'] ?? null,
+                'product' => $orderData['product'] ?? null,
+            ]);
+            
+            // Пробуем получить api_id из разных мест
             $categoryApiId = $orderData['category']['api_id'] ?? null;
+            $productApiId = $orderData['product']['api_id'] ?? null;
+            $productId = $orderData['product']['id'] ?? null;
+            
             $userTelegramId = $orderData['user']['telegram_id'] ?? null;
             $count = $orderData['count'] ?? 1;
 
-            if (!$categoryApiId) {
+            // Пробуем найти пакет по разным ID (приоритет: product.id > product.api_id > category.api_id)
+            $pack = null;
+            $usedApiId = null;
+            
+            // Вариант 1: ID товара напрямую (ПРИОРИТЕТ #1)
+            if ($productId) {
+                $pack = $this->findPackByApiId($productId);
+                if ($pack) {
+                    $usedApiId = $productId;
+                    Log::info('BOT-T: Pack found by product ID', [
+                        'source' => 'bott',
+                        'product_id' => $productId,
+                        'pack_id' => $pack->id,
+                        'pack_title' => $pack->title
+                    ]);
+                }
+            }
+            
+            // Вариант 2: api_id из товара (ПРИОРИТЕТ #2)
+            if (!$pack && $productApiId) {
+                $pack = $this->findPackByApiId($productApiId);
+                if ($pack) {
+                    $usedApiId = $productApiId;
+                    Log::info('BOT-T: Pack found by product API ID', [
+                        'source' => 'bott',
+                        'api_id' => $productApiId,
+                        'pack_id' => $pack->id,
+                        'pack_title' => $pack->title
+                    ]);
+                }
+            }
+            
+            // Вариант 3: api_id из категории (ПРИОРИТЕТ #3 - fallback)
+            if (!$pack && $categoryApiId) {
+                $pack = $this->findPackByApiId($categoryApiId);
+                if ($pack) {
+                    $usedApiId = $categoryApiId;
+                    Log::info('BOT-T: Pack found by category API ID', [
+                        'source' => 'bott',
+                        'api_id' => $categoryApiId,
+                        'pack_id' => $pack->id,
+                        'pack_title' => $pack->title
+                    ]);
+                }
+            }
+
+            if (!$pack) {
+                Log::warning('BOT-T: Pack not found by any API ID', [
+                    'source' => 'bott',
+                    'category_api_id' => $categoryApiId,
+                    'product_api_id' => $productApiId,
+                    'product_id' => $productId,
+                    'order_id' => $orderId,
+                    'available_packs' => Pack::select('id', 'api_id', 'title')->get()->toArray()
+                ]);
+
                 return [
                     'success' => false,
-                    'error' => 'Category API ID is required'
+                    'error' => "Pack not found for product ID: {$productId} (tried product_id: {$productId}, product_api_id: {$productApiId}, category_api_id: {$categoryApiId})"
                 ];
             }
 
@@ -62,21 +131,6 @@ class BotTService
                 return [
                     'success' => false,
                     'error' => 'User Telegram ID is required'
-                ];
-            }
-
-            // Находим пакет по api_id категории
-            $pack = $this->findPackByApiId($categoryApiId);
-            if (!$pack) {
-                Log::warning('BOT-T: Pack not found by API ID', [
-                    'source' => 'bott',
-                    'api_id' => $categoryApiId,
-                    'order_id' => $orderId
-                ]);
-
-                return [
-                    'success' => false,
-                    'error' => "Pack not found for API ID: {$categoryApiId}"
                 ];
             }
 
