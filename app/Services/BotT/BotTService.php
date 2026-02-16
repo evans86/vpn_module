@@ -48,15 +48,13 @@ class BotTService
         try {
             $orderId = $orderData['id'];
             
-            // Логируем всю структуру данных для отладки
-            Log::info('BOT-T: Full order data structure', [
+            // Логируем только основную информацию
+            Log::info('BOT-T: Order processing started', [
                 'source' => 'bott',
                 'order_id' => $orderId,
-                'full_data' => $orderData,
-                'category' => $orderData['category'] ?? null,
-                'product' => $orderData['product'] ?? null,
-                'product_id_field' => $orderData['product_id'] ?? null,
-                'all_keys' => array_keys($orderData),
+                'category_id' => $orderData['category']['id'] ?? null,
+                'category_api_id' => $orderData['category']['api_id'] ?? null,
+                'user_telegram_id' => $orderData['user']['telegram_id'] ?? null
             ]);
             
             // Согласно документации BOT-T и реальным данным:
@@ -84,28 +82,12 @@ class BotTService
             // Это ID товара из BOT-T (например, 2719564)
             if ($productId) {
                 $pack = $this->findPackByApiId((int)$productId);
-                if ($pack) {
-                    Log::info('BOT-T: Pack found by product ID (category.id)', [
-                        'source' => 'bott',
-                        'product_id' => $productId,
-                        'pack_id' => $pack->id,
-                        'pack_title' => $pack->title
-                    ]);
-                }
             }
             
             // Вариант 2: Используем API ID категории (ПРИОРИТЕТ #2)
             // Это api_id, установленный в категории/товаре BOT-T
             if (!$pack && $categoryApiId) {
                 $pack = $this->findPackByApiId((int)$categoryApiId);
-                if ($pack) {
-                    Log::info('BOT-T: Pack found by category API ID', [
-                        'source' => 'bott',
-                        'category_api_id' => $categoryApiId,
-                        'pack_id' => $pack->id,
-                        'pack_title' => $pack->title
-                    ]);
-                }
             }
 
             if (!$pack) {
@@ -132,12 +114,6 @@ class BotTService
             }
 
             // Находим или создаем salesman по telegram_id
-            Log::info('BOT-T: Finding or creating salesman', [
-                'source' => 'bott',
-                'order_id' => $orderId,
-                'telegram_id' => $userTelegramId
-            ]);
-            
             $salesman = $this->findOrCreateSalesman($userTelegramId, $orderData['user'] ?? []);
             if (!$salesman) {
                 Log::error('BOT-T: Failed to find or create salesman', [
@@ -151,45 +127,20 @@ class BotTService
                 ];
             }
 
-            Log::info('BOT-T: Salesman found/created', [
-                'source' => 'bott',
-                'order_id' => $orderId,
-                'salesman_id' => $salesman->id,
-                'telegram_id' => $salesman->telegram_id
-            ]);
-
             // Создаем PackSalesman
-            Log::info('BOT-T: Creating PackSalesman', [
-                'source' => 'bott',
-                'order_id' => $orderId,
-                'pack_id' => $pack->id,
-                'salesman_id' => $salesman->id
-            ]);
-            
             $packSalesman = $this->packSalesmanService->create(
                 $pack->id,
                 $salesman->id,
                 PackSalesman::PAID
             );
 
-            Log::info('BOT-T: PackSalesman created', [
-                'source' => 'bott',
-                'order_id' => $orderId,
-                'pack_salesman_id' => $packSalesman->id
-            ]);
-
-            // Создаем ключи согласно количеству в заказе
+            // Создаем ключи согласно количеству из пакета (не из заказа)
+            // Используем количество ключей из пакета, а не из заказа BOT-T
+            $keysCount = $pack->count ?? 1;
             $keysCreated = 0;
             $keys = [];
 
-            Log::info('BOT-T: Creating keys', [
-                'source' => 'bott',
-                'order_id' => $orderId,
-                'count' => $count,
-                'pack_salesman_id' => $packSalesman->id
-            ]);
-
-            for ($i = 0; $i < $count; $i++) {
+            for ($i = 0; $i < $keysCount; $i++) {
                 try {
                     $key = $this->keyActivateService->create(
                         $pack->traffic_limit,
@@ -199,48 +150,18 @@ class BotTService
                     );
                     $keys[] = $key;
                     $keysCreated++;
-                    Log::info('BOT-T: Key created', [
-                        'source' => 'bott',
-                        'order_id' => $orderId,
-                        'key_id' => $key->id,
-                        'key_number' => $i + 1,
-                        'total_keys' => $count
-                    ]);
                 } catch (Exception $e) {
                     Log::error('BOT-T: Error creating key', [
                         'source' => 'bott',
                         'order_id' => $orderId,
                         'pack_salesman_id' => $packSalesman->id,
                         'key_number' => $i + 1,
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
+                        'error' => $e->getMessage()
                     ]);
                 }
             }
 
-            Log::info('BOT-T: Keys creation completed', [
-                'source' => 'bott',
-                'order_id' => $orderId,
-                'keys_created' => $keysCreated,
-                'expected_count' => $count
-            ]);
-
-            // Отправляем ключи пользователю через FatherBot
-            if (count($keys) > 0) {
-                Log::info('BOT-T: Sending keys to user', [
-                    'source' => 'bott',
-                    'order_id' => $orderId,
-                    'telegram_id' => $userTelegramId,
-                    'keys_count' => count($keys)
-                ]);
-                $this->sendKeysToUser($userTelegramId, $keys, $pack, $orderId);
-            } else {
-                Log::warning('BOT-T: No keys to send', [
-                    'source' => 'bott',
-                    'order_id' => $orderId,
-                    'telegram_id' => $userTelegramId
-                ]);
-            }
+            // Не отправляем ключи пользователю - он сможет посмотреть их сам
 
             Log::info('BOT-T: Order processed successfully', [
                 'source' => 'bott',
@@ -316,21 +237,9 @@ class BotTService
      */
     private function findPackByApiId(int $apiId): ?Pack
     {
-        Log::info('BOT-T: Searching pack by API ID', [
-            'source' => 'bott',
-            'api_id' => $apiId
-        ]);
-
         // Вариант 1: Если есть поле api_id в таблице pack (прямое совпадение)
         $pack = Pack::where('api_id', $apiId)->first();
-        
         if ($pack) {
-            Log::info('BOT-T: Pack found by direct api_id match', [
-                'source' => 'bott',
-                'api_id' => $apiId,
-                'pack_id' => $pack->id,
-                'pack_title' => $pack->title
-            ]);
             return $pack;
         }
 
@@ -346,13 +255,6 @@ class BotTService
                 $packApiId = (int) substr($mappedValue, 4);
                 $pack = Pack::where('api_id', $packApiId)->first();
                 if ($pack) {
-                    Log::info('BOT-T: Pack found by config mapping (api_id)', [
-                        'source' => 'bott',
-                        'category_api_id' => $apiId,
-                        'mapped_pack_api_id' => $packApiId,
-                        'pack_id' => $pack->id,
-                        'pack_title' => $pack->title
-                    ]);
                     return $pack;
                 }
             } else {
@@ -360,36 +262,13 @@ class BotTService
                 $packId = (int) $mappedValue;
                 $pack = $this->packRepository->findById($packId);
                 if ($pack) {
-                    Log::info('BOT-T: Pack found by config mapping (pack_id)', [
-                        'source' => 'bott',
-                        'category_api_id' => $apiId,
-                        'mapped_pack_id' => $packId,
-                        'pack_title' => $pack->title
-                    ]);
                     return $pack;
                 }
             }
         }
 
         // Вариант 3: Если api_id совпадает с id пакета (fallback)
-        $pack = $this->packRepository->findById($apiId);
-        if ($pack) {
-            Log::info('BOT-T: Pack found by ID match (fallback)', [
-                'source' => 'bott',
-                'api_id' => $apiId,
-                'pack_id' => $pack->id,
-                'pack_title' => $pack->title
-            ]);
-            return $pack;
-        }
-
-        Log::warning('BOT-T: Pack not found by any method', [
-            'source' => 'bott',
-            'api_id' => $apiId,
-            'available_packs' => Pack::select('id', 'api_id', 'title')->get()->toArray()
-        ]);
-
-        return null;
+        return $this->packRepository->findById($apiId);
     }
 
     /**

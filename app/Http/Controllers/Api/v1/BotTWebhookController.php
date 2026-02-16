@@ -93,27 +93,9 @@ class BotTWebhookController extends Controller
             }
 
             $orderData = $request->all();
-            
-            Log::info('BOT-T Webhook: Starting order processing', [
-                'source' => 'bott_webhook',
-                'order_id' => $orderData['id'] ?? 'unknown',
-                'category_id' => $orderData['category']['id'] ?? null,
-                'category_api_id' => $orderData['category']['api_id'] ?? null,
-                'user_telegram_id' => $orderData['user']['telegram_id'] ?? null,
-                'count' => $orderData['count'] ?? null
-            ]);
 
             // Обрабатываем заказ
             $result = $this->botTService->processOrder($orderData);
-            
-            Log::info('BOT-T Webhook: Order processing result', [
-                'source' => 'bott_webhook',
-                'order_id' => $orderData['id'] ?? 'unknown',
-                'success' => $result['success'] ?? false,
-                'error' => $result['error'] ?? null,
-                'pack_salesman_id' => $result['pack_salesman_id'] ?? null,
-                'keys_created' => $result['keys_created'] ?? 0
-            ]);
 
             if ($result['success']) {
                 Log::info('BOT-T Webhook: Order processed successfully', [
