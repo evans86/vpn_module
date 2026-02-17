@@ -336,4 +336,5 @@ class PanelController extends Controller
                 ->with('error', 'Ошибка при удалении панели: ' . $e->getMessage());
         }
     }
+
 }

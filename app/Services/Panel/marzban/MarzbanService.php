@@ -989,10 +989,31 @@ class MarzbanService
     /**
      * Построение базовой конфигурации (общая часть)
      *
+     * @param Panel|null $panel Панель для проверки настроек прокси
      * @return array
      */
-    private function buildBaseConfig(): array
+    private function buildBaseConfig(?Panel $panel = null): array
     {
+        $outbounds = [
+            [
+                "protocol" => "freedom",
+                "tag" => "DIRECT",
+                "settings" => [
+                    "domainStrategy" => "UseIPv4"
+                ]
+            ]
+        ];
+
+        $routingRules = [
+            [
+                "type" => "field",
+                "ip" => [
+                    "geoip:private"
+                ],
+                "outboundTag" => "DIRECT"
+            ]
+        ];
+
         return [
             "log" => [
                 "loglevel" => "warning",
@@ -1028,27 +1049,9 @@ class MarzbanService
             ],
             "routing" => [
                 "domainStrategy" => "IPIfNonMatch",
-                "rules" => [
-                    // Правила для обхода блокировок: пропускаем трафик через VPN
-                    // Убраны правила для geosite:cn, чтобы не блокировать трафик
-                    [
-                        "type" => "field",
-                        "ip" => [
-                            "geoip:private"
-                        ],
-                        "outboundTag" => "DIRECT"
-                    ]
-                ]
+                "rules" => $routingRules
             ],
-            "outbounds" => [
-                [
-                    "protocol" => "freedom",
-                    "tag" => "DIRECT",
-                    "settings" => [
-                        "domainStrategy" => "UseIPv4"
-                    ]
-                ]
-            ],
+            "outbounds" => $outbounds,
             "policy" => [
                 "levels" => [
                     [
@@ -1067,6 +1070,7 @@ class MarzbanService
             ]
         ];
     }
+
 
     /**
      * Построение стабильных протоколов (без REALITY)
@@ -1243,7 +1247,7 @@ class MarzbanService
      * @param string $privateKey
      * @param string $shortId
      * @param string $grpcShortId
-     * @param string $xhttpShortId (зарезервировано для будущего использования)
+     * @param string $xhttpShortId
      * @return array
      */
     private function buildRealityInbounds(string $privateKey, string $shortId, string $grpcShortId, string $xhttpShortId): array
@@ -1331,6 +1335,81 @@ class MarzbanService
                         ],
                         "privateKey" => $privateKey,
                         "shortIds" => ["", $grpcShortId]
+                    ]
+                ],
+                "sniffing" => [
+                    "enabled" => true,
+                    "destOverride" => ["http", "tls", "quic"]
+                ]
+            ],
+            // VLESS XHTTP REALITY - комбинация Reality + XHTTP для максимального обхода блокировок
+            // Используем порт 8880 (альтернативный HTTP) - не блокируется, выглядит как веб-трафик
+            [
+                "tag" => "VLESS XHTTP REALITY",
+                "listen" => "0.0.0.0",
+                "port" => 8880,
+                "protocol" => "vless",
+                "settings" => [
+                    "clients" => [],
+                    "decryption" => "none",
+                    "level" => 0
+                ],
+                "streamSettings" => [
+                    "network" => "tcp",
+                    "security" => "reality",
+                    "realitySettings" => [
+                        "show" => false,
+                        "dest" => "www.microsoft.com:443",
+                        "xver" => 0,
+                        "serverNames" => [
+                            "www.microsoft.com",
+                            "microsoft.com",
+                            "login.microsoftonline.com",
+                            "outlook.office.com",
+                            "office.com",
+                            "www.cloudflare.com",
+                            "cloudflare.com"
+                        ],
+                        "privateKey" => $privateKey,
+                        "shortIds" => ["", $xhttpShortId]
+                    ],
+                    "tcpSettings" => [
+                        "acceptProxyProtocol" => false,
+                        "header" => [
+                            "type" => "http",
+                            "request" => [
+                                "version" => "1.1",
+                                "method" => "GET",
+                                "path" => ["/", "/index.html", "/home", "/api/v1"],
+                                "headers" => [
+                                    "Host" => ["www.microsoft.com", "microsoft.com", "login.microsoftonline.com"],
+                                    "User-Agent" => [
+                                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+                                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                                    ],
+                                    "Accept" => ["text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"],
+                                    "Accept-Language" => ["en-US,en;q=0.9", "ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3"],
+                                    "Accept-Encoding" => ["gzip, deflate, br"],
+                                    "Connection" => ["keep-alive"],
+                                    "Upgrade-Insecure-Requests" => ["1"],
+                                    "Sec-Fetch-Dest" => ["document"],
+                                    "Sec-Fetch-Mode" => ["navigate"],
+                                    "Sec-Fetch-Site" => ["none"],
+                                    "Cache-Control" => ["max-age=0"]
+                                ]
+                            ],
+                            "response" => [
+                                "version" => "1.1",
+                                "status" => "200",
+                                "reason" => "OK",
+                                "headers" => [
+                                    "Content-Type" => ["text/html; charset=utf-8"],
+                                    "Connection" => ["keep-alive"],
+                                    "Cache-Control" => ["private, max-age=0"]
+                                ]
+                            ]
+                        ]
                     ]
                 ],
                 "sniffing" => [
@@ -1517,7 +1596,7 @@ class MarzbanService
             'source' => 'panel'
         ]);
 
-        $json_config = $this->buildBaseConfig();
+        $json_config = $this->buildBaseConfig($panel);
         $json_config['inbounds'] = $this->buildStableInbounds();
 
         $this->applyConfiguration($panel, $json_config, Panel::CONFIG_TYPE_STABLE);
@@ -1547,7 +1626,7 @@ class MarzbanService
             // Получаем или генерируем REALITY ключи
             $realityKeys = $this->getOrGenerateRealityKeys($panel);
 
-            $json_config = $this->buildBaseConfig();
+            $json_config = $this->buildBaseConfig($panel);
             $json_config['inbounds'] = array_merge(
                 $this->buildRealityInbounds(
                     $realityKeys['private_key'],
