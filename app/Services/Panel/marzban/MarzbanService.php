@@ -1153,6 +1153,7 @@ class MarzbanService
                 ],
                 // VLESS TCP с HTTP/1.1 обфускацией для обхода ML-анализа (старый стандарт)
                 // Использует HTTP/1.1 вместо HTTP/2, что пропускается ML-моделью как обычный веб-трафик
+                // Обновлено на российские домены для обхода блокировок РКН
                 [
                     "tag" => "VLESS TCP HTTP/1.1 Obfuscated",
                     "listen" => "0.0.0.0",
@@ -1174,13 +1175,14 @@ class MarzbanService
                                     "method" => "GET",
                                     "path" => ["/", "/index.html", "/home"],
                                     "headers" => [
-                                        "Host" => ["www.microsoft.com", "microsoft.com"],
+                                        "Host" => ["www.gosuslugi.ru", "gosuslugi.ru", "yandex.ru", "mail.ru"],
                                         "User-Agent" => [
                                             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0"
+                                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+                                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 YaBrowser/24.1.0.0 Safari/537.36"
                                         ],
                                         "Accept" => ["text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"],
-                                        "Accept-Language" => ["en-US,en;q=0.9", "ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3"],
+                                        "Accept-Language" => ["ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7"],
                                         "Accept-Encoding" => ["gzip, deflate, br"],
                                         "Connection" => ["keep-alive"],
                                         "Upgrade-Insecure-Requests" => ["1"],
@@ -1209,6 +1211,7 @@ class MarzbanService
                     ]
                 ],
                 // VLESS HTTP Upgrade - альтернативный протокол для обхода (имитирует HTTP запрос)
+                // Обновлено на российские домены
                 [
                     "tag" => "VLESS HTTP Upgrade",
                     "listen" => "0.0.0.0",
@@ -1223,7 +1226,7 @@ class MarzbanService
                         "network" => "httpupgrade",
                         "httpupgradeSettings" => [
                             "path" => "/",
-                            "host" => "www.microsoft.com"
+                            "host" => "www.gosuslugi.ru"
                         ],
                         "security" => "none"
                     ],
@@ -1247,7 +1250,8 @@ class MarzbanService
     private function buildRealityInbounds(string $privateKey, string $shortId, string $grpcShortId, string $xhttpShortId): array
     {
         return [
-            // VLESS TCP REALITY - основной протокол для обхода (лучший для обхода белых списков)
+            // VLESS TCP REALITY - основной протокол с российскими SNI для обхода блокировок РКН
+            // Используем gosuslugi.ru - госуслуги точно не заблокируют
             [
                 "tag" => "VLESS TCP REALITY",
                 "listen" => "0.0.0.0",
@@ -1269,14 +1273,13 @@ class MarzbanService
                     "security" => "reality",
                     "realitySettings" => [
                         "show" => false,
-                        "dest" => "www.microsoft.com:443",
+                        "dest" => "www.gosuslugi.ru:443",
                         "xver" => 0,
                         "serverNames" => [
-                            "www.microsoft.com",
-                            "microsoft.com",
-                            "login.microsoftonline.com",
-                            "outlook.office.com",
-                            "office.com"
+                            "www.gosuslugi.ru",
+                            "gosuslugi.ru",
+                            "esia.gosuslugi.ru",
+                            "lk.gosuslugi.ru"
                         ],
                         "privateKey" => $privateKey,
                         "shortIds" => ["", $shortId]
@@ -1287,7 +1290,7 @@ class MarzbanService
                     "destOverride" => ["http", "tls", "quic"]
                 ]
             ],
-            // VLESS GRPC REALITY - альтернативный протокол (устаревает, но пока работает)
+            // VLESS GRPC REALITY - альтернативный протокол с Yandex SNI
             [
                 "tag" => "VLESS GRPC REALITY",
                 "listen" => "0.0.0.0",
@@ -1306,14 +1309,14 @@ class MarzbanService
                     "security" => "reality",
                     "realitySettings" => [
                         "show" => false,
-                        "dest" => "www.apple.com:443",
+                        "dest" => "yandex.ru:443",
                         "xver" => 0,
                         "serverNames" => [
-                            "www.apple.com",
-                            "apple.com",
-                            "cdn-apple.com",
-                            "icloud.com",
-                            "appleid.apple.com"
+                            "yandex.ru",
+                            "www.yandex.ru",
+                            "mail.yandex.ru",
+                            "disk.yandex.ru",
+                            "music.yandex.ru"
                         ],
                         "privateKey" => $privateKey,
                         "shortIds" => ["", $grpcShortId]
@@ -1324,7 +1327,7 @@ class MarzbanService
                     "destOverride" => ["http", "tls", "quic"]
                 ]
             ],
-            // Дополнительный VLESS TCP REALITY с другим SNI для разнообразия
+            // VLESS TCP REALITY ALT - с Mail.ru SNI
             [
                 "tag" => "VLESS TCP REALITY ALT",
                 "listen" => "0.0.0.0",
@@ -1340,14 +1343,51 @@ class MarzbanService
                     "security" => "reality",
                     "realitySettings" => [
                         "show" => false,
-                        "dest" => "www.google.com:443",
+                        "dest" => "mail.ru:443",
                         "xver" => 0,
                         "serverNames" => [
-                            "www.google.com",
-                            "google.com",
-                            "accounts.google.com",
-                            "mail.google.com",
-                            "drive.google.com"
+                            "mail.ru",
+                            "www.mail.ru",
+                            "e.mail.ru",
+                            "my.mail.ru",
+                            "ok.ru"
+                        ],
+                        "privateKey" => $privateKey,
+                        "shortIds" => ["", $xhttpShortId]
+                    ]
+                ],
+                "sniffing" => [
+                    "enabled" => true,
+                    "destOverride" => ["http", "tls", "quic"]
+                ]
+            ],
+            // VLESS XHTTP REALITY - новый протокол для обхода блокировок (XHTTP транспорт)
+            // XHTTP упаковывает данные в обычные HTTP GET/PUT запросы для максимальной маскировки
+            [
+                "tag" => "VLESS XHTTP REALITY",
+                "listen" => "0.0.0.0",
+                "port" => 2043,
+                "protocol" => "vless",
+                "settings" => [
+                    "clients" => [],
+                    "decryption" => "none",
+                    "level" => 0
+                ],
+                "streamSettings" => [
+                    "network" => "xhttp",
+                    "xhttpSettings" => [
+                        "path" => "/",
+                        "host" => ["www.gosuslugi.ru", "gosuslugi.ru"]
+                    ],
+                    "security" => "reality",
+                    "realitySettings" => [
+                        "show" => false,
+                        "dest" => "www.gosuslugi.ru:443",
+                        "xver" => 0,
+                        "serverNames" => [
+                            "www.gosuslugi.ru",
+                            "gosuslugi.ru",
+                            "esia.gosuslugi.ru"
                         ],
                         "privateKey" => $privateKey,
                         "shortIds" => ["", $xhttpShortId]
