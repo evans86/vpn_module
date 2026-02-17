@@ -1214,11 +1214,11 @@ class MarzbanService
                     ]
                 ],
                 // VLESS HTTP Upgrade - альтернативный протокол для обхода (имитирует HTTP запрос)
-                // Используем порт 8880 (альтернативный HTTP) - не блокируется
+                // Используем порт 8881 (альтернативный HTTP) - не блокируется
                 [
                     "tag" => "VLESS HTTP Upgrade",
                     "listen" => "0.0.0.0",
-                    "port" => 8880,
+                    "port" => 8881,
                     "protocol" => "vless",
                     "settings" => [
                         "clients" => [],
