@@ -1079,7 +1079,7 @@ class MarzbanService
                 [
                     "tag" => "VLESS-WS",
                     "listen" => "0.0.0.0",
-                    "port" => 2095,
+                    "port" => 2087,
                     "protocol" => "vless",
                     "settings" => [
                         "clients" => [],
@@ -1143,7 +1143,7 @@ class MarzbanService
                 [
                     "tag" => "Shadowsocks-TCP",
                     "listen" => "0.0.0.0",
-                    "port" => 2098,
+                    "port" => 8388,
                     "protocol" => "shadowsocks",
                     "settings" => [
                         "clients" => [],
@@ -1153,10 +1153,11 @@ class MarzbanService
                 ],
                 // VLESS TCP с HTTP/1.1 обфускацией для обхода ML-анализа (старый стандарт)
                 // Использует HTTP/1.1 вместо HTTP/2, что пропускается ML-моделью как обычный веб-трафик
+                // Используем порт 8080 (альтернативный HTTP) - не блокируется, но выглядит как веб-трафик
                 [
                     "tag" => "VLESS TCP HTTP/1.1 Obfuscated",
                     "listen" => "0.0.0.0",
-                    "port" => 2099,
+                    "port" => 8080,
                     "protocol" => "vless",
                     "settings" => [
                         "clients" => [],
@@ -1209,10 +1210,11 @@ class MarzbanService
                     ]
                 ],
                 // VLESS HTTP Upgrade - альтернативный протокол для обхода (имитирует HTTP запрос)
+                // Используем порт 8880 (альтернативный HTTP) - не блокируется
                 [
                     "tag" => "VLESS HTTP Upgrade",
                     "listen" => "0.0.0.0",
-                    "port" => 2100,
+                    "port" => 8880,
                     "protocol" => "vless",
                     "settings" => [
                         "clients" => [],
@@ -1247,12 +1249,12 @@ class MarzbanService
     private function buildRealityInbounds(string $privateKey, string $shortId, string $grpcShortId, string $xhttpShortId): array
     {
         return [
-            // VLESS TCP REALITY - основной протокол для обхода (возвращены проверенные SNI)
-            // Используем Microsoft домены - они стабильно работают с Reality
+            // VLESS TCP REALITY - основной протокол с улучшенными SNI
+            // Используем порт 8443 (альтернативный HTTPS) - не блокируется, но выглядит как веб-трафик
             [
                 "tag" => "VLESS TCP REALITY",
                 "listen" => "0.0.0.0",
-                "port" => 2040,
+                "port" => 8443,
                 "protocol" => "vless",
                 "settings" => [
                     "clients" => [],
@@ -1277,7 +1279,12 @@ class MarzbanService
                             "microsoft.com",
                             "login.microsoftonline.com",
                             "outlook.office.com",
-                            "office.com"
+                            "office.com",
+                            // Добавляем альтернативные домены для ротации
+                            "www.cloudflare.com",
+                            "cloudflare.com",
+                            "www.discord.com",
+                            "discord.com"
                         ],
                         "privateKey" => $privateKey,
                         "shortIds" => ["", $shortId]
@@ -1288,11 +1295,12 @@ class MarzbanService
                     "destOverride" => ["http", "tls", "quic"]
                 ]
             ],
-            // VLESS GRPC REALITY - альтернативный протокол (возвращены проверенные SNI)
+            // VLESS GRPC REALITY - альтернативный протокол с улучшенными SNI
+            // Используем порт 9443 (альтернативный HTTPS) - не блокируется
             [
                 "tag" => "VLESS GRPC REALITY",
                 "listen" => "0.0.0.0",
-                "port" => 2041,
+                "port" => 9443,
                 "protocol" => "vless",
                 "settings" => [
                     "clients" => [],
@@ -1314,7 +1322,12 @@ class MarzbanService
                             "apple.com",
                             "cdn-apple.com",
                             "icloud.com",
-                            "appleid.apple.com"
+                            "appleid.apple.com",
+                            // Добавляем альтернативные домены
+                            "www.github.com",
+                            "github.com",
+                            "www.stackoverflow.com",
+                            "stackoverflow.com"
                         ],
                         "privateKey" => $privateKey,
                         "shortIds" => ["", $grpcShortId]
@@ -1325,11 +1338,12 @@ class MarzbanService
                     "destOverride" => ["http", "tls", "quic"]
                 ]
             ],
-            // Дополнительный VLESS TCP REALITY с другим SNI для разнообразия
+            // Дополнительный VLESS TCP REALITY с другими SNI для разнообразия
+            // Используем порт 2083 (CDN порт) - не блокируется, выглядит как CDN трафик
             [
                 "tag" => "VLESS TCP REALITY ALT",
                 "listen" => "0.0.0.0",
-                "port" => 2042,
+                "port" => 2083,
                 "protocol" => "vless",
                 "settings" => [
                     "clients" => [],
@@ -1348,7 +1362,12 @@ class MarzbanService
                             "google.com",
                             "accounts.google.com",
                             "mail.google.com",
-                            "drive.google.com"
+                            "drive.google.com",
+                            // Добавляем альтернативные домены
+                            "www.amazon.com",
+                            "amazon.com",
+                            "www.netflix.com",
+                            "netflix.com"
                         ],
                         "privateKey" => $privateKey,
                         "shortIds" => ["", $xhttpShortId]
