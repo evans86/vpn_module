@@ -161,9 +161,14 @@
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             @foreach($comparison['panels'] as $panel)
-                                <tr class="hover:bg-gray-50">
+                                <tr class="hover:bg-gray-50 {{ ($panel['excluded_from_rotation'] ?? false) ? 'bg-yellow-50' : '' }}">
                                     <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                                         {{ $panel['id'] }}
+                                        @if($panel['excluded_from_rotation'] ?? false)
+                                            <span class="ml-2 px-2 py-0.5 text-xs font-semibold bg-yellow-500 text-white rounded" title="Исключена из ротации">
+                                                🚫
+                                            </span>
+                                        @endif
                                     </td>
                                     <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                                         {{ $panel['server_name'] }}
@@ -362,6 +367,65 @@
                 <p class="text-sm text-gray-600">
                     Все панели работают нормально. Ошибок не обнаружено.
                 </p>
+            </div>
+        @endif
+
+        <!-- Панели, исключенные из ротации (для тестирования) -->
+        @if($excludedPanels->isNotEmpty())
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <span class="text-yellow-500 mr-2">🚫</span>
+                    Панели, исключенные из ротации
+                </h3>
+                <p class="text-sm text-gray-600 mb-6">
+                    Эти панели вручную исключены из ротации (для тестирования или технического обслуживания). 
+                    Новые пользователи не будут создаваться на этих панелях, но существующие пользователи продолжат работать.
+                </p>
+
+                <div class="space-y-4">
+                    @foreach($excludedPanels as $panel)
+                        <div class="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center mb-2">
+                                        <span class="font-semibold text-gray-900">ID-{{ $panel->id }}</span>
+                                        <span class="ml-2 px-2 py-1 text-xs font-semibold bg-yellow-500 text-white rounded">
+                                            Исключена из ротации
+                                        </span>
+                                    </div>
+                                    <div class="text-sm text-gray-600">
+                                        <div><strong>Адрес:</strong> {{ $panel->panel_adress }}</div>
+                                        @if($panel->server)
+                                            <div><strong>Сервер:</strong> {{ $panel->server->name }}</div>
+                                        @endif
+                                        @if($panel->config_type)
+                                            <div><strong>Тип конфига:</strong> 
+                                                <span class="px-2 py-0.5 rounded text-xs font-medium 
+                                                    {{ $panel->config_type === 'reality' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800' }}">
+                                                    {{ $panel->config_type === 'reality' ? 'REALITY' : 'Стабильный' }}
+                                                </span>
+                                            </div>
+                                        @endif
+                                        @if($panel->use_tls)
+                                            <div><strong>TLS:</strong> 
+                                                <span class="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                                    Включен
+                                                </span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="ml-4">
+                                    <a href="{{ route('admin.module.panel.index') }}" 
+                                       class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors inline-block">
+                                        <i class="fas fa-arrow-right mr-2"></i>
+                                        Управление панелями
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
             </div>
         @endif
     </div>

@@ -58,7 +58,14 @@ class PanelSettingsController extends Controller
                 ->get();
         }
 
-        return view('module.panel-settings.index', compact('currentStrategy', 'strategies', 'comparison', 'panelsWithErrors', 'errorHistory'));
+        // Получаем панели, исключенные из ротации (но без ошибок)
+        $excludedPanels = \App\Models\Panel\Panel::where('excluded_from_rotation', true)
+            ->where('panel_status', \App\Models\Panel\Panel::PANEL_CONFIGURED)
+            ->where('has_error', false) // Только панели без ошибок
+            ->with('server')
+            ->get();
+
+        return view('module.panel-settings.index', compact('currentStrategy', 'strategies', 'comparison', 'panelsWithErrors', 'errorHistory', 'excludedPanels'));
     }
 
     /**

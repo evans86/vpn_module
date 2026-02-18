@@ -494,9 +494,23 @@ class PanelRepository extends BaseRepository
                 $intelligentPanel = $balancedPanel;
             }
 
-            // Собираем детальную информацию по каждой панели
+            // Также получаем все панели (включая исключенные) для отображения в таблице
+            $allPanels = $this->query()
+                ->where('panel_status', Panel::PANEL_CONFIGURED)
+                ->where('panel', $panelType)
+                ->where('has_error', false) // Исключаем панели с ошибками
+                // НЕ исключаем excluded_from_rotation - показываем все для отображения
+                ->whereNotIn('id', function ($query) {
+                    $query->select('panel_id')
+                        ->from('salesman')
+                        ->whereNotNull('panel_id');
+                })
+                ->with('server.location')
+                ->get();
+
+            // Собираем детальную информацию по каждой панели (включая исключенные для отображения)
             // Оборачиваем в try-catch для каждой панели, чтобы ошибки не блокировали всю страницу
-            $panelsInfo = $panels->map(function ($panel) use ($balancedPanel, $trafficPanel, $intelligentPanel) {
+            $panelsInfo = $allPanels->map(function ($panel) use ($balancedPanel, $trafficPanel, $intelligentPanel) {
                 try {
                     $totalUsers = $this->getTotalUsersCount($panel->id);
                     $activeUsers = $this->getActiveUsersFromStats($panel->id);
@@ -543,6 +557,7 @@ class PanelRepository extends BaseRepository
                         'is_intelligent_selected' => $intelligentPanel && $intelligentPanel->id === $panel->id,
                         'has_fresh_stats' => $this->isStatsFresh($panel->id),
                         'has_traffic_data' => $trafficData !== null,
+                        'excluded_from_rotation' => $panel->excluded_from_rotation ?? false,
                     ];
                 } catch (\Exception $e) {
                     // Если произошла ошибка при обработке панели, возвращаем минимальные данные
@@ -572,6 +587,7 @@ class PanelRepository extends BaseRepository
                         'is_intelligent_selected' => false,
                         'has_fresh_stats' => false,
                         'has_traffic_data' => false,
+                        'excluded_from_rotation' => $panel->excluded_from_rotation ?? false,
                     ];
                 }
             });
