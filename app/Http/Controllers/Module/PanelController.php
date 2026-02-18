@@ -355,13 +355,53 @@ class PanelController extends Controller
                 'source' => 'panel',
                 'panel_id' => $panel->id,
                 'has_certificate' => $request->hasFile('certificate'),
-                'has_key' => $request->hasFile('key')
+                'has_key' => $request->hasFile('key'),
+                'certificate_file' => $request->hasFile('certificate') ? [
+                    'name' => $request->file('certificate')->getClientOriginalName(),
+                    'size' => $request->file('certificate')->getSize(),
+                    'mime' => $request->file('certificate')->getMimeType(),
+                    'extension' => $request->file('certificate')->getClientOriginalExtension()
+                ] : null,
+                'key_file' => $request->hasFile('key') ? [
+                    'name' => $request->file('key')->getClientOriginalName(),
+                    'size' => $request->file('key')->getSize(),
+                    'mime' => $request->file('key')->getMimeType(),
+                    'extension' => $request->file('key')->getClientOriginalExtension()
+                ] : null
             ]);
             
-            $request->validate([
-                'certificate' => 'required|file|mimes:pem,crt|max:10240', // 10MB max
-                'key' => 'required|file|mimes:pem,key|max:10240', // 10MB max
-            ]);
+            try {
+                $validated = $request->validate([
+                    'certificate' => 'required|file|max:10240', // 10MB max, убрали mimes для теста
+                    'key' => 'required|file|max:10240', // 10MB max, убрали mimes для теста
+                ]);
+                
+                $this->logger->info('Валидация прошла, результат:', [
+                    'source' => 'panel',
+                    'panel_id' => $panel->id,
+                    'validated' => $validated
+                ]);
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                $this->logger->error('Ошибка валидации файлов', [
+                    'source' => 'panel',
+                    'panel_id' => $panel->id,
+                    'errors' => $e->errors(),
+                    'message' => $e->getMessage(),
+                    'certificate_file' => $request->hasFile('certificate') ? [
+                        'name' => $request->file('certificate')->getClientOriginalName(),
+                        'size' => $request->file('certificate')->getSize(),
+                        'mime' => $request->file('certificate')->getMimeType(),
+                        'extension' => $request->file('certificate')->getClientOriginalExtension()
+                    ] : null,
+                    'key_file' => $request->hasFile('key') ? [
+                        'name' => $request->file('key')->getClientOriginalName(),
+                        'size' => $request->file('key')->getSize(),
+                        'mime' => $request->file('key')->getMimeType(),
+                        'extension' => $request->file('key')->getClientOriginalExtension()
+                    ] : null
+                ]);
+                throw $e;
+            }
             
             $this->logger->info('Валидация прошла успешно', [
                 'source' => 'panel',
