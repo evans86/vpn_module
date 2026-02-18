@@ -1023,6 +1023,15 @@ class MarzbanService
         // Если панель указана и у неё включен TLS - используем TLS
         if ($panel && $panel->use_tls) {
             $certPaths = $this->getTlsCertificatePaths($panel);
+            
+            Log::info('TLS settings applied for panel', [
+                'panel_id' => $panel->id,
+                'use_tls' => $panel->use_tls,
+                'cert_path' => $certPaths['cert'],
+                'key_path' => $certPaths['key'],
+                'source' => 'panel'
+            ]);
+            
             return [
                 'security' => 'tls',
                 'tlsSettings' => [
@@ -1039,6 +1048,13 @@ class MarzbanService
         }
 
         // По умолчанию используем none для обратной совместимости
+        Log::info('TLS not enabled for panel, using security=none', [
+            'panel_id' => $panel ? $panel->id : null,
+            'use_tls' => $panel ? $panel->use_tls : null,
+            'has_cert' => $panel && $panel->tls_certificate_path ? 'yes' : 'no',
+            'source' => 'panel'
+        ]);
+        
         return [
             'security' => 'none'
         ];
@@ -1647,6 +1663,9 @@ class MarzbanService
 
         Log::info('Updating configuration to stable (without REALITY)', [
             'panel_id' => $panel_id,
+            'use_tls' => $panel->use_tls,
+            'has_cert' => $panel->tls_certificate_path ? 'yes' : 'no',
+            'has_key' => $panel->tls_key_path ? 'yes' : 'no',
             'source' => 'panel'
         ]);
 

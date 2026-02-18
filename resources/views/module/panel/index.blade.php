@@ -248,15 +248,36 @@
                                                 </button>
                                             </form>
                                             
-                                            <!-- TLS Certificates Button -->
-                                            <button type="button" 
-                                                    onclick="openCertificatesModal({{ $panel->id }}, '{{ $panel->tls_certificate_path ? 'yes' : 'no' }}', {{ $panel->use_tls ? 'true' : 'false' }})"
-                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors w-full
-                                                    {{ $panel->use_tls ? 'ring-2 ring-purple-500' : '' }}"
-                                                    title="Настроить TLS сертификаты">
-                                                <i class="fas fa-certificate mr-2"></i>
-                                                <span>TLS</span>
-                                            </button>
+                                            <!-- TLS Toggle Button -->
+                                            @if($panel->tls_certificate_path && $panel->tls_key_path)
+                                                <button type="button" 
+                                                        onclick="toggleTls({{ $panel->id }}, {{ $panel->use_tls ? 'true' : 'false' }})"
+                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md {{ $panel->use_tls ? 'text-green-700 bg-green-50 hover:bg-green-100 border-green-200' : 'text-gray-700 bg-gray-50 hover:bg-gray-100 border-gray-200' }} border transition-colors w-full
+                                                        {{ $panel->use_tls ? 'ring-2 ring-green-500' : '' }}"
+                                                        title="{{ $panel->use_tls ? 'Выключить TLS' : 'Включить TLS' }}">
+                                                    <i class="fas {{ $panel->use_tls ? 'fa-lock' : 'fa-unlock' }} mr-2"></i>
+                                                    <span>TLS {{ $panel->use_tls ? 'ON' : 'OFF' }}</span>
+                                                </button>
+                                            @else
+                                                <button type="button" 
+                                                        onclick="openCertificatesModal({{ $panel->id }}, 'no', false)"
+                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors w-full"
+                                                        title="Загрузить TLS сертификаты">
+                                                    <i class="fas fa-certificate mr-2"></i>
+                                                    <span>TLS</span>
+                                                </button>
+                                            @endif
+                                            
+                                            <!-- TLS Settings Button (если сертификаты есть) -->
+                                            @if($panel->tls_certificate_path && $panel->tls_key_path)
+                                                <button type="button" 
+                                                        onclick="openCertificatesModal({{ $panel->id }}, 'yes', {{ $panel->use_tls ? 'true' : 'false' }})"
+                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors w-full"
+                                                        title="Настроить TLS сертификаты">
+                                                    <i class="fas fa-cog mr-2"></i>
+                                                    <span>Настройки</span>
+                                                </button>
+                                            @endif
                                             
                                             <!-- Exclude from Rotation Button -->
                                             <button type="button" 
@@ -329,7 +350,7 @@
                 </p>
             </div>
 
-            <div class="mb-4">
+            <div class="mb-4" id="certificateUploadSection">
                 <label for="certificate" class="block text-sm font-medium text-gray-700 mb-1">
                     Сертификат (cert.pem или cert.crt)
                 </label>
@@ -341,7 +362,7 @@
                 <p class="mt-1 text-xs text-gray-500">Формат: PEM или CRT, максимум 10MB</p>
             </div>
 
-            <div class="mb-4">
+            <div class="mb-4" id="keyUploadSection">
                 <label for="key" class="block text-sm font-medium text-gray-700 mb-1">
                     Приватный ключ (key.pem или key.key)
                 </label>
@@ -353,15 +374,20 @@
                 <p class="mt-1 text-xs text-gray-500">Формат: PEM или KEY, максимум 10MB</p>
             </div>
 
-            <div class="mb-4">
+            <div class="mb-4" id="useTlsSection" style="display: none;">
                 <label class="flex items-center">
                     <input type="checkbox" 
                            name="use_tls" 
                            value="1"
+                           id="useTlsCheckbox"
                            class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
                     <span class="ml-2 text-sm text-gray-700">Включить TLS шифрование для этой панели</span>
                 </label>
                 <p class="mt-1 text-xs text-gray-500">По умолчанию TLS выключен для обратной совместимости</p>
+                <p class="mt-2 text-xs text-blue-600">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    <strong>Совет:</strong> Вы можете включить/выключить TLS кнопкой "TLS ON/OFF" на карточке панели без перезагрузки сертификатов
+                </p>
             </div>
 
             <div class="mb-4 p-3 rounded-md bg-blue-50 border border-blue-200">
@@ -380,8 +406,9 @@
             </button>
             <button type="submit" 
                     form="certificatesForm" 
+                    id="submitCertificatesBtn"
                     class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                <i class="fas fa-upload mr-2"></i> Загрузить
+                <i class="fas fa-upload mr-2"></i> <span id="submitBtnText">Загрузить</span>
             </button>
             <button type="button" 
                     class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" 
@@ -406,14 +433,53 @@
             const removeBtn = document.getElementById('removeCertificatesBtn');
             const useTlsCheckbox = form.querySelector('input[name="use_tls"]');
             
+            const useTlsSection = document.getElementById('useTlsSection');
+            
+            const certificateUploadSection = document.getElementById('certificateUploadSection');
+            const keyUploadSection = document.getElementById('keyUploadSection');
+            
             if (hasCertificates === 'yes') {
                 statusDiv.className = 'mb-4 p-3 rounded-md bg-green-50 border border-green-200';
                 statusText.innerHTML = '<i class="fas fa-check-circle mr-2 text-green-600"></i>Сертификаты настроены для этой панели';
                 removeBtn.style.display = 'inline-flex';
+                if (useTlsSection) {
+                    useTlsSection.style.display = 'block';
+                }
+                // Скрываем поля загрузки, если сертификаты уже есть
+                if (certificateUploadSection) {
+                    certificateUploadSection.style.display = 'none';
+                }
+                if (keyUploadSection) {
+                    keyUploadSection.style.display = 'none';
+                }
+                // Меняем текст кнопки
+                const submitBtn = document.getElementById('submitCertificatesBtn');
+                const submitBtnText = document.getElementById('submitBtnText');
+                if (submitBtn && submitBtnText) {
+                    submitBtnText.textContent = 'Обновить настройки';
+                    submitBtn.querySelector('i').className = 'fas fa-save mr-2';
+                }
             } else {
                 statusDiv.className = 'mb-4 p-3 rounded-md bg-yellow-50 border border-yellow-200';
                 statusText.innerHTML = '<i class="fas fa-exclamation-triangle mr-2 text-yellow-600"></i>Сертификаты не настроены, используются настройки по умолчанию';
                 removeBtn.style.display = 'none';
+                if (useTlsSection) {
+                    useTlsSection.style.display = 'none';
+                }
+                // Показываем поля загрузки, если сертификатов нет
+                if (certificateUploadSection) {
+                    certificateUploadSection.style.display = 'block';
+                }
+                if (keyUploadSection) {
+                    keyUploadSection.style.display = 'block';
+                }
+                // Меняем текст кнопки
+                const submitBtn = document.getElementById('submitCertificatesBtn');
+                const submitBtnText = document.getElementById('submitBtnText');
+                if (submitBtn && submitBtnText) {
+                    submitBtnText.textContent = 'Загрузить';
+                    submitBtn.querySelector('i').className = 'fas fa-upload mr-2';
+                }
             }
             
             // Устанавливаем значение use_tls
@@ -429,6 +495,32 @@
             }
             
             window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'certificatesModal' } }));
+        }
+
+        function toggleTls(panelId, isEnabled) {
+            $.ajax({
+                url: '{{ route('admin.module.panel.toggle-tls', ['panel' => ':id']) }}'.replace(':id', panelId),
+                method: 'POST',
+                data: {
+                    _token: '{{ csrf_token() }}'
+                },
+                success: function (response) {
+                    toastr.success(response.message || (isEnabled ? 'TLS выключен' : 'TLS включен'));
+                    if (response.use_tls) {
+                        toastr.info('Не забудьте обновить конфигурацию панели (кнопка "Стабильный" или "REALITY")');
+                    }
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                },
+                error: function (xhr) {
+                    let errorMessage = 'Произошла ошибка';
+                    if (xhr.responseJSON) {
+                        errorMessage = xhr.responseJSON.message || errorMessage;
+                    }
+                    toastr.error(errorMessage);
+                }
+            });
         }
 
         function toggleRotationExclusion(panelId, isExcluded) {

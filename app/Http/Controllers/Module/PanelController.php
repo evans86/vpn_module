@@ -306,6 +306,35 @@ class PanelController extends Controller
     public function uploadCertificates(Request $request, Panel $panel)
     {
         try {
+            // Если сертификаты уже загружены, можно обновить только use_tls без перезагрузки файлов
+            if ($panel->tls_certificate_path && $panel->tls_key_path && !$request->hasFile('certificate') && !$request->hasFile('key')) {
+                $panel->use_tls = $request->has('use_tls') && $request->input('use_tls') == '1';
+                $panel->save();
+
+                $this->logger->info('Обновлен статус TLS шифрования', [
+                    'source' => 'panel',
+                    'action' => 'update-tls-status',
+                    'user_id' => auth()->id(),
+                    'panel_id' => $panel->id,
+                    'use_tls' => $panel->use_tls
+                ]);
+
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success' => true,
+                        'message' => $panel->use_tls 
+                            ? 'TLS шифрование включено' 
+                            : 'TLS шифрование выключено',
+                        'use_tls' => $panel->use_tls
+                    ]);
+                }
+
+                return redirect()->route('admin.module.panel.index')
+                    ->with('success', $panel->use_tls 
+                        ? 'TLS шифрование включено. Не забудьте обновить конфигурацию панели!' 
+                        : 'TLS шифрование выключено');
+            }
+
             $request->validate([
                 'certificate' => 'required|file|mimes:pem,crt|max:10240', // 10MB max
                 'key' => 'required|file|mimes:pem,key|max:10240', // 10MB max
@@ -453,6 +482,74 @@ class PanelController extends Controller
 
             return redirect()->back()
                 ->with('error', 'Ошибка при удалении сертификатов: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Toggle TLS encryption for panel.
+     *
+     * @param Panel $panel
+     * @return JsonResponse|RedirectResponse
+     */
+    public function toggleTls(Panel $panel)
+    {
+        try {
+            // Проверяем, что сертификаты загружены
+            if (!$panel->tls_certificate_path || !$panel->tls_key_path) {
+                if (request()->wantsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Сначала загрузите TLS сертификаты'
+                    ], 400);
+                }
+
+                return redirect()->back()
+                    ->with('error', 'Сначала загрузите TLS сертификаты');
+            }
+
+            $panel->use_tls = !$panel->use_tls;
+            $panel->save();
+
+            $this->logger->info('Изменен статус TLS шифрования', [
+                'source' => 'panel',
+                'action' => 'toggle-tls',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'use_tls' => $panel->use_tls
+            ]);
+
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => $panel->use_tls 
+                        ? 'TLS шифрование включено' 
+                        : 'TLS шифрование выключено',
+                    'use_tls' => $panel->use_tls
+                ]);
+            }
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', $panel->use_tls 
+                    ? 'TLS шифрование включено. Не забудьте обновить конфигурацию панели!' 
+                    : 'TLS шифрование выключено');
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при изменении статуса TLS', [
+                'source' => 'panel',
+                'action' => 'toggle-tls',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage()
+            ]);
+
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ошибка: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return redirect()->back()
+                ->with('error', 'Ошибка: ' . $e->getMessage());
         }
     }
 
