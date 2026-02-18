@@ -365,28 +365,73 @@ class PanelController extends Controller
             
             $this->logger->info('Валидация прошла успешно', [
                 'source' => 'panel',
-                'panel_id' => $panel->id
+                'panel_id' => $panel->id,
+                'certificate_file' => $request->file('certificate') ? [
+                    'name' => $request->file('certificate')->getClientOriginalName(),
+                    'size' => $request->file('certificate')->getSize(),
+                    'mime' => $request->file('certificate')->getMimeType()
+                ] : null,
+                'key_file' => $request->file('key') ? [
+                    'name' => $request->file('key')->getClientOriginalName(),
+                    'size' => $request->file('key')->getSize(),
+                    'mime' => $request->file('key')->getMimeType()
+                ] : null
             ]);
 
             // Создаем директорию для сертификатов панели
             $certDir = storage_path('app/certificates/' . $panel->id);
+            $this->logger->info('Создание директории для сертификатов', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'certDir' => $certDir,
+                'dir_exists' => file_exists($certDir)
+            ]);
+            
             if (!file_exists($certDir)) {
-                mkdir($certDir, 0755, true);
+                $created = mkdir($certDir, 0755, true);
+                $this->logger->info('Директория создана', [
+                    'source' => 'panel',
+                    'panel_id' => $panel->id,
+                    'certDir' => $certDir,
+                    'created' => $created
+                ]);
             }
 
             // Сохраняем сертификат
+            $this->logger->info('Начало сохранения сертификата', [
+                'source' => 'panel',
+                'panel_id' => $panel->id
+            ]);
+            
             $certPath = $request->file('certificate')->storeAs(
                 'certificates/' . $panel->id,
                 'cert.pem',
                 'local'
             );
+            
+            $this->logger->info('Сертификат сохранен', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'certPath' => $certPath
+            ]);
 
             // Сохраняем ключ
+            $this->logger->info('Начало сохранения ключа', [
+                'source' => 'panel',
+                'panel_id' => $panel->id
+            ]);
+            
             $keyPath = $request->file('key')->storeAs(
                 'certificates/' . $panel->id,
                 'key.pem',
                 'local'
             );
+            
+            $this->logger->info('Ключ сохранен', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'keyPath' => $keyPath
+            ]);
 
             $this->logger->info('Файлы сохранены', [
                 'source' => 'panel',
