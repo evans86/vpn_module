@@ -46,6 +46,43 @@ class Salesman extends Authenticatable
         'remember_token', // Добавьте это поле в миграцию если нужно
     ];
 
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        // Базовые типы
+    ];
+
+    /**
+     * Get the token attribute (with backward compatibility for unencrypted data)
+     */
+    public function getTokenAttribute($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+        
+        try {
+            return decrypt($value);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            return $value;
+        }
+    }
+
+    /**
+     * Set the token attribute (always encrypt)
+     */
+    public function setTokenAttribute($value)
+    {
+        if (!empty($value)) {
+            $this->attributes['token'] = encrypt($value);
+        } else {
+            $this->attributes['token'] = null;
+        }
+    }
+
     public function botModule(): BelongsTo
     {
         return $this->belongsTo(BotModule::class, 'module_bot_id');

@@ -47,6 +47,73 @@ class Server extends Model
         'logs_upload_enabled'
     ];
 
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        // Базовые типы
+    ];
+
+    /**
+     * Get the password attribute (with backward compatibility for unencrypted data)
+     */
+    public function getPasswordAttribute($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+        
+        try {
+            // Пытаемся расшифровать (если данные зашифрованы)
+            return decrypt($value);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            // Если не удалось расшифровать, значит данные не зашифрованы - возвращаем как есть
+            return $value;
+        }
+    }
+
+    /**
+     * Set the password attribute (always encrypt)
+     */
+    public function setPasswordAttribute($value)
+    {
+        if (!empty($value)) {
+            $this->attributes['password'] = encrypt($value);
+        } else {
+            $this->attributes['password'] = null;
+        }
+    }
+
+    /**
+     * Get the login attribute (with backward compatibility for unencrypted data)
+     */
+    public function getLoginAttribute($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+        
+        try {
+            return decrypt($value);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            return $value;
+        }
+    }
+
+    /**
+     * Set the login attribute (always encrypt)
+     */
+    public function setLoginAttribute($value)
+    {
+        if (!empty($value)) {
+            $this->attributes['login'] = encrypt($value);
+        } else {
+            $this->attributes['login'] = null;
+        }
+    }
+
     // Провайдеры серверов
     public const VDSINA = 'vdsina';
 

@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
-use phpseclib\Math\BigInteger;
 
 /**
  * @property string $id
@@ -31,6 +30,43 @@ class ServerUser extends Model
     public $incrementing = false;
     protected $guarded = false;
     protected $table = 'server_user';
+
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        // Базовые типы
+    ];
+
+    /**
+     * Get the keys attribute (with backward compatibility for unencrypted data)
+     */
+    public function getKeysAttribute($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        try {
+            return decrypt($value);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            return $value;
+        }
+    }
+
+    /**
+     * Set the keys attribute (always encrypt)
+     */
+    public function setKeysAttribute($value)
+    {
+        if (!empty($value)) {
+            $this->attributes['keys'] = encrypt($value);
+        } else {
+            $this->attributes['keys'] = null;
+        }
+    }
 
     /**
      * Получить панель, к которой привязан пользователь

@@ -133,6 +133,25 @@
                                 @endif
                                 @endif
 
+                                <!-- TLS Status -->
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-700">TLS:</span>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                        {{ $panel->use_tls ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' }}">
+                                        {{ $panel->use_tls ? 'Включен' : 'Выключен' }}
+                                    </span>
+                                </div>
+
+                                <!-- Rotation Status -->
+                                @if($panel->excluded_from_rotation)
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-700">Ротация:</span>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                        <i class="fas fa-ban mr-1"></i> Исключена
+                                    </span>
+                                </div>
+                                @endif
+
                                 <!-- Server -->
                                 <div class="flex items-start justify-between">
                                     <span class="text-sm font-medium text-gray-700">Сервер:</span>
@@ -229,6 +248,25 @@
                                                 </button>
                                             </form>
                                             
+                                            <!-- TLS Certificates Button -->
+                                            <button type="button" 
+                                                    onclick="openCertificatesModal({{ $panel->id }}, '{{ $panel->tls_certificate_path ? 'yes' : 'no' }}', {{ $panel->use_tls ? 'true' : 'false' }})"
+                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors w-full
+                                                    {{ $panel->use_tls ? 'ring-2 ring-purple-500' : '' }}"
+                                                    title="Настроить TLS сертификаты">
+                                                <i class="fas fa-certificate mr-2"></i>
+                                                <span>TLS</span>
+                                            </button>
+                                            
+                                            <!-- Exclude from Rotation Button -->
+                                            <button type="button" 
+                                                    onclick="toggleRotationExclusion({{ $panel->id }}, {{ $panel->excluded_from_rotation ? 'true' : 'false' }})"
+                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md {{ $panel->excluded_from_rotation ? 'text-yellow-700 bg-yellow-50 hover:bg-yellow-100 border-yellow-200' : 'text-gray-700 bg-gray-50 hover:bg-gray-100 border-gray-200' }} border transition-colors w-full"
+                                                    title="{{ $panel->excluded_from_rotation ? 'Включить в ротацию' : 'Исключить из ротации (для тестирования)' }}">
+                                                <i class="fas {{ $panel->excluded_from_rotation ? 'fa-check-circle' : 'fa-ban' }} mr-2"></i>
+                                                <span>{{ $panel->excluded_from_rotation ? 'В ротации' : 'Исключить' }}</span>
+                                            </button>
+                                            
                                             <button type="button" 
                                                     onclick="deletePanel({{ $panel->id }})"
                                                     class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors w-full">
@@ -279,9 +317,210 @@
             </button>
         </x-slot>
     </x-admin.modal>
+
+    <!-- Modal: Upload TLS Certificates -->
+    <x-admin.modal id="certificatesModal" title="Настройка TLS сертификатов">
+        <form id="certificatesForm" method="POST" enctype="multipart/form-data">
+            @csrf
+            <div id="certificatesStatus" class="mb-4 p-3 rounded-md bg-gray-50 border border-gray-200">
+                <p class="text-sm text-gray-600">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    <span id="statusText">Проверка статуса...</span>
+                </p>
+            </div>
+
+            <div class="mb-4">
+                <label for="certificate" class="block text-sm font-medium text-gray-700 mb-1">
+                    Сертификат (cert.pem или cert.crt)
+                </label>
+                <input type="file" 
+                       id="certificate" 
+                       name="certificate" 
+                       accept=".pem,.crt"
+                       class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                <p class="mt-1 text-xs text-gray-500">Формат: PEM или CRT, максимум 10MB</p>
+            </div>
+
+            <div class="mb-4">
+                <label for="key" class="block text-sm font-medium text-gray-700 mb-1">
+                    Приватный ключ (key.pem или key.key)
+                </label>
+                <input type="file" 
+                       id="key" 
+                       name="key" 
+                       accept=".pem,.key"
+                       class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                <p class="mt-1 text-xs text-gray-500">Формат: PEM или KEY, максимум 10MB</p>
+            </div>
+
+            <div class="mb-4">
+                <label class="flex items-center">
+                    <input type="checkbox" 
+                           name="use_tls" 
+                           value="1"
+                           class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                    <span class="ml-2 text-sm text-gray-700">Включить TLS шифрование для этой панели</span>
+                </label>
+                <p class="mt-1 text-xs text-gray-500">По умолчанию TLS выключен для обратной совместимости</p>
+            </div>
+
+            <div class="mb-4 p-3 rounded-md bg-blue-50 border border-blue-200">
+                <p class="text-sm text-blue-800">
+                    <i class="fas fa-lightbulb mr-2"></i>
+                    <strong>Совет:</strong> Если не загрузить сертификаты, будут использоваться настройки по умолчанию из конфигурации.
+                </p>
+            </div>
+        </form>
+        <x-slot name="footer">
+            <button type="button" 
+                    id="removeCertificatesBtn"
+                    onclick="removeCertificates()"
+                    class="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md shadow-sm text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                <i class="fas fa-trash mr-2"></i> Удалить сертификаты
+            </button>
+            <button type="submit" 
+                    form="certificatesForm" 
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <i class="fas fa-upload mr-2"></i> Загрузить
+            </button>
+            <button type="button" 
+                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" 
+                    onclick="window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'certificatesModal' } }))">
+                Отмена
+            </button>
+        </x-slot>
+    </x-admin.modal>
 @endsection
 
 @push('js')
+    <script>
+        let currentPanelId = null;
+
+        function openCertificatesModal(panelId, hasCertificates, useTls) {
+            currentPanelId = panelId;
+            const form = document.getElementById('certificatesForm');
+            form.action = '{{ route('admin.module.panel.upload-certificates', ['panel' => ':id']) }}'.replace(':id', panelId);
+            
+            const statusDiv = document.getElementById('certificatesStatus');
+            const statusText = document.getElementById('statusText');
+            const removeBtn = document.getElementById('removeCertificatesBtn');
+            const useTlsCheckbox = form.querySelector('input[name="use_tls"]');
+            
+            if (hasCertificates === 'yes') {
+                statusDiv.className = 'mb-4 p-3 rounded-md bg-green-50 border border-green-200';
+                statusText.innerHTML = '<i class="fas fa-check-circle mr-2 text-green-600"></i>Сертификаты настроены для этой панели';
+                removeBtn.style.display = 'inline-flex';
+            } else {
+                statusDiv.className = 'mb-4 p-3 rounded-md bg-yellow-50 border border-yellow-200';
+                statusText.innerHTML = '<i class="fas fa-exclamation-triangle mr-2 text-yellow-600"></i>Сертификаты не настроены, используются настройки по умолчанию';
+                removeBtn.style.display = 'none';
+            }
+            
+            // Устанавливаем значение use_tls
+            if (useTlsCheckbox) {
+                useTlsCheckbox.checked = useTls === true || useTls === 'true';
+            }
+            
+            // Сброс формы (кроме use_tls)
+            const useTlsValue = useTlsCheckbox ? useTlsCheckbox.checked : false;
+            form.reset();
+            if (useTlsCheckbox) {
+                useTlsCheckbox.checked = useTlsValue;
+            }
+            
+            window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'certificatesModal' } }));
+        }
+
+        function toggleRotationExclusion(panelId, isExcluded) {
+            $.ajax({
+                url: '{{ route('admin.module.panel.toggle-rotation-exclusion', ['panel' => ':id']) }}'.replace(':id', panelId),
+                method: 'POST',
+                data: {
+                    _token: '{{ csrf_token() }}'
+                },
+                success: function (response) {
+                    toastr.success(response.message || (isExcluded ? 'Панель включена в ротацию' : 'Панель исключена из ротации'));
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                },
+                error: function (xhr) {
+                    let errorMessage = 'Произошла ошибка';
+                    if (xhr.responseJSON) {
+                        errorMessage = xhr.responseJSON.message || errorMessage;
+                    }
+                    toastr.error(errorMessage);
+                }
+            });
+        }
+
+        function removeCertificates() {
+            if (!confirm('Вы уверены, что хотите удалить сертификаты для этой панели? Будут использоваться настройки по умолчанию.')) {
+                return;
+            }
+
+            $.ajax({
+                url: '{{ route('admin.module.panel.remove-certificates', ['panel' => ':id']) }}'.replace(':id', currentPanelId),
+                method: 'DELETE',
+                data: {
+                    _token: '{{ csrf_token() }}'
+                },
+                success: function (response) {
+                    toastr.success('Сертификаты успешно удалены');
+                    window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'certificatesModal' } }));
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                },
+                error: function (xhr) {
+                    let errorMessage = 'Произошла ошибка при удалении сертификатов';
+                    if (xhr.responseJSON) {
+                        errorMessage = xhr.responseJSON.message || errorMessage;
+                    }
+                    toastr.error(errorMessage);
+                }
+            });
+        }
+
+        // Обработка отправки формы
+        $(document).ready(function () {
+            $('#certificatesForm').on('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this);
+                
+                $.ajax({
+                    url: $(this).attr('action'),
+                    method: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function (response) {
+                        toastr.success('Сертификаты успешно загружены');
+                        window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'certificatesModal' } }));
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                    },
+                    error: function (xhr) {
+                        let errorMessage = 'Произошла ошибка при загрузке сертификатов';
+                        if (xhr.responseJSON) {
+                            if (xhr.responseJSON.errors) {
+                                let errors = [];
+                                $.each(xhr.responseJSON.errors, function(key, value) {
+                                    errors.push(value[0]);
+                                });
+                                errorMessage = errors.join('<br>');
+                            } else {
+                                errorMessage = xhr.responseJSON.message || errorMessage;
+                            }
+                        }
+                        toastr.error(errorMessage);
+                    }
+                });
+            });
+        });
+    </script>
     <script>
         // Функция копирования в буфер обмена
         function copyToClipboard(text, label) {

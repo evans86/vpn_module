@@ -80,6 +80,7 @@ class PanelRepository extends BaseRepository
             ->where('panel_status', Panel::PANEL_CONFIGURED)
             ->where('panel', $panelType)
             ->where('has_error', false) // Исключаем панели с ошибками
+            ->where('excluded_from_rotation', false) // Исключаем панели из ротации (для тестирования)
             ->whereNotIn('id', function ($query) {
                 // Исключаем панели, которые привязаны к продавцам
                 $query->select('panel_id')
@@ -258,6 +259,7 @@ class PanelRepository extends BaseRepository
             ->where('panel_status', Panel::PANEL_CONFIGURED)
             ->where('panel', $panelType)
             ->where('has_error', false) // Исключаем панели с ошибками
+            ->where('excluded_from_rotation', false) // Исключаем панели из ротации (для тестирования)
             ->whereNotIn('id', function ($query) {
                 $query->select('panel_id')
                     ->from('salesman')
@@ -449,6 +451,7 @@ class PanelRepository extends BaseRepository
                 ->where('panel_status', Panel::PANEL_CONFIGURED)
                 ->where('panel', $panelType)
                 ->where('has_error', false) // Исключаем панели с ошибками
+                ->where('excluded_from_rotation', false) // Исключаем панели из ротации (для тестирования)
                 ->whereNotIn('id', function ($query) {
                     $query->select('panel_id')
                         ->from('salesman')

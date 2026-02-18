@@ -25,6 +25,18 @@ return [
     // Интервал проверки онлайн статуса в секундах
     'online_check_interval' => 60,
 
+    /*
+    |--------------------------------------------------------------------------
+    | TLS Certificate Paths
+    |--------------------------------------------------------------------------
+    |
+    | Пути к TLS сертификатам для шифрования протоколов
+    | Если не указаны, будут использоваться значения по умолчанию
+    |
+    */
+    'tls_certificate_path' => env('MARZBAN_TLS_CERT_PATH', '/var/lib/marzban/certificates/cert.pem'),
+    'tls_key_path' => env('MARZBAN_TLS_KEY_PATH', '/var/lib/marzban/certificates/key.pem'),
+
     // Конфигурация по умолчанию для панели
     'default_config' => [
         'log' => [

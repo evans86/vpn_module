@@ -28,9 +28,99 @@ class BotModule extends Model
 
     protected $guarded = false;
     protected $table = 'bot_module';
-//    protected $casts = [
+    
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
 //        'vpn_instructions' => 'array'
-//    ];
+    ];
+
+    /**
+     * Get the private key attribute (with backward compatibility)
+     */
+    public function getPrivateKeyAttribute($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+        
+        try {
+            return decrypt($value);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            return $value;
+        }
+    }
+
+    /**
+     * Set the private key attribute (always encrypt)
+     */
+    public function setPrivateKeyAttribute($value)
+    {
+        if (!empty($value)) {
+            $this->attributes['private_key'] = encrypt($value);
+        } else {
+            $this->attributes['private_key'] = null;
+        }
+    }
+
+    /**
+     * Get the public key attribute (with backward compatibility)
+     */
+    public function getPublicKeyAttribute($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+        
+        try {
+            return decrypt($value);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            return $value;
+        }
+    }
+
+    /**
+     * Set the public key attribute (always encrypt)
+     */
+    public function setPublicKeyAttribute($value)
+    {
+        if (!empty($value)) {
+            $this->attributes['public_key'] = encrypt($value);
+        } else {
+            $this->attributes['public_key'] = null;
+        }
+    }
+
+    /**
+     * Get the secret user key attribute (with backward compatibility)
+     */
+    public function getSecretUserKeyAttribute($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+        
+        try {
+            return decrypt($value);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            return $value;
+        }
+    }
+
+    /**
+     * Set the secret user key attribute (always encrypt)
+     */
+    public function setSecretUserKeyAttribute($value)
+    {
+        if (!empty($value)) {
+            $this->attributes['secret_user_key'] = encrypt($value);
+        } else {
+            $this->attributes['secret_user_key'] = null;
+        }
+    }
 
     public function salesman()
     {

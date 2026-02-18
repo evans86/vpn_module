@@ -990,6 +990,61 @@ class MarzbanService
     }
 
     /**
+     * Получение путей к TLS сертификатам из панели или конфигурации
+     *
+     * @param Panel|null $panel Панель для получения сертификатов
+     * @return array Массив с ключами 'cert' и 'key'
+     */
+    private function getTlsCertificatePaths(?Panel $panel = null): array
+    {
+        // Если указана панель и у неё есть свои сертификаты - используем их
+        if ($panel && $panel->tls_certificate_path && $panel->tls_key_path) {
+            return [
+                'cert' => $panel->tls_certificate_path,
+                'key' => $panel->tls_key_path
+            ];
+        }
+
+        // Иначе используем настройки из конфигурации
+        return [
+            'cert' => config('marzban.tls_certificate_path', '/var/lib/marzban/certificates/cert.pem'),
+            'key' => config('marzban.tls_key_path', '/var/lib/marzban/certificates/key.pem')
+        ];
+    }
+
+    /**
+     * Получение настроек безопасности (TLS или none) в зависимости от настроек панели
+     *
+     * @param Panel|null $panel Панель для проверки настроек TLS
+     * @return array Массив с ключами 'security' и 'tlsSettings' (если нужно)
+     */
+    private function getSecuritySettings(?Panel $panel = null): array
+    {
+        // Если панель указана и у неё включен TLS - используем TLS
+        if ($panel && $panel->use_tls) {
+            $certPaths = $this->getTlsCertificatePaths($panel);
+            return [
+                'security' => 'tls',
+                'tlsSettings' => [
+                    'allowInsecure' => false,
+                    'minVersion' => '1.2',
+                    'certificates' => [
+                        [
+                            'certificateFile' => $certPaths['cert'],
+                            'keyFile' => $certPaths['key']
+                        ]
+                    ]
+                ]
+            ];
+        }
+
+        // По умолчанию используем none для обратной совместимости
+        return [
+            'security' => 'none'
+        ];
+    }
+
+    /**
      * Построение базовой конфигурации (общая часть)
      *
      * @param Panel|null $panel Панель для проверки настроек прокси
@@ -1078,9 +1133,10 @@ class MarzbanService
     /**
      * Построение стабильных протоколов (без REALITY)
      *
+     * @param Panel|null $panel Панель для получения сертификатов
      * @return array
      */
-    private function buildStableInbounds(): array
+    private function buildStableInbounds(?Panel $panel = null): array
     {
         return [
                 [
@@ -1093,13 +1149,12 @@ class MarzbanService
                         "decryption" => "none",
                         "level" => 0
                     ],
-                    "streamSettings" => [
+                    "streamSettings" => array_merge([
                         "network" => "ws",
-                        "security" => "none",
                         "wsSettings" => [
                             "path" => "/vless"
                         ]
-                    ],
+                    ], $this->getSecuritySettings($panel)),
                     "sniffing" => [
                         "enabled" => true,
                         "destOverride" => ["http", "tls"]
@@ -1114,13 +1169,12 @@ class MarzbanService
                         "clients" => [],
                         "level" => 0
                     ],
-                    "streamSettings" => [
+                    "streamSettings" => array_merge([
                         "network" => "ws",
-                        "security" => "none",
                         "wsSettings" => [
                             "path" => "/vmess"
                         ]
-                    ],
+                    ], $this->getSecuritySettings($panel)),
                     "sniffing" => [
                         "enabled" => true,
                         "destOverride" => ["http", "tls"]
@@ -1135,13 +1189,12 @@ class MarzbanService
                         "clients" => [],
                         "level" => 0
                     ],
-                    "streamSettings" => [
+                    "streamSettings" => array_merge([
                         "network" => "ws",
-                        "security" => "none",
                         "wsSettings" => [
                             "path" => "/trojan"
                         ]
-                    ],
+                    ], $this->getSecuritySettings($panel)),
                     "sniffing" => [
                         "enabled" => true,
                         "destOverride" => ["http", "tls"]
@@ -1208,8 +1261,7 @@ class MarzbanService
                                     ]
                                 ]
                             ]
-                        ],
-                        "security" => "none"
+                        ]
                     ],
                     "sniffing" => [
                         "enabled" => true,
@@ -1228,14 +1280,13 @@ class MarzbanService
                         "decryption" => "none",
                         "level" => 0
                     ],
-                    "streamSettings" => [
+                    "streamSettings" => array_merge([
                         "network" => "httpupgrade",
                         "httpupgradeSettings" => [
                             "path" => "/",
                             "host" => "www.microsoft.com"
-                        ],
-                        "security" => "none"
-                    ],
+                        ]
+                    ], $this->getSecuritySettings($panel)),
                     "sniffing" => [
                         "enabled" => true,
                         "destOverride" => ["http", "tls"]
@@ -1600,7 +1651,7 @@ class MarzbanService
         ]);
 
         $json_config = $this->buildBaseConfig($panel);
-        $json_config['inbounds'] = $this->buildStableInbounds();
+        $json_config['inbounds'] = $this->buildStableInbounds($panel);
 
         $this->applyConfiguration($panel, $json_config, Panel::CONFIG_TYPE_STABLE);
     }
@@ -1637,7 +1688,7 @@ class MarzbanService
                     $realityKeys['grpc_short_id'],
                     $realityKeys['xhttp_short_id']
                 ),
-                $this->buildStableInbounds()
+                $this->buildStableInbounds($panel)
             );
 
             $this->applyConfiguration($panel, $json_config, Panel::CONFIG_TYPE_REALITY);

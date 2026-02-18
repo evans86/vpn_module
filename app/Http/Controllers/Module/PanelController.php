@@ -297,6 +297,221 @@ class PanelController extends Controller
     }
 
     /**
+     * Upload TLS certificates for panel.
+     *
+     * @param Request $request
+     * @param Panel $panel
+     * @return JsonResponse|RedirectResponse
+     */
+    public function uploadCertificates(Request $request, Panel $panel)
+    {
+        try {
+            $request->validate([
+                'certificate' => 'required|file|mimes:pem,crt|max:10240', // 10MB max
+                'key' => 'required|file|mimes:pem,key|max:10240', // 10MB max
+            ]);
+
+            // Создаем директорию для сертификатов панели
+            $certDir = storage_path('app/certificates/' . $panel->id);
+            if (!file_exists($certDir)) {
+                mkdir($certDir, 0755, true);
+            }
+
+            // Сохраняем сертификат
+            $certPath = $request->file('certificate')->storeAs(
+                'certificates/' . $panel->id,
+                'cert.pem',
+                'local'
+            );
+
+            // Сохраняем ключ
+            $keyPath = $request->file('key')->storeAs(
+                'certificates/' . $panel->id,
+                'key.pem',
+                'local'
+            );
+
+            // Обновляем пути в БД
+            $panel->tls_certificate_path = storage_path('app/' . $certPath);
+            $panel->tls_key_path = storage_path('app/' . $keyPath);
+            // Обновляем настройку use_tls из формы
+            $panel->use_tls = $request->has('use_tls') && $request->input('use_tls') == '1';
+            $panel->save();
+
+            $this->logger->info('TLS сертификаты загружены для панели', [
+                'source' => 'panel',
+                'action' => 'upload-certificates',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'cert_path' => $panel->tls_certificate_path,
+                'key_path' => $panel->tls_key_path
+            ]);
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Сертификаты успешно загружены',
+                    'cert_path' => $panel->tls_certificate_path,
+                    'key_path' => $panel->tls_key_path
+                ]);
+            }
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'TLS сертификаты успешно загружены для панели');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ошибка валидации',
+                    'errors' => $e->errors()
+                ], 422);
+            }
+
+            return redirect()->back()
+                ->withErrors($e->errors())
+                ->withInput();
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при загрузке TLS сертификатов', [
+                'source' => 'panel',
+                'action' => 'upload-certificates',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage()
+            ]);
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ошибка при загрузке сертификатов: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return redirect()->back()
+                ->with('error', 'Ошибка при загрузке сертификатов: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Remove TLS certificates for panel (use default).
+     *
+     * @param Panel $panel
+     * @return JsonResponse|RedirectResponse
+     */
+    public function removeCertificates(Panel $panel)
+    {
+        try {
+            // Удаляем файлы сертификатов
+            if ($panel->tls_certificate_path && file_exists($panel->tls_certificate_path)) {
+                @unlink($panel->tls_certificate_path);
+            }
+            if ($panel->tls_key_path && file_exists($panel->tls_key_path)) {
+                @unlink($panel->tls_key_path);
+            }
+
+            // Удаляем директорию если пуста
+            $certDir = storage_path('app/certificates/' . $panel->id);
+            if (is_dir($certDir) && count(scandir($certDir)) == 2) {
+                @rmdir($certDir);
+            }
+
+            // Очищаем пути в БД
+            $panel->tls_certificate_path = null;
+            $panel->tls_key_path = null;
+            $panel->save();
+
+            $this->logger->info('TLS сертификаты удалены для панели', [
+                'source' => 'panel',
+                'action' => 'remove-certificates',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id
+            ]);
+
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Сертификаты удалены, будут использоваться настройки по умолчанию'
+                ]);
+            }
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'TLS сертификаты удалены, будут использоваться настройки по умолчанию');
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при удалении TLS сертификатов', [
+                'source' => 'panel',
+                'action' => 'remove-certificates',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage()
+            ]);
+
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ошибка при удалении сертификатов: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return redirect()->back()
+                ->with('error', 'Ошибка при удалении сертификатов: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Toggle rotation exclusion for panel.
+     *
+     * @param Panel $panel
+     * @return JsonResponse|RedirectResponse
+     */
+    public function toggleRotationExclusion(Panel $panel)
+    {
+        try {
+            $panel->excluded_from_rotation = !$panel->excluded_from_rotation;
+            $panel->save();
+
+            $this->logger->info('Изменен статус исключения из ротации', [
+                'source' => 'panel',
+                'action' => 'toggle-rotation-exclusion',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'excluded_from_rotation' => $panel->excluded_from_rotation
+            ]);
+
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => $panel->excluded_from_rotation 
+                        ? 'Панель исключена из ротации' 
+                        : 'Панель включена в ротацию',
+                    'excluded_from_rotation' => $panel->excluded_from_rotation
+                ]);
+            }
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', $panel->excluded_from_rotation 
+                    ? 'Панель исключена из ротации' 
+                    : 'Панель включена в ротацию');
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при изменении статуса исключения из ротации', [
+                'source' => 'panel',
+                'action' => 'toggle-rotation-exclusion',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage()
+            ]);
+
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ошибка: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return redirect()->back()
+                ->with('error', 'Ошибка: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Remove the specified resource from storage.
      *
      * @param Panel $panel

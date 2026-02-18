@@ -146,6 +146,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/{panel}/update-config', [PanelController::class, 'updateConfig'])->name('update-config');
                 Route::post('/{panel}/update-config-stable', [PanelController::class, 'updateConfigStable'])->name('update-config-stable');
                 Route::post('/{panel}/update-config-reality', [PanelController::class, 'updateConfigReality'])->name('update-config-reality');
+                Route::post('/{panel}/upload-certificates', [PanelController::class, 'uploadCertificates'])->name('upload-certificates');
+                Route::delete('/{panel}/remove-certificates', [PanelController::class, 'removeCertificates'])->name('remove-certificates');
+                Route::post('/{panel}/toggle-rotation-exclusion', [PanelController::class, 'toggleRotationExclusion'])->name('toggle-rotation-exclusion');
             });
 
             // Настройки распределения панелей

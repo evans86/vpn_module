@@ -79,7 +79,11 @@ class Panel extends Model
         'reality_xhttp_short_id',
         'reality_keys_generated_at',
         'config_type',
-        'config_updated_at'
+        'config_updated_at',
+        'tls_certificate_path',
+        'tls_key_path',
+        'excluded_from_rotation',
+        'use_tls'
     ];
 
     protected $hidden = [
@@ -94,8 +98,208 @@ class Panel extends Model
         'has_error' => 'boolean',
         'error_at' => 'datetime',
         'reality_keys_generated_at' => 'datetime',
-        'config_updated_at' => 'datetime'
+        'config_updated_at' => 'datetime',
+        'excluded_from_rotation' => 'boolean',
+        'use_tls' => 'boolean',
     ];
+
+    /**
+     * Get the panel password attribute (with backward compatibility for unencrypted data)
+     */
+    public function getPanelPasswordAttribute($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+        
+        try {
+            // Пытаемся расшифровать (если данные зашифрованы)
+            return decrypt($value);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            // Если не удалось расшифровать, значит данные не зашифрованы - возвращаем как есть
+            return $value;
+        }
+    }
+
+    /**
+     * Set the panel password attribute (always encrypt)
+     */
+    public function setPanelPasswordAttribute($value)
+    {
+        if (!empty($value)) {
+            $this->attributes['panel_password'] = encrypt($value);
+        } else {
+            $this->attributes['panel_password'] = null;
+        }
+    }
+
+    /**
+     * Get the auth token attribute (with backward compatibility for unencrypted data)
+     */
+    public function getAuthTokenAttribute($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+        
+        try {
+            return decrypt($value);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            return $value;
+        }
+    }
+
+    /**
+     * Set the auth token attribute (always encrypt)
+     */
+    public function setAuthTokenAttribute($value)
+    {
+        if (!empty($value)) {
+            $this->attributes['auth_token'] = encrypt($value);
+        } else {
+            $this->attributes['auth_token'] = null;
+        }
+    }
+
+    /**
+     * Get the reality private key attribute (with backward compatibility)
+     */
+    public function getRealityPrivateKeyAttribute($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+        
+        try {
+            return decrypt($value);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            return $value;
+        }
+    }
+
+    /**
+     * Set the reality private key attribute (always encrypt)
+     */
+    public function setRealityPrivateKeyAttribute($value)
+    {
+        if (!empty($value)) {
+            $this->attributes['reality_private_key'] = encrypt($value);
+        } else {
+            $this->attributes['reality_private_key'] = null;
+        }
+    }
+
+    /**
+     * Get the reality public key attribute (with backward compatibility)
+     */
+    public function getRealityPublicKeyAttribute($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+        
+        try {
+            return decrypt($value);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            return $value;
+        }
+    }
+
+    /**
+     * Set the reality public key attribute (always encrypt)
+     */
+    public function setRealityPublicKeyAttribute($value)
+    {
+        if (!empty($value)) {
+            $this->attributes['reality_public_key'] = encrypt($value);
+        } else {
+            $this->attributes['reality_public_key'] = null;
+        }
+    }
+
+    /**
+     * Get the reality short id attribute (with backward compatibility)
+     */
+    public function getRealityShortIdAttribute($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+        
+        try {
+            return decrypt($value);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            return $value;
+        }
+    }
+
+    /**
+     * Set the reality short id attribute (always encrypt)
+     */
+    public function setRealityShortIdAttribute($value)
+    {
+        if (!empty($value)) {
+            $this->attributes['reality_short_id'] = encrypt($value);
+        } else {
+            $this->attributes['reality_short_id'] = null;
+        }
+    }
+
+    /**
+     * Get the reality grpc short id attribute (with backward compatibility)
+     */
+    public function getRealityGrpcShortIdAttribute($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+        
+        try {
+            return decrypt($value);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            return $value;
+        }
+    }
+
+    /**
+     * Set the reality grpc short id attribute (always encrypt)
+     */
+    public function setRealityGrpcShortIdAttribute($value)
+    {
+        if (!empty($value)) {
+            $this->attributes['reality_grpc_short_id'] = encrypt($value);
+        } else {
+            $this->attributes['reality_grpc_short_id'] = null;
+        }
+    }
+
+    /**
+     * Get the reality xhttp short id attribute (with backward compatibility)
+     */
+    public function getRealityXhttpShortIdAttribute($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+        
+        try {
+            return decrypt($value);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            return $value;
+        }
+    }
+
+    /**
+     * Set the reality xhttp short id attribute (always encrypt)
+     */
+    public function setRealityXhttpShortIdAttribute($value)
+    {
+        if (!empty($value)) {
+            $this->attributes['reality_xhttp_short_id'] = encrypt($value);
+        } else {
+            $this->attributes['reality_xhttp_short_id'] = null;
+        }
+    }
 
     /**
      * @var string Тип конфига: стабильный (без REALITY)
