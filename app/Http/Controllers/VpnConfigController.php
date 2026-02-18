@@ -327,8 +327,20 @@ class VpnConfigController extends Controller
             // Если links есть, но их мало (меньше 10 для REALITY), обновляем пользователя с правильными inbounds
             if (!empty($userData['links']) && $panel->config_type === 'reality' && count($userData['links']) < 10) {
                 try {
-                    // Определяем все inbounds для REALITY конфигурации
-                    $realityInbounds = [
+                    // Получаем конфигурацию панели, чтобы узнать доступные inbounds
+                    $panelConfig = $marzbanApi->getConfig($panel->auth_token);
+                    $availableInboundTags = [];
+                    
+                    if (!empty($panelConfig['inbounds']) && is_array($panelConfig['inbounds'])) {
+                        foreach ($panelConfig['inbounds'] as $inbound) {
+                            if (isset($inbound['tag'])) {
+                                $availableInboundTags[] = $inbound['tag'];
+                            }
+                        }
+                    }
+                    
+                    // Определяем все возможные inbounds для REALITY конфигурации
+                    $allPossibleInbounds = [
                         'vmess' => ["VMESS-WS"],
                         'vless' => [
                             "VLESS-WS",
@@ -342,18 +354,34 @@ class VpnConfigController extends Controller
                         'trojan' => ["TROJAN-WS"],
                         'shadowsocks' => ["Shadowsocks-TCP"],
                     ];
+                    
+                    // Фильтруем inbounds, оставляя только те, которые существуют на панели
+                    $realityInbounds = [];
+                    foreach ($allPossibleInbounds as $protocol => $inboundTags) {
+                        $filteredTags = [];
+                        foreach ($inboundTags as $tag) {
+                            if (in_array($tag, $availableInboundTags)) {
+                                $filteredTags[] = $tag;
+                            }
+                        }
+                        if (!empty($filteredTags)) {
+                            $realityInbounds[$protocol] = $filteredTags;
+                        }
+                    }
+                    
+                    // Обновляем пользователя только если есть доступные inbounds
+                    if (!empty($realityInbounds)) {
+                        $updatedUserData = $marzbanApi->updateUser(
+                            $panel->auth_token,
+                            $serverUser->id,
+                            $userData['expire'] ?? 0,
+                            $userData['data_limit'] ?? 0,
+                            $realityInbounds
+                        );
 
-                    // Обновляем пользователя с указанием всех inbounds для REALITY
-                    $updatedUserData = $marzbanApi->updateUser(
-                        $panel->auth_token,
-                        $serverUser->id,
-                        $userData['expire'] ?? 0,
-                        $userData['data_limit'] ?? 0,
-                        $realityInbounds
-                    );
-
-                    // Получаем обновленные данные пользователя
-                    $userData = $marzbanApi->getUser($panel->auth_token, $serverUser->id);
+                        // Получаем обновленные данные пользователя
+                        $userData = $marzbanApi->getUser($panel->auth_token, $serverUser->id);
+                    }
                 } catch (Exception $e) {
                     Log::warning('Failed to update user inbounds for REALITY', [
                         'user_id' => $serverUser->id,
