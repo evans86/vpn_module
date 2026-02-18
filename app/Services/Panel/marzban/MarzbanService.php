@@ -5,7 +5,10 @@ namespace App\Services\Panel\marzban;
 use App\Dto\Bot\BotModuleFactory;
 use App\Dto\Server\ServerDto;
 use App\Dto\Server\ServerFactory;
+use App\Models\Bot\BotModule;
 use App\Models\KeyActivate\KeyActivate;
+use App\Models\KeyActivateUser\KeyActivateUser;
+use App\Models\PackSalesman\PackSalesman;
 use App\Models\Panel\Panel;
 use App\Models\Salesman\Salesman;
 use App\Models\Server\Server;
@@ -111,10 +114,10 @@ class MarzbanService
                 'url' => self::INSTALL_SCRIPT_URL,
                 'source' => 'panel'
             ]);
-            
+
             $wgetOutput = $ssh->exec('wget -O install_marzban.sh ' . self::INSTALL_SCRIPT_URL . ' 2>&1');
             $wgetExitStatus = $ssh->getExitStatus();
-            
+
             Log::info('Wget command executed', [
                 'exit_status' => $wgetExitStatus,
                 'output' => substr($wgetOutput, 0, 500), // Первые 500 символов
@@ -127,10 +130,10 @@ class MarzbanService
 
             // Команда 2: Установка прав на выполнение
             Log::info('Setting execute permissions', ['source' => 'panel']);
-            
+
             $chmodOutput = $ssh->exec('chmod +x install_marzban.sh 2>&1');
             $chmodExitStatus = $ssh->getExitStatus();
-            
+
             Log::info('Chmod command executed', [
                 'exit_status' => $chmodExitStatus,
                 'output' => substr($chmodOutput, 0, 500),
@@ -146,16 +149,16 @@ class MarzbanService
                 'host' => $host,
                 'source' => 'panel'
             ]);
-            
+
             // Увеличиваем таймаут для длительной операции установки
             $ssh->setTimeout(600); // 10 минут
-            
+
             $installOutput = $ssh->exec('./install_marzban.sh ' . escapeshellarg($host) . ' 2>&1');
             $installExitStatus = $ssh->getExitStatus();
-            
+
             // Восстанавливаем таймаут
             $ssh->setTimeout(100000);
-            
+
             // Логируем полный вывод (может быть длинным)
             Log::info('Installation script executed', [
                 'exit_status' => $installExitStatus,
@@ -167,25 +170,25 @@ class MarzbanService
 
             if ($installExitStatus !== 0) {
                 // Проверяем, связана ли ошибка с Docker
-                if (strpos($installOutput, 'Cannot connect to the Docker daemon') !== false || 
+                if (strpos($installOutput, 'Cannot connect to the Docker daemon') !== false ||
                     strpos($installOutput, 'docker daemon running') !== false) {
                     Log::error('Docker daemon issue detected during installation', [
                         'host' => $host,
                         'source' => 'panel'
                     ]);
-                    
+
                     // Пытаемся запустить Docker и повторить
                     $this->ensureDockerRunning($ssh);
-                    
+
                     // Повторяем установку
                     Log::info('Retrying installation after Docker restart', [
                         'host' => $host,
                         'source' => 'panel'
                     ]);
-                    
+
                     $installOutput = $ssh->exec('./install_marzban.sh ' . escapeshellarg($host) . ' 2>&1');
                     $installExitStatus = $ssh->getExitStatus();
-                    
+
                     if ($installExitStatus !== 0) {
                         throw new RuntimeException(
                             "Installation script failed after Docker restart. Exit code: {$installExitStatus}. " .
@@ -195,7 +198,7 @@ class MarzbanService
                 } else {
                     // Пытаемся получить более подробную информацию об ошибке
                     $errorDetails = $ssh->exec('tail -n 50 /var/log/marzban-install.log 2>&1 || echo "Log file not found"');
-                    
+
                     throw new RuntimeException(
                         "Installation script failed. Exit code: {$installExitStatus}. " .
                         "Output (last 2000 chars): " . substr($installOutput, -2000) . ". " .
@@ -235,7 +238,7 @@ class MarzbanService
             // Проверяем, запущен ли Docker daemon
             $dockerCheck = $ssh->exec('docker info > /dev/null 2>&1; echo $?');
             $dockerCheck = trim($dockerCheck);
-            
+
             if ($dockerCheck === '0') {
                 Log::info('Docker daemon is running', ['source' => 'panel']);
                 return;
@@ -246,7 +249,7 @@ class MarzbanService
             // Пытаемся запустить Docker daemon
             $startDockerOutput = $ssh->exec('sudo systemctl start docker 2>&1');
             $startDockerStatus = $ssh->getExitStatus();
-            
+
             Log::info('Docker start command executed', [
                 'exit_status' => $startDockerStatus,
                 'output' => substr($startDockerOutput, 0, 500),
@@ -259,12 +262,12 @@ class MarzbanService
             // Проверяем снова
             $dockerCheck = $ssh->exec('docker info > /dev/null 2>&1; echo $?');
             $dockerCheck = trim($dockerCheck);
-            
+
             if ($dockerCheck !== '0') {
                 // Пытаемся включить автозапуск и запустить
                 $enableDockerOutput = $ssh->exec('sudo systemctl enable docker && sudo systemctl start docker 2>&1');
                 $enableDockerStatus = $ssh->getExitStatus();
-                
+
                 Log::info('Docker enable and start command executed', [
                     'exit_status' => $enableDockerStatus,
                     'output' => substr($enableDockerOutput, 0, 500),
@@ -277,7 +280,7 @@ class MarzbanService
                 // Финальная проверка
                 $dockerCheck = $ssh->exec('docker info > /dev/null 2>&1; echo $?');
                 $dockerCheck = trim($dockerCheck);
-                
+
                 if ($dockerCheck !== '0') {
                     throw new RuntimeException(
                         "Docker daemon is not running and could not be started. " .
@@ -483,13 +486,13 @@ class MarzbanService
             // finish_at - это источник истины для нашего приложения
             // Если finish_at еще не истек, НЕ деактивируем ключ, даже если Marzban вернул истекший expire
             $finishAtFromDb = $keyActivate->finish_at;
-            
+
             // Проверяем реальное истечение срока по timestamp из Marzban
             // Статус может быть 'limited' (превышен трафик) или 'disabled' (временно отключен)
             // но это не значит что ключ просрочен по времени!
             if (isset($userData['expire']) && $userData['expire'] > 0) {
                 $expireTime = $userData['expire'];
-                
+
                 // КРИТИЧЕСКАЯ ПРОВЕРКА: Если expire из Marzban в миллисекундах, конвертируем в секунды
                 // Marzban может возвращать expire в миллисекундах (если > 2147483647, то это миллисекунды)
                 if ($expireTime > 2147483647) {
@@ -509,7 +512,7 @@ class MarzbanService
                 if ($currentTime > $expireTime) {
                     // ПРОВЕРЯЕМ finish_at из БД - это источник истины!
                     $dbExpired = !$finishAtFromDb || ($finishAtFromDb > 0 && $currentTime > $finishAtFromDb);
-                    
+
                     if (!$dbExpired) {
                         // finish_at из БД еще не истек - НЕ деактивируем ключ!
                         Log::warning('🚫 ПРЕДОТВРАЩЕНА преждевременная деактивация ключа!', [
@@ -541,7 +544,7 @@ class MarzbanService
                         if (!$keyActivate->relationLoaded('keyActivateUser')) {
                             $keyActivate->load('keyActivateUser');
                         }
-                        
+
                         Log::critical("🚫 [KEY: {$keyActivate->id}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (срок истек по данным Marzban И БД) | KEY_ID: {$keyActivate->id} | {$keyActivate->id}", [
                             'source' => 'panel',
                             'action' => 'update_status_to_expired',
@@ -776,11 +779,11 @@ class MarzbanService
 
             if ($keyActivateUser) {
                 $keyActivateId = $keyActivateUser->key_activate_id;
-                
+
                 // Получаем статус ключа отдельным запросом
                 $keyStatus = \App\Models\KeyActivate\KeyActivate::where('id', $keyActivateId)
                     ->value('status');
-                
+
                 Log::critical("⚠️ [KEY: {$keyActivateId}] УДАЛЕНИЕ СВЯЗИ keyActivateUser (при удалении пользователя сервера) | KEY_ID: {$keyActivateId} | {$keyActivateId}", [
                     'source' => 'panel',
                     'action' => 'delete_key_activate_user',
@@ -797,7 +800,7 @@ class MarzbanService
                     'file' => __FILE__,
                     'line' => __LINE__
                 ]);
-                
+
                 // Удаляем через прямой запрос
                 \App\Models\KeyActivateUser\KeyActivateUser::where('id', $keyActivateUser->id)->delete();
             }
@@ -850,7 +853,7 @@ class MarzbanService
 
             // Генерация приватного и публичного ключа
             $x25519Output = $ssh->exec('docker exec marzban-marzban-1 xray x25519 2>&1');
-            
+
             if ($ssh->getExitStatus() !== 0) {
                 throw new RuntimeException("Failed to generate x25519 keys: {$x25519Output}");
             }
@@ -861,9 +864,9 @@ class MarzbanService
             // или "XXX\nYYY" (без префиксов)
             $privateKey = null;
             $publicKey = null;
-            
+
             $lines = array_filter(array_map('trim', explode("\n", $x25519Output)));
-            
+
             foreach ($lines as $line) {
                 // Ищем строки с префиксами "Private key:" или "Public key:"
                 if (preg_match('/Private\s+key[:\s]+(.+)/i', $line, $matches)) {
@@ -1508,7 +1511,7 @@ class MarzbanService
                 'config_size' => strlen($configJson),
                 'source' => 'panel'
             ]);
-            
+
             // Детальное логирование для отладки (только первые 2000 символов)
             Log::debug('Configuration JSON (first 2000 chars)', [
                 'panel_id' => $panel->id,
@@ -1519,7 +1522,7 @@ class MarzbanService
             // Применение конфигурации с retry механизмом
             $maxRetries = 2;
             $retryDelay = 2; // секунды
-            
+
             for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
         try {
             $marzbanApi->modifyConfig($panel->auth_token, $json_config);
@@ -1529,7 +1532,7 @@ class MarzbanService
                     if ($attempt === $maxRetries || !str_contains($e->getMessage(), 'Сервер Marzban недоступен')) {
                         throw $e;
                     }
-                    
+
                     // Логируем попытку повтора
                     Log::warning('Retrying configuration update', [
                         'panel_id' => $panel->id,
@@ -1537,7 +1540,7 @@ class MarzbanService
                         'max_retries' => $maxRetries,
                         'source' => 'panel'
                     ]);
-                    
+
                     // Ждем перед следующей попыткой
                     sleep($retryDelay);
                 }
@@ -1580,7 +1583,7 @@ class MarzbanService
 
     /**
      * Обновление конфигурации панели - стабильный вариант (без REALITY)
-     * 
+     *
      * Использует только проверенные протоколы для максимальной стабильности
      *
      * @param int $panel_id
@@ -1604,7 +1607,7 @@ class MarzbanService
 
     /**
      * Обновление конфигурации панели - с REALITY (лучший обход блокировок)
-     * 
+     *
      * Автоматически генерирует и сохраняет REALITY ключи при необходимости
      * Включает REALITY протоколы + стабильные протоколы для обратной совместимости
      * При ошибке генерации ключей использует fallback на стабильный конфиг
@@ -1648,7 +1651,7 @@ class MarzbanService
 
             // Применяем стабильный конфиг вместо REALITY
             $this->updateConfigurationStable($panel_id);
-            
+
             // Пробрасываем исключение с информацией о fallback
             throw new RuntimeException(
                 'Не удалось применить REALITY конфигурацию. ' .
@@ -1659,7 +1662,7 @@ class MarzbanService
 
     /**
      * Обновление конфигурации панели (legacy метод для обратной совместимости)
-     * 
+     *
      * По умолчанию использует REALITY конфигурацию
      *
      * @param int $panel_id
@@ -1705,11 +1708,11 @@ class MarzbanService
 
         // Проверка REALITY настроек
         foreach ($config['inbounds'] as $inbound) {
-            if (isset($inbound['streamSettings']['security']) 
+            if (isset($inbound['streamSettings']['security'])
                 && $inbound['streamSettings']['security'] === 'reality') {
-                
+
                 $realitySettings = $inbound['streamSettings']['realitySettings'] ?? [];
-                
+
                 if (empty($realitySettings['privateKey'])) {
                     throw new RuntimeException('REALITY private key is required');
                 }
@@ -1845,16 +1848,33 @@ class MarzbanService
      */
     public function transferUser(int $sourcePanel_id, int $targetPanel_id, string $serverUser_id): ServerUser
     {
-        try {
-            // Получаем исходную и целевую панели
-            /** @var Panel $panel */
-            $sourcePanel = Panel::findOrFail($sourcePanel_id);
-            /** @var Panel $panel */
-            $targetPanel = Panel::findOrFail($targetPanel_id);
+        // Увеличиваем лимит памяти для операции переноса
+        $originalMemoryLimit = ini_get('memory_limit');
+        ini_set('memory_limit', '256M');
 
-            // Получаем пользователя сервера
-            $key_activate = KeyActivate::findOrFail($serverUser_id);
-            $serverUser = $key_activate->keyActivateUser->serverUser;
+        try {
+            // Загружаем только необходимые поля панелей
+            /** @var Panel $sourcePanel */
+            $sourcePanel = Panel::select('id', 'panel', 'api_address', 'auth_token', 'server_id')
+                ->findOrFail($sourcePanel_id);
+            /** @var Panel $targetPanel */
+            $targetPanel = Panel::select('id', 'panel', 'api_address', 'auth_token', 'server_id')
+                ->findOrFail($targetPanel_id);
+
+            // Оптимизированная загрузка: получаем server_user_id напрямую
+            $keyActivateUser = KeyActivateUser::select('server_user_id')
+                ->where('key_activate_id', $serverUser_id)
+                ->firstOrFail();
+
+            // Загружаем только необходимые поля пользователя сервера
+            /** @var ServerUser $serverUser */
+            $serverUser = ServerUser::select('id', 'panel_id', 'keys')
+                ->where('id', $keyActivateUser->server_user_id)
+                ->firstOrFail();
+
+            // Загружаем ключ только для отправки уведомления (только необходимые поля)
+            $key_activate = KeyActivate::select('id', 'user_tg_id', 'module_salesman_id', 'pack_salesman_id')
+                ->findOrFail($serverUser_id);
 
             // Создаем API клиенты для обеих панелей
             $sourceMarzbanApi = new MarzbanAPI($sourcePanel->api_address);
@@ -1915,26 +1935,52 @@ class MarzbanService
 
                 try {
                     if (!is_null($key_activate->module_salesman_id)) {
-                        $salesman = $key_activate->moduleSalesman;
-
-                        BottApi::senModuleMessage(BotModuleFactory::fromEntity($salesman->botModule), $key_activate->user_tg_id, $message);
+                        // Загружаем только необходимые поля для модульного продавца
+                        // module_salesman_id ссылается на Salesman, у которого есть botModule через module_bot_id
+                        $salesman = Salesman::select('id', 'module_bot_id')
+                            ->where('id', $key_activate->module_salesman_id)
+                            ->first();
+                        
+                        if ($salesman && $salesman->module_bot_id) {
+                            $botModule = BotModule::select('id', 'token', 'username')
+                                ->where('id', $salesman->module_bot_id)
+                                ->first();
+                            
+                            if ($botModule) {
+                                BottApi::senModuleMessage(BotModuleFactory::fromEntity($botModule), $key_activate->user_tg_id, $message);
+                            }
+                        }
                     } else {
-                        $salesman = $key_activate->packSalesman->salesman;
-                        $telegram = new Api($salesman->token);
-                        $telegram->sendMessage([
-                            'chat_id' => $key_activate->user_tg_id,
-                            'text' => $message,
-                            'parse_mode' => 'HTML'
-                        ]);
+                        // Загружаем только необходимые поля для продавца пакетов
+                        $packSalesman = PackSalesman::select('salesman_id')
+                            ->where('id', $key_activate->pack_salesman_id)
+                            ->first();
+
+                        if ($packSalesman) {
+                            $salesman = Salesman::select('id', 'token', 'telegram_id')
+                                ->where('id', $packSalesman->salesman_id)
+                                ->first();
+
+                            if ($salesman) {
+                                $telegram = new Api($salesman->token);
+                                $telegram->sendMessage([
+                                    'chat_id' => $key_activate->user_tg_id,
+                                    'text' => $message,
+                                    'parse_mode' => 'HTML'
+                                ]);
+                            }
+                        }
                     }
                 } catch (Exception $e) {
                     Log::error('Ошибка при отправке сообщения через FatherBot', [
                         'error' => $e->getMessage(),
-                        'salesman_id' => $salesman->id,
-                        'telegram_id' => $salesman->telegram_id,
+                        'key_id' => $key_activate->id,
                         'source' => 'panel'
                     ]);
                 }
+
+                // Освобождаем память
+                unset($key_activate, $sourcePanel, $targetPanel, $sourceMarzbanApi, $targetMarzbanApi, $userData, $newUser, $oldKeys);
 
                 return $serverUser;
             } catch (Exception $e) {
@@ -1951,6 +1997,11 @@ class MarzbanService
                 'user_id' => $serverUser_id
             ]);
             throw new RuntimeException('Failed to transfer user: ' . $e->getMessage());
+        } finally {
+            // Восстанавливаем оригинальный лимит памяти
+            if (isset($originalMemoryLimit)) {
+                ini_set('memory_limit', $originalMemoryLimit);
+            }
         }
     }
 

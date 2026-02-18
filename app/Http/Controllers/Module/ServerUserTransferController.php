@@ -36,32 +36,22 @@ class ServerUserTransferController extends Controller
                 'key_id' => 'required|uuid|exists:key_activate,id'
             ]);
 
-            // Получаем текущую панель ключа
-            /**
-             * @var KeyActivate $key
-             */
-            $key = KeyActivate::with('keyActivateUser.serverUser')->findOrFail($validated['key_id']);
-
-            Log::info('Key data:', [
-                'key_id' => $key->id,
-                'key_activate_user' => $key->keyActivateUser,
-                'server_user' => $key->keyActivateUser->serverUser,
-//                'panel_id' => $key->keyActivateUser->serverUser->panel_id
-            ]);
-
-            /**
-             * @var KeyActivateUser $keyActivateUser
-             */
-            $keyActivateUser = KeyActivateUser::query()->where('key_activate_id', $key->id)->first();
-            /**
-             * @var ServerUser $serverUser
-             */
-            $serverUser = ServerUser::query()->where('id', $keyActivateUser->server_user_id)->first();
+            // Оптимизированная загрузка: получаем panel_id напрямую
+            $keyActivateUser = KeyActivateUser::select('server_user_id')
+                ->where('key_activate_id', $validated['key_id'])
+                ->firstOrFail();
+            
+            $serverUser = ServerUser::select('panel_id')
+                ->where('id', $keyActivateUser->server_user_id)
+                ->firstOrFail();
 
             $currentPanelId = $serverUser->panel_id;
 
-            // Получаем все активные панели, кроме текущей
-            $panels = Panel::with('server')
+            // Получаем все активные панели, кроме текущей (оптимизированная загрузка)
+            $panels = Panel::select('id', 'panel_status', 'address', 'server_id')
+                ->with(['server' => function($query) {
+                    $query->select('id', 'name');
+                }])
                 ->where('panel_status', 2)
                 ->when($currentPanelId, function ($query) use ($currentPanelId) {
                     return $query->where('id', '!=', $currentPanelId);
@@ -73,7 +63,7 @@ class ServerUserTransferController extends Controller
                 'panels' => $panels->map(fn($panel) => [
                     'id' => $panel->id,
                     'status' => $panel->panel_status,
-                    'server_name' => $panel->server->name
+                    'server_name' => $panel->server->name ?? 'Неизвестный сервер'
                 ])
             ]);
 
@@ -105,6 +95,10 @@ class ServerUserTransferController extends Controller
      */
     public function transfer(Request $request): JsonResponse
     {
+        // Увеличиваем лимит памяти для операции переноса
+        $originalMemoryLimit = ini_get('memory_limit');
+        ini_set('memory_limit', '256M');
+
         try {
             Log::info('Incoming request data:', [
                 'all' => $request->all(),
@@ -116,10 +110,25 @@ class ServerUserTransferController extends Controller
                 'target_panel_id' => 'required|integer|exists:panel,id',
             ]);
 
-            $key = KeyActivate::findOrFail($validated['key_id']);
-            $sourcePanel_id = $key->keyActivateUser->serverUser->panel_id;
-            $sourcePanel = \App\Models\Panel\Panel::findOrFail($sourcePanel_id);
-            $targetPanel = \App\Models\Panel\Panel::findOrFail($validated['target_panel_id']);
+            // Оптимизированная загрузка: только необходимые поля
+            $key = KeyActivate::select('id')->findOrFail($validated['key_id']);
+            
+            // Получаем panel_id напрямую через запрос, без загрузки всех связанных моделей
+            $keyActivateUser = KeyActivateUser::select('server_user_id')
+                ->where('key_activate_id', $key->id)
+                ->firstOrFail();
+            
+            $serverUser = ServerUser::select('panel_id')
+                ->where('id', $keyActivateUser->server_user_id)
+                ->firstOrFail();
+            
+            $sourcePanel_id = $serverUser->panel_id;
+            
+            // Загружаем только необходимые поля панелей
+            $sourcePanel = Panel::select('id', 'panel', 'api_address', 'auth_token', 'server_id')
+                ->findOrFail($sourcePanel_id);
+            $targetPanel = Panel::select('id', 'panel', 'api_address', 'auth_token', 'server_id')
+                ->findOrFail($validated['target_panel_id']);
 
             // Проверяем, что панели разные
             if ($sourcePanel_id === $validated['target_panel_id']) {
@@ -139,11 +148,14 @@ class ServerUserTransferController extends Controller
                 $validated['key_id']
             );
 
+            // Освобождаем память
+            unset($keyActivateUser, $serverUser, $sourcePanel, $targetPanel, $updatedKey, $panelStrategy);
+            
             return response()->json([
                 'message' => 'Key transferred successfully',
                 'key' => [
-                    'id' => $updatedKey->id,
-                    'new_panel_id' => $updatedKey->panel_id,
+                    'id' => $validated['key_id'],
+                    'new_panel_id' => $validated['target_panel_id'],
                 ]
             ]);
 
@@ -161,6 +173,9 @@ class ServerUserTransferController extends Controller
                 'request' => $request->all()
             ]);
             return response()->json(['message' => 'Failed to transfer key'], 500);
+        } finally {
+            // Восстанавливаем оригинальный лимит памяти
+            ini_set('memory_limit', $originalMemoryLimit);
         }
     }
 }
