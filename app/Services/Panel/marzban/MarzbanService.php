@@ -1854,11 +1854,12 @@ class MarzbanService
 
         try {
             // Загружаем только необходимые поля панелей
+            // api_address - это accessor, используем panel_adress для select
             /** @var Panel $sourcePanel */
-            $sourcePanel = Panel::select('id', 'panel', 'api_address', 'auth_token', 'server_id')
+            $sourcePanel = Panel::select('id', 'panel', 'panel_adress', 'auth_token', 'server_id')
                 ->findOrFail($sourcePanel_id);
             /** @var Panel $targetPanel */
-            $targetPanel = Panel::select('id', 'panel', 'api_address', 'auth_token', 'server_id')
+            $targetPanel = Panel::select('id', 'panel', 'panel_adress', 'auth_token', 'server_id')
                 ->findOrFail($targetPanel_id);
 
             // Оптимизированная загрузка: получаем server_user_id напрямую

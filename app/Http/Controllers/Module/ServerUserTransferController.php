@@ -125,9 +125,10 @@ class ServerUserTransferController extends Controller
             $sourcePanel_id = $serverUser->panel_id;
             
             // Загружаем только необходимые поля панелей
-            $sourcePanel = Panel::select('id', 'panel', 'api_address', 'auth_token', 'server_id')
+            // api_address - это accessor, используем panel_adress для select
+            $sourcePanel = Panel::select('id', 'panel', 'panel_adress', 'auth_token', 'server_id')
                 ->findOrFail($sourcePanel_id);
-            $targetPanel = Panel::select('id', 'panel', 'api_address', 'auth_token', 'server_id')
+            $targetPanel = Panel::select('id', 'panel', 'panel_adress', 'auth_token', 'server_id')
                 ->findOrFail($validated['target_panel_id']);
 
             // Проверяем, что панели разные
