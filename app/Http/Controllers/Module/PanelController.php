@@ -306,8 +306,24 @@ class PanelController extends Controller
     public function uploadCertificates(Request $request, Panel $panel)
     {
         try {
+            $this->logger->info('Начало загрузки сертификатов', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'has_certificate_file' => $request->hasFile('certificate'),
+                'has_key_file' => $request->hasFile('key'),
+                'has_use_tls' => $request->has('use_tls'),
+                'use_tls_value' => $request->input('use_tls'),
+                'panel_has_cert' => !empty($panel->tls_certificate_path),
+                'panel_has_key' => !empty($panel->tls_key_path),
+                'all_request_data' => $request->all()
+            ]);
+            
             // Если сертификаты уже загружены, можно обновить только use_tls без перезагрузки файлов
             if ($panel->tls_certificate_path && $panel->tls_key_path && !$request->hasFile('certificate') && !$request->hasFile('key')) {
+                $this->logger->info('Обновление только use_tls (без файлов)', [
+                    'source' => 'panel',
+                    'panel_id' => $panel->id
+                ]);
                 $panel->use_tls = $request->has('use_tls') && $request->input('use_tls') == '1';
                 $panel->save();
 
@@ -335,9 +351,21 @@ class PanelController extends Controller
                         : 'TLS шифрование выключено');
             }
 
+            $this->logger->info('Валидация файлов', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'has_certificate' => $request->hasFile('certificate'),
+                'has_key' => $request->hasFile('key')
+            ]);
+            
             $request->validate([
                 'certificate' => 'required|file|mimes:pem,crt|max:10240', // 10MB max
                 'key' => 'required|file|mimes:pem,key|max:10240', // 10MB max
+            ]);
+            
+            $this->logger->info('Валидация прошла успешно', [
+                'source' => 'panel',
+                'panel_id' => $panel->id
             ]);
 
             // Создаем директорию для сертификатов панели
