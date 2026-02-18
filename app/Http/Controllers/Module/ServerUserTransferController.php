@@ -48,7 +48,7 @@ class ServerUserTransferController extends Controller
             $currentPanelId = $serverUser->panel_id;
 
             // Получаем все активные панели, кроме текущей (оптимизированная загрузка)
-            $panels = Panel::select('id', 'panel_status', 'address', 'server_id')
+            $panels = Panel::select('id', 'panel_status', 'panel_adress', 'server_id')
                 ->with(['server' => function($query) {
                     $query->select('id', 'name');
                 }])
@@ -71,7 +71,7 @@ class ServerUserTransferController extends Controller
                 return [
                     'id' => $panel->id,
                     'server_name' => $panel->server->name ?? 'Неизвестный сервер',
-                    'address' => $panel->address ?? 'Адрес не указан'
+                    'address' => $panel->panel_adress ?? $panel->api_address ?? 'Адрес не указан'
                 ];
             });
 
