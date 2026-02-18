@@ -333,12 +333,66 @@ class VpnConfigController extends Controller
             // Получаем актуальные данные пользователя из Marzban
             $userData = $marzbanApi->getUser($panel->auth_token, $serverUser->id);
 
+            // Логируем, что вернул Marzban API
+            Log::info('Marzban API getUser response', [
+                'user_id' => $serverUser->id,
+                'panel_id' => $panel->id,
+                'has_links' => !empty($userData['links']),
+                'links_count' => !empty($userData['links']) ? count($userData['links']) : 0,
+                'links' => !empty($userData['links']) ? $userData['links'] : null,
+                'has_subscription_url' => !empty($userData['subscription_url']),
+                'source' => 'vpn'
+            ]);
+
+            // Если links есть, но их мало (меньше 5), возможно Marzban не обновил subscription links
+            // Попробуем обновить пользователя, чтобы Marzban пересоздал subscription links
+            if (!empty($userData['links']) && count($userData['links']) < 5 && $panel->config_type === 'reality') {
+                Log::info('Few links detected for REALITY config, attempting to refresh user subscription', [
+                    'user_id' => $serverUser->id,
+                    'panel_id' => $panel->id,
+                    'current_links_count' => count($userData['links']),
+                    'source' => 'vpn'
+                ]);
+
+                try {
+                    // Обновляем пользователя с теми же параметрами, чтобы Marzban пересоздал subscription links
+                    $updatedUserData = $marzbanApi->updateUser(
+                        $panel->auth_token,
+                        $serverUser->id,
+                        $userData['expire'] ?? 0,
+                        $userData['data_limit'] ?? 0
+                    );
+
+                    // Получаем обновленные данные пользователя
+                    $userData = $marzbanApi->getUser($panel->auth_token, $serverUser->id);
+
+                    Log::info('User subscription refreshed', [
+                        'user_id' => $serverUser->id,
+                        'panel_id' => $panel->id,
+                        'new_links_count' => !empty($userData['links']) ? count($userData['links']) : 0,
+                        'source' => 'vpn'
+                    ]);
+                } catch (Exception $e) {
+                    Log::warning('Failed to refresh user subscription', [
+                        'user_id' => $serverUser->id,
+                        'panel_id' => $panel->id,
+                        'error' => $e->getMessage(),
+                        'source' => 'vpn'
+                    ]);
+                    // Продолжаем с исходными links
+                }
+            }
+
             // Обновляем ссылки в БД
             if (!empty($userData['links'])) {
                 $serverUser->keys = json_encode($userData['links']);
                 $serverUser->save();
 
-                Log::info('User links updated from panel', ['user_id' => $serverUser->id]);
+                Log::info('User links updated from panel', [
+                    'user_id' => $serverUser->id,
+                    'links_count' => count($userData['links']),
+                    'source' => 'vpn'
+                ]);
                 return $userData['links'];
             }
 
@@ -974,7 +1028,15 @@ class VpnConfigController extends Controller
             ]
         ];
 
+        // Логируем входящие ссылки для диагностики
+        Log::info('Formatting connection keys', [
+            'total_keys' => count($connectionKeys),
+            'keys_preview' => array_slice($connectionKeys, 0, 5), // Первые 5 для примера
+            'source' => 'vpn'
+        ]);
+
         $formattedKeys = [];
+        $skippedKeys = [];
         foreach ($connectionKeys as $configString) {
             // Удаляем экранирование слешей
             $configString = stripslashes($configString);
@@ -1000,8 +1062,19 @@ class VpnConfigController extends Controller
                     'link' => addslashes($configString),
                     'connection_type' => $connectionType
                 ];
+            } else {
+                // Логируем пропущенные ссылки
+                $skippedKeys[] = substr($configString, 0, 100); // Первые 100 символов
             }
         }
+
+        // Логируем результат форматирования
+        Log::info('Connection keys formatted', [
+            'formatted_count' => count($formattedKeys),
+            'skipped_count' => count($skippedKeys),
+            'skipped_preview' => array_slice($skippedKeys, 0, 3), // Первые 3 пропущенных
+            'source' => 'vpn'
+        ]);
 
         return $formattedKeys;
     }
