@@ -344,10 +344,9 @@ class VpnConfigController extends Controller
                 'source' => 'vpn'
             ]);
 
-            // Если links есть, но их мало (меньше 5), возможно Marzban не обновил subscription links
-            // Попробуем обновить пользователя, чтобы Marzban пересоздал subscription links
-            if (!empty($userData['links']) && count($userData['links']) < 5 && $panel->config_type === 'reality') {
-                Log::info('Few links detected for REALITY config, attempting to refresh user subscription', [
+            // Если links есть, но их мало (меньше 10 для REALITY), обновляем пользователя с правильными inbounds
+            if (!empty($userData['links']) && $panel->config_type === 'reality' && count($userData['links']) < 10) {
+                Log::info('Few links detected for REALITY config, updating user inbounds to include REALITY protocols', [
                     'user_id' => $serverUser->id,
                     'panel_id' => $panel->id,
                     'current_links_count' => count($userData['links']),
@@ -355,25 +354,42 @@ class VpnConfigController extends Controller
                 ]);
 
                 try {
-                    // Обновляем пользователя с теми же параметрами, чтобы Marzban пересоздал subscription links
+                    // Определяем все inbounds для REALITY конфигурации
+                    $realityInbounds = [
+                        'vmess' => ["VMESS-WS"],
+                        'vless' => [
+                            "VLESS-WS",
+                            "VLESS TCP REALITY",
+                            "VLESS GRPC REALITY",
+                            "VLESS XHTTP REALITY",
+                            "VLESS TCP REALITY ALT",
+                            "VLESS TCP HTTP/1.1 Obfuscated",
+                            "VLESS HTTP Upgrade"
+                        ],
+                        'trojan' => ["TROJAN-WS"],
+                        'shadowsocks' => ["Shadowsocks-TCP"],
+                    ];
+
+                    // Обновляем пользователя с указанием всех inbounds для REALITY
                     $updatedUserData = $marzbanApi->updateUser(
                         $panel->auth_token,
                         $serverUser->id,
                         $userData['expire'] ?? 0,
-                        $userData['data_limit'] ?? 0
+                        $userData['data_limit'] ?? 0,
+                        $realityInbounds
                     );
 
                     // Получаем обновленные данные пользователя
                     $userData = $marzbanApi->getUser($panel->auth_token, $serverUser->id);
 
-                    Log::info('User subscription refreshed', [
+                    Log::info('User inbounds updated for REALITY config', [
                         'user_id' => $serverUser->id,
                         'panel_id' => $panel->id,
                         'new_links_count' => !empty($userData['links']) ? count($userData['links']) : 0,
                         'source' => 'vpn'
                     ]);
                 } catch (Exception $e) {
-                    Log::warning('Failed to refresh user subscription', [
+                    Log::warning('Failed to update user inbounds for REALITY', [
                         'user_id' => $serverUser->id,
                         'panel_id' => $panel->id,
                         'error' => $e->getMessage(),

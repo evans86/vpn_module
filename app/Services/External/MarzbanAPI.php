@@ -272,10 +272,20 @@ class MarzbanAPI
      * @throws GuzzleException
      * @throws Exception
      */
-    public function updateUser(string $token, string $userId, int $expire, int $data_limit)
+    public function updateUser(string $token, string $userId, int $expire, int $data_limit, ?array $inbounds = null)
     {
         try {
             $action = $userId;
+
+            $jsonData = [
+                'data_limit' => $data_limit, //лимит трафика
+                'expire' => $expire, //время окончания
+            ];
+
+            // Если переданы inbounds, добавляем их в запрос
+            if ($inbounds !== null) {
+                $jsonData['inbounds'] = $inbounds;
+            }
 
             $requestParam = [
                 'headers' => [
@@ -283,10 +293,7 @@ class MarzbanAPI
                     'Content-Type' => 'application/json',
                     'Accept' => 'application/json'
                 ],
-                'json' => [
-                    'data_limit' => $data_limit, //лимит трафика
-                    'expire' => $expire, //время окончания
-                ],
+                'json' => $jsonData,
                 'verify' => false // Отключаем проверку SSL сертификата
             ];
 
