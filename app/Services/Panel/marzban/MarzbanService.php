@@ -1052,6 +1052,9 @@ class MarzbanService
             'panel_id' => $panel ? $panel->id : null,
             'use_tls' => $panel ? $panel->use_tls : null,
             'has_cert' => $panel && $panel->tls_certificate_path ? 'yes' : 'no',
+            'has_key' => $panel && $panel->tls_key_path ? 'yes' : 'no',
+            'cert_path' => $panel ? $panel->tls_certificate_path : null,
+            'key_path' => $panel ? $panel->tls_key_path : null,
             'source' => 'panel'
         ]);
         
