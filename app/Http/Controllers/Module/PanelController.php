@@ -659,14 +659,25 @@ class PanelController extends Controller
                 'email' => 'nullable|email|max:255'
             ]);
 
-            $domain = $request->input('domain');
-            $email = $request->input('email', 'admin@' . $domain);
+            $domain = trim($request->input('domain'));
+            $email = trim($request->input('email', ''));
+            
+            // Если email не указан, генерируем его из домена
+            if (empty($email)) {
+                $email = 'admin@' . $domain;
+            }
+            
+            // Валидация email
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                throw new \RuntimeException('Некорректный email адрес: ' . $email);
+            }
 
             $this->logger->info('Начало получения Let\'s Encrypt сертификата', [
                 'source' => 'panel',
                 'panel_id' => $panel->id,
                 'domain' => $domain,
-                'email' => $email
+                'email' => $email,
+                'server_ip' => $panel->server ? $panel->server->ip : 'unknown'
             ]);
 
             // Проверяем наличие сервера
@@ -696,22 +707,51 @@ class PanelController extends Controller
                 }
             }
 
-            // Получаем сертификат
-            $this->logger->info('Получение сертификата Let\'s Encrypt', [
+            // Проверяем, что домен указывает на IP сервера с панелью
+            $serverIp = $panel->server->ip;
+            $domainIp = gethostbyname($domain);
+            
+            if ($domainIp === $domain) {
+                // DNS не разрешился
+                throw new \RuntimeException('Домен не разрешается в IP адрес. Убедитесь, что DNS запись настроена правильно.');
+            }
+            
+            if ($domainIp !== $serverIp) {
+                $this->logger->warning('IP домена не совпадает с IP сервера', [
+                    'source' => 'panel',
+                    'panel_id' => $panel->id,
+                    'domain' => $domain,
+                    'domain_ip' => $domainIp,
+                    'server_ip' => $serverIp
+                ]);
+                // Не блокируем, но предупреждаем - возможно используется поддомен или CDN
+            }
+
+            // Получаем сертификат (выполняется на сервере с панелью через SSH)
+            $this->logger->info('Получение сертификата Let\'s Encrypt на сервере с панелью', [
                 'source' => 'panel',
                 'panel_id' => $panel->id,
-                'domain' => $domain
+                'domain' => $domain,
+                'email' => $email,
+                'server_ip' => $serverIp,
+                'domain_ip' => $domainIp
             ]);
 
             // Останавливаем веб-сервер на порту 80, если он запущен (для standalone режима)
             $ssh->exec('sudo systemctl stop nginx 2>&1 || sudo systemctl stop apache2 2>&1 || true');
 
-            // Получаем сертификат
+            // Получаем сертификат на сервере с панелью
             $certbotCommand = sprintf(
                 'sudo certbot certonly --standalone --non-interactive --agree-tos --email %s -d %s 2>&1',
                 escapeshellarg($email),
                 escapeshellarg($domain)
             );
+            
+            $this->logger->info('Выполнение certbot команды на сервере', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'command' => $certbotCommand
+            ]);
 
             $certbotOutput = $ssh->exec($certbotCommand);
             $certbotStatus = $ssh->getExitStatus();
