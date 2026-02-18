@@ -584,7 +584,35 @@
                 e.preventDefault();
                 
                 const form = $(this);
-                const formData = new FormData(this);
+                const formData = new FormData();
+                
+                // Добавляем CSRF токен
+                formData.append('_token', form.find('input[name="_token"]').val());
+                
+                // Добавляем файлы
+                const certificateInput = form.find('input[name="certificate"]')[0];
+                const keyInput = form.find('input[name="key"]')[0];
+                
+                if (certificateInput && certificateInput.files && certificateInput.files[0]) {
+                    formData.append('certificate', certificateInput.files[0]);
+                    console.log('Добавлен сертификат:', certificateInput.files[0].name);
+                } else {
+                    console.warn('Сертификат не выбран');
+                }
+                
+                if (keyInput && keyInput.files && keyInput.files[0]) {
+                    formData.append('key', keyInput.files[0]);
+                    console.log('Добавлен ключ:', keyInput.files[0].name);
+                } else {
+                    console.warn('Ключ не выбран');
+                }
+                
+                // Добавляем use_tls если чекбокс отмечен
+                const useTlsCheckbox = form.find('input[name="use_tls"]')[0];
+                if (useTlsCheckbox && useTlsCheckbox.checked) {
+                    formData.append('use_tls', '1');
+                    console.log('TLS включен');
+                }
                 
                 // Логируем данные формы
                 console.log('Отправка формы:', {
