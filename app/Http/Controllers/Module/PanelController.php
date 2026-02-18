@@ -360,6 +360,19 @@ class PanelController extends Controller
                 'local'
             );
 
+            $this->logger->info('Файлы сохранены', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'certPath' => $certPath,
+                'keyPath' => $keyPath,
+                'full_cert_path' => storage_path('app/' . $certPath),
+                'full_key_path' => storage_path('app/' . $keyPath),
+                'cert_exists' => file_exists(storage_path('app/' . $certPath)),
+                'key_exists' => file_exists(storage_path('app/' . $keyPath)),
+                'use_tls_request' => $request->has('use_tls'),
+                'use_tls_value' => $request->input('use_tls')
+            ]);
+
             // Обновляем пути в БД
             $panel->tls_certificate_path = storage_path('app/' . $certPath);
             $panel->tls_key_path = storage_path('app/' . $keyPath);
@@ -367,11 +380,37 @@ class PanelController extends Controller
             if ($request->has('use_tls') && $request->input('use_tls') == '1') {
                 $panel->use_tls = true;
             }
+            
+            $this->logger->info('Перед сохранением в БД', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'tls_certificate_path' => $panel->tls_certificate_path,
+                'tls_key_path' => $panel->tls_key_path,
+                'use_tls' => $panel->use_tls
+            ]);
+            
             // Если чекбокс не был отмечен, оставляем use_tls как есть (не меняем на false)
-            $panel->save();
+            $saved = $panel->save();
+            
+            $this->logger->info('После сохранения в БД', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'saved' => $saved,
+                'tls_certificate_path' => $panel->tls_certificate_path,
+                'tls_key_path' => $panel->tls_key_path,
+                'use_tls' => $panel->use_tls
+            ]);
             
             // Обновляем модель из БД для корректного отображения
             $panel->refresh();
+            
+            $this->logger->info('После refresh из БД', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'tls_certificate_path' => $panel->tls_certificate_path,
+                'tls_key_path' => $panel->tls_key_path,
+                'use_tls' => $panel->use_tls
+            ]);
 
             $this->logger->info('TLS сертификаты загружены для панели', [
                 'source' => 'panel',
