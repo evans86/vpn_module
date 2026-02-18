@@ -1066,10 +1066,31 @@ class MarzbanService
      * @param Panel|null $panel Панель для проверки настроек TLS
      * @return array Массив с ключами 'security' и 'tlsSettings' (если нужно)
      */
-    private function getSecuritySettings(?Panel $panel = null): array
+    private function getSecuritySettings(?Panel $panel = null, bool $forceTls = false): array
     {
         // Если панель указана и у неё включен TLS - используем TLS
-        if ($panel && $panel->use_tls) {
+        // Или если forceTls = true (для протоколов, которые требуют TLS, например Trojan)
+        if ($panel && ($panel->use_tls || $forceTls)) {
+            // Если forceTls = true, но use_tls = false, проверяем наличие сертификатов
+            if ($forceTls && !$panel->use_tls) {
+                $certPaths = $this->getTlsCertificatePaths($panel);
+                // Если сертификаты не найдены, возвращаем none (протокол не будет работать)
+                $isLocalPath = str_starts_with($certPaths['cert'], storage_path()) || 
+                              str_starts_with($certPaths['cert'], base_path());
+                if ($isLocalPath) {
+                    $certExists = @file_exists($certPaths['cert']);
+                    $keyExists = @file_exists($certPaths['key']);
+                    if (!$certExists || !$keyExists) {
+                        Log::warning('TLS required for protocol but certificates not found, using none', [
+                            'panel_id' => $panel->id,
+                            'force_tls' => $forceTls,
+                            'source' => 'panel'
+                        ]);
+                        return ['security' => 'none'];
+                    }
+                }
+            }
+            
             $certPaths = $this->getTlsCertificatePaths($panel);
             
             // Проверяем, является ли путь локальным или удаленным
@@ -1100,6 +1121,7 @@ class MarzbanService
                 Log::info('TLS settings applied for panel (local paths)', [
                     'panel_id' => $panel->id,
                     'use_tls' => $panel->use_tls,
+                    'force_tls' => $forceTls,
                     'cert_path' => $certPaths['cert'],
                     'key_path' => $certPaths['key'],
                     'cert_exists' => $certExists,
@@ -1114,6 +1136,7 @@ class MarzbanService
                 Log::info('TLS settings applied for panel (remote paths)', [
                     'panel_id' => $panel->id,
                     'use_tls' => $panel->use_tls,
+                    'force_tls' => $forceTls,
                     'cert_path' => $certPaths['cert'],
                     'key_path' => $certPaths['key'],
                     'note' => 'Файлы находятся на удаленном сервере, проверка невозможна из-за open_basedir',
@@ -1302,7 +1325,7 @@ class MarzbanService
                         "wsSettings" => [
                             "path" => "/trojan"
                         ]
-                    ], $this->getSecuritySettings($panel)),
+                    ], $this->getSecuritySettings($panel, true)), // Trojan всегда требует TLS
                     "sniffing" => [
                         "enabled" => true,
                         "destOverride" => ["http", "tls"]
