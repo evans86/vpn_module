@@ -999,10 +999,38 @@ class MarzbanService
     {
         // Если указана панель и у неё есть свои сертификаты - используем их
         if ($panel && $panel->tls_certificate_path && $panel->tls_key_path) {
-            return [
-                'cert' => $panel->tls_certificate_path,
-                'key' => $panel->tls_key_path
-            ];
+            // Проверяем, существуют ли файлы по указанным путям
+            $certExists = file_exists($panel->tls_certificate_path);
+            $keyExists = file_exists($panel->tls_key_path);
+            
+            Log::info('Проверка путей к сертификатам', [
+                'panel_id' => $panel->id,
+                'cert_path' => $panel->tls_certificate_path,
+                'key_path' => $panel->tls_key_path,
+                'cert_exists' => $certExists,
+                'key_exists' => $keyExists,
+                'cert_readable' => $certExists ? is_readable($panel->tls_certificate_path) : false,
+                'key_readable' => $keyExists ? is_readable($panel->tls_key_path) : false,
+                'source' => 'panel'
+            ]);
+            
+            // Если файлы существуют и доступны для чтения - используем их
+            if ($certExists && $keyExists && is_readable($panel->tls_certificate_path) && is_readable($panel->tls_key_path)) {
+                return [
+                    'cert' => $panel->tls_certificate_path,
+                    'key' => $panel->tls_key_path
+                ];
+            } else {
+                // Если файлы не доступны, используем пути из конфигурации
+                Log::warning('Файлы сертификатов не доступны, используем пути из конфигурации', [
+                    'panel_id' => $panel->id,
+                    'cert_path' => $panel->tls_certificate_path,
+                    'key_path' => $panel->tls_key_path,
+                    'fallback_cert' => config('marzban.tls_certificate_path', '/var/lib/marzban/certificates/cert.pem'),
+                    'fallback_key' => config('marzban.tls_key_path', '/var/lib/marzban/certificates/key.pem'),
+                    'source' => 'panel'
+                ]);
+            }
         }
 
         // Иначе используем настройки из конфигурации
@@ -1024,11 +1052,33 @@ class MarzbanService
         if ($panel && $panel->use_tls) {
             $certPaths = $this->getTlsCertificatePaths($panel);
             
+            // Проверяем, что файлы существуют перед использованием
+            $certExists = file_exists($certPaths['cert']);
+            $keyExists = file_exists($certPaths['key']);
+            
+            if (!$certExists || !$keyExists) {
+                Log::error('TLS сертификаты не найдены по указанным путям', [
+                    'panel_id' => $panel->id,
+                    'cert_path' => $certPaths['cert'],
+                    'key_path' => $certPaths['key'],
+                    'cert_exists' => $certExists,
+                    'key_exists' => $keyExists,
+                    'source' => 'panel'
+                ]);
+                
+                // Возвращаем none вместо TLS, если файлы не найдены
+                return [
+                    'security' => 'none'
+                ];
+            }
+            
             Log::info('TLS settings applied for panel', [
                 'panel_id' => $panel->id,
                 'use_tls' => $panel->use_tls,
                 'cert_path' => $certPaths['cert'],
                 'key_path' => $certPaths['key'],
+                'cert_exists' => $certExists,
+                'key_exists' => $keyExists,
                 'source' => 'panel'
             ]);
             

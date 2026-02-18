@@ -8,6 +8,8 @@ use App\Models\Server\Server;
 use App\Services\Panel\marzban\MarzbanService;
 use App\Services\Panel\PanelStrategy;
 use App\Logging\DatabaseLogger;
+use App\Dto\Server\ServerFactory;
+use phpseclib3\Net\SFTP;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Contracts\Foundation\Application;
@@ -486,9 +488,71 @@ class PanelController extends Controller
                 'use_tls_value' => $request->input('use_tls')
             ]);
 
-            // Обновляем пути в БД
-            $panel->tls_certificate_path = storage_path('app/' . $certPath);
-            $panel->tls_key_path = storage_path('app/' . $keyPath);
+            // Копируем сертификаты на сервер Marzban через SSH
+            $localCertPath = storage_path('app/' . $certPath);
+            $localKeyPath = storage_path('app/' . $keyPath);
+            
+            // Пути на сервере Marzban
+            $remoteCertDir = '/var/lib/marzban/certificates';
+            $remoteCertPath = $remoteCertDir . '/cert_' . $panel->id . '.pem';
+            $remoteKeyPath = $remoteCertDir . '/key_' . $panel->id . '.pem';
+            
+            try {
+                // Загружаем сервер для SSH подключения
+                $panel->load('server');
+                if ($panel->server) {
+                    $serverDto = ServerFactory::fromEntity($panel->server);
+                    $marzbanService = app(MarzbanService::class);
+                    $ssh = $marzbanService->connectSshAdapter($serverDto);
+                    
+                    // Создаем директорию на сервере, если её нет
+                    $ssh->exec("mkdir -p {$remoteCertDir} 2>&1");
+                    
+                    // Копируем файлы через SFTP
+                    $sftp = new SFTP($serverDto->ip);
+                    if ($sftp->login($serverDto->login, $serverDto->password)) {
+                        $sftp->put($remoteCertPath, $localCertPath, SFTP::SOURCE_LOCAL_FILE);
+                        $sftp->put($remoteKeyPath, $localKeyPath, SFTP::SOURCE_LOCAL_FILE);
+                        
+                        // Устанавливаем права доступа
+                        $ssh->exec("chmod 600 {$remoteKeyPath} 2>&1");
+                        $ssh->exec("chmod 644 {$remoteCertPath} 2>&1");
+                        
+                        $this->logger->info('Сертификаты скопированы на сервер Marzban', [
+                            'source' => 'panel',
+                            'panel_id' => $panel->id,
+                            'remote_cert_path' => $remoteCertPath,
+                            'remote_key_path' => $remoteKeyPath
+                        ]);
+                        
+                        // Сохраняем пути на сервере в БД
+                        $panel->tls_certificate_path = $remoteCertPath;
+                        $panel->tls_key_path = $remoteKeyPath;
+                    } else {
+                        throw new \RuntimeException('SFTP authentication failed');
+                    }
+                } else {
+                    // Если сервер не найден, используем локальные пути
+                    $this->logger->warning('Сервер не найден для панели, используем локальные пути', [
+                        'source' => 'panel',
+                        'panel_id' => $panel->id
+                    ]);
+                    $panel->tls_certificate_path = $localCertPath;
+                    $panel->tls_key_path = $localKeyPath;
+                }
+            } catch (\Exception $e) {
+                $this->logger->error('Ошибка при копировании сертификатов на сервер', [
+                    'source' => 'panel',
+                    'panel_id' => $panel->id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+                
+                // В случае ошибки используем локальные пути
+                $panel->tls_certificate_path = $localCertPath;
+                $panel->tls_key_path = $localKeyPath;
+            }
+            
             // Обновляем настройку use_tls из формы (если чекбокс отмечен)
             if ($request->has('use_tls') && $request->input('use_tls') == '1') {
                 $panel->use_tls = true;
