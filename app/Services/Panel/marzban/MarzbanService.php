@@ -1147,7 +1147,7 @@ class MarzbanService
             return [
                 'security' => 'tls',
                 'tlsSettings' => [
-                    'allowInsecure' => false,
+                    'allowInsecure' => false, // false для валидных сертификатов (Let's Encrypt)
                     'minVersion' => '1.2',
                     'certificates' => [
                         [

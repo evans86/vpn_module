@@ -645,6 +645,177 @@ class PanelController extends Controller
     }
 
     /**
+     * Get Let's Encrypt certificate automatically via SSH.
+     *
+     * @param Request $request
+     * @param Panel $panel
+     * @return JsonResponse|RedirectResponse
+     */
+    public function getLetsEncryptCertificate(Request $request, Panel $panel)
+    {
+        try {
+            $request->validate([
+                'domain' => 'required|string|max:255',
+                'email' => 'nullable|email|max:255'
+            ]);
+
+            $domain = $request->input('domain');
+            $email = $request->input('email', 'admin@' . $domain);
+
+            $this->logger->info('Начало получения Let\'s Encrypt сертификата', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'domain' => $domain,
+                'email' => $email
+            ]);
+
+            // Проверяем наличие сервера
+            $panel->load('server');
+            if (!$panel->server) {
+                throw new \RuntimeException('Сервер не найден для панели');
+            }
+
+            $serverDto = ServerFactory::fromEntity($panel->server);
+            $marzbanService = app(MarzbanService::class);
+            $ssh = $marzbanService->connectSshAdapter($serverDto);
+
+            // Проверяем наличие certbot
+            $certbotCheck = $ssh->exec('which certbot 2>&1');
+            if (empty(trim($certbotCheck)) || str_contains($certbotCheck, 'not found')) {
+                // Устанавливаем certbot
+                $this->logger->info('Установка certbot', [
+                    'source' => 'panel',
+                    'panel_id' => $panel->id
+                ]);
+
+                $installOutput = $ssh->exec('sudo apt-get update -qq && sudo apt-get install -y certbot 2>&1');
+                $installStatus = $ssh->getExitStatus();
+
+                if ($installStatus !== 0) {
+                    throw new \RuntimeException('Не удалось установить certbot: ' . substr($installOutput, 0, 500));
+                }
+            }
+
+            // Получаем сертификат
+            $this->logger->info('Получение сертификата Let\'s Encrypt', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'domain' => $domain
+            ]);
+
+            // Останавливаем веб-сервер на порту 80, если он запущен (для standalone режима)
+            $ssh->exec('sudo systemctl stop nginx 2>&1 || sudo systemctl stop apache2 2>&1 || true');
+
+            // Получаем сертификат
+            $certbotCommand = sprintf(
+                'sudo certbot certonly --standalone --non-interactive --agree-tos --email %s -d %s 2>&1',
+                escapeshellarg($email),
+                escapeshellarg($domain)
+            );
+
+            $certbotOutput = $ssh->exec($certbotCommand);
+            $certbotStatus = $ssh->getExitStatus();
+
+            // Запускаем веб-сервер обратно
+            $ssh->exec('sudo systemctl start nginx 2>&1 || sudo systemctl start apache2 2>&1 || true');
+
+            if ($certbotStatus !== 0) {
+                $this->logger->error('Ошибка получения сертификата Let\'s Encrypt', [
+                    'source' => 'panel',
+                    'panel_id' => $panel->id,
+                    'domain' => $domain,
+                    'output' => substr($certbotOutput, 0, 1000),
+                    'exit_status' => $certbotStatus
+                ]);
+
+                throw new \RuntimeException('Не удалось получить сертификат Let\'s Encrypt. Убедитесь, что домен указывает на IP сервера и порт 80 открыт. Ошибка: ' . substr($certbotOutput, 0, 500));
+            }
+
+            // Пути к сертификатам Let's Encrypt
+            $letsEncryptCertPath = "/etc/letsencrypt/live/{$domain}/fullchain.pem";
+            $letsEncryptKeyPath = "/etc/letsencrypt/live/{$domain}/privkey.pem";
+
+            // Пути на сервере Marzban
+            $remoteCertDir = '/var/lib/marzban/certificates';
+            $remoteCertPath = $remoteCertDir . '/cert_' . $panel->id . '.pem';
+            $remoteKeyPath = $remoteCertDir . '/key_' . $panel->id . '.pem';
+
+            // Создаем директорию на сервере, если её нет
+            $ssh->exec("sudo mkdir -p {$remoteCertDir} 2>&1");
+            $ssh->exec("sudo chown -R marzban:marzban {$remoteCertDir} 2>&1 || sudo chown -R \$USER:\$USER {$remoteCertDir} 2>&1 || true");
+
+            // Копируем сертификаты
+            $copyCert = $ssh->exec("sudo cp {$letsEncryptCertPath} {$remoteCertPath} 2>&1");
+            $copyKey = $ssh->exec("sudo cp {$letsEncryptKeyPath} {$remoteKeyPath} 2>&1");
+
+            // Устанавливаем права доступа
+            $ssh->exec("sudo chmod 644 {$remoteCertPath} 2>&1");
+            $ssh->exec("sudo chmod 600 {$remoteKeyPath} 2>&1");
+            $ssh->exec("sudo chown marzban:marzban {$remoteCertPath} {$remoteKeyPath} 2>&1 || sudo chown \$USER:\$USER {$remoteCertPath} {$remoteKeyPath} 2>&1 || true");
+
+            // Сохраняем пути в БД
+            $panel->tls_certificate_path = $remoteCertPath;
+            $panel->tls_key_path = $remoteKeyPath;
+            $panel->use_tls = $request->has('use_tls') && $request->input('use_tls') == '1';
+            $panel->save();
+
+            $this->logger->info('Let\'s Encrypt сертификат успешно получен и сохранен', [
+                'source' => 'panel',
+                'action' => 'get-letsencrypt-certificate',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'domain' => $domain,
+                'cert_path' => $remoteCertPath,
+                'key_path' => $remoteKeyPath,
+                'use_tls' => $panel->use_tls
+            ]);
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Let\'s Encrypt сертификат успешно получен и сохранен! Не забудьте обновить конфигурацию панели.',
+                    'cert_path' => $remoteCertPath,
+                    'key_path' => $remoteKeyPath
+                ]);
+            }
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'Let\'s Encrypt сертификат успешно получен и сохранен! Не забудьте обновить конфигурацию панели.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ошибка валидации',
+                    'errors' => $e->errors()
+                ], 422);
+            }
+
+            return redirect()->back()
+                ->withErrors($e->errors())
+                ->withInput();
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при получении Let\'s Encrypt сертификата', [
+                'source' => 'panel',
+                'action' => 'get-letsencrypt-certificate',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ошибка при получении сертификата: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return redirect()->back()
+                ->with('error', 'Ошибка при получении сертификата: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Remove TLS certificates for panel (use default).
      *
      * @param Panel $panel
