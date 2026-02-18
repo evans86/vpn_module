@@ -205,92 +205,91 @@
                             <!-- Card Footer -->
                             @if($panel->panel_status !== Panel::PANEL_DELETED)
                                 <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg">
-                                    <div class="grid grid-cols-2 gap-4">
-                                        <!-- Left Side: Navigation Actions -->
-                                        <div class="flex flex-col gap-2">
+                                    <div class="space-y-3">
+                                        <!-- Navigation Actions -->
+                                        <div class="grid grid-cols-2 gap-2">
                                             <a href="{{ route('admin.module.server-users.index', ['panel_id' => $panel->id]) }}"
-                                               class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors w-full">
+                                               class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors">
                                                 <i class="fas fa-users mr-2"></i>
                                                 <span>Пользователи</span>
                                             </a>
                                             @if($panel->panel_status === Panel::PANEL_CONFIGURED)
                                                 <a href="{{ route('admin.module.server-monitoring.index', ['panel_id' => $panel->id]) }}"
-                                                   class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors w-full">
+                                                   class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors">
                                                     <i class="fas fa-chart-line mr-2"></i>
                                                     <span>Статистика</span>
                                                 </a>
+                                            @else
+                                                <div></div>
                                             @endif
                                         </div>
-                                        
-                                        <!-- Right Side: Service Actions -->
-                                        <div class="flex flex-col gap-2">
-                                            <!-- Stable Config Button -->
+
+                                        <!-- Config Type Buttons -->
+                                        <div class="grid grid-cols-2 gap-2">
                                             <form action="{{ route('admin.module.panel.update-config-stable', $panel) }}" method="POST" class="w-full">
                                                 @csrf
                                                 <button type="submit" 
                                                         class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors w-full
-                                                        {{ $panel->config_type === 'stable' ? 'ring-2 ring-blue-500' : '' }}"
+                                                        {{ $panel->config_type === 'stable' ? 'ring-2 ring-blue-500 shadow-sm' : '' }}"
                                                         title="Стабильный конфиг (без REALITY) - максимальная надежность">
                                                     <i class="fas fa-shield-alt mr-2"></i>
                                                     <span>Стабильный</span>
                                                 </button>
                                             </form>
-                                            
-                                            <!-- REALITY Config Button -->
                                             <form action="{{ route('admin.module.panel.update-config-reality', $panel) }}" method="POST" class="w-full">
                                                 @csrf
                                                 <button type="submit" 
                                                         class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 transition-colors w-full
-                                                        {{ $panel->config_type === 'reality' ? 'ring-2 ring-green-500' : '' }}"
+                                                        {{ $panel->config_type === 'reality' ? 'ring-2 ring-green-500 shadow-sm' : '' }}"
                                                         title="Конфиг с REALITY - лучший обход блокировок">
                                                     <i class="fas fa-rocket mr-2"></i>
                                                     <span>REALITY</span>
                                                 </button>
                                             </form>
-                                            
-                                            <!-- TLS Toggle Button -->
+                                        </div>
+
+                                        <!-- TLS Actions -->
+                                        <div class="grid grid-cols-2 gap-2">
                                             @if($panel->tls_certificate_path && $panel->tls_key_path)
                                                 <button type="button" 
                                                         onclick="toggleTls({{ $panel->id }}, {{ $panel->use_tls ? 'true' : 'false' }})"
-                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md {{ $panel->use_tls ? 'text-green-700 bg-green-50 hover:bg-green-100 border-green-200' : 'text-gray-700 bg-gray-50 hover:bg-gray-100 border-gray-200' }} border transition-colors w-full
-                                                        {{ $panel->use_tls ? 'ring-2 ring-green-500' : '' }}"
+                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md {{ $panel->use_tls ? 'text-green-700 bg-green-50 hover:bg-green-100 border-green-200' : 'text-gray-700 bg-gray-50 hover:bg-gray-100 border-gray-200' }} border transition-colors
+                                                        {{ $panel->use_tls ? 'ring-2 ring-green-500 shadow-sm' : '' }}"
                                                         title="{{ $panel->use_tls ? 'Выключить TLS' : 'Включить TLS' }}">
                                                     <i class="fas {{ $panel->use_tls ? 'fa-lock' : 'fa-unlock' }} mr-2"></i>
                                                     <span>TLS {{ $panel->use_tls ? 'ON' : 'OFF' }}</span>
                                                 </button>
-                                            @else
-                                                <button type="button" 
-                                                        onclick="openCertificatesModal({{ $panel->id }}, 'no', false, '{{ $panel->panel_adress }}')"
-                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors w-full"
-                                                        title="Получить TLS сертификат Let's Encrypt">
-                                                    <i class="fas fa-certificate mr-2"></i>
-                                                    <span>TLS</span>
-                                                </button>
-                                            @endif
-                                            
-                                            <!-- TLS Settings Button (если сертификаты есть) -->
-                                            @if($panel->tls_certificate_path && $panel->tls_key_path)
                                                 <button type="button" 
                                                         onclick="openCertificatesModal({{ $panel->id }}, 'yes', {{ $panel->use_tls ? 'true' : 'false' }}, '{{ $panel->panel_adress }}')"
-                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors w-full"
+                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors"
                                                         title="Настроить TLS сертификаты">
                                                     <i class="fas fa-cog mr-2"></i>
                                                     <span>Настройки</span>
                                                 </button>
+                                            @else
+                                                <button type="button" 
+                                                        onclick="openCertificatesModal({{ $panel->id }}, 'no', false, '{{ $panel->panel_adress }}')"
+                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors col-span-2"
+                                                        title="Получить TLS сертификат Let's Encrypt">
+                                                    <i class="fas fa-certificate mr-2"></i>
+                                                    <span>Получить TLS сертификат</span>
+                                                </button>
                                             @endif
-                                            
-                                            <!-- Exclude from Rotation Button -->
+                                        </div>
+
+                                        <!-- Management Actions -->
+                                        <div class="grid grid-cols-2 gap-2">
                                             <button type="button" 
                                                     onclick="toggleRotationExclusion({{ $panel->id }}, {{ $panel->excluded_from_rotation ? 'true' : 'false' }})"
-                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md {{ $panel->excluded_from_rotation ? 'text-yellow-700 bg-yellow-50 hover:bg-yellow-100 border-yellow-200' : 'text-gray-700 bg-gray-50 hover:bg-gray-100 border-gray-200' }} border transition-colors w-full"
+                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md {{ $panel->excluded_from_rotation ? 'text-yellow-700 bg-yellow-50 hover:bg-yellow-100 border-yellow-200' : 'text-gray-700 bg-gray-50 hover:bg-gray-100 border-gray-200' }} border transition-colors
+                                                    {{ $panel->excluded_from_rotation ? 'ring-2 ring-yellow-500 shadow-sm' : '' }}"
                                                     title="{{ $panel->excluded_from_rotation ? 'Включить в ротацию' : 'Исключить из ротации (для тестирования)' }}">
                                                 <i class="fas {{ $panel->excluded_from_rotation ? 'fa-check-circle' : 'fa-ban' }} mr-2"></i>
                                                 <span>{{ $panel->excluded_from_rotation ? 'В ротации' : 'Исключить' }}</span>
                                             </button>
-                                            
                                             <button type="button" 
                                                     onclick="deletePanel({{ $panel->id }})"
-                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors w-full">
+                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors">
                                                 <i class="fas fa-trash mr-2"></i>
                                                 <span>Удалить</span>
                                             </button>
