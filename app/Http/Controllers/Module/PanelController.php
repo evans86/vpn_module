@@ -363,9 +363,15 @@ class PanelController extends Controller
             // Обновляем пути в БД
             $panel->tls_certificate_path = storage_path('app/' . $certPath);
             $panel->tls_key_path = storage_path('app/' . $keyPath);
-            // Обновляем настройку use_tls из формы
-            $panel->use_tls = $request->has('use_tls') && $request->input('use_tls') == '1';
+            // Обновляем настройку use_tls из формы (если чекбокс отмечен)
+            if ($request->has('use_tls') && $request->input('use_tls') == '1') {
+                $panel->use_tls = true;
+            }
+            // Если чекбокс не был отмечен, оставляем use_tls как есть (не меняем на false)
             $panel->save();
+            
+            // Обновляем модель из БД для корректного отображения
+            $panel->refresh();
 
             $this->logger->info('TLS сертификаты загружены для панели', [
                 'source' => 'panel',

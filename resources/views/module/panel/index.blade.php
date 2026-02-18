@@ -579,32 +579,31 @@
             $('#certificatesForm').on('submit', function(e) {
                 e.preventDefault();
                 
+                const form = $(this);
                 const formData = new FormData(this);
                 
                 $.ajax({
-                    url: $(this).attr('action'),
+                    url: form.attr('action'),
                     method: 'POST',
                     data: formData,
                     processData: false,
                     contentType: false,
-                    success: function (response) {
-                        toastr.success('Сертификаты успешно загружены');
+                    success: function(response) {
+                        toastr.success(response.message || 'Сертификаты успешно загружены');
+                        // Закрываем модальное окно
                         window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'certificatesModal' } }));
+                        // Перезагружаем страницу для обновления статуса
                         setTimeout(() => {
                             window.location.reload();
-                        }, 1000);
+                        }, 500);
                     },
-                    error: function (xhr) {
+                    error: function(xhr) {
                         let errorMessage = 'Произошла ошибка при загрузке сертификатов';
                         if (xhr.responseJSON) {
+                            errorMessage = xhr.responseJSON.message || errorMessage;
                             if (xhr.responseJSON.errors) {
-                                let errors = [];
-                                $.each(xhr.responseJSON.errors, function(key, value) {
-                                    errors.push(value[0]);
-                                });
-                                errorMessage = errors.join('<br>');
-                            } else {
-                                errorMessage = xhr.responseJSON.message || errorMessage;
+                                const errors = Object.values(xhr.responseJSON.errors).flat();
+                                errorMessage = errors.join(', ');
                             }
                         }
                         toastr.error(errorMessage);
