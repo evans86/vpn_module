@@ -199,21 +199,13 @@ class VpnConfigController extends Controller
             }
 
             $userAgent = request()->header('User-Agent') ?? 'Unknown';
-            Log::warning('Incoming request with User-Agent:', ['User-Agent' => $userAgent]);
 
             // Определяем тип клиента
             $isVpnClient = $this->isVpnClient($userAgent);
             $isBrowser = $this->isBrowserClient($userAgent);
 
-            Log::warning('Client detection:', [
-                'is_vpn_client' => $isVpnClient,
-                'is_browser' => $isBrowser,
-                'wants_json' => request()->wantsJson()
-            ]);
-
             // Если это VPN клиент или запрос JSON - возвращаем конфигурацию
             if ($isVpnClient || request()->wantsJson()) {
-                Log::warning('Returning config for VPN client/JSON');
                 return response(implode("\n", $connectionKeys))
                     ->header('Content-Type', 'text/plain');
             }
@@ -224,7 +216,6 @@ class VpnConfigController extends Controller
             }
 
             // По умолчанию для неизвестных клиентов возвращаем конфигурацию
-            Log::warning('Returning config for unknown client type');
             return response(implode("\n", $connectionKeys))
                 ->header('Content-Type', 'text/plain');
 
@@ -333,26 +324,8 @@ class VpnConfigController extends Controller
             // Получаем актуальные данные пользователя из Marzban
             $userData = $marzbanApi->getUser($panel->auth_token, $serverUser->id);
 
-            // Логируем, что вернул Marzban API
-            Log::info('Marzban API getUser response', [
-                'user_id' => $serverUser->id,
-                'panel_id' => $panel->id,
-                'has_links' => !empty($userData['links']),
-                'links_count' => !empty($userData['links']) ? count($userData['links']) : 0,
-                'links' => !empty($userData['links']) ? $userData['links'] : null,
-                'has_subscription_url' => !empty($userData['subscription_url']),
-                'source' => 'vpn'
-            ]);
-
             // Если links есть, но их мало (меньше 10 для REALITY), обновляем пользователя с правильными inbounds
             if (!empty($userData['links']) && $panel->config_type === 'reality' && count($userData['links']) < 10) {
-                Log::info('Few links detected for REALITY config, updating user inbounds to include REALITY protocols', [
-                    'user_id' => $serverUser->id,
-                    'panel_id' => $panel->id,
-                    'current_links_count' => count($userData['links']),
-                    'source' => 'vpn'
-                ]);
-
                 try {
                     // Определяем все inbounds для REALITY конфигурации
                     $realityInbounds = [
@@ -381,13 +354,6 @@ class VpnConfigController extends Controller
 
                     // Получаем обновленные данные пользователя
                     $userData = $marzbanApi->getUser($panel->auth_token, $serverUser->id);
-
-                    Log::info('User inbounds updated for REALITY config', [
-                        'user_id' => $serverUser->id,
-                        'panel_id' => $panel->id,
-                        'new_links_count' => !empty($userData['links']) ? count($userData['links']) : 0,
-                        'source' => 'vpn'
-                    ]);
                 } catch (Exception $e) {
                     Log::warning('Failed to update user inbounds for REALITY', [
                         'user_id' => $serverUser->id,
@@ -403,12 +369,6 @@ class VpnConfigController extends Controller
             if (!empty($userData['links'])) {
                 $serverUser->keys = json_encode($userData['links']);
                 $serverUser->save();
-
-                Log::info('User links updated from panel', [
-                    'user_id' => $serverUser->id,
-                    'links_count' => count($userData['links']),
-                    'source' => 'vpn'
-                ]);
                 return $userData['links'];
             }
 
@@ -488,7 +448,6 @@ class VpnConfigController extends Controller
 
         foreach ($vpnPatterns as $pattern) {
             if (str_contains($userAgentLower, $pattern)) {
-                Log::warning('VPN pattern matched:', ['pattern' => $pattern, 'user_agent' => $userAgentLower]);
                 return true;
             }
         }
@@ -668,30 +627,15 @@ class VpnConfigController extends Controller
             }
 
             // ШАГ 1: Проверяем finish_at из БД (локальная дата, может быть изменена в админке)
-            Log::info('🔍 Проверка finish_at перед получением данных из Marzban', [
-                'key_id' => $keyActivate->id,
-                'current_status' => $keyActivate->status,
-                'finish_at' => $keyActivate->finish_at,
-                'finish_at_date' => $keyActivate->finish_at ? date('Y-m-d H:i:s', $keyActivate->finish_at) : null,
-                'source' => 'vpn'
-            ]);
-
             $keyActivate = $this->keyActivateService->checkAndUpdateStatus($keyActivate);
 
             // ШАГ 2: Получаем данные из Marzban API (expire из панели)
             $panel_strategy = new PanelStrategy($serverUser->panel->panel);
             $info = $panel_strategy->getSubscribeInfo($serverUser->panel->id, $serverUser->id);
 
-            Log::info('Panel info retrieved:', ['info' => $info, 'source' => 'vpn']);
-
             // ШАГ 3: Если статус ключа был обновлен в getUserSubscribeInfo, перезагружаем модель
             if (isset($info['key_status_updated']) && $info['key_status_updated'] === true) {
                 $keyActivate->refresh();
-                Log::info('🔄 KeyActivate перезагружен из БД после обновления статуса из Marzban', [
-                    'key_id' => $keyActivate->id,
-                    'new_status' => $keyActivate->status,
-                    'source' => 'vpn'
-                ]);
             }
 
             // Получаем данные из KeyActivate (который уже загружен с отношениями)
@@ -699,14 +643,6 @@ class VpnConfigController extends Controller
             $salesman = $packSalesman->salesman ?? null;
 
             $finishAt = $keyActivate->finish_at ?? null;
-
-            Log::info('KeyActivate data retrieved', [
-                'key_activate_id' => $keyActivate->id,
-                'finish_at' => $finishAt,
-                'finish_at_type' => gettype($finishAt),
-                'finish_at_value' => $finishAt,
-                'source' => 'vpn'
-            ]);
 
             $daysRemaining = null;
             if ($finishAt && $finishAt > 0) {
@@ -722,21 +658,6 @@ class VpnConfigController extends Controller
                 'expiration_date' => $finishAt,
                 'days_remaining' => $daysRemaining
             ];
-
-            Log::info('📊 Сформированы данные для отображения', [
-                'key_id' => $keyActivate->id,
-                'key_status_db' => $keyActivate->status,
-                'key_status_name' => $keyActivate->status === \App\Models\KeyActivate\KeyActivate::EXPIRED ? 'EXPIRED' :
-                                    ($keyActivate->status === \App\Models\KeyActivate\KeyActivate::ACTIVE ? 'ACTIVE' : 'OTHER'),
-                'marzban_status' => $info['status'] ?? 'unknown',
-                'used_traffic_bytes' => $info['used_traffic'] ?? 0,
-                'used_traffic_gb' => isset($info['used_traffic']) ? round($info['used_traffic'] / (1024*1024*1024), 2) : 0,
-                'data_limit_gb' => isset($info['data_limit']) ? round($info['data_limit'] / (1024*1024*1024), 2) : 0,
-                'finish_at' => $finishAt,
-                'finish_at_date' => $finishAt ? date('Y-m-d H:i:s', $finishAt) : null,
-                'days_remaining' => $daysRemaining,
-                'source' => 'vpn'
-            ]);
 
             // Форматируем ключи для отображения
             $formattedKeys = $this->formatConnectionKeys($connectionKeys);
@@ -804,11 +725,6 @@ class VpnConfigController extends Controller
                                 // Если статус нового ключа был обновлен в getUserSubscribeInfo, перезагружаем модель
                                 if (isset($newInfo['key_status_updated']) && $newInfo['key_status_updated'] === true) {
                                     $newKeyActivate->refresh();
-                                    Log::info('🔄 Новый KeyActivate перезагружен после обновления статуса из Marzban', [
-                                        'key_id' => $newKeyActivate->id,
-                                        'new_status' => $newKeyActivate->status,
-                                        'source' => 'vpn'
-                                    ]);
                                 }
 
                                 $newFinishAt = $newKeyActivate->finish_at ?? null;
@@ -838,7 +754,6 @@ class VpnConfigController extends Controller
                 }
             }
 
-            Log::warning('Returning browser page');
             return response()->view('vpn.config', compact(
                 'keyActivate',      // ← ДОБАВЛЕНО: передаем ключ со статусом из БД
                 'userInfo',
@@ -1044,15 +959,7 @@ class VpnConfigController extends Controller
             ]
         ];
 
-        // Логируем входящие ссылки для диагностики
-        Log::info('Formatting connection keys', [
-            'total_keys' => count($connectionKeys),
-            'keys_preview' => array_slice($connectionKeys, 0, 5), // Первые 5 для примера
-            'source' => 'vpn'
-        ]);
-
         $formattedKeys = [];
-        $skippedKeys = [];
         foreach ($connectionKeys as $configString) {
             // Удаляем экранирование слешей
             $configString = stripslashes($configString);
@@ -1078,19 +985,8 @@ class VpnConfigController extends Controller
                     'link' => addslashes($configString),
                     'connection_type' => $connectionType
                 ];
-            } else {
-                // Логируем пропущенные ссылки
-                $skippedKeys[] = substr($configString, 0, 100); // Первые 100 символов
             }
         }
-
-        // Логируем результат форматирования
-        Log::info('Connection keys formatted', [
-            'formatted_count' => count($formattedKeys),
-            'skipped_count' => count($skippedKeys),
-            'skipped_preview' => array_slice($skippedKeys, 0, 3), // Первые 3 пропущенных
-            'source' => 'vpn'
-        ]);
 
         return $formattedKeys;
     }

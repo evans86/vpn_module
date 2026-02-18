@@ -1008,44 +1008,17 @@ class MarzbanService
                 $certExists = @file_exists($panel->tls_certificate_path);
                 $keyExists = @file_exists($panel->tls_key_path);
                 
-                Log::info('Проверка локальных путей к сертификатам', [
-                    'panel_id' => $panel->id,
-                    'cert_path' => $panel->tls_certificate_path,
-                    'key_path' => $panel->tls_key_path,
-                    'cert_exists' => $certExists,
-                    'key_exists' => $keyExists,
-                    'source' => 'panel'
-                ]);
-                
                 // Если файлы существуют - используем их
                 if ($certExists && $keyExists) {
                     return [
                         'cert' => $panel->tls_certificate_path,
                         'key' => $panel->tls_key_path
                     ];
-                } else {
-                    // Если локальные файлы не найдены, используем пути из конфигурации
-                    Log::warning('Локальные файлы сертификатов не найдены, используем пути из конфигурации', [
-                        'panel_id' => $panel->id,
-                        'cert_path' => $panel->tls_certificate_path,
-                        'key_path' => $panel->tls_key_path,
-                        'fallback_cert' => config('marzban.tls_certificate_path', '/var/lib/marzban/certificates/cert.pem'),
-                        'fallback_key' => config('marzban.tls_key_path', '/var/lib/marzban/certificates/key.pem'),
-                        'source' => 'panel'
-                    ]);
                 }
             } else {
                 // Для удаленных путей (на сервере Marzban) не проверяем существование
                 // так как open_basedir не позволяет это сделать
                 // Полагаемся на то, что файлы были скопированы через SFTP
-                Log::info('Использование удаленных путей к сертификатам (на сервере Marzban)', [
-                    'panel_id' => $panel->id,
-                    'cert_path' => $panel->tls_certificate_path,
-                    'key_path' => $panel->tls_key_path,
-                    'note' => 'Проверка существования файлов пропущена из-за open_basedir ограничений',
-                    'source' => 'panel'
-                ]);
-                
                 return [
                     'cert' => $panel->tls_certificate_path,
                     'key' => $panel->tls_key_path
@@ -1081,11 +1054,6 @@ class MarzbanService
                     $certExists = @file_exists($certPaths['cert']);
                     $keyExists = @file_exists($certPaths['key']);
                     if (!$certExists || !$keyExists) {
-                        Log::warning('TLS required for protocol but certificates not found, using none', [
-                            'panel_id' => $panel->id,
-                            'force_tls' => $forceTls,
-                            'source' => 'panel'
-                        ]);
                         return ['security' => 'none'];
                     }
                 }
@@ -1117,31 +1085,6 @@ class MarzbanService
                         'security' => 'none'
                     ];
                 }
-                
-                Log::info('TLS settings applied for panel (local paths)', [
-                    'panel_id' => $panel->id,
-                    'use_tls' => $panel->use_tls,
-                    'force_tls' => $forceTls,
-                    'cert_path' => $certPaths['cert'],
-                    'key_path' => $certPaths['key'],
-                    'cert_exists' => $certExists,
-                    'key_exists' => $keyExists,
-                    'source' => 'panel'
-                ]);
-            } else {
-                // Для удаленных путей (на сервере Marzban) не проверяем существование
-                // так как open_basedir не позволяет это сделать
-                // Полагаемся на то, что файлы были скопированы через SFTP
-                // Если файлы не существуют, Marzban вернет ошибку при применении конфигурации
-                Log::info('TLS settings applied for panel (remote paths)', [
-                    'panel_id' => $panel->id,
-                    'use_tls' => $panel->use_tls,
-                    'force_tls' => $forceTls,
-                    'cert_path' => $certPaths['cert'],
-                    'key_path' => $certPaths['key'],
-                    'note' => 'Файлы находятся на удаленном сервере, проверка невозможна из-за open_basedir',
-                    'source' => 'panel'
-                ]);
             }
             
             // Получаем домен из адреса панели для SNI
@@ -1175,11 +1118,6 @@ class MarzbanService
             // Добавляем SNI, если домен определен
             if ($sni) {
                 $tlsSettings['serverName'] = $sni;
-                Log::info('SNI добавлен в TLS настройки', [
-                    'source' => 'panel',
-                    'panel_id' => $panel->id,
-                    'sni' => $sni
-                ]);
             }
             
             return [
@@ -1189,15 +1127,6 @@ class MarzbanService
         }
 
         // По умолчанию используем none для обратной совместимости
-        Log::info('TLS not enabled for panel, using security=none', [
-            'panel_id' => $panel ? $panel->id : null,
-            'use_tls' => $panel ? $panel->use_tls : null,
-            'has_cert' => $panel && $panel->tls_certificate_path ? 'yes' : 'no',
-            'has_key' => $panel && $panel->tls_key_path ? 'yes' : 'no',
-            'cert_path' => $panel ? $panel->tls_certificate_path : null,
-            'key_path' => $panel ? $panel->tls_key_path : null,
-            'source' => 'panel'
-        ]);
         
         return [
             'security' => 'none'
