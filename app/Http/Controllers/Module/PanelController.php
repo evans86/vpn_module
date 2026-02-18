@@ -824,15 +824,71 @@ class PanelController extends Controller
     public function removeCertificates(Panel $panel)
     {
         try {
-            // Удаляем файлы сертификатов
-            if ($panel->tls_certificate_path && file_exists($panel->tls_certificate_path)) {
+            // Проверяем, является ли путь локальным или удаленным
+            $isLocalCertPath = $panel->tls_certificate_path && (
+                str_starts_with($panel->tls_certificate_path, storage_path()) || 
+                str_starts_with($panel->tls_certificate_path, base_path())
+            );
+            
+            $isLocalKeyPath = $panel->tls_key_path && (
+                str_starts_with($panel->tls_key_path, storage_path()) || 
+                str_starts_with($panel->tls_key_path, base_path())
+            );
+
+            // Удаляем локальные файлы сертификатов
+            if ($isLocalCertPath && $panel->tls_certificate_path && @file_exists($panel->tls_certificate_path)) {
                 @unlink($panel->tls_certificate_path);
+                $this->logger->info('Локальный сертификат удален', [
+                    'source' => 'panel',
+                    'panel_id' => $panel->id,
+                    'path' => $panel->tls_certificate_path
+                ]);
             }
-            if ($panel->tls_key_path && file_exists($panel->tls_key_path)) {
+            
+            if ($isLocalKeyPath && $panel->tls_key_path && @file_exists($panel->tls_key_path)) {
                 @unlink($panel->tls_key_path);
+                $this->logger->info('Локальный ключ удален', [
+                    'source' => 'panel',
+                    'panel_id' => $panel->id,
+                    'path' => $panel->tls_key_path
+                ]);
             }
 
-            // Удаляем директорию если пуста
+            // Для удаленных путей (на сервере Marzban) пытаемся удалить через SSH
+            if (!$isLocalCertPath && $panel->tls_certificate_path) {
+                try {
+                    $panel->load('server');
+                    if ($panel->server) {
+                        $serverDto = ServerFactory::fromEntity($panel->server);
+                        $marzbanService = app(MarzbanService::class);
+                        $ssh = $marzbanService->connectSshAdapter($serverDto);
+                        
+                        // Удаляем файлы на удаленном сервере
+                        if ($panel->tls_certificate_path) {
+                            $ssh->exec("sudo rm -f " . escapeshellarg($panel->tls_certificate_path) . " 2>&1");
+                        }
+                        if ($panel->tls_key_path) {
+                            $ssh->exec("sudo rm -f " . escapeshellarg($panel->tls_key_path) . " 2>&1");
+                        }
+                        
+                        $this->logger->info('Удаленные сертификаты удалены через SSH', [
+                            'source' => 'panel',
+                            'panel_id' => $panel->id,
+                            'cert_path' => $panel->tls_certificate_path,
+                            'key_path' => $panel->tls_key_path
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    // Логируем ошибку, но продолжаем - главное очистить БД
+                    $this->logger->warning('Не удалось удалить файлы на удаленном сервере', [
+                        'source' => 'panel',
+                        'panel_id' => $panel->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            // Удаляем локальную директорию если пуста
             $certDir = storage_path('app/certificates/' . $panel->id);
             if (is_dir($certDir) && count(scandir($certDir)) == 2) {
                 @rmdir($certDir);
@@ -841,6 +897,7 @@ class PanelController extends Controller
             // Очищаем пути в БД
             $panel->tls_certificate_path = null;
             $panel->tls_key_path = null;
+            $panel->use_tls = false;
             $panel->save();
 
             $this->logger->info('TLS сертификаты удалены для панели', [
