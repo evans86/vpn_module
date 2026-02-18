@@ -655,12 +655,21 @@ class PanelController extends Controller
     {
         try {
             $request->validate([
-                'domain' => 'required|string|max:255',
+                'domain' => 'nullable|string|max:255',
                 'email' => 'nullable|email|max:255',
+                'use_tls' => 'nullable|boolean',
                 'validation_method' => 'nullable|in:http,dns'
             ]);
 
-            $domain = trim($request->input('domain'));
+            // Автоматически определяем домен из адреса панели
+            $domain = trim($request->input('domain', ''));
+            if (empty($domain)) {
+                $domain = parse_url($panel->panel_adress, PHP_URL_HOST);
+                if (empty($domain)) {
+                    throw new \RuntimeException('Не удалось определить домен из адреса панели. Укажите домен вручную.');
+                }
+            }
+            
             $email = trim($request->input('email', ''));
             
             // Если email не указан, генерируем его из домена
@@ -803,8 +812,14 @@ class PanelController extends Controller
             // Сохраняем пути в БД
             $panel->tls_certificate_path = $remoteCertPath;
             $panel->tls_key_path = $remoteKeyPath;
-            $panel->use_tls = $request->has('use_tls') && $request->input('use_tls') == '1';
+            
+            // Обновляем настройку use_tls из формы (если чекбокс отмечен)
+            if ($request->has('use_tls') && $request->input('use_tls') == '1') {
+                $panel->use_tls = true;
+            }
+            
             $panel->save();
+            $panel->refresh();
 
             $this->logger->info('Let\'s Encrypt сертификат успешно получен и сохранен', [
                 'source' => 'panel',

@@ -260,9 +260,9 @@
                                                 </button>
                                             @else
                                                 <button type="button" 
-                                                        onclick="openCertificatesModal({{ $panel->id }}, 'no', false)"
+                                                        onclick="openCertificatesModal({{ $panel->id }}, 'no', false, '{{ $panel->panel_adress }}')"
                                                         class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors w-full"
-                                                        title="Загрузить TLS сертификаты">
+                                                        title="Получить TLS сертификат Let's Encrypt">
                                                     <i class="fas fa-certificate mr-2"></i>
                                                     <span>TLS</span>
                                                 </button>
@@ -271,7 +271,7 @@
                                             <!-- TLS Settings Button (если сертификаты есть) -->
                                             @if($panel->tls_certificate_path && $panel->tls_key_path)
                                                 <button type="button" 
-                                                        onclick="openCertificatesModal({{ $panel->id }}, 'yes', {{ $panel->use_tls ? 'true' : 'false' }})"
+                                                        onclick="openCertificatesModal({{ $panel->id }}, 'yes', {{ $panel->use_tls ? 'true' : 'false' }}, '{{ $panel->panel_adress }}')"
                                                         class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors w-full"
                                                         title="Настроить TLS сертификаты">
                                                     <i class="fas fa-cog mr-2"></i>
@@ -339,9 +339,9 @@
         </x-slot>
     </x-admin.modal>
 
-    <!-- Modal: Upload TLS Certificates -->
-    <x-admin.modal id="certificatesModal" title="Настройка TLS сертификатов">
-        <form id="certificatesForm" method="POST" enctype="multipart/form-data">
+    <!-- Modal: Get Let's Encrypt Certificate -->
+    <x-admin.modal id="certificatesModal" title="Получение TLS сертификата Let's Encrypt">
+        <form id="certificatesForm" method="POST">
             @csrf
             <div id="certificatesStatus" class="mb-4 p-3 rounded-md bg-gray-50 border border-gray-200">
                 <p class="text-sm text-gray-600">
@@ -350,47 +350,37 @@
                 </p>
             </div>
 
-            <!-- Tabs: Manual Upload / Let's Encrypt -->
-            <div class="mb-4 border-b border-gray-200">
-                <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                    <button type="button" 
-                            onclick="switchCertificateTab('manual')"
-                            id="tab-manual"
-                            class="tab-button border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm active">
-                        <i class="fas fa-upload mr-2"></i>Ручная загрузка
-                    </button>
-                    <button type="button" 
-                            onclick="switchCertificateTab('letsencrypt')"
-                            id="tab-letsencrypt"
-                            class="tab-button border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
-                        <i class="fas fa-certificate mr-2"></i>Let's Encrypt (автоматически)
-                    </button>
-                </nav>
+            <div class="mb-4 p-3 rounded-md bg-green-50 border border-green-200">
+                <p class="text-sm text-green-800">
+                    <i class="fas fa-magic mr-2"></i>
+                    <strong>Автоматическое получение:</strong> Система автоматически получит валидный сертификат Let's Encrypt для вашего домена.
+                </p>
             </div>
 
-            <!-- Manual Upload Section -->
-            <div class="mb-4" id="certificateUploadSection">
-                <label for="certificate" class="block text-sm font-medium text-gray-700 mb-1">
-                    Сертификат (cert.pem или cert.crt)
+            <div class="mb-4">
+                <label for="domain" class="block text-sm font-medium text-gray-700 mb-1">
+                    Домен
                 </label>
-                <input type="file" 
-                       id="certificate" 
-                       name="certificate" 
-                       accept=".pem,.crt"
-                       class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
-                <p class="mt-1 text-xs text-gray-500">Формат: PEM или CRT, максимум 10MB</p>
+                <input type="text" 
+                       id="domain" 
+                       name="domain" 
+                       readonly
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-100 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                <p class="mt-1 text-xs text-gray-500">
+                    Домен автоматически определяется из адреса панели. Если нужно изменить, отредактируйте адрес панели.
+                </p>
             </div>
 
-            <div class="mb-4" id="keyUploadSection">
-                <label for="key" class="block text-sm font-medium text-gray-700 mb-1">
-                    Приватный ключ (key.pem или key.key)
+            <div class="mb-4">
+                <label for="email" class="block text-sm font-medium text-gray-700 mb-1">
+                    Email (опционально)
                 </label>
-                <input type="file" 
-                       id="key" 
-                       name="key" 
-                       accept=".pem,.key"
-                       class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
-                <p class="mt-1 text-xs text-gray-500">Формат: PEM или KEY, максимум 10MB</p>
+                <input type="email" 
+                       id="email" 
+                       name="email" 
+                       placeholder="admin@домен"
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                <p class="mt-1 text-xs text-gray-500">Email для уведомлений от Let's Encrypt. По умолчанию: admin@домен</p>
             </div>
 
             <div class="mb-4" id="useTlsSection">
@@ -409,50 +399,10 @@
                 </p>
             </div>
 
-            <!-- Let's Encrypt Section -->
-            <div class="mb-4 hidden" id="letsencryptSection">
-                <div class="mb-4 p-3 rounded-md bg-green-50 border border-green-200">
-                    <p class="text-sm text-green-800">
-                        <i class="fas fa-magic mr-2"></i>
-                        <strong>Автоматическое получение:</strong> Система автоматически получит валидный сертификат Let's Encrypt для вашего домена.
-                    </p>
-                </div>
-
-                <div class="mb-4">
-                    <label for="domain" class="block text-sm font-medium text-gray-700 mb-1">
-                        Домен <span class="text-red-500">*</span>
-                    </label>
-                    <input type="text" 
-                           id="domain" 
-                           name="domain" 
-                           placeholder="vpn-telegram.com или panel.vpn-telegram.com"
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    <p class="mt-1 text-xs text-gray-500">
-                        <strong>Важно:</strong> Домен должен указывать на IP сервера с панелью Marzban, а не на сервер Laravel!
-                    </p>
-                    <p class="mt-1 text-xs text-yellow-600">
-                        <i class="fas fa-exclamation-triangle mr-1"></i>
-                        Если используете основной домен (vpn-telegram.com), который указывает на сервер Laravel, создайте поддомен (например, panel.vpn-telegram.com) и укажите его на IP сервера с панелью.
-                    </p>
-                </div>
-
-                <div class="mb-4">
-                    <label for="email" class="block text-sm font-medium text-gray-700 mb-1">
-                        Email (опционально)
-                    </label>
-                    <input type="email" 
-                           id="email" 
-                           name="email" 
-                           placeholder="admin@vpn-telegram.com"
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    <p class="mt-1 text-xs text-gray-500">Email для уведомлений от Let's Encrypt. По умолчанию: admin@домен</p>
-                </div>
-            </div>
-
-            <div class="mb-4 p-3 rounded-md bg-blue-50 border border-blue-200">
-                <p class="text-sm text-blue-800">
-                    <i class="fas fa-lightbulb mr-2"></i>
-                    <strong>Совет:</strong> Если не загрузить сертификаты, будут использоваться настройки по умолчанию из конфигурации.
+            <div class="mb-4 p-3 rounded-md bg-yellow-50 border border-yellow-200">
+                <p class="text-sm text-yellow-800">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    <strong>Важно:</strong> Убедитесь, что домен указывает на IP сервера с панелью Marzban, а не на сервер Laravel! Порт 80 должен быть открыт для HTTP-валидации.
                 </p>
             </div>
         </form>
@@ -482,70 +432,50 @@
     <script>
         let currentPanelId = null;
 
-        function openCertificatesModal(panelId, hasCertificates, useTls) {
+        function openCertificatesModal(panelId, hasCertificates, useTls, panelAddress) {
             currentPanelId = panelId;
             const form = document.getElementById('certificatesForm');
-            form.action = '{{ route('admin.module.panel.upload-certificates', ['panel' => ':id']) }}'.replace(':id', panelId);
+            form.action = '{{ route('admin.module.panel.get-letsencrypt-certificate', ['panel' => ':id']) }}'.replace(':id', panelId);
             
             const statusDiv = document.getElementById('certificatesStatus');
             const statusText = document.getElementById('statusText');
             const removeBtn = document.getElementById('removeCertificatesBtn');
             const useTlsCheckbox = form.querySelector('input[name="use_tls"]');
+            const domainInput = form.querySelector('input[name="domain"]');
             
-            const useTlsSection = document.getElementById('useTlsSection');
+            // Автоматически определяем домен из адреса панели
+            let domain = '';
+            try {
+                const url = new URL(panelAddress);
+                domain = url.hostname;
+            } catch (e) {
+                // Если не удалось распарсить URL, пробуем извлечь домен другим способом
+                const match = panelAddress.match(/(?:https?:\/\/)?([^\/]+)/);
+                if (match) {
+                    domain = match[1].split(':')[0]; // Убираем порт если есть
+                }
+            }
             
-            const certificateUploadSection = document.getElementById('certificateUploadSection');
-            const keyUploadSection = document.getElementById('keyUploadSection');
+            if (domainInput) {
+                domainInput.value = domain;
+            }
             
             // Сбрасываем форму перед открытием
             form.reset();
             
-            // Инициализируем вкладку "manual" по умолчанию
-            switchCertificateTab('manual');
+            // Восстанавливаем домен и use_tls
+            if (domainInput) {
+                domainInput.value = domain;
+            }
             
             if (hasCertificates === 'yes') {
                 statusDiv.className = 'mb-4 p-3 rounded-md bg-green-50 border border-green-200';
                 statusText.innerHTML = '<i class="fas fa-check-circle mr-2 text-green-600"></i>Сертификаты настроены для этой панели';
                 removeBtn.style.display = 'inline-flex';
-                if (useTlsSection) {
-                    useTlsSection.style.display = 'block';
-                }
-                // Скрываем поля загрузки, если сертификаты уже есть
-                if (certificateUploadSection) {
-                    certificateUploadSection.style.display = 'none';
-                }
-                if (keyUploadSection) {
-                    keyUploadSection.style.display = 'none';
-                }
-                // Меняем текст кнопки
-                const submitBtn = document.getElementById('submitCertificatesBtn');
-                const submitBtnText = document.getElementById('submitBtnText');
-                if (submitBtn && submitBtnText) {
-                    submitBtnText.textContent = 'Обновить настройки';
-                    submitBtn.querySelector('i').className = 'fas fa-save mr-2';
-                }
             } else {
                 statusDiv.className = 'mb-4 p-3 rounded-md bg-yellow-50 border border-yellow-200';
                 statusText.innerHTML = '<i class="fas fa-exclamation-triangle mr-2 text-yellow-600"></i>Сертификаты не настроены, используются настройки по умолчанию';
                 removeBtn.style.display = 'none';
-                // Показываем чекбокс даже при первой загрузке
-                if (useTlsSection) {
-                    useTlsSection.style.display = 'block';
-                }
-                // Показываем поля загрузки, если сертификатов нет
-                if (certificateUploadSection) {
-                    certificateUploadSection.style.display = 'block';
-                }
-                if (keyUploadSection) {
-                    keyUploadSection.style.display = 'block';
-                }
-                // Меняем текст кнопки
-                const submitBtn = document.getElementById('submitCertificatesBtn');
-                const submitBtnText = document.getElementById('submitBtnText');
-                if (submitBtn && submitBtnText) {
-                    submitBtnText.textContent = 'Загрузить';
-                    submitBtn.querySelector('i').className = 'fas fa-upload mr-2';
-                }
             }
             
             // Устанавливаем значение use_tls
@@ -553,11 +483,12 @@
                 useTlsCheckbox.checked = useTls === true || useTls === 'true';
             }
             
-            // Сброс формы (кроме use_tls)
-            const useTlsValue = useTlsCheckbox ? useTlsCheckbox.checked : false;
-            form.reset();
-            if (useTlsCheckbox) {
-                useTlsCheckbox.checked = useTlsValue;
+            // Обновляем текст кнопки
+            const submitBtn = document.getElementById('submitCertificatesBtn');
+            const submitBtnText = document.getElementById('submitBtnText');
+            if (submitBtn && submitBtnText) {
+                submitBtnText.textContent = hasCertificates === 'yes' ? 'Обновить сертификат' : 'Получить сертификат';
+                submitBtn.querySelector('i').className = 'fas fa-certificate mr-2';
             }
             
             window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'certificatesModal' } }));
@@ -640,135 +571,42 @@
             });
         }
 
-        let currentCertificateTab = 'manual';
-
-        function switchCertificateTab(tab) {
-            currentCertificateTab = tab;
-            
-            // Обновляем активную вкладку
-            document.querySelectorAll('.tab-button').forEach(btn => {
-                btn.classList.remove('active', 'border-indigo-500', 'text-indigo-600');
-                btn.classList.add('border-transparent', 'text-gray-500');
-            });
-            
-            const activeTab = document.getElementById('tab-' + tab);
-            if (activeTab) {
-                activeTab.classList.add('active', 'border-indigo-500', 'text-indigo-600');
-                activeTab.classList.remove('border-transparent', 'text-gray-500');
-            }
-            
-            // Показываем/скрываем секции
-            const manualSection = document.getElementById('certificateUploadSection');
-            const letsencryptSection = document.getElementById('letsencryptSection');
-            const keySection = document.getElementById('keyUploadSection');
-            
-            if (tab === 'manual') {
-                if (manualSection) manualSection.classList.remove('hidden');
-                if (keySection) keySection.classList.remove('hidden');
-                if (letsencryptSection) letsencryptSection.classList.add('hidden');
-                
-                // Обновляем форму для ручной загрузки
-                const form = document.getElementById('certificatesForm');
-                form.action = '{{ route('admin.module.panel.upload-certificates', ['panel' => ':id']) }}'.replace(':id', currentPanelId);
-                form.enctype = 'multipart/form-data';
-                
-                const submitBtn = document.getElementById('submitCertificatesBtn');
-                const submitBtnText = document.getElementById('submitBtnText');
-                if (submitBtn && submitBtnText) {
-                    submitBtnText.textContent = 'Загрузить';
-                    submitBtn.querySelector('i').className = 'fas fa-upload mr-2';
-                }
-            } else {
-                if (manualSection) manualSection.classList.add('hidden');
-                if (keySection) keySection.classList.add('hidden');
-                if (letsencryptSection) letsencryptSection.classList.remove('hidden');
-                
-                // Обновляем форму для Let's Encrypt
-                const form = document.getElementById('certificatesForm');
-                form.action = '{{ route('admin.module.panel.get-letsencrypt-certificate', ['panel' => ':id']) }}'.replace(':id', currentPanelId);
-                form.enctype = 'application/x-www-form-urlencoded';
-                
-                const submitBtn = document.getElementById('submitCertificatesBtn');
-                const submitBtnText = document.getElementById('submitBtnText');
-                if (submitBtn && submitBtnText) {
-                    submitBtnText.textContent = 'Получить сертификат';
-                    submitBtn.querySelector('i').className = 'fas fa-certificate mr-2';
-                }
-            }
-        }
-
         // Обработка отправки формы
         $(document).ready(function () {
             $('#certificatesForm').on('submit', function(e) {
                 e.preventDefault();
                 
                 const form = $(this);
-                let formData;
-                let processData = false;
-                let contentType = false;
+                const formData = {
+                    _token: form.find('input[name="_token"]').val(),
+                    domain: form.find('input[name="domain"]').val(),
+                    email: form.find('input[name="email"]').val() || '',
+                    use_tls: form.find('input[name="use_tls"]').is(':checked') ? '1' : '0'
+                };
                 
-                // Проверяем, какой режим активен
-                if (currentCertificateTab === 'letsencrypt') {
-                    // Let's Encrypt - обычная форма
-                    formData = {
-                        _token: form.find('input[name="_token"]').val(),
-                        domain: form.find('input[name="domain"]').val(),
-                        email: form.find('input[name="email"]').val() || '',
-                        use_tls: form.find('input[name="use_tls"]').is(':checked') ? '1' : '0'
-                    };
-                    
-                    if (!formData.domain) {
-                        toastr.error('Укажите домен');
-                        return;
-                    }
-                    
-                    processData = true;
-                    contentType = 'application/x-www-form-urlencoded';
-                } else {
-                    // Ручная загрузка - FormData
-                    formData = new FormData();
-                    formData.append('_token', form.find('input[name="_token"]').val());
-                    
-                    const certificateInput = form.find('input[name="certificate"]')[0];
-                    const keyInput = form.find('input[name="key"]')[0];
-                    
-                    if (certificateInput && certificateInput.files && certificateInput.files[0]) {
-                        formData.append('certificate', certificateInput.files[0]);
-                    }
-                    
-                    if (keyInput && keyInput.files && keyInput.files[0]) {
-                        formData.append('key', keyInput.files[0]);
-                    }
-                    
-                    const useTlsCheckbox = form.find('input[name="use_tls"]')[0];
-                    if (useTlsCheckbox && useTlsCheckbox.checked) {
-                        formData.append('use_tls', '1');
-                    }
-                    
-                    processData = false;
-                    contentType = false;
+                if (!formData.domain) {
+                    toastr.error('Домен не определен. Проверьте адрес панели.');
+                    return;
                 }
                 
                 // Показываем индикатор загрузки
                 const submitBtn = $('#submitCertificatesBtn');
                 const originalText = submitBtn.find('span').text();
-                submitBtn.prop('disabled', true).find('span').text('Обработка...');
+                submitBtn.prop('disabled', true).find('span').text('Получение сертификата...');
                 
                 $.ajax({
                     url: form.attr('action'),
                     method: 'POST',
                     data: formData,
-                    processData: processData,
-                    contentType: contentType,
                     success: function(response) {
-                        toastr.success(response.message || 'Операция выполнена успешно');
+                        toastr.success(response.message || 'Сертификат успешно получен!');
                         window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'certificatesModal' } }));
                         setTimeout(() => {
                             window.location.reload();
-                        }, 1000);
+                        }, 2000);
                     },
                     error: function(xhr) {
-                        let errorMessage = 'Произошла ошибка';
+                        let errorMessage = 'Произошла ошибка при получении сертификата';
                         if (xhr.responseJSON) {
                             errorMessage = xhr.responseJSON.message || errorMessage;
                             if (xhr.responseJSON.errors) {
