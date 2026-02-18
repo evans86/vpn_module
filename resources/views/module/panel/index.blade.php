@@ -586,6 +586,15 @@
                 const form = $(this);
                 const formData = new FormData(this);
                 
+                // Логируем данные формы
+                console.log('Отправка формы:', {
+                    action: form.attr('action'),
+                    has_certificate: formData.has('certificate'),
+                    has_key: formData.has('key'),
+                    has_use_tls: formData.has('use_tls'),
+                    use_tls_value: formData.get('use_tls')
+                });
+                
                 $.ajax({
                     url: form.attr('action'),
                     method: 'POST',
@@ -593,6 +602,7 @@
                     processData: false,
                     contentType: false,
                     success: function(response) {
+                        console.log('Ответ сервера:', response);
                         toastr.success(response.message || 'Сертификаты успешно загружены');
                         // Закрываем модальное окно
                         window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'certificatesModal' } }));
