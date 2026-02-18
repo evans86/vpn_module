@@ -379,20 +379,22 @@ class PanelController extends Controller
                 'user_id' => auth()->id(),
                 'panel_id' => $panel->id,
                 'cert_path' => $panel->tls_certificate_path,
-                'key_path' => $panel->tls_key_path
+                'key_path' => $panel->tls_key_path,
+                'use_tls' => $panel->use_tls
             ]);
 
             if ($request->wantsJson()) {
                 return response()->json([
                     'success' => true,
-                    'message' => 'Сертификаты успешно загружены',
+                    'message' => 'Сертификаты успешно загружены' . ($panel->use_tls ? '. TLS включен' : '. Не забудьте включить TLS!'),
                     'cert_path' => $panel->tls_certificate_path,
-                    'key_path' => $panel->tls_key_path
+                    'key_path' => $panel->tls_key_path,
+                    'use_tls' => $panel->use_tls
                 ]);
             }
 
             return redirect()->route('admin.module.panel.index')
-                ->with('success', 'TLS сертификаты успешно загружены для панели');
+                ->with('success', 'TLS сертификаты успешно загружены для панели' . ($panel->use_tls ? '. TLS включен' : '. Не забудьте включить TLS!'));
         } catch (\Illuminate\Validation\ValidationException $e) {
             if ($request->wantsJson()) {
                 return response()->json([

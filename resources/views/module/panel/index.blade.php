@@ -374,7 +374,7 @@
                 <p class="mt-1 text-xs text-gray-500">Формат: PEM или KEY, максимум 10MB</p>
             </div>
 
-            <div class="mb-4" id="useTlsSection" style="display: none;">
+            <div class="mb-4" id="useTlsSection">
                 <label class="flex items-center">
                     <input type="checkbox" 
                            name="use_tls" 
@@ -438,6 +438,9 @@
             const certificateUploadSection = document.getElementById('certificateUploadSection');
             const keyUploadSection = document.getElementById('keyUploadSection');
             
+            // Сбрасываем форму перед открытием
+            form.reset();
+            
             if (hasCertificates === 'yes') {
                 statusDiv.className = 'mb-4 p-3 rounded-md bg-green-50 border border-green-200';
                 statusText.innerHTML = '<i class="fas fa-check-circle mr-2 text-green-600"></i>Сертификаты настроены для этой панели';
@@ -463,8 +466,9 @@
                 statusDiv.className = 'mb-4 p-3 rounded-md bg-yellow-50 border border-yellow-200';
                 statusText.innerHTML = '<i class="fas fa-exclamation-triangle mr-2 text-yellow-600"></i>Сертификаты не настроены, используются настройки по умолчанию';
                 removeBtn.style.display = 'none';
+                // Показываем чекбокс даже при первой загрузке
                 if (useTlsSection) {
-                    useTlsSection.style.display = 'none';
+                    useTlsSection.style.display = 'block';
                 }
                 // Показываем поля загрузки, если сертификатов нет
                 if (certificateUploadSection) {
