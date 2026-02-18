@@ -1332,7 +1332,7 @@ class MarzbanService
                         "decryption" => "none",
                         "level" => 0
                     ],
-                    "streamSettings" => [
+                    "streamSettings" => array_merge([
                         "network" => "tcp",
                         "tcpSettings" => [
                             "acceptProxyProtocol" => false,
@@ -1370,7 +1370,7 @@ class MarzbanService
                                 ]
                             ]
                         ]
-                    ],
+                    ], $this->getSecuritySettings($panel)),
                     "sniffing" => [
                         "enabled" => true,
                         "destOverride" => ["http", "tls"]
