@@ -1144,18 +1144,47 @@ class MarzbanService
                 ]);
             }
             
-            return [
-                'security' => 'tls',
-                'tlsSettings' => [
-                    'allowInsecure' => false, // false для валидных сертификатов (Let's Encrypt)
-                    'minVersion' => '1.2',
-                    'certificates' => [
-                        [
-                            'certificateFile' => $certPaths['cert'],
-                            'keyFile' => $certPaths['key']
-                        ]
+            // Получаем домен из адреса панели для SNI
+            $sni = null;
+            if ($panel && $panel->panel_adress) {
+                $parsedUrl = parse_url($panel->panel_adress);
+                if (isset($parsedUrl['host'])) {
+                    $sni = $parsedUrl['host'];
+                } elseif (str_contains($panel->panel_adress, '://')) {
+                    // Если адрес содержит протокол, извлекаем домен
+                    $parts = parse_url($panel->panel_adress);
+                    $sni = $parts['host'] ?? null;
+                } else {
+                    // Если адрес без протокола, используем как есть
+                    $sni = str_replace(['http://', 'https://', '/dashboard'], '', $panel->panel_adress);
+                    $sni = trim($sni, '/');
+                }
+            }
+            
+            $tlsSettings = [
+                'allowInsecure' => false, // false для валидных сертификатов (Let's Encrypt)
+                'minVersion' => '1.2',
+                'certificates' => [
+                    [
+                        'certificateFile' => $certPaths['cert'],
+                        'keyFile' => $certPaths['key']
                     ]
                 ]
+            ];
+            
+            // Добавляем SNI, если домен определен
+            if ($sni) {
+                $tlsSettings['serverName'] = $sni;
+                Log::info('SNI добавлен в TLS настройки', [
+                    'source' => 'panel',
+                    'panel_id' => $panel->id,
+                    'sni' => $sni
+                ]);
+            }
+            
+            return [
+                'security' => 'tls',
+                'tlsSettings' => $tlsSettings
             ];
         }
 

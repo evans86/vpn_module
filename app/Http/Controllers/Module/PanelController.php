@@ -656,7 +656,8 @@ class PanelController extends Controller
         try {
             $request->validate([
                 'domain' => 'required|string|max:255',
-                'email' => 'nullable|email|max:255'
+                'email' => 'nullable|email|max:255',
+                'validation_method' => 'nullable|in:http,dns'
             ]);
 
             $domain = trim($request->input('domain'));
@@ -717,14 +718,20 @@ class PanelController extends Controller
             }
             
             if ($domainIp !== $serverIp) {
-                $this->logger->warning('IP домена не совпадает с IP сервера', [
+                $this->logger->error('IP домена не совпадает с IP сервера с панелью', [
                     'source' => 'panel',
                     'panel_id' => $panel->id,
                     'domain' => $domain,
                     'domain_ip' => $domainIp,
                     'server_ip' => $serverIp
                 ]);
-                // Не блокируем, но предупреждаем - возможно используется поддомен или CDN
+                
+                throw new \RuntimeException(
+                    "Домен '{$domain}' указывает на IP {$domainIp}, а сервер с панелью имеет IP {$serverIp}. " .
+                    "Let's Encrypt не сможет проверить домен. " .
+                    "Создайте поддомен (например, panel.vpn-telegram.com) и укажите его на IP сервера с панелью ({$serverIp}), " .
+                    "или измените DNS запись для этого домена."
+                );
             }
 
             // Получаем сертификат (выполняется на сервере с панелью через SSH)
@@ -740,7 +747,7 @@ class PanelController extends Controller
             // Останавливаем веб-сервер на порту 80, если он запущен (для standalone режима)
             $ssh->exec('sudo systemctl stop nginx 2>&1 || sudo systemctl stop apache2 2>&1 || true');
 
-            // Получаем сертификат на сервере с панелью
+            // Получаем сертификат на сервере с панелью (standalone режим - HTTP-валидация)
             $certbotCommand = sprintf(
                 'sudo certbot certonly --standalone --non-interactive --agree-tos --email %s -d %s 2>&1',
                 escapeshellarg($email),

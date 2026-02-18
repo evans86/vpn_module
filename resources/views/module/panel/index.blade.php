@@ -425,9 +425,15 @@
                     <input type="text" 
                            id="domain" 
                            name="domain" 
-                           placeholder="vpn-telegram.com"
+                           placeholder="vpn-telegram.com или panel.vpn-telegram.com"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    <p class="mt-1 text-xs text-gray-500">Домен должен указывать на IP сервера. Порт 80 должен быть открыт.</p>
+                    <p class="mt-1 text-xs text-gray-500">
+                        <strong>Важно:</strong> Домен должен указывать на IP сервера с панелью Marzban, а не на сервер Laravel!
+                    </p>
+                    <p class="mt-1 text-xs text-yellow-600">
+                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                        Если используете основной домен (vpn-telegram.com), который указывает на сервер Laravel, создайте поддомен (например, panel.vpn-telegram.com) и укажите его на IP сервера с панелью.
+                    </p>
                 </div>
 
                 <div class="mb-4">
