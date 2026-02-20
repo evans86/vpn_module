@@ -46,6 +46,37 @@ class BotModuleController extends Controller
     public function create(BotCreateRequest $request)
     {
         try {
+            // Проверяем, существует ли уже модуль с таким bot_id
+            /** @var BotModule|null $existingModule */
+            $existingModule = BotModule::query()
+                ->where('bot_id', $request->bot_id)
+                ->first();
+
+            if ($existingModule instanceof BotModule) {
+                // Если модуль уже существует, возвращаем его
+                Log::info('Модуль с bot_id уже существует, возвращаем существующий', [
+                    'bot_id' => $request->bot_id,
+                    'module_id' => $existingModule->id
+                ]);
+                return ApiHelpers::success(BotModuleFactory::fromEntity($existingModule)->getArray());
+            }
+
+            // Проверяем уникальность public_key и private_key
+            /** @var BotModule|null $existingByKeys */
+            $existingByKeys = BotModule::query()
+                ->where('public_key', $request->public_key)
+                ->orWhere('private_key', $request->private_key)
+                ->first();
+
+            if ($existingByKeys instanceof BotModule) {
+                Log::warning('Попытка создать модуль с существующими ключами', [
+                    'bot_id' => $request->bot_id,
+                    'existing_bot_id' => $existingByKeys->bot_id
+                ]);
+                return ApiHelpers::error('Module with these keys already exists');
+            }
+
+            // Создаем новый модуль
             $botModule = $this->botModuleService->create(
                 $request->public_key,
                 $request->private_key,
