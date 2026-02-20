@@ -21,7 +21,7 @@ class BotModuleFactory
         $dto->version = $bot_module->version;
         $dto->is_paid = $bot_module->is_paid;
         $dto->free_show = $bot_module->free_show;
-        $dto->secret_user_key = $bot_module->secret_user_key;
+        $dto->secret_user_key = $bot_module->secret_user_key ?? '';
         $dto->tariff_cost = $bot_module->tariff_cost;
         $dto->vpn_instructions = $bot_module->vpn_instructions;
         $dto->bot_user_id = $bot_module->bot_user_id;

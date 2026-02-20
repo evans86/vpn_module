@@ -12,7 +12,7 @@ class BotModuleDto
     public ?int $version;
     public int $is_paid;
     public int $free_show;
-    public string $secret_user_key;
+    public ?string $secret_user_key;
     public ?string $tariff_cost;
     public ?string $vpn_instructions;
     public ?int $bot_user_id;
