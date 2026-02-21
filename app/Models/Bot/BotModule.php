@@ -39,14 +39,13 @@ class BotModule extends Model
     ];
 
     /**
-     * Get the private key attribute (with backward compatibility)
+     * Get the private key attribute (with backward compatibility: decrypt if was stored encrypted)
      */
     public function getPrivateKeyAttribute($value)
     {
         if (empty($value)) {
             return null;
         }
-        
         try {
             return decrypt($value);
         } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
@@ -55,26 +54,21 @@ class BotModule extends Model
     }
 
     /**
-     * Set the private key attribute (always encrypt)
+     * Set the private key attribute. Храним в открытом виде — по нему ищем в get/update/delete.
      */
     public function setPrivateKeyAttribute($value)
     {
-        if (!empty($value)) {
-            $this->attributes['private_key'] = encrypt($value);
-        } else {
-            $this->attributes['private_key'] = null;
-        }
+        $this->attributes['private_key'] = $value ?? null;
     }
 
     /**
-     * Get the public key attribute (with backward compatibility)
+     * Get the public key attribute (with backward compatibility: decrypt if was stored encrypted)
      */
     public function getPublicKeyAttribute($value)
     {
         if (empty($value)) {
             return null;
         }
-        
         try {
             return decrypt($value);
         } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
@@ -83,15 +77,11 @@ class BotModule extends Model
     }
 
     /**
-     * Set the public key attribute (always encrypt)
+     * Set the public key attribute. Храним в открытом виде — по нему ищем в get/update/delete.
      */
     public function setPublicKeyAttribute($value)
     {
-        if (!empty($value)) {
-            $this->attributes['public_key'] = encrypt($value);
-        } else {
-            $this->attributes['public_key'] = null;
-        }
+        $this->attributes['public_key'] = $value ?? null;
     }
 
     /**
