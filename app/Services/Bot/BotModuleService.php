@@ -58,17 +58,9 @@ class BotModuleService
      */
     public function update(BotModuleDto $dto): BotModule
     {
-        $bot = BotModule::query()
-            ->where('public_key', $dto->public_key)
-            ->where('private_key', $dto->private_key)
-            ->first();
-
-        if (empty($bot) && !empty($dto->id)) {
-            $bot = BotModule::query()->find($dto->id);
-        }
-        if (empty($bot)) {
+        $bot = BotModule::query()->where('public_key', $dto->public_key)->where('private_key', $dto->private_key)->first();
+        if (empty($bot))
             throw new RuntimeException('Not found module.');
-        }
 
         $bot->version = $dto->version;
         $bot->category_id = $dto->category_id;
@@ -113,31 +105,19 @@ class BotModuleService
     }
 
     /**
-     * Удаление модуля по ключам
+     * Удаление модуля
+     *
+     * @param string $public_key
+     * @param string $private_key
+     * @return void
      */
     public function delete(string $public_key, string $private_key): void
     {
         $bot = BotModule::query()->where('public_key', $public_key)->where('private_key', $private_key)->first();
-        if (empty($bot)) {
+        if (empty($bot))
             throw new RuntimeException('Not found module.');
-        }
-        if (!$bot->delete()) {
+        if (!$bot->delete())
             throw new RuntimeException('Bot dont delete');
-        }
-    }
-
-    /**
-     * Удаление модуля по id (для вызова из списка BOT T)
-     */
-    public function deleteById(int $id): void
-    {
-        $bot = BotModule::query()->find($id);
-        if (empty($bot)) {
-            throw new RuntimeException('Not found module.');
-        }
-        if (!$bot->delete()) {
-            throw new RuntimeException('Bot dont delete');
-        }
     }
 
     public function getDefaultVpnInstructions(): string

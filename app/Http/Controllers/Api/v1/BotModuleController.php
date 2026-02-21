@@ -218,16 +218,11 @@ class BotModuleController extends Controller
     {
         try {
             $validated = $request->validate([
-                'id' => 'nullable|integer',
-                'public_key' => 'required_without:id|nullable|string',
-                'private_key' => 'required_without:id|nullable|string',
+                'public_key' => 'required|string',
+                'private_key' => 'required|string',
             ]);
 
-            if (!empty($validated['id'])) {
-                $this->botModuleService->deleteById((int) $validated['id']);
-            } else {
-                $this->botModuleService->delete($validated['public_key'], $validated['private_key']);
-            }
+            $this->botModuleService->delete($validated['public_key'], $validated['private_key']);
             return ApiHelpers::success('OK');
         } catch (RuntimeException $r) {
             return ApiHelpers::error($r->getMessage());
@@ -236,7 +231,7 @@ class BotModuleController extends Controller
                 'exception' => get_class($e),
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'request' => $request->only(['id', 'public_key']),
+                'public_key' => $validated['public_key'] ?? null
             ]);
             return ApiHelpers::error('Module delete error');
         }
