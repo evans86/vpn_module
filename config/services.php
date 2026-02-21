@@ -32,6 +32,11 @@ return [
 
     'api_keys' => [
         'vdsina_key' => env('VDSINA_API_KEY'),
+        'timeweb_key' => env('TIMEWEB_API_KEY'),
+    ],
+
+    'timeweb' => [
+        'project_id' => env('TIMEWEB_PROJECT_ID'), // ID проекта (например VPN-TELEGRAM) — в панели в URL или в карточке проекта
     ],
 
     'cloudflare' => [

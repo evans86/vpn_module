@@ -195,7 +195,7 @@
                     </td>
                     <td>
                         @if($current['traffic'])
-                            <strong>{{ number_format($current['traffic']['used_tb'], 2) }}</strong> / {{ number_format($current['traffic']['limit_tb'], 2) }}
+                            <strong>{{ number_format($current['traffic']['used_tb'], 2) }}</strong> / {{ ($current['traffic']['limit_tb'] ?? 0) > 0 ? number_format($current['traffic']['limit_tb'], 2) : 'безлимит' }}
                         @else
                             N/A
                         @endif
@@ -258,7 +258,7 @@
                                     <td style="padding: 4px; border: 1px solid #ddd; text-align: right;">{{ $month['online_users'] ?? 'N/A' }}</td>
                                     <td style="padding: 4px; border: 1px solid #ddd; text-align: right;">
                                         @if($month['traffic_used_tb'] !== null)
-                                            {{ number_format($month['traffic_used_tb'], 2) }} / {{ $month['traffic_limit_tb'] ? number_format($month['traffic_limit_tb'], 2) : 'N/A' }}
+                                            {{ number_format($month['traffic_used_tb'], 2) }} / {{ ($month['traffic_limit_tb'] ?? 0) > 0 ? number_format($month['traffic_limit_tb'], 2) : 'безлимит' }}
                                         @else
                                             N/A
                                         @endif

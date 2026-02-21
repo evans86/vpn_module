@@ -116,6 +116,7 @@ class Server extends Model
 
     // Провайдеры серверов
     public const VDSINA = 'vdsina';
+    public const TIMEWEB = 'timeweb';
 
     // Действия с сервером
     public const PASSWORD_UPDATE = 'password_update';

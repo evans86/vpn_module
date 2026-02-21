@@ -93,7 +93,10 @@ class ServerController extends Controller
             // Добавляем параметр show_deleted в пагинацию
             $servers->appends($request->only(['show_deleted', 'name', 'ip', 'host', 'status']));
 
-            return view('module.server.index', compact('servers', 'showDeleted'));
+            // Получаем список локаций для формы создания сервера
+            $locations = \App\Models\Location\Location::all();
+
+            return view('module.server.index', compact('servers', 'showDeleted', 'locations'));
         } catch (Exception $e) {
             $this->logger->error('Ошибка при просмотре списка серверов', [
                 'source' => 'server',

@@ -144,6 +144,11 @@ class MarzbanService
                 throw new RuntimeException("Failed to set execute permissions. Exit code: {$chmodExitStatus}. Output: " . substr($chmodOutput, 0, 1000));
             }
 
+            // Патчим скрипт: после загрузки docker-compose.yml подменяем образ на ghcr.io (обход лимита Docker Hub)
+            $patchCmd = "sed -i '/File saved in.*docker-compose.yml/a sed -i '\\''s|gozargah/marzban|ghcr.io/gozargah/marzban|g'\\'' \"\$APP_DIR/docker-compose.yml\"' install_marzban.sh";
+            $ssh->exec($patchCmd);
+            Log::info('Patched install script to use ghcr.io image', ['source' => 'panel']);
+
             // Команда 3: Запуск скрипта установки
             Log::info('Running installation script', [
                 'host' => $host,
@@ -169,7 +174,7 @@ class MarzbanService
             ]);
 
             if ($installExitStatus !== 0) {
-                // Проверяем, связана ли ошибка с Docker
+                // Проверяем, связана ли ошибка с Docker daemon
                 if (strpos($installOutput, 'Cannot connect to the Docker daemon') !== false ||
                     strpos($installOutput, 'docker daemon running') !== false) {
                     Log::error('Docker daemon issue detected during installation', [
@@ -224,7 +229,7 @@ class MarzbanService
     }
 
     /**
-     * Проверка и запуск Docker daemon
+     * Проверка и запуск Docker daemon. При отсутствии Docker — установка через get.docker.com
      *
      * @param SSH2 $ssh
      * @return void
@@ -235,7 +240,7 @@ class MarzbanService
         try {
             Log::info('Checking Docker daemon status', ['source' => 'panel']);
 
-            // Проверяем, запущен ли Docker daemon
+            // Проверяем, установлен ли docker и запущен ли daemon
             $dockerCheck = $ssh->exec('docker info > /dev/null 2>&1; echo $?');
             $dockerCheck = trim($dockerCheck);
 
@@ -246,49 +251,77 @@ class MarzbanService
 
             Log::warning('Docker daemon is not running, attempting to start', ['source' => 'panel']);
 
-            // Пытаемся запустить Docker daemon
             $startDockerOutput = $ssh->exec('sudo systemctl start docker 2>&1');
             $startDockerStatus = $ssh->getExitStatus();
-
-            Log::info('Docker start command executed', [
-                'exit_status' => $startDockerStatus,
-                'output' => substr($startDockerOutput, 0, 500),
-                'source' => 'panel'
-            ]);
-
-            // Ждем немного, чтобы Docker запустился
             sleep(3);
 
-            // Проверяем снова
+            $dockerCheck = $ssh->exec('docker info > /dev/null 2>&1; echo $?');
+            $dockerCheck = trim($dockerCheck);
+
+            if ($dockerCheck === '0') {
+                Log::info('Docker daemon is now running', ['source' => 'panel']);
+                return;
+            }
+
+            // Если unit docker.service не найден — Docker не установлен, ставим
+            $dockerNotFound = (stripos($startDockerOutput, 'not found') !== false || stripos($startDockerOutput, 'does not exist') !== false);
+            if ($dockerNotFound) {
+                $this->waitForAptLock($ssh, 300);
+                $maxInstallAttempts = 2;
+                $installStatus = -1;
+                $installOutput = '';
+                for ($attempt = 1; $attempt <= $maxInstallAttempts; $attempt++) {
+                    Log::info('Docker install attempt ' . $attempt . '/' . $maxInstallAttempts, ['source' => 'panel']);
+                    $installOutput = $ssh->exec('curl -fsSL https://get.docker.com | sudo sh 2>&1');
+                    $installStatus = $ssh->getExitStatus();
+                    Log::info('Docker install script finished', [
+                        'attempt' => $attempt,
+                        'exit_status' => $installStatus,
+                        'output_preview' => substr($installOutput, -500),
+                        'source' => 'panel'
+                    ]);
+                    if ($installStatus === 0) {
+                        break;
+                    }
+                    $isLockError = (stripos($installOutput, 'Could not get lock') !== false
+                        || stripos($installOutput, 'Unable to acquire') !== false
+                        || stripos($installOutput, 'is another process using it') !== false);
+                    if ($isLockError && $attempt < $maxInstallAttempts) {
+                        Log::warning('Docker install failed due to apt/dpkg lock, waiting 60s and retrying', ['source' => 'panel']);
+                        sleep(60);
+                        $this->waitForAptLock($ssh, 120);
+                    } else {
+                        break;
+                    }
+                }
+                if ($installStatus !== 0) {
+                    throw new RuntimeException(
+                        'Docker installation failed. Exit code: ' . $installStatus . '. ' .
+                        'Last output: ' . substr($installOutput, -800)
+                    );
+                }
+                sleep(5);
+            }
+
+            // Включаем автозапуск и запускаем
+            $enableDockerOutput = $ssh->exec('sudo systemctl enable docker && sudo systemctl start docker 2>&1');
+            $enableDockerStatus = $ssh->getExitStatus();
+            Log::info('Docker enable and start executed', [
+                'exit_status' => $enableDockerStatus,
+                'output' => substr($enableDockerOutput, 0, 500),
+                'source' => 'panel'
+            ]);
+            sleep(3);
+
             $dockerCheck = $ssh->exec('docker info > /dev/null 2>&1; echo $?');
             $dockerCheck = trim($dockerCheck);
 
             if ($dockerCheck !== '0') {
-                // Пытаемся включить автозапуск и запустить
-                $enableDockerOutput = $ssh->exec('sudo systemctl enable docker && sudo systemctl start docker 2>&1');
-                $enableDockerStatus = $ssh->getExitStatus();
-
-                Log::info('Docker enable and start command executed', [
-                    'exit_status' => $enableDockerStatus,
-                    'output' => substr($enableDockerOutput, 0, 500),
-                    'source' => 'panel'
-                ]);
-
-                // Ждем еще немного
-                sleep(3);
-
-                // Финальная проверка
-                $dockerCheck = $ssh->exec('docker info > /dev/null 2>&1; echo $?');
-                $dockerCheck = trim($dockerCheck);
-
-                if ($dockerCheck !== '0') {
-                    throw new RuntimeException(
-                        "Docker daemon is not running and could not be started. " .
-                        "Please ensure Docker is installed and the user has sudo privileges. " .
-                        "Start output: " . substr($startDockerOutput, 0, 500) . ". " .
-                        "Enable output: " . substr($enableDockerOutput, 0, 500)
-                    );
-                }
+                throw new RuntimeException(
+                    "Docker daemon could not be started. " .
+                    "Start output: " . substr($startDockerOutput, 0, 400) . ". " .
+                    "Enable output: " . substr($enableDockerOutput, 0, 400)
+                );
             }
 
             Log::info('Docker daemon is now running', ['source' => 'panel']);
@@ -300,6 +333,32 @@ class MarzbanService
             ]);
             throw new RuntimeException('Docker daemon is required but not available: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Ожидание освобождения блокировки apt/dpkg на сервере (другой процесс apt может обновлять пакеты).
+     *
+     * @param SSH2 $ssh
+     * @param int $timeoutSeconds Максимум ждать (секунды)
+     * @return void
+     */
+    private function waitForAptLock(SSH2 $ssh, int $timeoutSeconds = 300): void
+    {
+        $interval = 15;
+        $elapsed = 0;
+        while ($elapsed < $timeoutSeconds) {
+            // fuser возвращает 0, если процесс держит файл; 1 — если никто не держит
+            $check = trim($ssh->exec('sudo fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock 2>/dev/null; echo $?'));
+            $lockHeld = ($check === '0');
+            if (!$lockHeld) {
+                Log::info('Apt/dpkg lock is free', ['source' => 'panel', 'waited' => $elapsed]);
+                return;
+            }
+            Log::info('Waiting for apt/dpkg lock', ['source' => 'panel', 'elapsed' => $elapsed, 'timeout' => $timeoutSeconds]);
+            sleep($interval);
+            $elapsed += $interval;
+        }
+        Log::warning('Apt lock wait timeout reached, proceeding anyway', ['source' => 'panel', 'timeout' => $timeoutSeconds]);
     }
 
     /**
@@ -627,7 +686,10 @@ class MarzbanService
     public function getServerStats(): void
     {
         try {
-            $panels = Panel::query()->where('panel_status', Panel::PANEL_CONFIGURED)->get();
+            $panels = Panel::query()
+                ->where('panel_status', Panel::PANEL_CONFIGURED)
+                ->where('panel', Panel::MARZBAN)
+                ->get();
 
             $panels->each(function ($panel) {
                 // Обработка каждой панели

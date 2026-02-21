@@ -44,12 +44,14 @@ class StatisticsCron extends Command
         try {
             $this->info("Statistics update start");
 
-            /**
-             * @var Panel $panel
-             */
-            $panel = Panel::query()->where('panel_status', Panel::PANEL_CONFIGURED)->first();
-            $strategy = new PanelStrategy($panel->panel);
-            $strategy->getServerStats();
+            $panelTypes = Panel::query()
+                ->where('panel_status', Panel::PANEL_CONFIGURED)
+                ->distinct()
+                ->pluck('panel');
+            foreach ($panelTypes as $panelType) {
+                $strategy = new PanelStrategy($panelType);
+                $strategy->getServerStats();
+            }
 
             $this->info('Statistics update completed');
         } catch (\Exception $e) {

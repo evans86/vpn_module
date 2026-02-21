@@ -116,6 +116,14 @@
                                     </span>
                                 </div>
 
+                                <!-- Provider -->
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-700">Провайдер:</span>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        {{ $server->provider === Server::VDSINA ? 'VDSina' : ($server->provider === Server::TIMEWEB ? 'Timeweb Cloud' : $server->provider) }}
+                                    </span>
+                                </div>
+
                                 <!-- Location -->
                                 <div class="flex items-center justify-between">
                                     <span class="text-sm font-medium text-gray-700">Локация:</span>
@@ -255,17 +263,28 @@
                 <label for="createServerProvider" class="block text-sm font-medium text-gray-700 mb-1">
                     Провайдер
                 </label>
-                <select id="createServerProvider" name="provider" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm">
+                <select id="createServerProvider" name="provider" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" required>
+                    <option value="">Выберите провайдера...</option>
                     <option value="{{ Server::VDSINA }}">VDSina</option>
+                    <option value="{{ Server::TIMEWEB }}">Timeweb Cloud</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label for="createServerLocation" class="block text-sm font-medium text-gray-700 mb-1">
+                    Локация
+                </label>
+                <select id="createServerLocation" name="location_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" required>
+                    <option value="">Выберите локацию...</option>
+                    @foreach($locations as $location)
+                        <option value="{{ $location->id }}">{{ $location->code }} {{ $location->emoji }}</option>
+                    @endforeach
                 </select>
             </div>
         </form>
         <x-slot name="footer">
             <button type="button" 
                     class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 create-server" 
-                    id="createServerBtn" 
-                    data-provider="vdsina"
-                    data-location="1">
+                    id="createServerBtn">
                 Создать сервер
             </button>
             <button type="button" 
@@ -348,11 +367,11 @@
                 // Обработчик создания сервера
                 $('.create-server').on('click', function () {
                     const btn = $(this);
-                    const provider = btn.data('provider');
-                    const location_id = btn.data('location');
+                    const provider = $('#createServerProvider').val();
+                    const location_id = $('#createServerLocation').val();
 
                     if (!provider || !location_id) {
-                        toastr.error('Не указан провайдер или локация');
+                        toastr.error('Пожалуйста, выберите провайдера и локацию');
                         return;
                     }
 

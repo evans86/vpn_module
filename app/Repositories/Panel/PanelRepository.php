@@ -10,6 +10,7 @@ use App\Models\ServerMonitoring\ServerMonitoring;
 use App\Models\ServerUser\ServerUser;
 use App\Models\KeyActivate\KeyActivate;
 use App\Repositories\BaseRepository;
+use App\Services\External\TimewebCloudAPI;
 use App\Services\External\VdsinaAPI;
 use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -1104,46 +1105,72 @@ class PanelRepository extends BaseRepository
      */
     private function getServerTrafficDataFromCache(Panel $panel, ?string $provider = null): ?array
     {
-        // Используем Server::VDSINA по умолчанию для обратной совместимости
-        $provider = $provider ?? Server::VDSINA;
-        
-        if (!$panel->server || $panel->server->provider !== $provider) {
+        if (!$panel->server) {
             return null;
         }
-
-        if (!$panel->server->provider_id) {
+        $provider = $provider ?? $panel->server->provider;
+        if (!$provider || !$panel->server->provider_id) {
             return null;
         }
-
-        $cacheKey = "server_traffic_{$panel->server->provider_id}";
-        
-        // Только читаем из кэша, не делаем запросов к API
+        $cacheKey = "server_traffic_{$provider}_{$panel->server->provider_id}";
         return Cache::get($cacheKey);
     }
 
     /**
-     * Получить данные о трафике сервера
-     * 
+     * Получить данные о трафике сервера.
+     * Провайдер определяется по серверу панели; для каждого провайдера — своя ветка (VDSina, Timeweb и т.д.).
+     * Формат ответа: ['limit' => bytes, 'current_month' => bytes, 'last_month' => bytes|null].
+     *
      * @param Panel $panel Панель
-     * @param string|null $provider Провайдер сервера (по умолчанию Server::VDSINA для обратной совместимости)
+     * @param string|null $provider Провайдер (если null — берётся из $panel->server->provider)
      * @return array|null
      */
     public function getServerTrafficData(Panel $panel, ?string $provider = null): ?array
     {
-        // Используем Server::VDSINA по умолчанию для обратной совместимости
-        $provider = $provider ?? Server::VDSINA;
-        
-        if (!$panel->server || $panel->server->provider !== $provider) {
+        if (!$panel->server) {
             return null;
         }
 
-        if (!$panel->server->provider_id) {
+        $provider = $provider ?? $panel->server->provider;
+        if (!$provider || !$panel->server->provider_id) {
             return null;
         }
 
-        $cacheKey = "server_traffic_{$panel->server->provider_id}";
-        // Увеличиваем время кэширования для уменьшения количества запросов к API
-        $cacheTtl = config('panel.traffic_cache_ttl', 1800); // 30 минут вместо 10
+        $cacheKey = "server_traffic_{$provider}_{$panel->server->provider_id}";
+        $cacheTtl = (int) config('panel.traffic_cache_ttl', 1800);
+
+        // Ветвление по провайдеру сервера (при добавлении нового провайдера — добавить ветку и API)
+        if ($provider === Server::TIMEWEB) {
+            $cachedData = Cache::get($cacheKey);
+            if ($cachedData !== null) {
+                $cacheAge = Cache::get("{$cacheKey}_age", 0);
+                $cacheMaxAge = $cacheTtl - 600;
+                if ($cacheAge > 0 && (time() - $cacheAge) < $cacheMaxAge) {
+                    return $cachedData;
+                }
+            }
+            try {
+                $timewebApi = new TimewebCloudAPI(config('services.api_keys.timeweb_key'));
+                $trafficData = $timewebApi->getServerTraffic((int) $panel->server->provider_id);
+                if ($trafficData !== null) {
+                    Cache::put($cacheKey, $trafficData, $cacheTtl);
+                    Cache::put("{$cacheKey}_age", time(), $cacheTtl);
+                    return $trafficData;
+                }
+            } catch (\Exception $e) {
+                Log::error('Timeweb Cloud: failed to get server traffic', [
+                    'server_id' => $panel->server->id,
+                    'provider_id' => $panel->server->provider_id,
+                    'error' => $e->getMessage(),
+                    'source' => 'panel',
+                ]);
+            }
+            return $cachedData;
+        }
+
+        if ($provider !== Server::VDSINA) {
+            return null;
+        }
 
         // Проверяем глобальный флаг блокировки API из-за rate limit (403 Blacklisted)
         // Согласно поддержке VDSina, блокировка снимается автоматически через 4 часа
@@ -1298,27 +1325,24 @@ class PanelRepository extends BaseRepository
             
             // Трафик за текущий месяц (из API current_month)
             $currentTraffic = null;
-            if ($trafficData && isset($trafficData['current_month'])) {
-                $limitBytes = $trafficData['limit'];
-                $currentTrafficBytes = $trafficData['current_month'];
-                
+            if ($trafficData && array_key_exists('current_month', $trafficData) && $trafficData['current_month'] !== null) {
+                $limitBytes = (int) ($trafficData['limit'] ?? 0);
+                $currentTrafficBytes = (int) $trafficData['current_month'];
                 $currentTraffic = [
                     'used_tb' => round($currentTrafficBytes / (1024 * 1024 * 1024 * 1024), 2),
-                    'limit_tb' => round($limitBytes / (1024 * 1024 * 1024 * 1024), 2),
+                    'limit_tb' => $limitBytes > 0 ? round($limitBytes / (1024 * 1024 * 1024 * 1024), 2) : 0,
                     'used_percent' => $limitBytes > 0 ? round(($currentTrafficBytes / $limitBytes) * 100, 2) : 0,
                 ];
             }
             
             // Трафик за прошлый месяц (из API last_month или из сохраненных данных)
             $lastTraffic = null;
-            if ($trafficData && isset($trafficData['last_month']) && $trafficData['last_month'] !== null && $trafficData['last_month'] > 0) {
-                // Используем данные из API
-                $limitBytes = $trafficData['limit'];
-                $lastTrafficBytes = $trafficData['last_month'];
-                
+            if ($trafficData && array_key_exists('last_month', $trafficData) && $trafficData['last_month'] !== null) {
+                $limitBytes = (int) ($trafficData['limit'] ?? 0);
+                $lastTrafficBytes = (int) $trafficData['last_month'];
                 $lastTraffic = [
                     'used_tb' => round($lastTrafficBytes / (1024 * 1024 * 1024 * 1024), 2),
-                    'limit_tb' => round($limitBytes / (1024 * 1024 * 1024 * 1024), 2),
+                    'limit_tb' => $limitBytes > 0 ? round($limitBytes / (1024 * 1024 * 1024 * 1024), 2) : 0,
                     'used_percent' => $limitBytes > 0 ? round(($lastTrafficBytes / $limitBytes) * 100, 2) : 0,
                 ];
             } else {
