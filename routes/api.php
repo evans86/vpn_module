@@ -36,14 +36,14 @@ Route::prefix('telegram')->group(function () {
     Route::post('salesman-bot/{token}/init', [WebhookController::class, 'salesmanBot']);
 });
 
-// Bot Module API Routes
+// Bot Module API Routes (GET и POST для совместимости с BOT T и др.)
 Route::prefix('v1/bot-module')->group(function () {
-    Route::get('ping', [BotModuleController::class, 'ping']); //+
-    Route::get('create', [BotModuleController::class, 'create']); // ?
-    Route::get('get', [BotModuleController::class, 'get']); // ?
-    Route::get('settings', [BotModuleController::class, 'getSettings']); // ?
-    Route::post('update', [BotModuleController::class, 'update']); // ?
-    Route::get('delete', [BotModuleController::class, 'delete']); // ?
+    Route::match(['get', 'post'], 'ping', [BotModuleController::class, 'ping']);
+    Route::match(['get', 'post'], 'create', [BotModuleController::class, 'create']);
+    Route::match(['get', 'post'], 'get', [BotModuleController::class, 'get']);
+    Route::match(['get', 'post'], 'settings', [BotModuleController::class, 'getSettings']);
+    Route::post('update', [BotModuleController::class, 'update']);
+    Route::match(['get', 'post'], 'delete', [BotModuleController::class, 'delete']);
 });
 
 // Key Activate API Routes
