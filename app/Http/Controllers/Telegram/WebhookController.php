@@ -67,8 +67,8 @@ class WebhookController extends Controller
     public function salesmanBot(Request $request, string $token): JsonResponse
     {
         try {
-            // Проверяем существование продавца перед созданием контроллера
-            $salesman = Salesman::where('token', $token)->first();
+            // Проверяем существование продавца перед созданием контроллера (поиск учитывает старые зашифрованные токены)
+            $salesman = Salesman::findByToken($token);
             if (!$salesman) {
                 // Если продавец не найден, это может быть старый вебхук от удаленного/измененного бота
                 // Возвращаем успешный ответ, чтобы Telegram не повторял запрос

@@ -70,17 +70,13 @@ class SalesmanRepository extends BaseRepository
     }
 
     /**
-     * Find salesman by token
+     * Find salesman by token (учитывает старые записи с зашифрованным токеном)
      * @param string $token
      * @return Salesman|null
      */
     public function findByToken(string $token): ?Salesman
     {
-        /** @var Salesman|null $result */
-        $result = $this->query()
-            ->where('token', $token)
-            ->first();
-        return $result;
+        return Salesman::findByToken($token);
     }
 
     /**

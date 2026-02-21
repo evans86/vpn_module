@@ -72,15 +72,28 @@ class Salesman extends Authenticatable
     }
 
     /**
-     * Set the token attribute (always encrypt)
+     * Set the token attribute. Храним в открытом виде — по токену ищут вебхук и другие сервисы.
      */
     public function setTokenAttribute($value)
     {
-        if (!empty($value)) {
-            $this->attributes['token'] = encrypt($value);
-        } else {
-            $this->attributes['token'] = null;
+        $this->attributes['token'] = $value ?? null;
+    }
+
+    /**
+     * Поиск продавца по токену бота. Учитывает старые записи с зашифрованным токеном в БД.
+     */
+    public static function findByToken(string $token): ?self
+    {
+        /** @var static|null $salesman */
+        $salesman = static::query()->where('token', $token)->first();
+        if ($salesman !== null) {
+            return $salesman;
         }
+        $found = static::query()->get()->first(function ($s) use ($token) {
+            return $s->token === $token;
+        });
+
+        return $found instanceof static ? $found : null;
     }
 
     public function botModule(): BelongsTo
