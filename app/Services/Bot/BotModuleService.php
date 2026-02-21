@@ -113,19 +113,31 @@ class BotModuleService
     }
 
     /**
-     * Удаление модуля
-     *
-     * @param string $public_key
-     * @param string $private_key
-     * @return void
+     * Удаление модуля по ключам
      */
     public function delete(string $public_key, string $private_key): void
     {
         $bot = BotModule::query()->where('public_key', $public_key)->where('private_key', $private_key)->first();
-        if (empty($bot))
+        if (empty($bot)) {
             throw new RuntimeException('Not found module.');
-        if (!$bot->delete())
+        }
+        if (!$bot->delete()) {
             throw new RuntimeException('Bot dont delete');
+        }
+    }
+
+    /**
+     * Удаление модуля по id (для вызова из списка BOT T)
+     */
+    public function deleteById(int $id): void
+    {
+        $bot = BotModule::query()->find($id);
+        if (empty($bot)) {
+            throw new RuntimeException('Not found module.');
+        }
+        if (!$bot->delete()) {
+            throw new RuntimeException('Bot dont delete');
+        }
     }
 
     public function getDefaultVpnInstructions(): string
