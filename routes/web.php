@@ -177,6 +177,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/{id}/assign-panel', [SalesmanController::class, 'assignPanel'])->name('assign-panel');
                 Route::post('/{id}/reset-panel', [SalesmanController::class, 'resetPanel'])->name('reset-panel');
                 Route::post('/{id}/update-bot-token', [SalesmanController::class, 'updateBotToken'])->name('update-bot-token');
+                Route::post('/{id}/update-module', [SalesmanController::class, 'updateModule'])->name('update-module');
             });
 
             // Pack

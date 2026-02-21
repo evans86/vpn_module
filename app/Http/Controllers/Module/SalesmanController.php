@@ -327,4 +327,43 @@ class SalesmanController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Ручная установка/смена модуля VPN (ID модуля) для продавца
+     *
+     * @param Request $request
+     * @param int $id
+     * @return JsonResponse
+     */
+    public function updateModule(Request $request, int $id): JsonResponse
+    {
+        try {
+            $request->validate([
+                'module_bot_id' => 'nullable|integer|min:0',
+            ]);
+
+            $salesman = $this->salesmanRepository->findById($id);
+            $salesman->module_bot_id = $request->input('module_bot_id') ?: null;
+            $salesman->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Модуль VPN успешно обновлён',
+                'module_bot_id' => $salesman->module_bot_id,
+            ]);
+        } catch (Exception $e) {
+            Log::error('Error updating salesman module', [
+                'source' => 'salesman',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'salesman_id' => $id,
+                'user_id' => auth()->id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

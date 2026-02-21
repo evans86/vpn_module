@@ -171,13 +171,43 @@
             <div class="mb-6">
                 <div class="flex justify-between items-center mb-4">
                     <h5 class="text-lg font-semibold text-gray-900">Модуль VPN</h5>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">ID</label>
-                        <input type="text" 
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-50 text-gray-500 sm:text-sm" 
-                               value="{{ $salesman->module_bot_id ?? 'Не указан' }}" 
-                               readonly>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ID модуля</label>
+                        <form id="updateModuleForm" class="flex gap-2 items-end" data-salesman-id="{{ $salesman->id }}">
+                            @csrf
+                            <input type="number"
+                                   name="module_bot_id"
+                                   id="moduleBotIdInput"
+                                   min="0"
+                                   step="1"
+                                   placeholder="Введите ID модуля или оставьте пустым"
+                                   value="{{ $salesman->module_bot_id ?? '' }}"
+                                   class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            <button type="submit"
+                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                Сохранить
+                            </button>
+                        </form>
+                        <p class="mt-1 text-xs text-gray-500">ID записи из таблицы модулей (bot_module). Пусто — отвязать модуль.</p>
                     </div>
+                    @if($salesman->botModule !== null)
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Public key привязанного модуля</label>
+                        <div class="flex rounded-md shadow-sm">
+                            <input type="text"
+                                   class="flex-1 rounded-l-md border-gray-300 shadow-sm bg-gray-50 text-gray-500 sm:text-sm"
+                                   value="{{ $salesman->botModule->public_key }}"
+                                   id="modulePublicKeyDisplay"
+                                   readonly>
+                            <button class="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 rounded-r-md bg-white text-gray-500 hover:bg-gray-50"
+                                    data-clipboard-target="#modulePublicKeyDisplay">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                    @endif
                 </div>
 
                 <!-- Пакеты продавца -->
@@ -450,6 +480,33 @@
                     },
                     error: function (xhr) {
                         toastr.error(xhr.responseJSON?.message || 'Произошла ошибка при привязке панели');
+                    }
+                });
+            });
+
+            // Ручное сохранение ID модуля VPN
+            $('#updateModuleForm').on('submit', function (e) {
+                e.preventDefault();
+                const salesmanId = $(this).data('salesman-id');
+                const moduleBotId = $('#moduleBotIdInput').val();
+
+                const payload = { _token: $('meta[name="csrf-token"]').attr('content') };
+                if (moduleBotId !== '') payload.module_bot_id = parseInt(moduleBotId, 10);
+
+                $.ajax({
+                    url: `/admin/module/salesman/${salesmanId}/update-module`,
+                    method: 'POST',
+                    data: payload,
+                    success: function (response) {
+                        if (response.success) {
+                            toastr.success(response.message);
+                            location.reload();
+                        } else {
+                            toastr.error(response.message || 'Произошла ошибка');
+                        }
+                    },
+                    error: function (xhr) {
+                        toastr.error(xhr.responseJSON?.message || 'Произошла ошибка при сохранении модуля');
                     }
                 });
             });
