@@ -116,4 +116,42 @@ class BotModule extends Model
     {
         return $this->hasOne(Salesman::class, 'module_bot_id');
     }
+
+    /**
+     * Поиск модуля по ключам. Учитывает старые записи с зашифрованными ключами в БД.
+     */
+    public static function findByKeys(string $publicKey, string $privateKey): ?self
+    {
+        /** @var static|null $module */
+        $module = static::query()
+            ->where('public_key', $publicKey)
+            ->where('private_key', $privateKey)
+            ->first();
+        if ($module !== null) {
+            return $module;
+        }
+        // Старые записи могли быть сохранены в зашифрованном виде — ищем по расшифрованным (геттер)
+        $found = static::query()->get()->first(function ($m) use ($publicKey, $privateKey) {
+            return $m->public_key === $publicKey && $m->private_key === $privateKey;
+        });
+
+        return $found instanceof static ? $found : null;
+    }
+
+    /**
+     * Поиск модуля по public_key (для getSettings). Учитывает старые зашифрованные записи.
+     */
+    public static function findByPublicKey(string $publicKey): ?self
+    {
+        /** @var static|null $module */
+        $module = static::query()->where('public_key', $publicKey)->first();
+        if ($module !== null) {
+            return $module;
+        }
+        $found = static::query()->get()->first(function ($m) use ($publicKey) {
+            return $m->public_key === $publicKey;
+        });
+
+        return $found instanceof static ? $found : null;
+    }
 }

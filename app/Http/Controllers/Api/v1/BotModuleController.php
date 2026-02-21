@@ -56,14 +56,9 @@ class BotModuleController extends Controller
                 return ApiHelpers::success(BotModuleFactory::fromEntity($existingModule)->getArray());
             }
 
-            // Проверяем уникальность public_key и private_key
-            /** @var BotModule|null $existingByKeys */
-            $existingByKeys = BotModule::query()
-                ->where('public_key', $request->public_key)
-                ->orWhere('private_key', $request->private_key)
-                ->first();
-
-            if ($existingByKeys instanceof BotModule) {
+            // Проверяем уникальность по ключам (учитываем и старые зашифрованные записи)
+            $existingByKeys = BotModule::findByKeys($request->public_key, $request->private_key);
+            if ($existingByKeys !== null) {
                 return ApiHelpers::error('Module with these keys already exists');
             }
 
@@ -101,10 +96,7 @@ class BotModuleController extends Controller
             /**
              * @var BotModule|null $botModule
              */
-            $botModule = BotModule::query()
-                ->where('public_key', $request->public_key)
-                ->where('private_key', $request->private_key)
-                ->first();
+            $botModule = BotModule::findByKeys($request->public_key, $request->private_key);
 
             if (!$botModule) {
                 return ApiHelpers::error('Not found module.');
@@ -139,7 +131,7 @@ class BotModuleController extends Controller
             /**
              * @var BotModule|null $botModule
              */
-            $botModule = BotModule::query()->where('public_key', $request->public_key)->first();
+            $botModule = BotModule::findByPublicKey($request->public_key);
 
             if (!$botModule) {
                 throw new RuntimeException('Not found module.');
