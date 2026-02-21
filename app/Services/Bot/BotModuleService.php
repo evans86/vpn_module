@@ -69,35 +69,33 @@ class BotModuleService
         $bot->free_show = $dto->free_show;
         $bot->bot_user_id = $dto->bot_user_id;
 
-        $creator = BottApi::getCreator($dto->public_key, $dto->private_key);
-        
-        // Проверка наличия данных в ответе API
-        if (!isset($creator['data']) || !isset($creator['data']['user'])) {
-            Log::error('Invalid API response from getCreator', [
+        // Привязка к продавцу через API BOT T — при ошибке не блокируем сохранение настроек модуля
+        try {
+            $creator = BottApi::getCreator($dto->public_key, $dto->private_key);
+            if (isset($creator['data']['user'])) {
+                $telegramId = $creator['data']['user']['telegram_id'];
+                $username = $creator['data']['user']['username'] ?? null;
+                $salesman = Salesman::query()->where('telegram_id', $telegramId)->first();
+                if (!$salesman) {
+                    $this->salesmanService->create($telegramId, $username);
+                    $salesman = Salesman::query()->where('telegram_id', $telegramId)->first();
+                }
+                if ($salesman) {
+                    $salesman->module_bot_id = $dto->id;
+                    $salesman->save();
+                }
+            } else {
+                Log::warning('BotModuleService::update getCreator — нет user в ответе', [
+                    'public_key' => $dto->public_key,
+                    'response' => $creator
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('BotModuleService::update getCreator — ошибка, настройки модуля сохраняем', [
                 'public_key' => $dto->public_key,
-                'response' => $creator
+                'message' => $e->getMessage()
             ]);
-            throw new RuntimeException('Invalid API response: missing user data');
         }
-
-        $telegramId = $creator['data']['user']['telegram_id'];
-        $username = $creator['data']['user']['username'] ?? null;
-        
-        $salesman = Salesman::query()->where('telegram_id', $telegramId)->first();
-
-        if (!isset($salesman)) {
-            $this->salesmanService->create($telegramId, $username);
-        }
-
-        $salesman = Salesman::query()->where('telegram_id', $telegramId)->first();
-        if (!$salesman) {
-            throw new RuntimeException('Failed to create or find salesman');
-        }
-        
-        $salesman->module_bot_id = $dto->id;
-
-        if (!$salesman->save())
-            throw new RuntimeException('salesman dont save');
 
         if (!$bot->save())
             throw new RuntimeException('bot dont save');
