@@ -59,14 +59,8 @@ class BotModuleService
     public function update(BotModuleDto $dto): BotModule
     {
         $bot = BotModule::query()->where('public_key', $dto->public_key)->where('private_key', $dto->private_key)->first();
-        if (empty($bot)) {
-            Log::warning('BotModuleService::update: module not found by keys', [
-                'public_key' => $dto->public_key,
-                'id' => $dto->id,
-                'modules_count' => BotModule::query()->count(),
-            ]);
+        if (empty($bot))
             throw new RuntimeException('Not found module.');
-        }
 
         $bot->version = $dto->version;
         $bot->category_id = $dto->category_id;
@@ -120,13 +114,8 @@ class BotModuleService
     public function delete(string $public_key, string $private_key): void
     {
         $bot = BotModule::query()->where('public_key', $public_key)->where('private_key', $private_key)->first();
-        if (empty($bot)) {
-            Log::warning('BotModuleService::delete: module not found', [
-                'public_key' => $public_key,
-                'modules_count' => BotModule::query()->count(),
-            ]);
+        if (empty($bot))
             throw new RuntimeException('Not found module.');
-        }
         if (!$bot->delete())
             throw new RuntimeException('Bot dont delete');
     }

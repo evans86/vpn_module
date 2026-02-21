@@ -45,11 +45,6 @@ class BotModuleController extends Controller
      */
     public function create(BotCreateRequest $request)
     {
-        Log::info('bot-module.create', [
-            'bot_id' => $request->bot_id,
-            'public_key' => $request->public_key,
-            'private_key' => $request->private_key ? '(set)' : null,
-        ]);
         try {
             // Проверяем, существует ли уже модуль с таким bot_id
             /** @var BotModule|null $existingModule */
@@ -58,11 +53,6 @@ class BotModuleController extends Controller
                 ->first();
 
             if ($existingModule instanceof BotModule) {
-                // Если модуль уже существует, возвращаем его
-                Log::info('Модуль с bot_id уже существует, возвращаем существующий', [
-                    'bot_id' => $request->bot_id,
-                    'module_id' => $existingModule->id
-                ]);
                 return ApiHelpers::success(BotModuleFactory::fromEntity($existingModule)->getArray());
             }
 
@@ -74,10 +64,6 @@ class BotModuleController extends Controller
                 ->first();
 
             if ($existingByKeys instanceof BotModule) {
-                Log::warning('Попытка создать модуль с существующими ключами', [
-                    'bot_id' => $request->bot_id,
-                    'existing_bot_id' => $existingByKeys->bot_id
-                ]);
                 return ApiHelpers::error('Module with these keys already exists');
             }
 
@@ -111,10 +97,6 @@ class BotModuleController extends Controller
      */
     public function get(BotGetRequest $request)
     {
-        Log::info('bot-module.get', [
-            'public_key' => $request->public_key,
-            'private_key' => $request->private_key ? '(set)' : null,
-        ]);
         try {
             /**
              * @var BotModule|null $botModule
@@ -125,13 +107,9 @@ class BotModuleController extends Controller
                 ->first();
 
             if (!$botModule) {
-                Log::warning('bot-module.get: module not found', [
-                    'public_key' => $request->public_key,
-                    'modules_count' => BotModule::query()->count(),
-                ]);
                 return ApiHelpers::error('Not found module.');
             }
-            
+
             return ApiHelpers::success(BotModuleFactory::fromEntity($botModule)->getArray());
         } catch (RuntimeException $r) {
             return ApiHelpers::error($r->getMessage());
@@ -154,7 +132,6 @@ class BotModuleController extends Controller
      */
     public function getSettings(Request $request)
     {
-        Log::info('bot-module.getSettings', ['public_key' => $request->public_key]);
         try {
             $request->validate([
                 'public_key' => 'required|string',
@@ -165,10 +142,6 @@ class BotModuleController extends Controller
             $botModule = BotModule::query()->where('public_key', $request->public_key)->first();
 
             if (!$botModule) {
-                Log::warning('bot-module.getSettings: module not found', [
-                    'public_key' => $request->public_key,
-                    'modules_count' => BotModule::query()->count(),
-                ]);
                 throw new RuntimeException('Not found module.');
             }
 
@@ -198,14 +171,8 @@ class BotModuleController extends Controller
      */
     public function update(BotUpdateRequest $request)
     {
-        $dto = $request->getDto();
-        Log::info('bot-module.update', [
-            'id' => $dto->id,
-            'public_key' => $dto->public_key,
-            'private_key' => $dto->private_key ? '(set)' : null,
-        ]);
         try {
-            $botModule = $this->botModuleService->update($dto);
+            $botModule = $this->botModuleService->update($request->getDto());
             /**
              * @var BotModule|null $botModule
              */
@@ -220,12 +187,6 @@ class BotModuleController extends Controller
             
             return ApiHelpers::success(BotModuleFactory::fromEntity($botModule)->getArray());
         } catch (RuntimeException $r) {
-            Log::warning('bot-module.update: exception', [
-                'message' => $r->getMessage(),
-                'id' => $request->id ?? null,
-                'public_key' => $request->public_key ?? null,
-                'modules_count' => BotModule::query()->count(),
-            ]);
             return ApiHelpers::error($r->getMessage());
         } catch (Exception $e) {
             Log::error('Ошибка при обновлении модуля', [
@@ -246,10 +207,6 @@ class BotModuleController extends Controller
      */
     public function delete(Request $request)
     {
-        Log::info('bot-module.delete', [
-            'public_key' => $request->input('public_key'),
-            'private_key' => $request->input('private_key') ? '(set)' : null,
-        ]);
         try {
             $validated = $request->validate([
                 'public_key' => 'required|string',
@@ -259,11 +216,6 @@ class BotModuleController extends Controller
             $this->botModuleService->delete($validated['public_key'], $validated['private_key']);
             return ApiHelpers::success('OK');
         } catch (RuntimeException $r) {
-            Log::warning('bot-module.delete: exception', [
-                'message' => $r->getMessage(),
-                'public_key' => $validated['public_key'] ?? $request->input('public_key'),
-                'modules_count' => BotModule::query()->count(),
-            ]);
             return ApiHelpers::error($r->getMessage());
         } catch (Exception $e) {
             Log::error('Ошибка при удалении модуля', [
