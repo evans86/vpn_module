@@ -204,6 +204,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/mass-transfer/key-count', [ServerUserTransferController::class, 'massTransferKeyCount'])->name('mass-transfer.key-count');
                 Route::post('/mass-transfer/run', [ServerUserTransferController::class, 'massTransfer'])->name('mass-transfer.run');
                 Route::post('/mass-transfer/run-batch', [ServerUserTransferController::class, 'massTransferBatch'])->name('mass-transfer.run-batch');
+                Route::post('/balance/stats', [ServerUserTransferController::class, 'balanceStats'])->name('balance.stats');
+                Route::post('/balance/step', [ServerUserTransferController::class, 'balanceStep'])->name('balance.step');
                 Route::post('/panels', [ServerUserTransferController::class, 'getPanels'])->name('panels');
                 Route::post('/transfer', [ServerUserTransferController::class, 'transfer'])->name('transfer');
             });

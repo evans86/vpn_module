@@ -105,6 +105,57 @@
                 </div>
             </div>
         </x-admin.card>
+
+        <x-admin.card title="Выравнивание нагрузки по панелям">
+            <p class="text-sm text-gray-600 mb-4">
+                Перенос ключей с самых загруженных панелей на наименее загруженные (тот же принцип, что и выше). Ссылка на конфиг не меняется — пользователю достаточно обновить подписку.
+            </p>
+            <div class="flex items-center gap-4 mb-4 flex-wrap">
+                <button type="button" id="btn-refresh-balance-stats" class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    <i class="fas fa-sync-alt mr-1.5"></i> Обновить статистику
+                </button>
+                <label class="inline-flex items-center gap-2 text-sm text-gray-600">
+                    <span>Порция за шаг:</span>
+                    <input type="number" id="balance-batch-size" value="50" min="10" max="150" class="rounded border-gray-300 w-20 text-sm">
+                </label>
+                <label class="inline-flex items-center gap-2 text-sm text-gray-600">
+                    <span>Считать выровненным при разнице ≤</span>
+                    <input type="number" id="balance-threshold" value="100" min="0" max="2000" class="rounded border-gray-300 w-20 text-sm">
+                </label>
+            </div>
+            <div id="balance-summary" class="mb-4 p-3 bg-gray-50 rounded-lg text-sm hidden">
+                <p><strong>Всего пользователей:</strong> <span id="stats-total">—</span></p>
+                <p><strong>Среднее на панель:</strong> <span id="stats-average">—</span></p>
+                <p><strong>Разница (макс − мин):</strong> <span id="stats-diff">—</span></p>
+            </div>
+            <div class="overflow-x-auto border border-gray-200 rounded-md mb-4">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Панель</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Сервер</th>
+                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Активных пользователей</th>
+                        </tr>
+                    </thead>
+                    <tbody id="balance-table-body" class="bg-white divide-y divide-gray-200">
+                        <tr><td colspan="3" class="px-3 py-4 text-gray-500 text-center">Нажмите «Обновить статистику»</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="flex items-center gap-4">
+                <button type="button" id="btn-balance" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-balance-scale mr-2"></i> Выровнять нагрузку
+                </button>
+            </div>
+            <div id="balance-progress" class="mt-6 p-4 rounded-lg border border-blue-200 bg-blue-50 hidden" aria-live="polite">
+                <h4 class="font-medium text-gray-900 mb-2">Прогресс</h4>
+                <p id="balance-progress-text" class="text-sm text-gray-700"></p>
+            </div>
+            <div id="balance-result" class="mt-6 p-4 rounded-lg border hidden" aria-live="polite">
+                <h4 class="font-medium text-gray-900 mb-2">Результат</h4>
+                <p id="balance-result-message" class="text-sm"></p>
+            </div>
+        </x-admin.card>
     </div>
 
     <script>
@@ -298,5 +349,124 @@
             }
             runBatch();
         });
+
+        (function () {
+            var balancePanels = @json($panels->keyBy('id'));
+            var balanceStatsUrl = '{{ route('admin.module.server-user-transfer.balance.stats') }}';
+            var balanceStepUrl = '{{ route('admin.module.server-user-transfer.balance.step') }}';
+            var balanceCsrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content') || (document.querySelector('input[name="_token"]') && document.querySelector('input[name="_token"]').value);
+
+            function balanceRenderTable(counts) {
+                var tbody = document.getElementById('balance-table-body');
+                if (!counts || Object.keys(counts).length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-4 text-gray-500 text-center">Нет данных</td></tr>';
+                    return;
+                }
+                var rows = [];
+                Object.keys(counts).sort(function (a, b) { return parseInt(a, 10) - parseInt(b, 10); }).forEach(function (panelId) {
+                    var p = balancePanels[panelId];
+                    var name = p && p.server ? p.server.name : '—';
+                    rows.push('<tr><td class="px-3 py-2">Панель #' + panelId + '</td><td class="px-3 py-2">' + name + '</td><td class="px-3 py-2 text-right font-medium">' + counts[panelId] + '</td></tr>');
+                });
+                tbody.innerHTML = rows.join('');
+            }
+
+            function balanceUpdateSummary(data) {
+                document.getElementById('stats-total').textContent = data.total != null ? data.total : '—';
+                document.getElementById('stats-average').textContent = data.average != null ? data.average : '—';
+                document.getElementById('stats-diff').textContent = data.diff != null ? data.diff : '—';
+                document.getElementById('balance-summary').classList.remove('hidden');
+            }
+
+            function loadBalanceStats() {
+                var tbody = document.getElementById('balance-table-body');
+                tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-4 text-gray-500 text-center">Загрузка…</td></tr>';
+                fetch(balanceStatsUrl, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': balanceCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.success && data.counts) {
+                            balanceRenderTable(data.counts);
+                            balanceUpdateSummary(data);
+                        } else {
+                            tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-4 text-red-500 text-center">Ошибка загрузки</td></tr>';
+                        }
+                    })
+                    .catch(function () {
+                        tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-4 text-red-500 text-center">Ошибка сети</td></tr>';
+                    });
+            }
+
+            document.getElementById('btn-refresh-balance-stats').addEventListener('click', loadBalanceStats);
+
+            document.getElementById('btn-balance').addEventListener('click', function () {
+                var btn = this;
+                var progressBlock = document.getElementById('balance-progress');
+                var progressText = document.getElementById('balance-progress-text');
+                var resultBlock = document.getElementById('balance-result');
+                var resultMessage = document.getElementById('balance-result-message');
+                var batchSize = parseInt(document.getElementById('balance-batch-size').value, 10) || 50;
+                var threshold = parseInt(document.getElementById('balance-threshold').value, 10) || 100;
+                btn.disabled = true;
+                resultBlock.classList.add('hidden');
+                progressBlock.classList.remove('hidden');
+                progressText.textContent = 'Запуск выравнивания…';
+                var totalMoved = 0;
+
+                function runBalanceStep() {
+                    fetch(balanceStepUrl, {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': balanceCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ batch_size: batchSize, max_diff_threshold: threshold }),
+                    })
+                        .then(function (r) { return r.json(); })
+                        .then(function (data) {
+                            if (!data.success) {
+                                progressBlock.classList.add('hidden');
+                                resultBlock.classList.remove('hidden');
+                                resultBlock.classList.add('border-red-200', 'bg-red-50');
+                                resultMessage.textContent = data.message || 'Ошибка';
+                                btn.disabled = false;
+                                if (typeof toastr !== 'undefined') toastr.error(data.message);
+                                return;
+                            }
+                            totalMoved += data.moved || 0;
+                            if (data.counts) {
+                                balanceRenderTable(data.counts);
+                                balanceUpdateSummary({
+                                    total: Object.values(data.counts).reduce(function (a, b) { return a + b; }, 0),
+                                    average: data.counts && Object.keys(data.counts).length ? Math.round(Object.values(data.counts).reduce(function (a, b) { return a + b; }, 0) / Object.keys(data.counts).length) : 0,
+                                    diff: data.counts && Object.keys(data.counts).length ? Math.max.apply(null, Object.values(data.counts)) - Math.min.apply(null, Object.values(data.counts)) : 0,
+                                });
+                            }
+                            progressText.textContent = (data.message || '') + ' Всего перенесено: ' + totalMoved;
+                            if (data.done) {
+                                progressBlock.classList.add('hidden');
+                                resultBlock.classList.remove('hidden');
+                                resultBlock.classList.remove('border-red-200', 'bg-red-50');
+                                resultBlock.classList.add('border-green-200', 'bg-green-50');
+                                resultMessage.textContent = 'Выравнивание завершено. Всего перенесено ключей: ' + totalMoved + '.';
+                                btn.disabled = false;
+                                if (typeof toastr !== 'undefined') toastr.success('Выравнивание завершено.');
+                                loadBalanceStats();
+                                return;
+                            }
+                            runBalanceStep();
+                        })
+                        .catch(function (err) {
+                            progressBlock.classList.add('hidden');
+                            resultBlock.classList.remove('hidden');
+                            resultBlock.classList.add('border-red-200', 'bg-red-50');
+                            resultMessage.textContent = 'Ошибка запроса: ' + (err.message || 'неизвестная ошибка');
+                            btn.disabled = false;
+                            if (typeof toastr !== 'undefined') toastr.error('Ошибка запроса');
+                        });
+                }
+                runBalanceStep();
+            });
+        })();
     </script>
 @endsection

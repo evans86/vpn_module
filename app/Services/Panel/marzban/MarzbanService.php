@@ -2293,6 +2293,41 @@ class MarzbanService
     }
 
     /**
+     * Количество активных пользователей по каждой панели Marzban (для балансировки).
+     *
+     * @return array<int, int> [panel_id => count]
+     */
+    public function getActiveUserCountPerPanel(): array
+    {
+        $panelIds = Panel::query()
+            ->where('panel', Panel::MARZBAN)
+            ->where('panel_status', Panel::PANEL_CONFIGURED)
+            ->pluck('id');
+
+        if ($panelIds->isEmpty()) {
+            return [];
+        }
+
+        $counts = KeyActivateUser::query()
+            ->join('server_user', 'key_activate_user.server_user_id', '=', 'server_user.id')
+            ->join('key_activate', 'key_activate_user.key_activate_id', '=', 'key_activate.id')
+            ->where('key_activate.status', KeyActivate::ACTIVE)
+            ->whereIn('server_user.panel_id', $panelIds)
+            ->selectRaw('server_user.panel_id as panel_id, count(*) as cnt')
+            ->groupBy('server_user.panel_id')
+            ->pluck('cnt', 'panel_id')
+            ->toArray();
+
+        foreach ($panelIds as $id) {
+            if (!isset($counts[$id])) {
+                $counts[$id] = 0;
+            }
+        }
+
+        return $counts;
+    }
+
+    /**
      * Получить текстовое представление статуса по коду
      *
      * @param int $statusCode

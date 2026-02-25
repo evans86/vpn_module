@@ -422,4 +422,160 @@ class ServerUserTransferController extends Controller
             ini_set('memory_limit', $originalMemoryLimit);
         }
     }
+
+    /**
+     * Текущая статистика по панелям (количество активных пользователей).
+     */
+    public function balanceStats(Request $request): JsonResponse
+    {
+        $marzbanService = app(MarzbanService::class);
+        $counts = $marzbanService->getActiveUserCountPerPanel();
+
+        $total = array_sum($counts);
+        $panelCount = count($counts);
+        $average = $panelCount > 0 ? round($total / $panelCount, 0) : 0;
+
+        $maxPanelId = null;
+        $minPanelId = null;
+        $maxCount = 0;
+        $minCount = PHP_INT_MAX;
+        foreach ($counts as $panelId => $cnt) {
+            if ($cnt > $maxCount) {
+                $maxCount = $cnt;
+                $maxPanelId = (int) $panelId;
+            }
+            if ($cnt < $minCount) {
+                $minCount = $cnt;
+                $minPanelId = (int) $panelId;
+            }
+        }
+        if ($minCount === PHP_INT_MAX) {
+            $minCount = 0;
+        }
+
+        return response()->json([
+            'success' => true,
+            'counts' => $counts,
+            'total' => $total,
+            'average' => $average,
+            'max_panel_id' => $maxPanelId,
+            'min_panel_id' => $minPanelId,
+            'max_count' => $maxCount,
+            'min_count' => $minCount,
+            'diff' => $maxPanelId !== null ? $maxCount - $minCount : 0,
+        ]);
+    }
+
+    /**
+     * Один шаг выравнивания: перенос порции ключей с самой загруженной панели на наименее загруженную.
+     */
+    public function balanceStep(Request $request): JsonResponse
+    {
+        $originalMemoryLimit = ini_get('memory_limit');
+        ini_set('memory_limit', '512M');
+
+        try {
+            $validated = $request->validate([
+                'batch_size' => 'sometimes|integer|min:10|max:150',
+                'max_diff_threshold' => 'sometimes|integer|min:0|max:5000',
+            ]);
+
+            $batchSize = (int) ($validated['batch_size'] ?? 50);
+            $maxDiffThreshold = (int) ($validated['max_diff_threshold'] ?? 100);
+
+            $marzbanService = app(MarzbanService::class);
+            $counts = $marzbanService->getActiveUserCountPerPanel();
+
+            if (count($counts) < 2) {
+                return response()->json([
+                    'success' => true,
+                    'done' => true,
+                    'moved' => 0,
+                    'message' => 'Нужно минимум 2 панели для выравнивания.',
+                    'counts' => $counts,
+                ]);
+            }
+
+            $maxPanelId = null;
+            $minPanelId = null;
+            $maxCount = 0;
+            $minCount = PHP_INT_MAX;
+            foreach ($counts as $panelId => $cnt) {
+                if ($cnt > $maxCount) {
+                    $maxCount = $cnt;
+                    $maxPanelId = (int) $panelId;
+                }
+                if ($cnt < $minCount) {
+                    $minCount = $cnt;
+                    $minPanelId = (int) $panelId;
+                }
+            }
+            if ($minCount === PHP_INT_MAX) {
+                $minCount = 0;
+            }
+
+            $diff = $maxCount - $minCount;
+            if ($diff <= $maxDiffThreshold || $maxPanelId === null || $minPanelId === null || $maxPanelId === $minPanelId) {
+                return response()->json([
+                    'success' => true,
+                    'done' => true,
+                    'moved' => 0,
+                    'message' => $diff <= $maxDiffThreshold ? 'Нагрузка уже выровнена (разница ≤ ' . $maxDiffThreshold . ').' : 'Нечего переносить.',
+                    'counts' => $marzbanService->getActiveUserCountPerPanel(),
+                ]);
+            }
+
+            $keyIds = $marzbanService->getActiveKeyIdsOnPanel($maxPanelId);
+            $chunk = $keyIds->take($batchSize);
+
+            if ($chunk->isEmpty()) {
+                return response()->json([
+                    'success' => true,
+                    'done' => true,
+                    'moved' => 0,
+                    'message' => 'Нет ключей для переноса на самой загруженной панели.',
+                    'counts' => $marzbanService->getActiveUserCountPerPanel(),
+                ]);
+            }
+
+            $moved = 0;
+            $errors = [];
+            foreach ($chunk as $keyActivateId) {
+                try {
+                    $marzbanService->transferUserWithoutSourcePanel($maxPanelId, $minPanelId, $keyActivateId);
+                    $moved++;
+                } catch (Exception $e) {
+                    Log::warning('Balance step: failed key', ['key_activate_id' => $keyActivateId, 'error' => $e->getMessage()]);
+                    $errors[] = ['key_id' => $keyActivateId, 'message' => $e->getMessage()];
+                }
+            }
+
+            $newCounts = $marzbanService->getActiveUserCountPerPanel();
+            $newMax = $newCounts ? max($newCounts) : 0;
+            $newMin = $newCounts ? min($newCounts) : 0;
+            $newDiff = $newMax - $newMin;
+
+            return response()->json([
+                'success' => true,
+                'done' => $newDiff <= $maxDiffThreshold,
+                'moved' => $moved,
+                'from_panel_id' => $maxPanelId,
+                'to_panel_id' => $minPanelId,
+                'counts' => $newCounts,
+                'message' => "Перенесено {$moved} ключей с панели #{$maxPanelId} на панель #{$minPanelId}. Разница: {$newDiff}.",
+                'errors' => $errors,
+            ]);
+        } catch (Exception $e) {
+            Log::error('Balance step failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json([
+                'success' => false,
+                'done' => false,
+                'moved' => 0,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+                'counts' => [],
+            ], 500);
+        } finally {
+            ini_set('memory_limit', $originalMemoryLimit);
+        }
+    }
 }
