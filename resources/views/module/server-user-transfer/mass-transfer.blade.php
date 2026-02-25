@@ -81,6 +81,28 @@
                 <h4 class="font-medium text-gray-900 mb-2">Результат</h4>
                 <p id="result-message" class="text-sm"></p>
                 <div id="result-errors" class="mt-2 text-sm text-red-600 max-h-48 overflow-y-auto hidden"></div>
+                <div id="result-report-wrap" class="mt-4 hidden">
+                    <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
+                        <h5 class="font-medium text-gray-800">Отчёт о перенесённых ключах</h5>
+                        <button type="button" id="btn-download-report" class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            <i class="fas fa-download mr-1.5"></i> Скачать отчёт (CSV)
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto max-h-64 overflow-y-auto border border-gray-200 rounded-md">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead class="bg-gray-50 sticky top-0">
+                                <tr>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">ID ключа</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Пользователь сервера</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Трафик (МБ)</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Окончание</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Telegram ID</th>
+                                </tr>
+                            </thead>
+                            <tbody id="result-report-body" class="bg-white divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </x-admin.card>
     </div>
@@ -117,6 +139,31 @@
 
         var BATCH_SIZE = 100;
         var totalKeys = 0;
+        var lastTransferReport = [];
+
+        document.getElementById('btn-download-report').addEventListener('click', function () {
+            if (!lastTransferReport.length) return;
+            var headers = ['key_activate_id', 'server_user_id', 'traffic_limit_mb', 'traffic_limit_bytes', 'expire_date', 'finish_at', 'user_tg_id'];
+            var rows = [headers.join(',')];
+            lastTransferReport.forEach(function (r) {
+                rows.push([
+                    (r.key_activate_id || '').replace(/"/g, '""'),
+                    (r.server_user_id || '').replace(/"/g, '""'),
+                    r.traffic_limit_mb != null ? r.traffic_limit_mb : '',
+                    r.traffic_limit_bytes != null ? r.traffic_limit_bytes : '',
+                    (r.expire_date || '').replace(/"/g, '""'),
+                    r.finish_at != null ? r.finish_at : '',
+                    r.user_tg_id != null ? r.user_tg_id : ''
+                ].map(function (cell) { return typeof cell === 'string' && (cell.indexOf(',') >= 0 || cell.indexOf('"') >= 0) ? '"' + cell + '"' : cell; }).join(','));
+            });
+            var csv = '\uFEFF' + rows.join('\r\n');
+            var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'mass-transfer-report-' + new Date().toISOString().slice(0, 10) + '.csv';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        });
 
         document.getElementById('btn-test-transfer').addEventListener('click', function () {
             var form = document.getElementById('mass-transfer-form');
@@ -151,6 +198,7 @@
             var totalTransferred = 0;
             var totalFailed = 0;
             var allErrors = [];
+            var allTransferredKeys = [];
 
             function runBatch() {
                 var fd = new FormData(form);
@@ -185,6 +233,9 @@
                         if (data.errors && data.errors.length) {
                             allErrors = allErrors.concat(data.errors);
                         }
+                        if (data.transferred_keys && data.transferred_keys.length) {
+                            allTransferredKeys = allTransferredKeys.concat(data.transferred_keys);
+                        }
                         var processed = totalTransferred + totalFailed;
                         if (totalKeys === 0 && (processed > 0 || (data.remaining !== undefined && data.remaining > 0))) {
                             totalKeys = processed + (data.remaining || 0);
@@ -214,6 +265,19 @@
                                 resultErrors.classList.add('hidden');
                                 resultErrors.innerHTML = '';
                             }
+                            var reportWrap = document.getElementById('result-report-wrap');
+                            var reportBody = document.getElementById('result-report-body');
+                            if (allTransferredKeys.length > 0 && reportWrap && reportBody) {
+                                reportWrap.classList.remove('hidden');
+                                reportBody.innerHTML = allTransferredKeys.map(function (r) {
+                                    function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+                                    return '<tr><td class="px-3 py-1.5 font-mono text-xs">' + esc(r.key_activate_id) + '</td><td class="px-3 py-1.5 font-mono text-xs">' + esc(r.server_user_id) + '</td><td class="px-3 py-1.5">' + esc(r.traffic_limit_mb) + '</td><td class="px-3 py-1.5">' + esc(r.expire_date) + '</td><td class="px-3 py-1.5">' + esc(r.user_tg_id) + '</td></tr>';
+                                }).join('');
+                            } else if (reportWrap) {
+                                reportWrap.classList.add('hidden');
+                                reportBody.innerHTML = '';
+                            }
+                            lastTransferReport = allTransferredKeys.slice(0);
                             if (typeof toastr !== 'undefined') toastr.success('Перенос завершён.');
                             if (alpineData && alpineData.$data.loadKeyCount) alpineData.$data.loadKeyCount();
                             btn.disabled = false;

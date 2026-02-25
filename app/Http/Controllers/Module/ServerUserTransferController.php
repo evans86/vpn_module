@@ -351,17 +351,29 @@ class ServerUserTransferController extends Controller
                     'transferred' => 0,
                     'failed' => 0,
                     'errors' => [],
+                    'transferred_keys' => [],
                     'message' => 'Нет ключей для переноса в этой порции.',
                 ]);
             }
 
             $transferred = 0;
             $errors = [];
+            $transferredReport = [];
 
             foreach ($chunk as $keyActivateId) {
                 try {
-                    $marzbanService->transferUserWithoutSourcePanel($sourcePanelId, $targetPanelId, $keyActivateId);
+                    $serverUser = $marzbanService->transferUserWithoutSourcePanel($sourcePanelId, $targetPanelId, $keyActivateId);
+                    $keyActivate = KeyActivate::select('traffic_limit', 'finish_at', 'user_tg_id')->find($keyActivateId);
                     $transferred++;
+                    $transferredReport[] = [
+                        'key_activate_id' => $keyActivateId,
+                        'server_user_id' => $serverUser->id,
+                        'traffic_limit_bytes' => (int) ($keyActivate->traffic_limit ?? 0),
+                        'traffic_limit_mb' => round((int) ($keyActivate->traffic_limit ?? 0) / 1024 / 1024, 2),
+                        'finish_at' => $keyActivate->finish_at ? (int) $keyActivate->finish_at : null,
+                        'expire_date' => $keyActivate->finish_at ? date('Y-m-d H:i', (int) $keyActivate->finish_at) : null,
+                        'user_tg_id' => $keyActivate->user_tg_id ?? null,
+                    ];
                 } catch (Exception $e) {
                     Log::warning('Mass transfer batch: failed key', [
                         'key_activate_id' => $keyActivateId,
@@ -384,6 +396,7 @@ class ServerUserTransferController extends Controller
                 'transferred' => $transferred,
                 'failed' => count($errors),
                 'errors' => $errors,
+                'transferred_keys' => $transferredReport,
                 'processed_in_batch' => $chunk->count(),
                 'remaining' => $remainingAfterBatch,
                 'message' => $remainingAfterBatch > 0
@@ -403,6 +416,7 @@ class ServerUserTransferController extends Controller
                 'transferred' => 0,
                 'failed' => 0,
                 'errors' => [],
+                'transferred_keys' => [],
             ], 500);
         } finally {
             ini_set('memory_limit', $originalMemoryLimit);
