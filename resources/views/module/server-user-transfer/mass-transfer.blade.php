@@ -142,9 +142,12 @@
                     </tbody>
                 </table>
             </div>
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-4 flex-wrap">
                 <button type="button" id="btn-balance" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
                     <i class="fas fa-balance-scale mr-2"></i> Выровнять нагрузку
+                </button>
+                <button type="button" id="btn-balance-stop" class="hidden inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md shadow-sm text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                    <i class="fas fa-stop mr-2"></i> Остановить
                 </button>
             </div>
             <div id="balance-progress" class="mt-6 p-4 rounded-lg border border-blue-200 bg-blue-50 hidden" aria-live="polite">
@@ -402,6 +405,9 @@
 
             document.getElementById('btn-refresh-balance-stats').addEventListener('click', loadBalanceStats);
 
+            var balanceAborted = false;
+            var btnBalanceStop = document.getElementById('btn-balance-stop');
+
             document.getElementById('btn-balance').addEventListener('click', function () {
                 var btn = this;
                 var progressBlock = document.getElementById('balance-progress');
@@ -410,13 +416,16 @@
                 var resultMessage = document.getElementById('balance-result-message');
                 var batchSize = parseInt(document.getElementById('balance-batch-size').value, 10) || 50;
                 var threshold = parseInt(document.getElementById('balance-threshold').value, 10) || 100;
+                balanceAborted = false;
                 btn.disabled = true;
+                if (btnBalanceStop) btnBalanceStop.classList.remove('hidden');
                 resultBlock.classList.add('hidden');
                 progressBlock.classList.remove('hidden');
                 progressText.textContent = 'Запуск выравнивания…';
                 var totalMoved = 0;
 
                 function runBalanceStep() {
+                    if (balanceAborted) return;
                     fetch(balanceStepUrl, {
                         method: 'POST',
                         headers: { 'X-CSRF-TOKEN': balanceCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
@@ -424,12 +433,14 @@
                     })
                         .then(function (r) { return r.json(); })
                         .then(function (data) {
+                            if (balanceAborted) return;
                             if (!data.success) {
                                 progressBlock.classList.add('hidden');
                                 resultBlock.classList.remove('hidden');
                                 resultBlock.classList.add('border-red-200', 'bg-red-50');
                                 resultMessage.textContent = data.message || 'Ошибка';
                                 btn.disabled = false;
+                                if (btnBalanceStop) btnBalanceStop.classList.add('hidden');
                                 if (typeof toastr !== 'undefined') toastr.error(data.message);
                                 return;
                             }
@@ -450,21 +461,40 @@
                                 resultBlock.classList.add('border-green-200', 'bg-green-50');
                                 resultMessage.textContent = 'Выравнивание завершено. Всего перенесено ключей: ' + totalMoved + '.';
                                 btn.disabled = false;
+                                if (btnBalanceStop) btnBalanceStop.classList.add('hidden');
                                 if (typeof toastr !== 'undefined') toastr.success('Выравнивание завершено.');
                                 loadBalanceStats();
+                                return;
+                            }
+                            if (balanceAborted) {
+                                progressBlock.classList.add('hidden');
+                                resultBlock.classList.remove('hidden');
+                                resultBlock.classList.remove('border-red-200', 'bg-red-50');
+                                resultBlock.classList.add('border-amber-200', 'bg-amber-50');
+                                resultMessage.textContent = 'Остановлено пользователем. Перенесено ключей: ' + totalMoved + '.';
+                                btn.disabled = false;
+                                if (btnBalanceStop) btnBalanceStop.classList.add('hidden');
+                                if (typeof toastr !== 'undefined') toastr.info('Выравнивание остановлено.');
                                 return;
                             }
                             runBalanceStep();
                         })
                         .catch(function (err) {
+                            if (balanceAborted) return;
                             progressBlock.classList.add('hidden');
                             resultBlock.classList.remove('hidden');
                             resultBlock.classList.add('border-red-200', 'bg-red-50');
                             resultMessage.textContent = 'Ошибка запроса: ' + (err.message || 'неизвестная ошибка');
                             btn.disabled = false;
+                            if (btnBalanceStop) btnBalanceStop.classList.add('hidden');
                             if (typeof toastr !== 'undefined') toastr.error('Ошибка запроса');
                         });
                 }
+
+                btnBalanceStop && btnBalanceStop.addEventListener('click', function () {
+                    balanceAborted = true;
+                }, { once: true });
+
                 runBalanceStep();
             });
         })();
