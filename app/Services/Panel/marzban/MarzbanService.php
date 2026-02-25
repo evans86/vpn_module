@@ -2282,14 +2282,29 @@ class MarzbanService
      * @param int $panelId
      * @return \Illuminate\Support\Collection list of key_activate.id
      */
+    /**
+     * Условие: ключ активен по статусу и не просрочен по дате (finish_at > now или null).
+     */
+    private function activeKeyScope($query): void
+    {
+        $query->where('key_activate.status', KeyActivate::ACTIVE)
+            ->where(function ($q) {
+                $q->whereNull('key_activate.finish_at')
+                    ->orWhere('key_activate.finish_at', '>', time());
+            });
+    }
+
+    /**
+     * Список ID активных (и не просроченных) ключей на панели.
+     */
     public function getActiveKeyIdsOnPanel(int $panelId): \Illuminate\Support\Collection
     {
-        return KeyActivateUser::query()
+        $q = KeyActivateUser::query()
             ->join('server_user', 'key_activate_user.server_user_id', '=', 'server_user.id')
             ->join('key_activate', 'key_activate_user.key_activate_id', '=', 'key_activate.id')
-            ->where('server_user.panel_id', $panelId)
-            ->where('key_activate.status', KeyActivate::ACTIVE)
-            ->pluck('key_activate.id');
+            ->where('server_user.panel_id', $panelId);
+        $this->activeKeyScope($q);
+        return $q->pluck('key_activate.id');
     }
 
     /**
@@ -2308,12 +2323,12 @@ class MarzbanService
             return [];
         }
 
-        $counts = KeyActivateUser::query()
+        $q = KeyActivateUser::query()
             ->join('server_user', 'key_activate_user.server_user_id', '=', 'server_user.id')
             ->join('key_activate', 'key_activate_user.key_activate_id', '=', 'key_activate.id')
-            ->where('key_activate.status', KeyActivate::ACTIVE)
-            ->whereIn('server_user.panel_id', $panelIds)
-            ->selectRaw('server_user.panel_id as panel_id, count(*) as cnt')
+            ->whereIn('server_user.panel_id', $panelIds);
+        $this->activeKeyScope($q);
+        $counts = $q->selectRaw('server_user.panel_id as panel_id, count(*) as cnt')
             ->groupBy('server_user.panel_id')
             ->pluck('cnt', 'panel_id')
             ->toArray();
