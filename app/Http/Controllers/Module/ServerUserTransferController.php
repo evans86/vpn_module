@@ -7,6 +7,7 @@ use App\Models\KeyActivate\KeyActivate;
 use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Models\Panel\Panel;
 use App\Models\ServerUser\ServerUser;
+use App\Repositories\Panel\PanelRepository;
 use App\Services\Panel\marzban\MarzbanService;
 use App\Services\Panel\PanelStrategy;
 use Exception;
@@ -424,12 +425,12 @@ class ServerUserTransferController extends Controller
     }
 
     /**
-     * Текущая статистика по панелям (количество активных пользователей).
+     * Текущая статистика по панелям (активных пользователей из статистики Marzban — как в «Детальная информация по панелям»).
      */
     public function balanceStats(Request $request): JsonResponse
     {
-        $marzbanService = app(MarzbanService::class);
-        $counts = $marzbanService->getActiveUserCountPerPanel();
+        $panelRepository = app(PanelRepository::class);
+        $counts = $panelRepository->getActiveUserCountPerPanelFromStats();
 
         $total = array_sum($counts);
         $panelCount = count($counts);
@@ -483,8 +484,8 @@ class ServerUserTransferController extends Controller
             $batchSize = (int) ($validated['batch_size'] ?? 50);
             $maxDiffThreshold = (int) ($validated['max_diff_threshold'] ?? 100);
 
-            $marzbanService = app(MarzbanService::class);
-            $counts = $marzbanService->getActiveUserCountPerPanel();
+            $panelRepository = app(PanelRepository::class);
+            $counts = $panelRepository->getActiveUserCountPerPanelFromStats();
 
             if (count($counts) < 2) {
                 return response()->json([
@@ -492,7 +493,7 @@ class ServerUserTransferController extends Controller
                     'done' => true,
                     'moved' => 0,
                     'message' => 'Нужно минимум 2 панели для выравнивания.',
-                    'counts' => $counts,
+                    'counts' => $panelRepository->getActiveUserCountPerPanelFromStats(),
                 ]);
             }
 
@@ -521,10 +522,11 @@ class ServerUserTransferController extends Controller
                     'done' => true,
                     'moved' => 0,
                     'message' => $diff <= $maxDiffThreshold ? 'Нагрузка уже выровнена (разница ≤ ' . $maxDiffThreshold . ').' : 'Нечего переносить.',
-                    'counts' => $marzbanService->getActiveUserCountPerPanel(),
+                    'counts' => $panelRepository->getActiveUserCountPerPanelFromStats(),
                 ]);
             }
 
+            $marzbanService = app(MarzbanService::class);
             $keyIds = $marzbanService->getActiveKeyIdsOnPanel($maxPanelId);
             $chunk = $keyIds->take($batchSize);
 
@@ -534,7 +536,7 @@ class ServerUserTransferController extends Controller
                     'done' => true,
                     'moved' => 0,
                     'message' => 'Нет ключей для переноса на самой загруженной панели.',
-                    'counts' => $marzbanService->getActiveUserCountPerPanel(),
+                    'counts' => $panelRepository->getActiveUserCountPerPanelFromStats(),
                 ]);
             }
 
@@ -550,7 +552,7 @@ class ServerUserTransferController extends Controller
                 }
             }
 
-            $newCounts = $marzbanService->getActiveUserCountPerPanel();
+            $newCounts = $panelRepository->getActiveUserCountPerPanelFromStats();
             $newMax = $newCounts ? max($newCounts) : 0;
             $newMin = $newCounts ? min($newCounts) : 0;
             $newDiff = $newMax - $newMin;

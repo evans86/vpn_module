@@ -896,6 +896,48 @@ class PanelRepository extends BaseRepository
     }
 
     /**
+     * Количество активных пользователей по панелям из статистики Marzban (server_monitoring).
+     * Тот же источник, что и в «Детальная информация по панелям» — числа совпадают.
+     *
+     * @return array<int, int> [panel_id => active_users]
+     */
+    public function getActiveUserCountPerPanelFromStats(): array
+    {
+        $panelIds = Panel::query()
+            ->where('panel', Panel::MARZBAN)
+            ->where('panel_status', Panel::PANEL_CONFIGURED)
+            ->where('has_error', false)
+            ->where('excluded_from_rotation', false)
+            ->whereNotIn('id', function ($query) {
+                $query->select('panel_id')
+                    ->from('salesman')
+                    ->whereNotNull('panel_id');
+            })
+            ->pluck('id');
+
+        if ($panelIds->isEmpty()) {
+            return [];
+        }
+
+        $latestPerPanel = ServerMonitoring::query()
+            ->whereIn('panel_id', $panelIds)
+            ->orderByDesc('created_at')
+            ->get()
+            ->unique('panel_id');
+
+        $counts = [];
+        foreach ($panelIds as $id) {
+            $counts[$id] = 0;
+        }
+        foreach ($latestPerPanel as $row) {
+            $decoded = is_string($row->statistics) ? json_decode($row->statistics, true) : $row->statistics;
+            $counts[$row->panel_id] = (int) ($decoded['users_active'] ?? 0);
+        }
+
+        return $counts;
+    }
+
+    /**
      * Старый метод подсчета активных пользователей (для отладки)
      */
     private function getActiveUsersCount(int $panelId): int
