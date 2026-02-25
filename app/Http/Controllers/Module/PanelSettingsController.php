@@ -49,13 +49,21 @@ class PanelSettingsController extends Controller
         // Получаем панели с ошибками
         $panelsWithErrors = $panelRepository->getPanelsWithErrors();
 
-        // Получаем историю ошибок для каждой панели
+        // История ошибок — один запрос вместо N
         $errorHistory = [];
-        foreach ($panelsWithErrors as $panel) {
-            $errorHistory[$panel->id] = \App\Models\Panel\PanelErrorHistory::where('panel_id', $panel->id)
+        if ($panelsWithErrors->isNotEmpty()) {
+            $panelIds = $panelsWithErrors->pluck('id')->toArray();
+            $histories = \App\Models\Panel\PanelErrorHistory::whereIn('panel_id', $panelIds)
                 ->orderBy('error_occurred_at', 'desc')
-                ->limit(10) // Последние 10 записей
                 ->get();
+            foreach ($histories->groupBy('panel_id') as $panelId => $items) {
+                $errorHistory[$panelId] = $items->sortByDesc('error_occurred_at')->take(10)->values();
+            }
+            foreach ($panelIds as $id) {
+                if (!isset($errorHistory[$id])) {
+                    $errorHistory[$id] = collect();
+                }
+            }
         }
 
         // Получаем панели, исключенные из ротации (но без ошибок)

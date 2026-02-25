@@ -447,6 +447,9 @@ class PanelRepository extends BaseRepository
      * @param string|null $panelType Тип панели (по умолчанию Panel::MARZBAN для обратной совместимости)
      * @return array
      */
+    /** Максимум панелей для сравнения стратегий (чтобы страница не грузилась минутами) */
+    private const COMPARISON_PANELS_LIMIT = 150;
+
     public function compareAllStrategies(?string $panelType = null): array
     {
         // Используем Panel::MARZBAN по умолчанию для обратной совместимости
@@ -464,6 +467,8 @@ class PanelRepository extends BaseRepository
                         ->whereNotNull('panel_id');
                 })
                 ->with('server.location')
+                ->orderBy('id')
+                ->limit(self::COMPARISON_PANELS_LIMIT)
                 ->get();
 
             if ($panels->isEmpty()) {
@@ -500,18 +505,19 @@ class PanelRepository extends BaseRepository
                 $intelligentPanel = $balancedPanel;
             }
 
-            // Также получаем все панели (включая исключенные) для отображения в таблице
+            // Панели для таблицы (ограничиваем, иначе N запросов/API делают страницу очень медленной)
             $allPanels = $this->query()
                 ->where('panel_status', Panel::PANEL_CONFIGURED)
                 ->where('panel', $panelType)
-                ->where('has_error', false) // Исключаем панели с ошибками
-                // НЕ исключаем excluded_from_rotation - показываем все для отображения
+                ->where('has_error', false)
                 ->whereNotIn('id', function ($query) {
                     $query->select('panel_id')
                         ->from('salesman')
                         ->whereNotNull('panel_id');
                 })
                 ->with('server.location')
+                ->orderBy('id')
+                ->limit(self::COMPARISON_PANELS_LIMIT)
                 ->get();
 
             // Собираем детальную информацию по каждой панели (включая исключенные для отображения)
