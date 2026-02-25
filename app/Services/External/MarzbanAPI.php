@@ -13,6 +13,15 @@ class MarzbanAPI
 {
     private string $host;
 
+    /** cURL-опции для отключения проверки SSL (на части серверов одного verify => false в Guzzle недостаточно) */
+    private static function curlSslDisable(): array
+    {
+        return [
+            \CURLOPT_SSL_VERIFYPEER => false,
+            \CURLOPT_SSL_VERIFYHOST => 0,
+        ];
+    }
+
     public function __construct($host)
     {
         $this->host = $host;
@@ -34,7 +43,9 @@ class MarzbanAPI
 
             $client = new Client([
                 'base_uri' => $host,
-                'verify' => false
+                'verify' => false,
+                'timeout' => 30,
+                'connect_timeout' => 15,
             ]);
 
             $response = $client->post('api/admin/token', [
@@ -48,7 +59,8 @@ class MarzbanAPI
                     'password' => $password,
                     'scope' => '',
                 ],
-                'verify' => false
+                'verify' => false,
+                'curl' => self::curlSslDisable(),
             ]);
 
             $result = json_decode($response->getBody()->getContents(), true);
@@ -84,16 +96,17 @@ class MarzbanAPI
                     'Accept' => 'application/json'
                 ],
                 'json' => $json_config,
-                'verify' => false, // Отключаем проверку SSL сертификата
-                'timeout' => 30, // Таймаут 30 секунд
-                'connect_timeout' => 10 // Таймаут подключения 10 секунд
+                'verify' => false,
+                'timeout' => 45,
+                'connect_timeout' => 15,
+                'curl' => self::curlSslDisable(),
             ];
 
             $client = new Client([
                 'base_uri' => $this->host . '/api/',
-                'verify' => false, // Отключаем проверку SSL сертификата
-                'timeout' => 30,
-                'connect_timeout' => 10
+                'verify' => false,
+                'timeout' => 45,
+                'connect_timeout' => 15,
             ]);
 
             $response = $client->put($action, $requestParam);
@@ -334,12 +347,17 @@ class MarzbanAPI
                     'Content-Type' => 'application/json',
                     'Accept' => 'application/json'
                 ],
-                'verify' => false // Отключаем проверку SSL сертификата
+                'verify' => false,
+                'timeout' => 45,
+                'connect_timeout' => 15,
+                'curl' => self::curlSslDisable(),
             ];
 
             $client = new Client([
                 'base_uri' => $this->host . '/api/user/',
-                'verify' => false // Отключаем проверку SSL сертификата
+                'verify' => false,
+                'timeout' => 45,
+                'connect_timeout' => 15,
             ]);
 
             $response = $client->get($action, $requestParam);
@@ -373,12 +391,17 @@ class MarzbanAPI
                     'Content-Type' => 'application/json',
                     'Accept' => 'application/json'
                 ],
-                'verify' => false // Отключаем проверку SSL сертификата
+                'verify' => false,
+                'timeout' => 45,
+                'connect_timeout' => 15,
+                'curl' => self::curlSslDisable(),
             ];
 
             $client = new Client([
                 'base_uri' => $this->host . '/api/',
-                'verify' => false // Отключаем проверку SSL сертификата
+                'verify' => false,
+                'timeout' => 45,
+                'connect_timeout' => 15,
             ]);
 
             $response = $client->get($action, $requestParam);
@@ -412,12 +435,17 @@ class MarzbanAPI
                     'Content-Type' => 'application/json',
                     'Accept' => 'application/json'
                 ],
-                'verify' => false // Отключаем проверку SSL сертификата
+                'verify' => false,
+                'timeout' => 45,
+                'connect_timeout' => 15,
+                'curl' => self::curlSslDisable(),
             ];
 
             $client = new Client([
                 'base_uri' => $this->host . '/api/user/',
-                'verify' => false // Отключаем проверку SSL сертификата
+                'verify' => false,
+                'timeout' => 45,
+                'connect_timeout' => 15,
             ]);
 
             $response = $client->delete($action, $requestParam);
@@ -450,14 +478,17 @@ class MarzbanAPI
         try {
             $client = new Client([
                 'base_uri' => $this->host . '/api/',
-                'verify' => false
+                'verify' => false,
+                'timeout' => 45,
+                'connect_timeout' => 15,
             ]);
 
             $response = $client->get('core/config', [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $token,
                     'Accept' => 'application/json'
-                ]
+                ],
+                'curl' => self::curlSslDisable(),
             ]);
 
             $result = json_decode($response->getBody()->getContents(), true);
@@ -480,7 +511,9 @@ class MarzbanAPI
         try {
             $client = new Client([
                 'base_uri' => $this->host . '/api/',
-                'verify' => false
+                'verify' => false,
+                'timeout' => 45,
+                'connect_timeout' => 15,
             ]);
 
             $response = $client->put('core/config', [
@@ -488,7 +521,8 @@ class MarzbanAPI
                     'Authorization' => 'Bearer ' . $token,
                     'Content-Type' => 'application/json'
                 ],
-                'json' => $config
+                'json' => $config,
+                'curl' => self::curlSslDisable(),
             ]);
 
             return json_decode($response->getBody()->getContents(), true);

@@ -7,9 +7,11 @@ use App\Models\KeyActivate\KeyActivate;
 use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Models\Panel\Panel;
 use App\Models\ServerUser\ServerUser;
+use App\Services\Panel\marzban\MarzbanService;
 use App\Services\Panel\PanelStrategy;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -176,6 +178,233 @@ class ServerUserTransferController extends Controller
             return response()->json(['message' => 'Failed to transfer key'], 500);
         } finally {
             // Восстанавливаем оригинальный лимит памяти
+            ini_set('memory_limit', $originalMemoryLimit);
+        }
+    }
+
+    /**
+     * Страница массового переноса ключей (исходная панель недоступна — перенос только по данным из БД).
+     */
+    public function massTransferPage(): View
+    {
+        $panels = Panel::query()
+            ->select('id', 'panel', 'panel_adress', 'panel_status', 'server_id')
+            ->with(['server:id,name'])
+            ->orderBy('id')
+            ->get();
+
+        return view('module.server-user-transfer.mass-transfer', [
+            'panels' => $panels,
+        ]);
+    }
+
+    /**
+     * Количество активных ключей на панели (для отображения на форме массового переноса).
+     */
+    public function massTransferKeyCount(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'panel_id' => 'required|integer|exists:panel,id',
+        ]);
+
+        $marzbanService = app(MarzbanService::class);
+        $keyIds = $marzbanService->getActiveKeyIdsOnPanel((int) $validated['panel_id']);
+
+        return response()->json(['count' => $keyIds->count()]);
+    }
+
+    /**
+     * Выполнить массовый перенос ключей с исходной панели на целевую (без обращения к исходной панели).
+     */
+    public function massTransfer(Request $request): JsonResponse
+    {
+        $originalMemoryLimit = ini_get('memory_limit');
+        ini_set('memory_limit', '512M');
+
+        try {
+            $validated = $request->validate([
+                'source_panel_id' => 'required|integer|exists:panel,id',
+                'target_panel_id' => 'required|integer|exists:panel,id',
+            ]);
+
+            $sourcePanelId = (int) $validated['source_panel_id'];
+            $targetPanelId = (int) $validated['target_panel_id'];
+
+            if ($sourcePanelId === $targetPanelId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Исходная и целевая панели должны отличаться.',
+                ], 400);
+            }
+
+            $targetPanel = Panel::find($targetPanelId);
+            if (!$targetPanel || $targetPanel->panel !== \App\Models\Panel\Panel::MARZBAN) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Целевая панель должна быть типа Marzban.',
+                ], 400);
+            }
+
+            $marzbanService = app(MarzbanService::class);
+            $keyIds = $marzbanService->getActiveKeyIdsOnPanel($sourcePanelId);
+
+            if ($keyIds->isEmpty()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'На исходной панели нет активных ключей для переноса.',
+                    'transferred' => 0,
+                    'failed' => 0,
+                    'errors' => [],
+                ]);
+            }
+
+            $transferred = 0;
+            $errors = [];
+
+            foreach ($keyIds as $keyActivateId) {
+                try {
+                    $marzbanService->transferUserWithoutSourcePanel($sourcePanelId, $targetPanelId, $keyActivateId);
+                    $transferred++;
+                } catch (Exception $e) {
+                    Log::warning('Mass transfer: failed key', [
+                        'key_activate_id' => $keyActivateId,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $errors[] = [
+                        'key_id' => $keyActivateId,
+                        'message' => $e->getMessage(),
+                    ];
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Перенос завершён: {$transferred} из " . $keyIds->count() . " ключей.",
+                'transferred' => $transferred,
+                'failed' => count($errors),
+                'errors' => $errors,
+            ]);
+        } catch (Exception $e) {
+            Log::error('Mass transfer failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request' => $request->all(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Ошибка массового переноса: ' . $e->getMessage(),
+                'transferred' => 0,
+                'failed' => 0,
+                'errors' => [],
+            ], 500);
+        } finally {
+            ini_set('memory_limit', $originalMemoryLimit);
+        }
+    }
+
+    /**
+     * Обработать одну порцию ключей (для массового переноса без таймаута при 5000+ ключах).
+     * Каждый запрос переносит до batch_size ключей. Фронтенд вызывает повторно, пока done !== true.
+     */
+    public function massTransferBatch(Request $request): JsonResponse
+    {
+        $originalMemoryLimit = ini_get('memory_limit');
+        ini_set('memory_limit', '512M');
+
+        try {
+            $validated = $request->validate([
+                'source_panel_id' => 'required|integer|exists:panel,id',
+                'target_panel_id' => 'required|integer|exists:panel,id',
+                'batch_size' => 'sometimes|integer|min:10|max:200',
+                'max_total' => 'sometimes|integer|min:1|max:20', // тест: перенести не больше N ключей и остановиться
+            ]);
+
+            $sourcePanelId = (int) $validated['source_panel_id'];
+            $targetPanelId = (int) $validated['target_panel_id'];
+            $batchSize = (int) ($validated['batch_size'] ?? 100);
+            $maxTotal = isset($validated['max_total']) ? (int) $validated['max_total'] : null;
+
+            if ($sourcePanelId === $targetPanelId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Исходная и целевая панели должны отличаться.',
+                ], 400);
+            }
+
+            $targetPanel = Panel::find($targetPanelId);
+            if (!$targetPanel || $targetPanel->panel !== \App\Models\Panel\Panel::MARZBAN) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Целевая панель должна быть типа Marzban.',
+                ], 400);
+            }
+
+            $marzbanService = app(MarzbanService::class);
+            $keyIds = $marzbanService->getActiveKeyIdsOnPanel($sourcePanelId);
+            $limit = $maxTotal !== null ? min($batchSize, $maxTotal) : $batchSize;
+            $chunk = $keyIds->take($limit);
+
+            if ($chunk->isEmpty()) {
+                return response()->json([
+                    'success' => true,
+                    'done' => true,
+                    'transferred' => 0,
+                    'failed' => 0,
+                    'errors' => [],
+                    'message' => 'Нет ключей для переноса в этой порции.',
+                ]);
+            }
+
+            $transferred = 0;
+            $errors = [];
+
+            foreach ($chunk as $keyActivateId) {
+                try {
+                    $marzbanService->transferUserWithoutSourcePanel($sourcePanelId, $targetPanelId, $keyActivateId);
+                    $transferred++;
+                } catch (Exception $e) {
+                    Log::warning('Mass transfer batch: failed key', [
+                        'key_activate_id' => $keyActivateId,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $errors[] = [
+                        'key_id' => $keyActivateId,
+                        'message' => $e->getMessage(),
+                    ];
+                }
+            }
+
+            $remainingAfterBatch = $keyIds->count() - $chunk->count();
+            $isTestRun = $maxTotal !== null;
+
+            return response()->json([
+                'success' => true,
+                'done' => $isTestRun || $remainingAfterBatch <= 0,
+                'test_run' => $isTestRun,
+                'transferred' => $transferred,
+                'failed' => count($errors),
+                'errors' => $errors,
+                'processed_in_batch' => $chunk->count(),
+                'remaining' => $remainingAfterBatch,
+                'message' => $remainingAfterBatch > 0
+                    ? "Обработано {$chunk->count()} ключей, осталось примерно {$remainingAfterBatch}."
+                    : "Порция завершена. Перенесено: {$transferred}, ошибок: " . count($errors) . ".",
+            ]);
+        } catch (Exception $e) {
+            Log::error('Mass transfer batch failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request' => $request->all(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'done' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+                'transferred' => 0,
+                'failed' => 0,
+                'errors' => [],
+            ], 500);
+        } finally {
             ini_set('memory_limit', $originalMemoryLimit);
         }
     }

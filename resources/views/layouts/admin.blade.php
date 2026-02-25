@@ -163,6 +163,12 @@
                     'routes' => ['admin.module.key-activate.*']
                 ])
                 @include('layouts.admin.nav-item', [
+                    'route' => 'admin.module.server-user-transfer.mass-transfer',
+                    'icon' => 'fa-exchange-alt',
+                    'label' => 'Массовый перенос ключей',
+                    'routes' => ['admin.module.server-user-transfer.*']
+                ])
+                @include('layouts.admin.nav-item', [
                     'route' => 'admin.module.bot.index',
                     'icon' => 'fa-robot',
                     'label' => 'Настройки бота',

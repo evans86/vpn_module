@@ -299,6 +299,33 @@ class PanelController extends Controller
     }
 
     /**
+     * Проверка подключения к панели (через браузер, без консоли).
+     * Откройте в админке: Панели → выберите панель → в адресной строке добавьте /test-connection
+     * Или откройте: /admin/module/panel/28/test-connection (подставьте id панели).
+     *
+     * @param Panel $panel
+     * @return JsonResponse
+     */
+    public function testConnection(Panel $panel): JsonResponse
+    {
+        $host = $panel->api_address ?? ('https://' . preg_replace('#^https?://#', '', rtrim($panel->panel_adress ?? '', '/')));
+        $result = ['success' => false, 'message' => '', 'details' => '', 'host' => $host];
+
+        try {
+            $api = new \App\Services\External\MarzbanAPI($host);
+            $token = $api->getToken($panel->panel_login ?? '', $panel->panel_password ?? '');
+            $result['success'] = true;
+            $result['message'] = 'Подключение к панели успешно. Токен получен.';
+            $result['details'] = 'Длина токена: ' . strlen($token ?? '') . ' символов.';
+        } catch (\Throwable $e) {
+            $result['message'] = $e->getMessage();
+            $result['details'] = get_class($e) . ' in ' . $e->getFile() . ':' . $e->getLine();
+        }
+
+        return response()->json($result);
+    }
+
+    /**
      * Upload TLS certificates for panel.
      *
      * @param Request $request

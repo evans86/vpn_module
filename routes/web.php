@@ -150,6 +150,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::delete('/{panel}/remove-certificates', [PanelController::class, 'removeCertificates'])->name('remove-certificates');
                 Route::post('/{panel}/toggle-tls', [PanelController::class, 'toggleTls'])->name('toggle-tls');
                 Route::post('/{panel}/toggle-rotation-exclusion', [PanelController::class, 'toggleRotationExclusion'])->name('toggle-rotation-exclusion');
+                Route::get('/{panel}/test-connection', [PanelController::class, 'testConnection'])->name('test-connection');
             });
 
             // Настройки распределения панелей
@@ -199,6 +200,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
             // Server User Transfer
             Route::prefix('server-user-transfer')->name('server-user-transfer.')->group(function () {
+                Route::get('/mass-transfer', [ServerUserTransferController::class, 'massTransferPage'])->name('mass-transfer');
+                Route::post('/mass-transfer/key-count', [ServerUserTransferController::class, 'massTransferKeyCount'])->name('mass-transfer.key-count');
+                Route::post('/mass-transfer/run', [ServerUserTransferController::class, 'massTransfer'])->name('mass-transfer.run');
+                Route::post('/mass-transfer/run-batch', [ServerUserTransferController::class, 'massTransferBatch'])->name('mass-transfer.run-batch');
                 Route::post('/panels', [ServerUserTransferController::class, 'getPanels'])->name('panels');
                 Route::post('/transfer', [ServerUserTransferController::class, 'transfer'])->name('transfer');
             });

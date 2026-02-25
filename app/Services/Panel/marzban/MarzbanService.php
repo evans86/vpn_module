@@ -2214,6 +2214,84 @@ class MarzbanService
     }
 
     /**
+     * Перенос одного ключа на целевую панель БЕЗ обращения к исходной панели (для массового переноса при сломанной исходной панели).
+     * Данные берутся из БД: traffic_limit и finish_at из key_activate.
+     * Ссылка на конфиг (key_activate_id) не меняется — пользователю достаточно обновить подписку.
+     *
+     * @param int $sourcePanelId Исходная панель (только для проверки, API не вызывается)
+     * @param int $targetPanelId Целевая панель (должна быть доступна)
+     * @param string $keyActivateId UUID ключа
+     * @return ServerUser
+     * @throws RuntimeException
+     */
+    public function transferUserWithoutSourcePanel(int $sourcePanelId, int $targetPanelId, string $keyActivateId): ServerUser
+    {
+        $keyActivate = KeyActivate::select('id', 'traffic_limit', 'finish_at', 'user_tg_id', 'module_salesman_id', 'pack_salesman_id')
+            ->where('id', $keyActivateId)
+            ->where('status', KeyActivate::ACTIVE)
+            ->firstOrFail();
+
+        $keyActivateUser = KeyActivateUser::where('key_activate_id', $keyActivateId)->firstOrFail();
+        $serverUser = ServerUser::where('id', $keyActivateUser->server_user_id)->firstOrFail();
+
+        if ((int) $serverUser->panel_id !== $sourcePanelId) {
+            throw new RuntimeException("Ключ {$keyActivateId} не принадлежит исходной панели {$sourcePanelId}");
+        }
+
+        $targetPanel = $this->updateMarzbanToken($targetPanelId);
+        $marzbanApi = new MarzbanAPI($targetPanel->api_address);
+
+        $dataLimit = (int) ($keyActivate->traffic_limit ?? 0);
+        $expire = (int) ($keyActivate->finish_at ?? (time() + 30 * 86400));
+        if ($expire <= time()) {
+            $expire = time() + 86400; // минимум 1 день, если дата уже прошла
+        }
+
+        $newUser = $marzbanApi->createUser(
+            $targetPanel->auth_token,
+            $serverUser->id,
+            $dataLimit,
+            $expire
+        );
+
+        if (empty($newUser['links'])) {
+            throw new RuntimeException("Панель не вернула ссылки для ключа {$keyActivateId}");
+        }
+
+        DB::transaction(function () use ($serverUser, $targetPanelId, $newUser) {
+            $serverUser->panel_id = $targetPanelId;
+            $serverUser->keys = is_array($newUser['links']) ? json_encode($newUser['links']) : $newUser['links'];
+            $serverUser->save();
+        });
+
+        Log::info('Mass transfer: key moved without source panel', [
+            'key_activate_id' => $keyActivateId,
+            'source_panel' => $sourcePanelId,
+            'target_panel' => $targetPanelId,
+            'server_user_id' => $serverUser->id,
+            'source' => 'panel',
+        ]);
+
+        return $serverUser->fresh();
+    }
+
+    /**
+     * Список ID активных ключей на панели (для массового переноса).
+     *
+     * @param int $panelId
+     * @return \Illuminate\Support\Collection list of key_activate.id
+     */
+    public function getActiveKeyIdsOnPanel(int $panelId): \Illuminate\Support\Collection
+    {
+        return KeyActivateUser::query()
+            ->join('server_user', 'key_activate_user.server_user_id', '=', 'server_user.id')
+            ->join('key_activate', 'key_activate_user.key_activate_id', '=', 'key_activate.id')
+            ->where('server_user.panel_id', $panelId)
+            ->where('key_activate.status', KeyActivate::ACTIVE)
+            ->pluck('key_activate.id');
+    }
+
+    /**
      * Получить текстовое представление статуса по коду
      *
      * @param int $statusCode

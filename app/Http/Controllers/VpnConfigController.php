@@ -659,13 +659,21 @@ class VpnConfigController extends Controller
             // ШАГ 1: Проверяем finish_at из БД (локальная дата, может быть изменена в админке)
             $keyActivate = $this->keyActivateService->checkAndUpdateStatus($keyActivate);
 
-            // ШАГ 2: Получаем данные из Marzban API (expire из панели)
-            $panel_strategy = new PanelStrategy($serverUser->panel->panel);
-            $info = $panel_strategy->getSubscribeInfo($serverUser->panel->id, $serverUser->id);
-
-            // ШАГ 3: Если статус ключа был обновлен в getUserSubscribeInfo, перезагружаем модель
-            if (isset($info['key_status_updated']) && $info['key_status_updated'] === true) {
-                $keyActivate->refresh();
+            // ШАГ 2: Получаем данные из Marzban API (expire из панели). При ошибке (cURL 18, таймаут) показываем страницу по сохранённым данным.
+            $info = [];
+            try {
+                $panel_strategy = new PanelStrategy($serverUser->panel->panel);
+                $info = $panel_strategy->getSubscribeInfo($serverUser->panel->id, $serverUser->id);
+                if (isset($info['key_status_updated']) && $info['key_status_updated'] === true) {
+                    $keyActivate->refresh();
+                }
+            } catch (Exception $e) {
+                Log::warning('Error showing browser page: could not fetch subscribe info from panel, using stored data', [
+                    'error' => $e->getMessage(),
+                    'key_activate_id' => $keyActivate->id,
+                    'panel_id' => $serverUser->panel_id,
+                    'source' => 'vpn'
+                ]);
             }
 
             // Получаем данные из KeyActivate (который уже загружен с отношениями)
@@ -681,8 +689,8 @@ class VpnConfigController extends Controller
 
             $userInfo = [
                 'username' => $serverUser->id,
-                'status' => $info['status'] ?? 'unknown',
-                'data_limit' => $info['data_limit'] ?? 0,
+                'status' => $info['status'] ?? 'active',
+                'data_limit' => $info['data_limit'] ?? ($keyActivate->traffic_limit ?? 0),
                 'data_limit_tariff' => $keyActivate->traffic_limit ?? 0,
                 'data_used' => $info['used_traffic'] ?? 0,
                 'expiration_date' => $finishAt,
