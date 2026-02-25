@@ -128,6 +128,9 @@ class DatabaseLoggerHandler extends AbstractProcessingHandler
      * @param array $record
      * @return void
      */
+    /** Max size of stored context (bytes) to avoid memory exhaustion when logging */
+    private const MAX_CONTEXT_SIZE = 50000;
+
     protected function write(array $record): void
     {
         try {
@@ -147,10 +150,19 @@ class DatabaseLoggerHandler extends AbstractProcessingHandler
                 ];
             }
 
+            $contextJson = json_encode($context, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+            if ($contextJson !== false && strlen($contextJson) > self::MAX_CONTEXT_SIZE) {
+                $context = [
+                    '_truncated' => true,
+                    '_original_size' => strlen($contextJson),
+                    'preview' => substr($contextJson, 0, self::MAX_CONTEXT_SIZE - 100) . '...'
+                ];
+            }
+
             $data = [
                 'level' => strtolower($record['level_name']),
-                'message' => mb_convert_encoding($record['message'], 'UTF-8', 'UTF-8'),
-                'source' => isset($context['source']) ? $context['source'] : 'system',
+                'message' => mb_convert_encoding(mb_substr($record['message'], 0, 65535), 'UTF-8', 'UTF-8'),
+                'source' => isset($record['context']['source']) ? $record['context']['source'] : 'system',
                 'context' => $context,
                 'user_id' => Auth::id(),
                 'ip_address' => request()->ip(),
@@ -159,10 +171,10 @@ class DatabaseLoggerHandler extends AbstractProcessingHandler
 
             ApplicationLog::create($data);
         } catch (Throwable $e) {
-            // В случае ошибки записи лога, записываем в стандартный error_log
+            // Не логируем весь $record — он может быть огромным и снова исчерпать память
             error_log(sprintf(
-                'Failed to write log entry: %s. Error: %s',
-                json_encode($record),
+                'Failed to write log entry. Message: %s. Error: %s',
+                isset($record['message']) ? substr($record['message'], 0, 500) : 'n/a',
                 $e->getMessage()
             ));
         }

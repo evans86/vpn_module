@@ -52,8 +52,10 @@ class VpnConfigController extends Controller
 
     public function show(string $key_activate_id): Response
     {
-        // Увеличиваем лимит памяти для отображения конфигурации
-        ini_set('memory_limit', '256M');
+        // Лимит памяти для отображения конфигурации (совпадает с bootstrap, чтобы не падать при тяжёлых связях)
+        if ((int) ini_get('memory_limit') < 512) {
+            @ini_set('memory_limit', '512M');
+        }
 
         try {
             // Если запрошен роут /config/error, перенаправляем на метод showError

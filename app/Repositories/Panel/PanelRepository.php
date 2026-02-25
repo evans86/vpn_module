@@ -61,7 +61,10 @@ class PanelRepository extends BaseRepository
         if ($panelType !== null) {
             $query->where('panel', $panelType);
         }
-        
+
+        // Защита от исчерпания памяти: не загружать больше 2000 панелей за раз
+        $query->limit(2000);
+
         return $query->get();
     }
 
@@ -89,6 +92,7 @@ class PanelRepository extends BaseRepository
                     ->whereNotNull('panel_id');
             })
             ->with('server.location')
+            ->limit(1000)
             ->get();
 
         // Исключаем панели по различным критериям
@@ -267,6 +271,7 @@ class PanelRepository extends BaseRepository
                     ->whereNotNull('panel_id');
             })
             ->with('server.location')
+            ->limit(1000)
             ->get();
 
         // Исключаем панели по различным критериям
