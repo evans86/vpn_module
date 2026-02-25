@@ -316,13 +316,13 @@ class ServerUserTransferController extends Controller
                 'source_panel_id' => 'required|integer|exists:panel,id',
                 'target_panel_id' => 'required|integer|exists:panel,id',
                 'batch_size' => 'sometimes|integer|min:10|max:200',
-                'max_total' => 'sometimes|integer|min:1|max:20', // тест: перенести не больше N ключей и остановиться
+                'max_total' => 'nullable|integer|min:1|max:20', // тест: перенести не больше N ключей; пусто = без лимита
             ]);
 
             $sourcePanelId = (int) $validated['source_panel_id'];
             $targetPanelId = (int) $validated['target_panel_id'];
             $batchSize = (int) ($validated['batch_size'] ?? 100);
-            $maxTotal = isset($validated['max_total']) ? (int) $validated['max_total'] : null;
+            $maxTotal = !empty($validated['max_total']) ? (int) $validated['max_total'] : null;
 
             if ($sourcePanelId === $targetPanelId) {
                 return response()->json([
