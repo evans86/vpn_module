@@ -2242,6 +2242,7 @@ class MarzbanService
         $marzbanApi = new MarzbanAPI($targetPanel->api_address);
 
         $dataLimit = (int) ($keyActivate->traffic_limit ?? 0);
+        // finish_at в БД — Unix timestamp (секунды), Marzban API ожидает то же
         $expire = (int) ($keyActivate->finish_at ?? (time() + 30 * 86400));
         if ($expire <= time()) {
             $expire = time() + 86400; // минимум 1 день, если дата уже прошла
