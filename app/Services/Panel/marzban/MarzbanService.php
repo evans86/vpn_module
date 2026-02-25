@@ -1953,19 +1953,19 @@ class MarzbanService
     public function addServerUser(int $panel_id, int $userTgId, int $data_limit, int $expire, string $key_activate_id, array $options = []): ServerUser
     {
         try {
-            // Получаем key_activate ДО использования в логе
-            /**
-             * @var KeyActivate $key_activate
-             */
-            $key_activate = KeyActivate::query()->where('id', $key_activate_id)->firstOrFail();
+            // Тестовые ключи (например из panels:check-errors) не существуют в БД — не требуем KeyActivate
+            $isTestKey = str_starts_with($key_activate_id, 'test-key-');
+            $key_activate = $isTestKey
+                ? null
+                : KeyActivate::query()->where('id', $key_activate_id)->firstOrFail();
 
             Log::info('Creating server user', [
                 'panel_id' => $panel_id,
                 'data_limit' => $data_limit,
                 'expire' => $expire,
                 'expire_date' => date('Y-m-d H:i:s', $expire),
-                'key_finish_at' => $key_activate->finish_at ?? null,
-                'key_finish_at_date' => $key_activate->finish_at ? date('Y-m-d H:i:s', $key_activate->finish_at) : null,
+                'key_finish_at' => $key_activate ? $key_activate->finish_at : null,
+                'key_finish_at_date' => $key_activate && $key_activate->finish_at ? date('Y-m-d H:i:s', $key_activate->finish_at) : null,
                 'current_time' => time(),
                 'current_date' => date('Y-m-d H:i:s'),
                 'days_until_expire' => ceil(($expire - time()) / 86400),
@@ -2004,18 +2004,20 @@ class MarzbanService
                 throw new RuntimeException('Failed to save server user');
             }
 
-            // Создаем запись key_activate_user
-            $keyActivateUserService = new KeyActivateUserService();
-            try {
-                $keyActivateUserService->create(
-                    $serverUser->id,
-                    $key_activate_id,
-                    $panel->server->location_id
-                );
-            } catch (Exception $e) {
-                // Если не удалось создать key_activate_user, удаляем созданного пользователя
-                $serverUser->delete();
-                throw new RuntimeException('Failed to create key activate user: ' . $e->getMessage());
+            // Создаем запись key_activate_user только для реальных ключей (не для теста проверки панели)
+            if ($key_activate !== null) {
+                $keyActivateUserService = new KeyActivateUserService();
+                try {
+                    $keyActivateUserService->create(
+                        $serverUser->id,
+                        $key_activate_id,
+                        $panel->server->location_id
+                    );
+                } catch (Exception $e) {
+                    // Если не удалось создать key_activate_user, удаляем созданного пользователя
+                    $serverUser->delete();
+                    throw new RuntimeException('Failed to create key activate user: ' . $e->getMessage());
+                }
             }
 
             Log::info('Server user created successfully', [

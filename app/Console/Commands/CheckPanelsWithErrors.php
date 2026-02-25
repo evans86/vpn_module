@@ -115,15 +115,15 @@ class CheckPanelsWithErrors extends Command
                     return false;
                 }
 
-                // Если создание успешно, удаляем тестового пользователя
+                // Если создание успешно, удаляем тестового пользователя (по реальному id из панели)
                 try {
-                    $panelStrategy->deleteServerUser($panel->id, $testUserId);
+                    $panelStrategy->deleteServerUser($panel->id, $testUser->id);
                 } catch (\Exception $e) {
                     // Игнорируем ошибки удаления тестового пользователя
                     Log::warning('Failed to delete test user', [
                         'source' => 'cron',
                         'panel_id' => $panel->id,
-                        'test_user_id' => $testUserId,
+                        'test_user_id' => $testUser->id,
                         'error' => $e->getMessage(),
                     ]);
                 }
