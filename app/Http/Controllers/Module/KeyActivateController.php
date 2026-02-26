@@ -138,7 +138,7 @@ class KeyActivateController extends Controller
         $key->load([
             'packSalesman.pack',
             'packSalesman.salesman',
-            'keyActivateUser.serverUser.panel'
+            'keyActivateUsers.serverUser.panel.server',
         ]);
         return view('module.key-activate.show', compact('key'));
     }

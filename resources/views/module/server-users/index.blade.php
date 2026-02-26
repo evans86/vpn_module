@@ -34,7 +34,8 @@
                     title="Пользователи не найдены"
                     description="Попробуйте изменить параметры фильтрации" />
             @else
-                <x-admin.table :headers="['ID', 'Сервер', 'Панель', 'Telegram ID', 'Дата создания']">
+                <p class="text-xs text-gray-500 mb-2">При мульти-провайдере один ключ даёт несколько записей (по одной на каждый сервер/провайдер). Один Telegram ID может быть в нескольких строках.</p>
+                <x-admin.table :headers="['ID', 'Сервер', 'Провайдер', 'Панель', 'Telegram ID', 'Дата создания']">
                     @foreach($serverUsers as $user)
                         <tr class="hover:bg-gray-50">
                             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm">
@@ -55,6 +56,13 @@
                                     </a>
                                 @else
                                     <span class="text-gray-400">Нет сервера</span>
+                                @endif
+                            </td>
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm">
+                                @if($user->panel && $user->panel->server && $user->panel->server->provider)
+                                    <span class="badge badge-secondary">{{ $user->panel->server->provider }}</span>
+                                @else
+                                    <span class="text-gray-400">—</span>
                                 @endif
                             </td>
                             <td class="px-3 sm:px-6 py-4 text-xs sm:text-sm">

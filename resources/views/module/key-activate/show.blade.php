@@ -70,15 +70,28 @@
                                     </div>
                                 @endif
 
-                                @if($key->keyActivateUser && $key->keyActivateUser->serverUser)
+                                @if($key->keyActivateUsers && $key->keyActivateUsers->isNotEmpty())
                                     <div class="mb-3">
-                                        <label class="form-label">Пользователь сервера</label>
-                                        <div>
-                                            <a href="{{ route('admin.server-users.show', $key->keyActivateUser->serverUser) }}"
-                                               class="text-primary">
-                                                {{ $key->keyActivateUser->serverUser->id }}
-                                            </a>
-                                        </div>
+                                        <label class="form-label">Пользователи сервера (слоты)</label>
+                                        <p class="text-muted small mb-2">Один ключ может иметь несколько слотов (по одному на провайдера). Подключения тянутся с разных серверов.</p>
+                                        <ul class="list-unstyled mb-0">
+                                            @foreach($key->keyActivateUsers as $kau)
+                                                @if($kau->serverUser)
+                                                    <li class="mb-2">
+                                                        <a href="{{ route('admin.module.server-users.show', $kau->serverUser) }}"
+                                                           class="text-primary font-mono text-sm">
+                                                            {{ Str::limit($kau->serverUser->id, 12) }}…
+                                                        </a>
+                                                        @if($kau->serverUser->panel && $kau->serverUser->panel->server)
+                                                            <span class="text-muted small"> — {{ $kau->serverUser->panel->server->name ?? 'Панель #'.$kau->serverUser->panel_id }}</span>
+                                                            @if($kau->serverUser->panel->server->provider)
+                                                                <span class="badge badge-secondary">{{ $kau->serverUser->panel->server->provider }}</span>
+                                                            @endif
+                                                        @endif
+                                                    </li>
+                                                @endif
+                                            @endforeach
+                                        </ul>
                                     </div>
                                 @endif
                             </div>
