@@ -710,6 +710,111 @@
                 runMultiProviderMigration(false, 2);
             });
 
+            function checkLatestMigrationAndResumePolling() {
+                fetch(multiProviderStatusUrl, { method: 'GET', headers: { 'Accept': 'application/json' } })
+                    .then(function (r) { return r.json(); })
+                    .then(function (s) {
+                        if (!s.success || !s.found || !s.run_id) return;
+                        var runId = s.run_id;
+                        var progressBlock = document.getElementById('multi-provider-progress');
+                        var progressBar = document.getElementById('multi-provider-progress-bar');
+                        var progressText = document.getElementById('multi-provider-progress-text');
+                        var resultBlock = document.getElementById('multi-provider-result');
+                        var resultMessage = document.getElementById('multi-provider-result-message');
+                        var resultErrors = document.getElementById('multi-provider-result-errors');
+                        var btnBg = document.getElementById('btn-multi-provider-run-background');
+                        var btnRun = document.getElementById('btn-multi-provider-run');
+                        var btnTest = document.getElementById('btn-multi-provider-test');
+
+                        if (s.done) {
+                            resultBlock.classList.remove('hidden');
+                            progressBlock.classList.add('hidden');
+                            if (s.error) {
+                                resultBlock.classList.add('border-red-200', 'bg-red-50');
+                                resultMessage.textContent = s.error;
+                            } else {
+                                resultBlock.classList.remove('border-red-200', 'bg-red-50');
+                                resultBlock.classList.add('border-green-200', 'bg-green-50');
+                                resultMessage.textContent = 'Миграция завершена. Обработано ключей: ' + (s.processed || 0) + ', добавлено слотов: ' + (s.added_total || 0) + (s.errors && s.errors.length ? ', ошибок: ' + s.errors.length : '') + '.';
+                                if (s.errors && s.errors.length > 0) {
+                                    resultErrors.classList.remove('hidden');
+                                    resultErrors.innerHTML = '<ul class="list-disc pl-5">' + s.errors.slice(0, 30).map(function (e) {
+                                        return '<li>' + (e.key_id || '') + ': ' + (e.message || '') + '</li>';
+                                    }).join('') + (s.errors.length > 30 ? '<li class="text-gray-500">… и ещё ' + (s.errors.length - 30) + ' ошибок</li>' : '') + '</ul>';
+                                } else {
+                                    resultErrors.classList.add('hidden');
+                                    resultErrors.innerHTML = '';
+                                }
+                            }
+                            if (btnBg) btnBg.disabled = false;
+                            if (btnRun) btnRun.disabled = false;
+                            if (btnTest) btnTest.disabled = false;
+                            return;
+                        }
+
+                        progressBlock.classList.remove('hidden');
+                        resultBlock.classList.add('hidden');
+                        if (btnBg) btnBg.disabled = true;
+                        if (btnRun) btnRun.disabled = true;
+                        if (btnTest) btnTest.disabled = true;
+                        var total = s.total || 0;
+                        var processed = s.processed || 0;
+                        var added = s.added_total || 0;
+                        var pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+                        progressBar.style.width = pct + '%';
+                        progressText.textContent = (s.message || '') + ' Обработано: ' + processed + ' из ' + total + ', добавлено слотов: ' + added + '.';
+
+                        function poll() {
+                            fetch(multiProviderStatusUrl + '?run_id=' + encodeURIComponent(runId), { method: 'GET', headers: { 'Accept': 'application/json' } })
+                                .then(function (r) { return r.json(); })
+                                .then(function (s) {
+                                    if (!s.found) return;
+                                    var total = s.total || 0;
+                                    var processed = s.processed || 0;
+                                    var added = s.added_total || 0;
+                                    var pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+                                    progressBar.style.width = pct + '%';
+                                    progressText.textContent = (s.message || '') + ' Обработано: ' + processed + ' из ' + total + ', добавлено слотов: ' + added + '.';
+                                    if (s.done) {
+                                        progressBlock.classList.add('hidden');
+                                        resultBlock.classList.remove('hidden');
+                                        if (s.error) {
+                                            resultBlock.classList.add('border-red-200', 'bg-red-50');
+                                            resultMessage.textContent = s.error;
+                                        } else {
+                                            resultBlock.classList.remove('border-red-200', 'bg-red-50');
+                                            resultBlock.classList.add('border-green-200', 'bg-green-50');
+                                            resultMessage.textContent = 'Миграция завершена. Обработано ключей: ' + processed + ', добавлено слотов: ' + added + (s.errors && s.errors.length ? ', ошибок: ' + s.errors.length : '') + '.';
+                                            if (s.errors && s.errors.length > 0) {
+                                                resultErrors.classList.remove('hidden');
+                                                resultErrors.innerHTML = '<ul class="list-disc pl-5">' + s.errors.slice(0, 30).map(function (e) {
+                                                    return '<li>' + (e.key_id || '') + ': ' + (e.message || '') + '</li>';
+                                                }).join('') + (s.errors.length > 30 ? '<li class="text-gray-500">… и ещё ' + (s.errors.length - 30) + ' ошибок</li>' : '') + '</ul>';
+                                            } else {
+                                                resultErrors.classList.add('hidden');
+                                                resultErrors.innerHTML = '';
+                                            }
+                                        }
+                                        if (btnBg) btnBg.disabled = false;
+                                        if (btnRun) btnRun.disabled = false;
+                                        if (btnTest) btnTest.disabled = false;
+                                        if (typeof toastr !== 'undefined') toastr.success('Миграция завершена.');
+                                        return;
+                                    }
+                                    setTimeout(poll, 2500);
+                                })
+                                .catch(function () { setTimeout(poll, 5000); });
+                        }
+                        setTimeout(poll, 2500);
+                    })
+                    .catch(function () {});
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', checkLatestMigrationAndResumePolling);
+            } else {
+                checkLatestMigrationAndResumePolling();
+            }
+
             function runMultiProviderMigrationBackground() {
                 var btnBg = document.getElementById('btn-multi-provider-run-background');
                 var btnRun = document.getElementById('btn-multi-provider-run');

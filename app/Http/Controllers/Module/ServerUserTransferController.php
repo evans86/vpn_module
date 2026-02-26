@@ -997,6 +997,8 @@ class ServerUserTransferController extends Controller
                 'started_at' => now()->toIso8601String(),
             ], now()->addHours(3));
 
+            Cache::put('multi_provider_migration_latest_run_id', $runId, now()->addHours(3));
+
             MultiProviderMigrationBatchJob::dispatch($runId, 0, $batchSize, $dryRun);
 
             return response()->json([
@@ -1015,12 +1017,21 @@ class ServerUserTransferController extends Controller
 
     /**
      * Статус фоновой миграции по run_id (для опроса с интерфейса).
+     * Если run_id не передан — возвращается статус последнего запуска (после перезагрузки страницы).
      */
     public function multiProviderMigrationStatus(Request $request): JsonResponse
     {
         $runId = $request->input('run_id');
         if (!$runId || !is_string($runId)) {
-            return response()->json(['success' => false, 'message' => 'Нужен run_id.'], 400);
+            $runId = Cache::get('multi_provider_migration_latest_run_id');
+        }
+        if (!$runId || !is_string($runId)) {
+            return response()->json([
+                'success' => true,
+                'run_id' => null,
+                'found' => false,
+                'message' => 'Нет активного или последнего запуска миграции.',
+            ]);
         }
         $cacheKey = 'multi_provider_migration_' . $runId;
         $progress = Cache::get($cacheKey);
