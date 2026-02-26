@@ -889,7 +889,7 @@ class ServerUserTransferController extends Controller
     public function multiProviderMigrationBatch(Request $request): JsonResponse
     {
         $originalMemoryLimit = ini_get('memory_limit');
-        ini_set('memory_limit', '512M');
+        ini_set('memory_limit', '1024M');
 
         try {
             $validated = $request->validate([
@@ -917,13 +917,13 @@ class ServerUserTransferController extends Controller
             $maxTotal = isset($validated['max_total']) && $validated['max_total'] !== '' ? (int) $validated['max_total'] : null;
             $dryRun = !empty($validated['dry_run']);
 
-            $query = KeyActivate::query()
+            $baseQuery = KeyActivate::query()
                 ->where('status', KeyActivate::ACTIVE)
                 ->whereNotNull('user_tg_id')
                 ->whereHas('keyActivateUsers')
                 ->orderBy('id');
 
-            $total = $query->count();
+            $total = (clone $baseQuery)->count();
             $limit = $maxTotal !== null ? min($batchSize, $maxTotal - $offset) : $batchSize;
             if ($limit < 1 && $maxTotal !== null) {
                 return response()->json([
@@ -937,25 +937,33 @@ class ServerUserTransferController extends Controller
                 ]);
             }
 
-            $keys = (clone $query)->offset($offset)->limit($limit)->get();
+            $ids = (clone $baseQuery)->offset($offset)->limit($limit)->pluck('id');
+            unset($baseQuery);
             $keyActivateService = app(KeyActivateService::class);
 
             $addedTotal = 0;
             $errors = [];
-            foreach ($keys as $key) {
+            $processed = 0;
+            foreach ($ids as $keyId) {
+                $key = KeyActivate::query()
+                    ->where('id', $keyId)
+                    ->first();
+                if (!$key) {
+                    continue;
+                }
                 try {
                     $added = $keyActivateService->addMissingProviderSlots($key, $dryRun);
                     $addedTotal += $added;
                 } catch (\Throwable $e) {
                     Log::warning('Multi-provider migration batch: failed key', [
-                        'key_activate_id' => $key->id,
+                        'key_activate_id' => $keyId,
                         'error' => $e->getMessage(),
                     ]);
-                    $errors[] = ['key_id' => $key->id, 'message' => $e->getMessage()];
+                    $errors[] = ['key_id' => $keyId, 'message' => $e->getMessage()];
                 }
+                $processed++;
+                unset($key);
             }
-
-            $processed = $keys->count();
             $nextOffset = $offset + $processed;
             $remaining = max(0, $total - $nextOffset);
             $isTestRun = $maxTotal !== null && $processed >= $maxTotal;
