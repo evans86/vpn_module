@@ -212,7 +212,7 @@ class VpnConfigController extends Controller
                     $flag = '';
                     $name = 'Сервер';
                     if ($location) {
-                        $flag = $location->emoji ? $location->emoji . ' ' : '';
+                        $flag = $location->emoji ? $this->locationEmojiToFlag($location->emoji) . ' ' : '';
                         $name = $location->code ?: 'Сервер';
                     } elseif ($server && $server->name) {
                         $flag = '🌐 ';
@@ -1016,6 +1016,39 @@ class VpnConfigController extends Controller
 //            ]);
 //        }
 //    }
+
+    /**
+     * Преобразует короткий код эмодзи локации (:nl:, :ru:) в символ флага (🇳🇱, 🇷🇺).
+     * Если в БД уже записан Unicode-флаг — возвращает как есть.
+     *
+     * @param string $emoji Значение из location.emoji (например :nl: или 🇳🇱)
+     * @return string
+     */
+    private function locationEmojiToFlag(string $emoji): string
+    {
+        $emoji = trim($emoji);
+        // Уже символ флага (два regional indicator) — не трогаем
+        if (mb_strlen($emoji) >= 2 && preg_match('/[\x{1F1E6}-\x{1F1FF}]/u', $emoji)) {
+            return $emoji;
+        }
+        // Формат :xx: — две буквы кода страны → Unicode флаг (regional indicators)
+        if (preg_match('/^:([a-z]{2}):$/i', $emoji, $m)) {
+            $code = strtoupper($m[1]);
+            if (function_exists('mb_chr')) {
+                $c1 = $code[0];
+                $c2 = $code[1];
+                if ($c1 >= 'A' && $c1 <= 'Z' && $c2 >= 'A' && $c2 <= 'Z') {
+                    return mb_chr(0x1F1E6 + ord($c1) - 65) . mb_chr(0x1F1E6 + ord($c2) - 65);
+                }
+            }
+            // Fallback: известные коды из вашей БД
+            $flags = ['NL' => "\xF0\x9F\x87\xB3\xF0\x9F\x87\xB1", 'RU' => "\xF0\x9F\x87\xB7\xF0\x9F\x87\xBA"];
+            if (isset($flags[$code])) {
+                return $flags[$code];
+            }
+        }
+        return $emoji;
+    }
 
     /**
      * Format connection keys for display
