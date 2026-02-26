@@ -209,7 +209,18 @@ class VpnConfigController extends Controller
                 if (!empty($slotLinks)) {
                     $server = $serverUser->panel && $serverUser->panel->server ? $serverUser->panel->server : null;
                     $location = $server && $server->relationLoaded('location') ? $server->location : null;
-                    $baseLabel = ($location && $location->code) ? $location->code : ($server && $server->name ? $server->name : 'Сервер');
+                    $flag = '';
+                    $name = 'Сервер';
+                    if ($location) {
+                        $flag = $location->emoji ? $location->emoji . ' ' : '';
+                        $name = $location->code ?: 'Сервер';
+                    } elseif ($server && $server->name) {
+                        $flag = '🌐 ';
+                        $name = $server->name;
+                    } else {
+                        $flag = '🌐 ';
+                    }
+                    $baseLabel = $flag . $name;
                     $locKey = ($location ? $location->id : 0) . '_' . ($server ? $server->id : 0);
                     $locationCounts[$locKey] = isset($locationCounts[$locKey]) ? $locationCounts[$locKey] + 1 : 1;
                     $suffix = $locationCounts[$locKey] > 1 ? ' #' . $locationCounts[$locKey] : '';
