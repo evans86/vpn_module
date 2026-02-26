@@ -23,6 +23,46 @@ class ServerUserTransferController extends Controller
 {
 
     /**
+     * Слоты ключа (панели/провайдеры) для выбора при переносе при мульти-провайдере.
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function getKeySlots(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'key_id' => 'required|uuid|exists:key_activate,id',
+            ]);
+
+            $slots = KeyActivateUser::query()
+                ->where('key_activate_id', $validated['key_id'])
+                ->with(['serverUser.panel.server:id,name,provider', 'serverUser.panel:id,panel_adress,server_id'])
+                ->get()
+                ->map(function (KeyActivateUser $kau) {
+                    $panel = $kau->serverUser ? $kau->serverUser->panel : null;
+                    $server = $panel ? $panel->server : null;
+                    return [
+                        'panel_id' => $panel ? $panel->id : null,
+                        'server_name' => $server ? $server->name : ('Панель #' . ($panel ? $panel->id : '?')),
+                        'provider' => $server ? $server->provider : '',
+                    ];
+                })
+                ->filter(fn ($s) => !empty($s['panel_id']))
+                ->values()
+                ->all();
+
+            return response()->json(['slots' => $slots]);
+        } catch (Exception $e) {
+            Log::error('Failed to get key slots', [
+                'error' => $e->getMessage(),
+                'request' => $request->all(),
+            ]);
+            return response()->json(['message' => $e->getMessage(), 'slots' => []], 500);
+        }
+    }
+
+    /**
      * Получить список доступных панелей для переноса
      *
      * @param Request $request
@@ -37,19 +77,25 @@ class ServerUserTransferController extends Controller
             ]);
 
             $validated = $request->validate([
-                'key_id' => 'required|uuid|exists:key_activate,id'
+                'key_id' => 'required|uuid|exists:key_activate,id',
+                'source_panel_id' => 'nullable|integer|exists:panel,id',
             ]);
 
-            // Оптимизированная загрузка: получаем panel_id напрямую
-            $keyActivateUser = KeyActivateUser::select('server_user_id')
-                ->where('key_activate_id', $validated['key_id'])
-                ->firstOrFail();
-            
-            $serverUser = ServerUser::select('panel_id')
-                ->where('id', $keyActivateUser->server_user_id)
-                ->firstOrFail();
-
-            $currentPanelId = $serverUser->panel_id;
+            // При мульти-провайдере слот задаётся source_panel_id; иначе берём первый слот ключа
+            $currentPanelId = null;
+            if (!empty($validated['source_panel_id'])) {
+                $currentPanelId = (int) $validated['source_panel_id'];
+            } else {
+                $keyActivateUser = KeyActivateUser::select('server_user_id')
+                    ->where('key_activate_id', $validated['key_id'])
+                    ->first();
+                if ($keyActivateUser) {
+                    $serverUser = ServerUser::select('panel_id')
+                        ->where('id', $keyActivateUser->server_user_id)
+                        ->first();
+                    $currentPanelId = $serverUser ? (int) $serverUser->panel_id : null;
+                }
+            }
 
             // Получаем все активные панели, кроме текущей (оптимизированная загрузка)
             $panels = Panel::select('id', 'panel_status', 'panel_adress', 'server_id')
@@ -112,21 +158,25 @@ class ServerUserTransferController extends Controller
             $validated = $request->validate([
                 'key_id' => 'required|uuid|exists:key_activate,id',
                 'target_panel_id' => 'required|integer|exists:panel,id',
+                'source_panel_id' => 'nullable|integer|exists:panel,id',
             ]);
 
-            // Оптимизированная загрузка: только необходимые поля
-            $key = KeyActivate::select('id')->findOrFail($validated['key_id']);
-            
-            // Получаем panel_id напрямую через запрос, без загрузки всех связанных моделей
-            $keyActivateUser = KeyActivateUser::select('server_user_id')
-                ->where('key_activate_id', $key->id)
-                ->firstOrFail();
-            
-            $serverUser = ServerUser::select('panel_id')
-                ->where('id', $keyActivateUser->server_user_id)
-                ->firstOrFail();
-            
-            $sourcePanel_id = $serverUser->panel_id;
+            $keyId = $validated['key_id'];
+
+            // При мульти-провайдере переносим слот с выбранной исходной панели; иначе — первый слот ключа
+            $keyActivateUser = KeyActivateUser::query()
+                ->select('server_user_id')
+                ->where('key_activate_id', $keyId);
+            if (!empty($validated['source_panel_id'])) {
+                $keyActivateUser = $keyActivateUser->whereHas(
+                    'serverUser',
+                    fn ($q) => $q->where('panel_id', (int) $validated['source_panel_id'])
+                );
+            }
+            $keyActivateUser = $keyActivateUser->firstOrFail();
+
+            $serverUser = ServerUser::select('panel_id')->where('id', $keyActivateUser->server_user_id)->firstOrFail();
+            $sourcePanel_id = (int) $serverUser->panel_id;
             
             // Загружаем только необходимые поля панелей
             // api_address - это accessor, используем panel_adress для select
@@ -145,16 +195,16 @@ class ServerUserTransferController extends Controller
                 return response()->json(['message' => 'Cannot transfer between different panel types'], 400);
             }
 
-            // Используем стратегию для переноса пользователя
+            // Используем стратегию для переноса пользователя (передаём server_user_id выбранного слота)
             $panelStrategy = new PanelStrategy($sourcePanel->panel);
-            $updatedKey = $panelStrategy->transferUser(
+            $panelStrategy->transferUser(
                 $sourcePanel_id,
-                $validated['target_panel_id'],
-                $validated['key_id']
+                (int) $validated['target_panel_id'],
+                $keyActivateUser->server_user_id
             );
 
             // Освобождаем память
-            unset($keyActivateUser, $serverUser, $sourcePanel, $targetPanel, $updatedKey, $panelStrategy);
+            unset($keyActivateUser, $serverUser, $sourcePanel, $targetPanel, $panelStrategy);
             
             return response()->json([
                 'message' => 'Key transferred successfully',

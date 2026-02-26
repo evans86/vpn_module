@@ -2069,20 +2069,18 @@ class MarzbanService
             $targetPanel = Panel::select('id', 'panel', 'panel_adress', 'auth_token', 'server_id')
                 ->findOrFail($targetPanel_id);
 
-            // Оптимизированная загрузка: получаем server_user_id напрямую
-            $keyActivateUser = KeyActivateUser::select('server_user_id')
-                ->where('key_activate_id', $serverUser_id)
-                ->firstOrFail();
-
-            // Загружаем только необходимые поля пользователя сервера
+            // Загружаем пользователя сервера по ID (при одиночном переносе передаётся server_user_id выбранного слота)
             /** @var ServerUser $serverUser */
             $serverUser = ServerUser::select('id', 'panel_id', 'keys')
-                ->where('id', $keyActivateUser->server_user_id)
+                ->where('id', $serverUser_id)
                 ->firstOrFail();
 
-            // Загружаем ключ только для отправки уведомления (только необходимые поля)
-            $key_activate = KeyActivate::select('id', 'user_tg_id', 'module_salesman_id', 'pack_salesman_id')
-                ->findOrFail($serverUser_id);
+            $keyActivateUser = KeyActivateUser::select('key_activate_id')
+                ->where('server_user_id', $serverUser_id)
+                ->first();
+            $key_activate = $keyActivateUser
+                ? KeyActivate::select('id', 'user_tg_id', 'module_salesman_id', 'pack_salesman_id')->find($keyActivateUser->key_activate_id)
+                : null;
 
             // Создаем API клиенты для обеих панелей
             $sourceMarzbanApi = new MarzbanAPI($sourcePanel->api_address);
@@ -2134,57 +2132,59 @@ class MarzbanService
 
                 DB::commit();
 
-                // Отправляем сообщение через FatherBot
-                $message = "⚠️ Ваш ключ доступа: " . "<code>{$key_activate->id}</code> " . "был перемещен на новый сервер!\n\n";
-                $message .= "🔗 Для продолжения работы:\n";
-                $message .= "• Заново вставьте ссылку-подключение в клиент VPN, или\n";
-                $message .= "• При выключенном VPN нажмите кнопку обновления конфигурации\n\n";
-                $message .= "🔗 Ссылка: https://vpn-telegram.com/config/{$key_activate->id}";
+                // Отправляем сообщение через FatherBot (только если найден ключ key_activate)
+                if ($key_activate) {
+                    $message = "⚠️ Ваш ключ доступа: " . "<code>{$key_activate->id}</code> " . "был перемещен на новый сервер!\n\n";
+                    $message .= "🔗 Для продолжения работы:\n";
+                    $message .= "• Заново вставьте ссылку-подключение в клиент VPN, или\n";
+                    $message .= "• При выключенном VPN нажмите кнопку обновления конфигурации\n\n";
+                    $message .= "🔗 Ссылка: https://vpn-telegram.com/config/{$key_activate->id}";
 
-                try {
-                    if (!is_null($key_activate->module_salesman_id)) {
-                        // Загружаем только необходимые поля для модульного продавца
-                        // module_salesman_id ссылается на Salesman, у которого есть botModule через module_bot_id
-                        $salesman = Salesman::select('id', 'module_bot_id')
-                            ->where('id', $key_activate->module_salesman_id)
-                            ->first();
-                        
-                        if ($salesman && $salesman->module_bot_id) {
-                            $botModule = BotModule::select('id', 'token', 'username')
-                                ->where('id', $salesman->module_bot_id)
+                    try {
+                        if (!is_null($key_activate->module_salesman_id)) {
+                            // Загружаем только необходимые поля для модульного продавца
+                            // module_salesman_id ссылается на Salesman, у которого есть botModule через module_bot_id
+                            $salesman = Salesman::select('id', 'module_bot_id')
+                                ->where('id', $key_activate->module_salesman_id)
                                 ->first();
                             
-                            if ($botModule) {
-                                BottApi::senModuleMessage(BotModuleFactory::fromEntity($botModule), $key_activate->user_tg_id, $message);
+                            if ($salesman && $salesman->module_bot_id) {
+                                $botModule = BotModule::select('id', 'token', 'username')
+                                    ->where('id', $salesman->module_bot_id)
+                                    ->first();
+                                
+                                if ($botModule) {
+                                    BottApi::senModuleMessage(BotModuleFactory::fromEntity($botModule), $key_activate->user_tg_id, $message);
+                                }
                             }
-                        }
-                    } else {
-                        // Загружаем только необходимые поля для продавца пакетов
-                        $packSalesman = PackSalesman::select('salesman_id')
-                            ->where('id', $key_activate->pack_salesman_id)
-                            ->first();
-
-                        if ($packSalesman) {
-                            $salesman = Salesman::select('id', 'token', 'telegram_id')
-                                ->where('id', $packSalesman->salesman_id)
+                        } else {
+                            // Загружаем только необходимые поля для продавца пакетов
+                            $packSalesman = PackSalesman::select('salesman_id')
+                                ->where('id', $key_activate->pack_salesman_id)
                                 ->first();
 
-                            if ($salesman) {
-                                $telegram = new Api($salesman->token);
-                                $telegram->sendMessage([
-                                    'chat_id' => $key_activate->user_tg_id,
-                                    'text' => $message,
-                                    'parse_mode' => 'HTML'
-                                ]);
+                            if ($packSalesman) {
+                                $salesman = Salesman::select('id', 'token', 'telegram_id')
+                                    ->where('id', $packSalesman->salesman_id)
+                                    ->first();
+
+                                if ($salesman) {
+                                    $telegram = new Api($salesman->token);
+                                    $telegram->sendMessage([
+                                        'chat_id' => $key_activate->user_tg_id,
+                                        'text' => $message,
+                                        'parse_mode' => 'HTML'
+                                    ]);
+                                }
                             }
                         }
+                    } catch (Exception $e) {
+                        Log::error('Ошибка при отправке сообщения через FatherBot', [
+                            'error' => $e->getMessage(),
+                            'key_id' => $key_activate->id,
+                            'source' => 'panel'
+                        ]);
                     }
-                } catch (Exception $e) {
-                    Log::error('Ошибка при отправке сообщения через FatherBot', [
-                        'error' => $e->getMessage(),
-                        'key_id' => $key_activate->id,
-                        'source' => 'panel'
-                    ]);
                 }
 
                 // Освобождаем память
@@ -2231,12 +2231,12 @@ class MarzbanService
             ->where('status', KeyActivate::ACTIVE)
             ->firstOrFail();
 
-        $keyActivateUser = KeyActivateUser::where('key_activate_id', $keyActivateId)->firstOrFail();
+        // При мульти-провайдере у ключа несколько слотов — переносим тот, что на исходной панели
+        $keyActivateUser = KeyActivateUser::query()
+            ->where('key_activate_id', $keyActivateId)
+            ->whereHas('serverUser', fn ($q) => $q->where('panel_id', $sourcePanelId))
+            ->firstOrFail();
         $serverUser = ServerUser::where('id', $keyActivateUser->server_user_id)->firstOrFail();
-
-        if ((int) $serverUser->panel_id !== $sourcePanelId) {
-            throw new RuntimeException("Ключ {$keyActivateId} не принадлежит исходной панели {$sourcePanelId}");
-        }
 
         $targetPanel = $this->updateMarzbanToken($targetPanelId);
         $marzbanApi = new MarzbanAPI($targetPanel->api_address);
