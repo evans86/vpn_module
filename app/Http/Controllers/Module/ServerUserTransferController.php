@@ -63,6 +63,77 @@ class ServerUserTransferController extends Controller
     }
 
     /**
+     * Одним запросом: слоты ключа и список панелей для переноса (исключены панели, где ключ уже есть).
+     */
+    public function getTransferData(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'key_id' => 'required|uuid|exists:key_activate,id',
+            ]);
+            $keyId = $validated['key_id'];
+
+            $slots = KeyActivateUser::query()
+                ->where('key_activate_id', $keyId)
+                ->with(['serverUser.panel.server:id,name,provider', 'serverUser.panel:id,panel_adress,server_id'])
+                ->get()
+                ->map(function (KeyActivateUser $kau) {
+                    $panel = $kau->serverUser ? $kau->serverUser->panel : null;
+                    $server = $panel ? $panel->server : null;
+                    return [
+                        'panel_id' => $panel ? $panel->id : null,
+                        'server_name' => $server ? $server->name : ('Панель #' . ($panel ? $panel->id : '?')),
+                        'provider' => $server ? $server->provider : '',
+                    ];
+                })
+                ->filter(function ($s) {
+                    return !empty($s['panel_id']);
+                })
+                ->values()
+                ->all();
+
+            $panelIdsWithKey = KeyActivateUser::query()
+                ->where('key_activate_id', $keyId)
+                ->join('server_user', 'key_activate_user.server_user_id', '=', 'server_user.id')
+                ->select('server_user.panel_id')
+                ->pluck('panel_id')
+                ->unique()
+                ->values()
+                ->all();
+
+            $panels = Panel::select('id', 'panel_status', 'server_id')
+                ->with(['server' => function ($query) {
+                    $query->select('id', 'name', 'provider');
+                }])
+                ->where('panel_status', 2)
+                ->when(!empty($panelIdsWithKey), function ($query) use ($panelIdsWithKey) {
+                    return $query->whereNotIn('id', $panelIdsWithKey);
+                })
+                ->get()
+                ->map(function ($panel) {
+                    $server = $panel->server;
+                    return [
+                        'id' => $panel->id,
+                        'server_name' => $server ? $server->name : 'Неизвестный сервер',
+                        'provider' => $server ? $server->provider : '',
+                    ];
+                });
+
+            return response()->json(['slots' => $slots, 'panels' => $panels]);
+        } catch (Exception $e) {
+            Log::error('Failed to get transfer data', [
+                'error' => $e->getMessage(),
+                'key_id' => $request->input('key_id'),
+            ]);
+            return response()->json([
+                'message' => $e->getMessage(),
+                'slots' => [],
+                'panels' => [],
+            ], 500);
+        }
+    }
+
+    /**
      * Получить список доступных панелей для переноса
      *
      * @param Request $request
@@ -71,53 +142,30 @@ class ServerUserTransferController extends Controller
     public function getPanels(Request $request): JsonResponse
     {
         try {
-            Log::info('Incoming request data:', [
-                'all' => $request->all(),
-                'headers' => $request->headers->all()
-            ]);
-
             $validated = $request->validate([
                 'key_id' => 'required|uuid|exists:key_activate,id',
                 'source_panel_id' => 'nullable|integer|exists:panel,id',
             ]);
 
-            // При мульти-провайдере слот задаётся source_panel_id; иначе берём первый слот ключа
-            $currentPanelId = null;
-            if (!empty($validated['source_panel_id'])) {
-                $currentPanelId = (int) $validated['source_panel_id'];
-            } else {
-                $keyActivateUser = KeyActivateUser::select('server_user_id')
-                    ->where('key_activate_id', $validated['key_id'])
-                    ->first();
-                if ($keyActivateUser) {
-                    $serverUser = ServerUser::select('panel_id')
-                        ->where('id', $keyActivateUser->server_user_id)
-                        ->first();
-                    $currentPanelId = $serverUser ? (int) $serverUser->panel_id : null;
-                }
-            }
+            // Исключаем все панели, на которых у этого ключа уже есть слот (не только исходную)
+            $panelIdsWithKey = KeyActivateUser::query()
+                ->where('key_activate_id', $validated['key_id'])
+                ->join('server_user', 'key_activate_user.server_user_id', '=', 'server_user.id')
+                ->select('server_user.panel_id')
+                ->pluck('panel_id')
+                ->unique()
+                ->values()
+                ->all();
 
-            // Получаем все активные панели, кроме текущей (оптимизированная загрузка)
-            $panels = Panel::select('id', 'panel_status', 'panel_adress', 'server_id')
+            $panels = Panel::select('id', 'panel_status', 'server_id')
                 ->with(['server' => function ($query) {
                     $query->select('id', 'name', 'provider');
                 }])
                 ->where('panel_status', 2)
-                ->when($currentPanelId, function ($query) use ($currentPanelId) {
-                    return $query->where('id', '!=', $currentPanelId);
+                ->when(!empty($panelIdsWithKey), function ($query) use ($panelIdsWithKey) {
+                    return $query->whereNotIn('id', $panelIdsWithKey);
                 })
                 ->get();
-
-            Log::info('Available panels:', [
-                'count' => $panels->count(),
-                'panels' => $panels->map(function ($panel) {
-                    return [
-                        'id' => $panel->id,
-                        'status' => $panel->panel_status,
-                        'server_name' => $panel->server ? $panel->server->name : 'Неизвестный сервер',
-                    ];
-                })->all()
-            ]);
 
             $result = $panels->map(function ($panel) {
                 $server = $panel->server;
@@ -132,8 +180,7 @@ class ServerUserTransferController extends Controller
         } catch (Exception $e) {
             Log::error('Failed to get panels list', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'request' => $request->all()
+                'key_id' => $request->input('key_id'),
             ]);
             return response()->json(['message' => 'Failed to get panels list: ' . $e->getMessage()], 500);
         }

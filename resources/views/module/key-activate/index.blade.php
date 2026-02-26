@@ -301,9 +301,9 @@
             </div>
         </form>
         <x-slot name="footer">
-            <button type="submit" form="transfer-key-form" class="btn btn-primary">
-                <span class="spinner spinner-border-sm d-none" role="status"></span>
-                Перенести
+            <button type="submit" form="transfer-key-form" id="transfer-key-submit-btn" class="btn btn-primary">
+                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                <span class="btn-text">Перенести</span>
             </button>
             <button type="button" 
                     class="btn btn-secondary" 
@@ -490,7 +490,7 @@
                 });
             });
 
-            // Обработчик клика по кнопке переноса (мульти-провайдер: сначала слоты, затем панели)
+            // Обработчик клика по кнопке переноса — один запрос: слоты и панели (без панелей, где ключ уже есть)
             $(document).on('click', '.btn-transfer-key', function () {
                 const keyId = $(this).data('key-id');
                 $('#transfer-key-id').val(keyId);
@@ -498,103 +498,83 @@
                 $('#source-slot-select').empty().off('change');
 
                 $.ajax({
-                    url: '{{ route('admin.module.server-user-transfer.key-slots') }}',
+                    url: '{{ route('admin.module.server-user-transfer.transfer-data') }}',
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                     },
                     data: { key_id: keyId },
-                    success: function (slotResponse) {
-                        const slots = slotResponse.slots || [];
+                    success: function (response) {
+                        const slots = response.slots || [];
+                        const panels = response.panels || [];
                         if (slots.length === 0) {
                             toastr.error('У ключа нет слотов для переноса');
                             return;
                         }
-                        let sourcePanelId = slots[0].panel_id;
+                        var sourcePanelId = slots[0].panel_id;
                         if (slots.length > 1) {
                             $('#transfer-slot-block').removeClass('d-none');
-                            const slotSelect = $('#source-slot-select');
+                            var slotSelect = $('#source-slot-select');
                             slotSelect.append('<option value="">Выберите слот</option>');
                             slots.forEach(function (s) {
-                                const name = (s.server_name || 'Сервер') + ' (' + s.panel_id + ')';
-                                const label = s.provider ? name + ', ' + s.provider : name;
-                                slotSelect.append(`<option value="${s.panel_id}">${label}</option>`);
+                                var name = (s.server_name || 'Сервер') + ' (' + s.panel_id + ')';
+                                var label = s.provider ? name + ', ' + s.provider : name;
+                                slotSelect.append('<option value="' + s.panel_id + '">' + label + '</option>');
                             });
-                            slotSelect.off('change').on('change', function () {
-                                const v = $(this).val();
-                                if (v) {
-                                    $('#transfer-source-panel-id').val(v);
-                                    loadTransferPanels(keyId, v);
-                                }
-                            });
-                            sourcePanelId = slots[0].panel_id;
-                            $('#transfer-source-panel-id').val(sourcePanelId);
                             slotSelect.val(sourcePanelId);
+                            slotSelect.off('change').on('change', function () {
+                                var v = $(this).val();
+                                if (v) $('#transfer-source-panel-id').val(v);
+                            });
+                            $('#transfer-source-panel-id').val(sourcePanelId);
                         } else {
                             $('#transfer-slot-block').addClass('d-none');
                             $('#transfer-source-panel-id').val(sourcePanelId);
                         }
-                        loadTransferPanels(keyId, sourcePanelId);
-                    },
-                    error: function (xhr) {
-                        toastr.error('Ошибка при загрузке слотов: ' + (xhr.responseJSON?.message || 'Неизвестная ошибка'));
-                    }
-                });
-            });
-
-            function loadTransferPanels(keyId, sourcePanelId) {
-                const data = { key_id: keyId };
-                if (sourcePanelId) data.source_panel_id = sourcePanelId;
-                $.ajax({
-                    url: '{{ route('admin.module.server-user-transfer.panels') }}',
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                    },
-                    data: data,
-                    success: function (response) {
-                        const panels = response.panels || [];
-                        const select = $('#target-panel-select');
+                        var select = $('#target-panel-select');
                         select.empty();
                         select.append('<option value="">Выберите сервер</option>');
                         if (panels.length > 0) {
                             panels.forEach(function (panel) {
-                                const serverName = panel.server_name || 'Неизвестный сервер';
-                                const short = serverName + ' (' + panel.id + ')';
-                                const displayName = panel.provider ? short + ', ' + panel.provider : short;
+                                var serverName = panel.server_name || 'Неизвестный сервер';
+                                var short = serverName + ' (' + panel.id + ')';
+                                var displayName = panel.provider ? short + ', ' + panel.provider : short;
                                 select.append('<option value="' + panel.id + '">' + displayName + '</option>');
                             });
-                            window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'transferKeyModal' } }));
-                        } else {
-                            toastr.warning('Нет доступных серверов для переноса');
+                        }
+                        window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'transferKeyModal' } }));
+                        if (panels.length === 0) {
+                            toastr.warning('Нет доступных серверов для переноса (ключ уже есть на всех панелях)');
                         }
                     },
                     error: function (xhr) {
-                        toastr.error('Ошибка при загрузке списка серверов: ' + (xhr.responseJSON?.message || 'Неизвестная ошибка'));
+                        toastr.error('Ошибка загрузки: ' + (xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Неизвестная ошибка'));
                     }
                 });
-            }
+            });
 
             // Обработчик отправки формы переноса
             $('#transfer-key-form').on('submit', function (e) {
                 e.preventDefault();
 
-                const keyId = $('#transfer-key-id').val();
-                const targetPanelId = $('#target-panel-select').val();
-                const sourcePanelId = $('#transfer-source-panel-id').val();
+                var keyId = $('#transfer-key-id').val();
+                var targetPanelId = $('#target-panel-select').val();
+                var sourcePanelId = $('#transfer-source-panel-id').val();
 
                 if (!targetPanelId) {
                     toastr.warning('Пожалуйста, выберите сервер для переноса');
                     return;
                 }
 
-                const submitBtn = $(this).find('button[type="submit"]');
-                const spinner = submitBtn.find('.spinner');
+                var submitBtn = $('#transfer-key-submit-btn');
+                var spinner = submitBtn.find('.spinner-border');
+                var btnText = submitBtn.find('.btn-text');
 
                 submitBtn.prop('disabled', true);
                 spinner.removeClass('d-none');
+                btnText.addClass('d-none');
 
-                const payload = {
+                var payload = {
                     key_id: keyId,
                     target_panel_id: targetPanelId
                 };
@@ -610,16 +590,17 @@
                     success: function (response) {
                         window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'transferKeyModal' } }));
                         toastr.success('Ключ успешно перенесен на новый сервер');
-                        setTimeout(() => {
+                        setTimeout(function () {
                             window.location.reload();
                         }, 1000);
                     },
                     error: function (xhr) {
-                        toastr.error('Ошибка при переносе ключа: ' + (xhr.responseJSON?.message || 'Неизвестная ошибка'));
+                        toastr.error('Ошибка при переносе ключа: ' + (xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Неизвестная ошибка'));
                     },
                     complete: function () {
                         submitBtn.prop('disabled', false);
                         spinner.addClass('d-none');
+                        btnText.removeClass('d-none');
                     }
                 });
             });
