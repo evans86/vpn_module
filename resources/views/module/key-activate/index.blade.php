@@ -516,7 +516,8 @@
                             const slotSelect = $('#source-slot-select');
                             slotSelect.append('<option value="">Выберите слот</option>');
                             slots.forEach(function (s) {
-                                const label = [s.server_name, s.provider].filter(Boolean).join(' — ') || 'Панель #' + s.panel_id;
+                                const name = (s.server_name || 'Сервер') + ' (' + s.panel_id + ')';
+                                const label = s.provider ? name + ', ' + s.provider : name;
                                 slotSelect.append(`<option value="${s.panel_id}">${label}</option>`);
                             });
                             slotSelect.off('change').on('change', function () {
@@ -559,8 +560,8 @@
                         if (panels.length > 0) {
                             panels.forEach(function (panel) {
                                 const serverName = panel.server_name || 'Неизвестный сервер';
-                                const address = panel.address || '';
-                                const displayName = address ? serverName + ' (' + address + ')' : serverName;
+                                const short = serverName + ' (' + panel.id + ')';
+                                const displayName = panel.provider ? short + ', ' + panel.provider : short;
                                 select.append('<option value="' + panel.id + '">' + displayName + '</option>');
                             });
                             window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'transferKeyModal' } }));
