@@ -12,6 +12,26 @@ use Illuminate\Support\Facades\Log;
  */
 class MultiProviderMigrationService
 {
+    /**
+     * Только подсчёт ключей-кандидатов (для быстрого отображения в UI).
+     */
+    public function getTotalCount(): int
+    {
+        $slots = config('panel.multi_provider_slots', []);
+        if (empty($slots) || !is_array($slots)) {
+            return 0;
+        }
+        return (int) DB::table('key_activate as ka')
+            ->where('ka.status', KeyActivate::ACTIVE)
+            ->whereNotNull('ka.user_tg_id')
+            ->whereExists(function ($q) {
+                $q->select(DB::raw(1))
+                    ->from('key_activate_user')
+                    ->whereColumn('key_activate_user.key_activate_id', 'ka.id');
+            })
+            ->count();
+    }
+
     public function runOneBatch(int $offset, int $batchSize, bool $dryRun, ?int $maxTotal = null): array
     {
         $slots = config('panel.multi_provider_slots', []);

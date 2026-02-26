@@ -36,14 +36,33 @@ class MultiProviderMigrationBatchJob implements ShouldQueue
 
     public function handle(): void
     {
-        $originalMemoryLimit = ini_get('memory_limit');
         ini_set('memory_limit', '2048M');
 
         try {
+            $cacheKey = 'multi_provider_migration_' . $this->runId;
+            $progress = Cache::get($cacheKey, [
+                'total' => 0,
+                'processed' => 0,
+                'added_total' => 0,
+                'errors' => [],
+                'done' => false,
+                'message' => '',
+                'started_at' => null,
+            ]);
+            if ($progress['started_at'] === null) {
+                $progress['started_at'] = now()->toIso8601String();
+            }
+
+            if ($this->offset === 0 && ($progress['total'] ?? 0) === 0) {
+                $service = app(MultiProviderMigrationService::class);
+                $progress['total'] = $service->getTotalCount();
+                $progress['message'] = 'Подсчёт завершён. Обработка первой порции…';
+                Cache::put($cacheKey, $progress, now()->addHours(3));
+            }
+
             $service = app(MultiProviderMigrationService::class);
             $result = $service->runOneBatch($this->offset, $this->batchSize, $this->dryRun, null);
 
-            $cacheKey = 'multi_provider_migration_' . $this->runId;
             $progress = Cache::get($cacheKey, [
                 'total' => 0,
                 'processed' => 0,
@@ -87,8 +106,8 @@ class MultiProviderMigrationBatchJob implements ShouldQueue
             $progress['message'] = 'Ошибка: ' . $e->getMessage();
             $progress['error'] = $e->getMessage();
             Cache::put($cacheKey, $progress, now()->addHours(3));
-        } finally {
-            ini_set('memory_limit', $originalMemoryLimit);
         }
+        // Не восстанавливаем memory_limit: после обработки использование может превышать
+        // исходный лимит (512M), ini_set() вызовет ошибку. Оставляем 2048M до выхода процесса.
     }
 }
