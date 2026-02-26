@@ -210,6 +210,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/multi-provider-migration/check-key', [ServerUserTransferController::class, 'multiProviderMigrationCheckKey'])->name('multi-provider-migration.check-key');
                 Route::post('/multi-provider-migration/single-key', [ServerUserTransferController::class, 'multiProviderMigrationSingleKey'])->name('multi-provider-migration.single-key');
                 Route::post('/multi-provider-migration/run-batch', [ServerUserTransferController::class, 'multiProviderMigrationBatch'])->name('multi-provider-migration.run-batch');
+                Route::post('/multi-provider-migration/start', [ServerUserTransferController::class, 'multiProviderMigrationStart'])->name('multi-provider-migration.start');
+                Route::get('/multi-provider-migration/status', [ServerUserTransferController::class, 'multiProviderMigrationStatus'])->name('multi-provider-migration.status');
                 Route::post('/key-slots', [ServerUserTransferController::class, 'getKeySlots'])->name('key-slots');
                 Route::post('/transfer-data', [ServerUserTransferController::class, 'getTransferData'])->name('transfer-data');
                 Route::post('/panels', [ServerUserTransferController::class, 'getPanels'])->name('panels');

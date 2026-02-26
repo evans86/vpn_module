@@ -162,7 +162,7 @@
 
         <x-admin.card title="Миграция на мульти-провайдер">
             <p class="text-sm text-gray-600 mb-4">
-                Добавление недостающих провайдер-слотов к уже активным ключам. У каждого ключа будет по одному слоту на каждый провайдер из настройки (например VDSINA и Timeweb); подписка объединит конфиги — при падении одного сервера пользователь сможет переключиться на другой. Сначала обязательно запустите «Только проверка» или «Тест (2 ключа)».
+                Добавление недостающих провайдер-слотов к уже активным ключам. У каждого ключа будет по одному слоту на каждый провайдер из настройки (например VDSINA и Timeweb); подписка объединит конфиги — при падении одного сервера пользователь сможет переключиться на другой. Сначала обязательно запустите «Только проверка» или «Тест (2 ключа)». Полная миграция обрабатывает ключи порциями (не все сразу); можно запустить в фоне через очередь и наблюдать за прогрессом.
             </p>
 
             <div class="mb-6 p-4 rounded-lg border border-gray-200 bg-gray-50">
@@ -216,9 +216,13 @@
                     <span>Только проверка (dry-run)</span>
                 </label>
             </div>
+            <p class="text-sm text-gray-500 mb-3">Обработка идёт порциями (по «Порция за шаг» ключей за один шаг). Либо в этой вкладке — запросы по очереди, вкладку не закрывать; либо в фоне — через очередь, можно закрыть страницу и смотреть прогресс при следующем заходе.</p>
             <div class="flex items-center gap-4 flex-wrap">
-                <button type="button" id="btn-multi-provider-run" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
-                    <i class="fas fa-layer-group mr-2"></i> Запустить миграцию
+                <button type="button" id="btn-multi-provider-run-background" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed" title="Запуск в очереди: нужны QUEUE_CONNECTION=database и php artisan queue:work">
+                    <i class="fas fa-cloud-upload-alt mr-2"></i> Запустить в фоне (очередь)
+                </button>
+                <button type="button" id="btn-multi-provider-run" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-layer-group mr-2"></i> Запустить в этой вкладке
                 </button>
                 <button type="button" id="btn-multi-provider-test" class="inline-flex items-center px-4 py-2 border border-amber-300 text-sm font-medium rounded-md shadow-sm text-amber-800 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed" title="Обработать только 2 ключа">
                     <i class="fas fa-vial mr-2"></i> Тест (2 ключа)
@@ -582,6 +586,8 @@
             var multiProviderCheckKeyUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.check-key') }}';
             var multiProviderSingleKeyUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.single-key') }}';
             var multiProviderBatchUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.run-batch') }}';
+            var multiProviderStartUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.start') }}';
+            var multiProviderStatusUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.status') }}';
             var multiProviderCsrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content') || (document.querySelector('input[name="_token"]') && document.querySelector('input[name="_token"]').value);
 
             var lastCheckedKeyId = null;
@@ -697,11 +703,122 @@
             document.getElementById('btn-multi-provider-run').addEventListener('click', function () {
                 runMultiProviderMigration(false, null);
             });
+            document.getElementById('btn-multi-provider-run-background').addEventListener('click', function () {
+                runMultiProviderMigrationBackground();
+            });
             document.getElementById('btn-multi-provider-test').addEventListener('click', function () {
                 runMultiProviderMigration(false, 2);
             });
 
+            function runMultiProviderMigrationBackground() {
+                var btnBg = document.getElementById('btn-multi-provider-run-background');
+                var btnRun = document.getElementById('btn-multi-provider-run');
+                var btnTest = document.getElementById('btn-multi-provider-test');
+                var progressBlock = document.getElementById('multi-provider-progress');
+                var progressBar = document.getElementById('multi-provider-progress-bar');
+                var progressText = document.getElementById('multi-provider-progress-text');
+                var resultBlock = document.getElementById('multi-provider-result');
+                var resultMessage = document.getElementById('multi-provider-result-message');
+                var resultErrors = document.getElementById('multi-provider-result-errors');
+                var batchSize = parseInt(document.getElementById('multi-provider-batch-size').value, 10) || 50;
+                var isDryRun = document.getElementById('multi-provider-dry-run') && document.getElementById('multi-provider-dry-run').checked;
+
+                btnBg.disabled = true;
+                btnRun.disabled = true;
+                if (btnTest) btnTest.disabled = true;
+                resultBlock.classList.add('hidden');
+                progressBlock.classList.remove('hidden');
+                progressBar.style.width = '0%';
+                progressText.textContent = 'Постановка в очередь…';
+
+                fetch(multiProviderStartUrl, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': multiProviderCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ batch_size: batchSize, dry_run: isDryRun }),
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (!data.success || !data.run_id) {
+                            progressBlock.classList.add('hidden');
+                            resultBlock.classList.remove('hidden');
+                            resultBlock.classList.add('border-red-200', 'bg-red-50');
+                            resultMessage.textContent = data.message || 'Не удалось запустить. Проверьте: QUEUE_CONNECTION=database и php artisan queue:work.';
+                            if (typeof toastr !== 'undefined') toastr.error(data.message);
+                            btnBg.disabled = false;
+                            btnRun.disabled = false;
+                            if (btnTest) btnTest.disabled = false;
+                            return;
+                        }
+                        var runId = data.run_id;
+                        progressText.textContent = 'Миграция в фоне. Обновление прогресса…';
+
+                        function poll() {
+                            fetch(multiProviderStatusUrl + '?run_id=' + encodeURIComponent(runId), {
+                                method: 'GET',
+                                headers: { 'Accept': 'application/json' },
+                            })
+                                .then(function (r) { return r.json(); })
+                                .then(function (s) {
+                                    if (!s.found) {
+                                        progressText.textContent = 'Сессия не найдена.';
+                                        return;
+                                    }
+                                    var total = s.total || 0;
+                                    var processed = s.processed || 0;
+                                    var added = s.added_total || 0;
+                                    var pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+                                    progressBar.style.width = pct + '%';
+                                    progressText.textContent = (s.message || '') + ' Обработано: ' + processed + ' из ' + total + ', добавлено слотов: ' + added + '.';
+
+                                    if (s.done) {
+                                        progressBlock.classList.add('hidden');
+                                        resultBlock.classList.remove('hidden');
+                                        if (s.error) {
+                                            resultBlock.classList.add('border-red-200', 'bg-red-50');
+                                            resultMessage.textContent = s.error;
+                                        } else {
+                                            resultBlock.classList.remove('border-red-200', 'bg-red-50');
+                                            resultBlock.classList.add('border-green-200', 'bg-green-50');
+                                            resultMessage.textContent = (isDryRun ? 'Проверка завершена. ' : 'Миграция завершена. ') + 'Обработано ключей: ' + processed + ', добавлено слотов: ' + added + (s.errors && s.errors.length ? ', ошибок: ' + s.errors.length : '') + '.';
+                                            if (s.errors && s.errors.length > 0) {
+                                                resultErrors.classList.remove('hidden');
+                                                resultErrors.innerHTML = '<ul class="list-disc pl-5">' + s.errors.slice(0, 30).map(function (e) {
+                                                    return '<li>' + (e.key_id || '') + ': ' + (e.message || '') + '</li>';
+                                                }).join('') + (s.errors.length > 30 ? '<li class="text-gray-500">… и ещё ' + (s.errors.length - 30) + ' ошибок</li>' : '') + '</ul>';
+                                            } else {
+                                                resultErrors.classList.add('hidden');
+                                                resultErrors.innerHTML = '';
+                                            }
+                                        }
+                                        if (typeof toastr !== 'undefined') toastr.success(isDryRun ? 'Проверка завершена.' : 'Миграция завершена.');
+                                        btnBg.disabled = false;
+                                        btnRun.disabled = false;
+                                        if (btnTest) btnTest.disabled = false;
+                                        return;
+                                    }
+                                    setTimeout(poll, 2500);
+                                })
+                                .catch(function () {
+                                    progressText.textContent = 'Ошибка запроса статуса. Повтор через 5 сек…';
+                                    setTimeout(poll, 5000);
+                                });
+                        }
+                        setTimeout(poll, 1500);
+                    })
+                    .catch(function (err) {
+                        progressBlock.classList.add('hidden');
+                        resultBlock.classList.remove('hidden');
+                        resultBlock.classList.add('border-red-200', 'bg-red-50');
+                        resultMessage.textContent = 'Ошибка запуска: ' + (err.message || 'неизвестная ошибка');
+                        if (typeof toastr !== 'undefined') toastr.error('Ошибка запуска');
+                        btnBg.disabled = false;
+                        btnRun.disabled = false;
+                        if (btnTest) btnTest.disabled = false;
+                    });
+            }
+
             function runMultiProviderMigration(dryRun, maxTotal) {
+                var btnBg = document.getElementById('btn-multi-provider-run-background');
                 var btnRun = document.getElementById('btn-multi-provider-run');
                 var btnTest = document.getElementById('btn-multi-provider-test');
                 var progressBlock = document.getElementById('multi-provider-progress');
@@ -713,6 +830,7 @@
                 var batchSize = parseInt(document.getElementById('multi-provider-batch-size').value, 10) || 50;
                 var isDryRun = dryRun || (document.getElementById('multi-provider-dry-run') && document.getElementById('multi-provider-dry-run').checked);
 
+                btnBg.disabled = true;
                 btnRun.disabled = true;
                 if (btnTest) btnTest.disabled = true;
                 resultBlock.classList.add('hidden');
@@ -738,7 +856,19 @@
                         headers: { 'X-CSRF-TOKEN': multiProviderCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
                         body: JSON.stringify(body),
                     })
-                        .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+                        .then(function (r) {
+                            var ct = (r.headers.get('Content-Type') || '').toLowerCase();
+                            return r.text().then(function (text) {
+                                var data = null;
+                                if (ct.indexOf('application/json') !== -1 || (text && text.trim().indexOf('{') === 0)) {
+                                    try { data = JSON.parse(text); } catch (e) { }
+                                }
+                                if (!data) {
+                                    data = { success: false, message: 'Сервер вернул страницу ошибки вместо JSON (возможно 500 или нехватка памяти). Проверьте storage/logs/laravel.log. Код ответа: ' + r.status + '.' };
+                                }
+                                return { ok: r.ok, data: data };
+                            });
+                        })
                         .then(function (res) {
                             if (!res.ok || !res.data.success) {
                                 progressBlock.classList.add('hidden');
@@ -747,6 +877,7 @@
                                 resultMessage.textContent = res.data.message || 'Ошибка';
                                 resultErrors.classList.add('hidden');
                                 if (typeof toastr !== 'undefined') toastr.error(res.data.message);
+                                btnBg.disabled = false;
                                 btnRun.disabled = false;
                                 if (btnTest) btnTest.disabled = false;
                                 return;
@@ -776,6 +907,7 @@
                                     resultErrors.innerHTML = '';
                                 }
                                 if (typeof toastr !== 'undefined') toastr.success(isDryRun ? 'Проверка завершена.' : 'Миграция завершена.');
+                                btnBg.disabled = false;
                                 btnRun.disabled = false;
                                 if (btnTest) btnTest.disabled = false;
                                 return;
@@ -789,6 +921,7 @@
                             resultMessage.textContent = 'Ошибка запроса: ' + (err.message || 'неизвестная ошибка');
                             resultErrors.classList.add('hidden');
                             if (typeof toastr !== 'undefined') toastr.error('Ошибка запроса');
+                            btnBg.disabled = false;
                             btnRun.disabled = false;
                             if (btnTest) btnTest.disabled = false;
                         });

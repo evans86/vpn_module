@@ -8,7 +8,9 @@ use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Models\Panel\Panel;
 use App\Models\ServerUser\ServerUser;
 use App\Repositories\Panel\PanelRepository;
+use App\Jobs\MultiProviderMigrationBatchJob;
 use App\Services\Key\KeyActivateService;
+use App\Services\Key\MultiProviderMigrationService;
 use App\Services\Panel\marzban\MarzbanService;
 use App\Services\Panel\PanelStrategy;
 use Exception;
@@ -16,7 +18,10 @@ use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 class ServerUserTransferController extends Controller
@@ -889,7 +894,7 @@ class ServerUserTransferController extends Controller
     public function multiProviderMigrationBatch(Request $request): JsonResponse
     {
         $originalMemoryLimit = ini_get('memory_limit');
-        ini_set('memory_limit', '1024M');
+        ini_set('memory_limit', '2048M');
 
         try {
             $validated = $request->validate([
@@ -917,71 +922,24 @@ class ServerUserTransferController extends Controller
             $maxTotal = isset($validated['max_total']) && $validated['max_total'] !== '' ? (int) $validated['max_total'] : null;
             $dryRun = !empty($validated['dry_run']);
 
-            $baseQuery = KeyActivate::query()
-                ->where('status', KeyActivate::ACTIVE)
-                ->whereNotNull('user_tg_id')
-                ->whereHas('keyActivateUsers')
-                ->orderBy('id');
+            $service = app(MultiProviderMigrationService::class);
+            $result = $service->runOneBatch($offset, $batchSize, $dryRun, $maxTotal);
 
-            $total = (clone $baseQuery)->count();
-            $limit = $maxTotal !== null ? min($batchSize, $maxTotal - $offset) : $batchSize;
-            if ($limit < 1 && $maxTotal !== null) {
-                return response()->json([
-                    'success' => true,
-                    'done' => true,
-                    'added_total' => 0,
-                    'processed' => 0,
-                    'remaining' => 0,
-                    'errors' => [],
-                    'message' => 'Достигнут лимит (max_total).',
-                ]);
+            if (!$result['success']) {
+                return response()->json(array_merge($result, ['dry_run' => $dryRun]), 400);
             }
-
-            $ids = (clone $baseQuery)->offset($offset)->limit($limit)->pluck('id');
-            unset($baseQuery);
-            $keyActivateService = app(KeyActivateService::class);
-
-            $addedTotal = 0;
-            $errors = [];
-            $processed = 0;
-            foreach ($ids as $keyId) {
-                $key = KeyActivate::query()
-                    ->where('id', $keyId)
-                    ->first();
-                if (!$key) {
-                    continue;
-                }
-                try {
-                    $added = $keyActivateService->addMissingProviderSlots($key, $dryRun);
-                    $addedTotal += $added;
-                } catch (\Throwable $e) {
-                    Log::warning('Multi-provider migration batch: failed key', [
-                        'key_activate_id' => $keyId,
-                        'error' => $e->getMessage(),
-                    ]);
-                    $errors[] = ['key_id' => $keyId, 'message' => $e->getMessage()];
-                }
-                $processed++;
-                unset($key);
-            }
-            $nextOffset = $offset + $processed;
-            $remaining = max(0, $total - $nextOffset);
-            $isTestRun = $maxTotal !== null && $processed >= $maxTotal;
-            $done = $remaining <= 0 || $isTestRun;
 
             return response()->json([
                 'success' => true,
-                'done' => $done,
+                'done' => $result['done'],
                 'dry_run' => $dryRun,
-                'added_total' => $addedTotal,
-                'processed' => $processed,
-                'next_offset' => $nextOffset,
-                'remaining' => $remaining,
-                'total' => $total,
-                'errors' => $errors,
-                'message' => $dryRun
-                    ? "Проверка: обработано {$processed} ключей, было бы добавлено слотов: {$addedTotal}."
-                    : "Обработано {$processed} ключей, добавлено слотов: {$addedTotal}. Осталось ключей: {$remaining}.",
+                'added_total' => $result['added_total'],
+                'processed' => $result['processed'],
+                'next_offset' => $result['next_offset'],
+                'remaining' => $result['remaining'],
+                'total' => $result['total'],
+                'errors' => $result['errors'],
+                'message' => $result['message'],
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             throw $e;
@@ -1002,5 +960,90 @@ class ServerUserTransferController extends Controller
         } finally {
             ini_set('memory_limit', $originalMemoryLimit);
         }
+    }
+
+    /**
+     * Запустить миграцию в фоне (очередь). Возвращает run_id для опроса статуса.
+     * Требуется: QUEUE_CONNECTION=database (или redis) и запущенный php artisan queue:work.
+     */
+    public function multiProviderMigrationStart(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'batch_size' => 'sometimes|integer|min:1|max:200',
+                'dry_run' => 'nullable|boolean',
+            ]);
+            $batchSize = (int) ($validated['batch_size'] ?? 50);
+            $dryRun = !empty($validated['dry_run']);
+
+            $slots = config('panel.multi_provider_slots', []);
+            $slots = is_array($slots) ? $slots : [];
+            if (empty($slots)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Мульти-провайдер отключён. Задайте PANEL_MULTI_PROVIDER_SLOTS в .env.',
+                ], 400);
+            }
+
+            $runId = 'mp_' . Str::random(16);
+            $cacheKey = 'multi_provider_migration_' . $runId;
+            Cache::put($cacheKey, [
+                'total' => 0,
+                'processed' => 0,
+                'added_total' => 0,
+                'errors' => [],
+                'done' => false,
+                'message' => 'Запуск…',
+                'started_at' => now()->toIso8601String(),
+            ], now()->addHours(3));
+
+            MultiProviderMigrationBatchJob::dispatch($runId, 0, $batchSize, $dryRun);
+
+            return response()->json([
+                'success' => true,
+                'run_id' => $runId,
+                'message' => 'Миграция поставлена в очередь. Наблюдайте за прогрессом ниже.',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Multi-provider migration start failed', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Статус фоновой миграции по run_id (для опроса с интерфейса).
+     */
+    public function multiProviderMigrationStatus(Request $request): JsonResponse
+    {
+        $runId = $request->input('run_id');
+        if (!$runId || !is_string($runId)) {
+            return response()->json(['success' => false, 'message' => 'Нужен run_id.'], 400);
+        }
+        $cacheKey = 'multi_provider_migration_' . $runId;
+        $progress = Cache::get($cacheKey);
+        if (!$progress) {
+            return response()->json([
+                'success' => true,
+                'run_id' => $runId,
+                'found' => false,
+                'message' => 'Сессия не найдена или уже удалена.',
+            ]);
+        }
+        return response()->json([
+            'success' => true,
+            'run_id' => $runId,
+            'found' => true,
+            'total' => (int) ($progress['total'] ?? 0),
+            'processed' => (int) ($progress['processed'] ?? 0),
+            'added_total' => (int) ($progress['added_total'] ?? 0),
+            'errors' => $progress['errors'] ?? [],
+            'done' => (bool) ($progress['done'] ?? false),
+            'message' => $progress['message'] ?? '',
+            'error' => $progress['error'] ?? null,
+            'started_at' => $progress['started_at'] ?? null,
+        ]);
     }
 }
