@@ -589,9 +589,13 @@ class SalesmanBotController extends AbstractTelegramBot
             }
         } catch (\Exception $e) {
             Log::error('Key activation error: ' . $e->getMessage(), ['source' => 'telegram']);
-            // При повторной доставке webhook ключ уже может быть активирован — отдаём понятное сообщение
+            // При повторной доставке webhook тот же ключ может обрабатываться дважды: первый раз — успех, второй — ключ уже ACTIVE.
+            // Если ключ уже активирован этим же пользователем — не слать второе сообщение (пользователь уже получил «успешно активирован»).
             $keyRefreshed = $this->keyActivateRepository->findById($keyId);
             if ($keyRefreshed && $keyRefreshed->user_tg_id && $keyRefreshed->status === KeyActivate::ACTIVE) {
+                if ((int) $keyRefreshed->user_tg_id === (int) $this->chatId) {
+                    return; // Дубликат доставки — не дублируем сообщение
+                }
                 $this->sendMessage("✅ Ключ уже был активирован ранее. Ваша конфигурация: https://vpn-telegram.com/config/{$keyRefreshed->id}");
                 return;
             }
