@@ -5,6 +5,7 @@ namespace App\Repositories\KeyActivateUser;
 use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Repositories\BaseRepository;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Collection;
 
 class KeyActivateUserRepository extends BaseRepository
 {
@@ -30,5 +31,25 @@ class KeyActivateUserRepository extends BaseRepository
                 'keyActivate.packSalesman.salesman'
             ])
             ->first();
+    }
+
+    /**
+     * Все слоты ключа (для мульти-провайдерной подписки).
+     *
+     * @return Collection<int, KeyActivateUser>
+     */
+    public function findAllByKeyActivateId(string $keyActivateId): Collection
+    {
+        return $this->query()
+            ->where('key_activate_id', $keyActivateId)
+            ->with([
+                'serverUser',
+                'serverUser.panel:id,panel,panel_adress,auth_token,panel_login,panel_password,token_died_time',
+                'keyActivate',
+                'keyActivate.packSalesman',
+                'keyActivate.packSalesman.salesman'
+            ])
+            ->orderBy('id')
+            ->get();
     }
 }

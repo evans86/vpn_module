@@ -159,6 +159,84 @@
                 <p id="balance-result-message" class="text-sm"></p>
             </div>
         </x-admin.card>
+
+        <x-admin.card title="Миграция на мульти-провайдер">
+            <p class="text-sm text-gray-600 mb-4">
+                Добавление недостающих провайдер-слотов к уже активным ключам. У каждого ключа будет по одному слоту на каждый провайдер из настройки (например VDSINA и Timeweb); подписка объединит конфиги — при падении одного сервера пользователь сможет переключиться на другой. Сначала обязательно запустите «Только проверка» или «Тест (2 ключа)».
+            </p>
+
+            <div class="mb-6 p-4 rounded-lg border border-gray-200 bg-gray-50">
+                <h4 class="font-medium text-gray-900 mb-2">Добавить мульти-провайдер к одному ключу</h4>
+                <p class="text-sm text-gray-600 mb-3">Вставьте ID ключа (UUID), проверьте его и добавьте недостающие слоты.</p>
+                <div class="flex flex-wrap items-end gap-3 mb-3">
+                    <label class="flex-1 min-w-[200px]">
+                        <span class="block text-sm font-medium text-gray-700 mb-1">ID ключа</span>
+                        <input type="text" id="multi-provider-single-key-id" placeholder="например: 550e8400-e29b-41d4-a716-446655440000"
+                               class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono">
+                    </label>
+                    <button type="button" id="btn-multi-provider-check-key" class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        <i class="fas fa-check-circle mr-2"></i> Проверить ключ
+                    </button>
+                </div>
+                <div id="multi-provider-single-check-result" class="mb-3 p-3 rounded-lg border hidden" aria-live="polite">
+                    <p id="multi-provider-single-check-message" class="text-sm"></p>
+                    <p id="multi-provider-single-check-detail" class="text-xs text-gray-600 mt-1 hidden"></p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-600">
+                        <input type="checkbox" id="multi-provider-single-dry-run" class="rounded border-gray-300">
+                        <span>Только проверка (не создавать слоты)</span>
+                    </label>
+                    <button type="button" id="btn-multi-provider-add-to-key" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <i class="fas fa-plus-circle mr-2"></i> Добавить мульти-провайдер к ключу
+                    </button>
+                </div>
+                <div id="multi-provider-single-result" class="mt-3 p-3 rounded-lg border hidden" aria-live="polite">
+                    <p id="multi-provider-single-result-message" class="text-sm"></p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4 mb-4 flex-wrap" x-data="{ multiProviderCount: null, multiProviderSlots: [], multiProviderLoading: false }">
+                <button type="button" id="btn-multi-provider-count" class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                        @click="multiProviderLoading = true; fetch('{{ route('admin.module.server-user-transfer.multi-provider-migration.count') }}', { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || document.querySelector('input[name=_token]')?.value, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: '{}' }).then(r => r.json()).then(d => { multiProviderCount = d.count; multiProviderSlots = d.slots || []; multiProviderLoading = false; }).catch(() => { multiProviderLoading = false; });">
+                    <i class="fas fa-sync-alt mr-1.5"></i> <span x-text="multiProviderLoading ? 'Загрузка…' : 'Обновить счётчик'"></span>
+                </button>
+                <p class="text-sm text-gray-600" x-show="multiProviderCount !== null" x-cloak>
+                    <span x-text="'Ключей-кандидатов: ' + multiProviderCount"></span>
+                    <span x-show="multiProviderSlots.length" x-text="'. Провайдеры: ' + multiProviderSlots.join(', ')"></span>
+                </p>
+            </div>
+            <div class="flex items-center gap-4 mb-4 flex-wrap">
+                <label class="inline-flex items-center gap-2 text-sm text-gray-600">
+                    <span>Порция за шаг:</span>
+                    <input type="number" id="multi-provider-batch-size" value="50" min="1" max="200" class="rounded border-gray-300 w-20 text-sm">
+                </label>
+                <label class="inline-flex items-center gap-2 text-sm text-gray-600">
+                    <input type="checkbox" id="multi-provider-dry-run" class="rounded border-gray-300">
+                    <span>Только проверка (dry-run)</span>
+                </label>
+            </div>
+            <div class="flex items-center gap-4 flex-wrap">
+                <button type="button" id="btn-multi-provider-run" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-layer-group mr-2"></i> Запустить миграцию
+                </button>
+                <button type="button" id="btn-multi-provider-test" class="inline-flex items-center px-4 py-2 border border-amber-300 text-sm font-medium rounded-md shadow-sm text-amber-800 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed" title="Обработать только 2 ключа">
+                    <i class="fas fa-vial mr-2"></i> Тест (2 ключа)
+                </button>
+            </div>
+            <div id="multi-provider-progress" class="mt-6 p-4 rounded-lg border border-blue-200 bg-blue-50 hidden" aria-live="polite">
+                <h4 class="font-medium text-gray-900 mb-2">Прогресс</h4>
+                <div class="w-full bg-gray-200 rounded-full h-3 mb-2">
+                    <div id="multi-provider-progress-bar" class="bg-indigo-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <p id="multi-provider-progress-text" class="text-sm text-gray-700"></p>
+            </div>
+            <div id="multi-provider-result" class="mt-6 p-4 rounded-lg border hidden" aria-live="polite">
+                <h4 class="font-medium text-gray-900 mb-2">Результат</h4>
+                <p id="multi-provider-result-message" class="text-sm"></p>
+                <div id="multi-provider-result-errors" class="mt-2 text-sm text-red-600 max-h-48 overflow-y-auto hidden"></div>
+            </div>
+        </x-admin.card>
     </div>
 
     <script>
@@ -497,6 +575,227 @@
 
                 runBalanceStep();
             });
+        })();
+
+        (function () {
+            var multiProviderCountUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.count') }}';
+            var multiProviderCheckKeyUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.check-key') }}';
+            var multiProviderSingleKeyUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.single-key') }}';
+            var multiProviderBatchUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.run-batch') }}';
+            var multiProviderCsrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content') || (document.querySelector('input[name="_token"]') && document.querySelector('input[name="_token"]').value);
+
+            var lastCheckedKeyId = null;
+            var lastCheckCanAdd = false;
+
+            document.getElementById('btn-multi-provider-check-key').addEventListener('click', function () {
+                var input = document.getElementById('multi-provider-single-key-id');
+                var keyId = (input && input.value) ? input.value.trim() : '';
+                var resultBlock = document.getElementById('multi-provider-single-check-result');
+                var messageEl = document.getElementById('multi-provider-single-check-message');
+                var detailEl = document.getElementById('multi-provider-single-check-detail');
+                var btnAdd = document.getElementById('btn-multi-provider-add-to-key');
+                if (!keyId) {
+                    if (typeof toastr !== 'undefined') toastr.warning('Введите ID ключа');
+                    return;
+                }
+                this.disabled = true;
+                fetch(multiProviderCheckKeyUrl, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': multiProviderCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key_id: keyId }),
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        resultBlock.classList.remove('hidden');
+                        detailEl.classList.add('hidden');
+                        if (data.success && data.valid) {
+                            resultBlock.classList.remove('border-red-200', 'bg-red-50');
+                            resultBlock.classList.add('border-green-200', 'bg-green-50');
+                            messageEl.textContent = data.message || 'Ключ подходит.';
+                            if (data.missing_slots && data.missing_slots.length) {
+                                detailEl.textContent = 'Не хватает провайдеров: ' + data.missing_slots.join(', ');
+                                detailEl.classList.remove('hidden');
+                            }
+                            lastCheckedKeyId = data.key_id;
+                            lastCheckCanAdd = data.can_add === true;
+                            btnAdd.disabled = !lastCheckCanAdd;
+                        } else {
+                            resultBlock.classList.remove('border-green-200', 'bg-green-50');
+                            resultBlock.classList.add('border-red-200', 'bg-red-50');
+                            messageEl.textContent = data.message || 'Ключ не подходит.';
+                            lastCheckCanAdd = false;
+                            btnAdd.disabled = true;
+                        }
+                    })
+                    .catch(function () {
+                        resultBlock.classList.remove('hidden', 'border-green-200', 'bg-green-50');
+                        resultBlock.classList.add('border-red-200', 'bg-red-50');
+                        messageEl.textContent = 'Ошибка запроса.';
+                        btnAdd.disabled = true;
+                    })
+                    .finally(function () { this.disabled = false; }.bind(this));
+            });
+
+            document.getElementById('btn-multi-provider-add-to-key').addEventListener('click', function () {
+                var input = document.getElementById('multi-provider-single-key-id');
+                var keyId = (input && input.value) ? input.value.trim() : '';
+                var dryRun = document.getElementById('multi-provider-single-dry-run') && document.getElementById('multi-provider-single-dry-run').checked;
+                var resultBlock = document.getElementById('multi-provider-single-result');
+                var messageEl = document.getElementById('multi-provider-single-result-message');
+                var btnAdd = this;
+                if (!keyId) {
+                    if (typeof toastr !== 'undefined') toastr.warning('Введите ID ключа и нажмите «Проверить ключ»');
+                    return;
+                }
+                btnAdd.disabled = true;
+                fetch(multiProviderSingleKeyUrl, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': multiProviderCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key_id: keyId, dry_run: dryRun }),
+                })
+                    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+                    .then(function (res) {
+                        resultBlock.classList.remove('hidden');
+                        if (res.ok && res.data.success) {
+                            resultBlock.classList.remove('border-red-200', 'bg-red-50');
+                            resultBlock.classList.add('border-green-200', 'bg-green-50');
+                            messageEl.textContent = res.data.message || (res.data.added ? 'Добавлено слотов: ' + res.data.added : 'Готово.');
+                            if (typeof toastr !== 'undefined') toastr.success(res.data.message || 'Готово.');
+                            if (!dryRun && res.data.added > 0) {
+                                document.getElementById('btn-multi-provider-check-key').click();
+                            }
+                        } else {
+                            resultBlock.classList.remove('border-green-200', 'bg-green-50');
+                            resultBlock.classList.add('border-red-200', 'bg-red-50');
+                            messageEl.textContent = res.data.message || 'Ошибка';
+                            if (typeof toastr !== 'undefined') toastr.error(res.data.message);
+                        }
+                    })
+                    .catch(function (err) {
+                        resultBlock.classList.remove('hidden', 'border-green-200', 'bg-green-50');
+                        resultBlock.classList.add('border-red-200', 'bg-red-50');
+                        messageEl.textContent = 'Ошибка запроса: ' + (err.message || 'неизвестная ошибка');
+                        if (typeof toastr !== 'undefined') toastr.error('Ошибка запроса');
+                    })
+                    .finally(function () { btnAdd.disabled = false; });
+            });
+
+            function getMultiProviderTotal(cb) {
+                fetch(multiProviderCountUrl, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': multiProviderCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                    body: '{}',
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.success && data.count != null) cb(data.count);
+                        else cb(0);
+                    })
+                    .catch(function () { cb(0); });
+            }
+
+            document.getElementById('btn-multi-provider-run').addEventListener('click', function () {
+                runMultiProviderMigration(false, null);
+            });
+            document.getElementById('btn-multi-provider-test').addEventListener('click', function () {
+                runMultiProviderMigration(false, 2);
+            });
+
+            function runMultiProviderMigration(dryRun, maxTotal) {
+                var btnRun = document.getElementById('btn-multi-provider-run');
+                var btnTest = document.getElementById('btn-multi-provider-test');
+                var progressBlock = document.getElementById('multi-provider-progress');
+                var progressBar = document.getElementById('multi-provider-progress-bar');
+                var progressText = document.getElementById('multi-provider-progress-text');
+                var resultBlock = document.getElementById('multi-provider-result');
+                var resultMessage = document.getElementById('multi-provider-result-message');
+                var resultErrors = document.getElementById('multi-provider-result-errors');
+                var batchSize = parseInt(document.getElementById('multi-provider-batch-size').value, 10) || 50;
+                var isDryRun = dryRun || (document.getElementById('multi-provider-dry-run') && document.getElementById('multi-provider-dry-run').checked);
+
+                btnRun.disabled = true;
+                if (btnTest) btnTest.disabled = true;
+                resultBlock.classList.add('hidden');
+                progressBlock.classList.remove('hidden');
+                progressBar.style.width = '0%';
+                progressText.textContent = 'Запуск…';
+
+                var totalKeys = 0;
+                var totalProcessed = 0;
+                var totalAdded = 0;
+                var allErrors = [];
+
+                function runBatch(offset) {
+                    var body = {
+                        offset: offset,
+                        batch_size: batchSize,
+                        dry_run: isDryRun,
+                    };
+                    if (maxTotal != null) body.max_total = maxTotal; // при тесте передаём каждый раз, чтобы бэкенд учитывал лимит
+
+                    fetch(multiProviderBatchUrl, {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': multiProviderCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body),
+                    })
+                        .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+                        .then(function (res) {
+                            if (!res.ok || !res.data.success) {
+                                progressBlock.classList.add('hidden');
+                                resultBlock.classList.remove('hidden');
+                                resultBlock.classList.add('border-red-200', 'bg-red-50');
+                                resultMessage.textContent = res.data.message || 'Ошибка';
+                                resultErrors.classList.add('hidden');
+                                if (typeof toastr !== 'undefined') toastr.error(res.data.message);
+                                btnRun.disabled = false;
+                                if (btnTest) btnTest.disabled = false;
+                                return;
+                            }
+                            var d = res.data;
+                            totalProcessed += d.processed || 0;
+                            totalAdded += d.added_total || 0;
+                            if (d.errors && d.errors.length) allErrors = allErrors.concat(d.errors);
+                            if (totalKeys === 0 && d.total != null) totalKeys = d.total;
+                            var pct = totalKeys > 0 ? Math.min(100, Math.round((totalProcessed / totalKeys) * 100)) : 0;
+                            progressBar.style.width = pct + '%';
+                            progressText.textContent = (d.message || '') + ' Всего обработано: ' + totalProcessed + ', добавлено слотов: ' + totalAdded + '.';
+
+                            if (d.done) {
+                                progressBlock.classList.add('hidden');
+                                resultBlock.classList.remove('hidden');
+                                resultBlock.classList.remove('border-red-200', 'bg-red-50');
+                                resultBlock.classList.add('border-green-200', 'bg-green-50');
+                                resultMessage.textContent = (isDryRun ? 'Проверка завершена. ' : 'Миграция завершена. ') + 'Обработано ключей: ' + totalProcessed + ', добавлено слотов: ' + totalAdded + (allErrors.length ? ', ошибок: ' + allErrors.length : '') + '.';
+                                if (allErrors.length > 0) {
+                                    resultErrors.classList.remove('hidden');
+                                    resultErrors.innerHTML = '<ul class="list-disc pl-5">' + allErrors.slice(0, 30).map(function (e) {
+                                        return '<li>' + (e.key_id || '') + ': ' + (e.message || '') + '</li>';
+                                    }).join('') + (allErrors.length > 30 ? '<li class="text-gray-500">… и ещё ' + (allErrors.length - 30) + ' ошибок</li>' : '') + '</ul>';
+                                } else {
+                                    resultErrors.classList.add('hidden');
+                                    resultErrors.innerHTML = '';
+                                }
+                                if (typeof toastr !== 'undefined') toastr.success(isDryRun ? 'Проверка завершена.' : 'Миграция завершена.');
+                                btnRun.disabled = false;
+                                if (btnTest) btnTest.disabled = false;
+                                return;
+                            }
+                            runBatch(d.next_offset != null ? d.next_offset : offset + (d.processed || 0));
+                        })
+                        .catch(function (err) {
+                            progressBlock.classList.add('hidden');
+                            resultBlock.classList.remove('hidden');
+                            resultBlock.classList.add('border-red-200', 'bg-red-50');
+                            resultMessage.textContent = 'Ошибка запроса: ' + (err.message || 'неизвестная ошибка');
+                            resultErrors.classList.add('hidden');
+                            if (typeof toastr !== 'undefined') toastr.error('Ошибка запроса');
+                            btnRun.disabled = false;
+                            if (btnTest) btnTest.disabled = false;
+                        });
+                }
+
+                runBatch(0);
+            }
         })();
     </script>
 @endsection

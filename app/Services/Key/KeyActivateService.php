@@ -50,6 +50,123 @@ class KeyActivateService
     }
 
     /**
+     * Список панелей для активации: либо одна (старый режим), либо по одной на провайдера из multi_provider_slots.
+     *
+     * @return Panel[]
+     */
+    private function getPanelsForActivation(KeyActivate $key, bool $useCacheOnly = true): array
+    {
+        $slots = config('panel.multi_provider_slots', []);
+        $slots = is_array($slots) ? $slots : [];
+
+        if (empty($slots)) {
+            $panel = null;
+            if ($key->packSalesman && $key->packSalesman->salesman && $key->packSalesman->salesman->panel_id) {
+                $panel = $key->packSalesman->salesman->panel;
+            }
+            if (!$panel) {
+                $panel = $this->panelRepository->getOptimizedMarzbanPanel(null, $useCacheOnly);
+            }
+            return $panel ? [$panel] : [];
+        }
+
+        $panels = [];
+        $salesmanPanel = ($key->packSalesman && $key->packSalesman->salesman && $key->packSalesman->salesman->panel_id)
+            ? $key->packSalesman->salesman->panel
+            : null;
+        $salesmanProvider = $salesmanPanel && $salesmanPanel->server ? $salesmanPanel->server->provider : null;
+
+        foreach ($slots as $provider) {
+            $provider = (string) $provider;
+            $panel = null;
+            if ($salesmanProvider === $provider && $salesmanPanel) {
+                $panel = $salesmanPanel;
+            }
+            if (!$panel) {
+                $panel = $this->panelRepository->getOptimizedMarzbanPanelForProvider($provider, null, $useCacheOnly);
+            }
+            if ($panel && !isset($panels[$panel->id])) {
+                $panels[$panel->id] = $panel;
+            }
+        }
+        return array_values($panels);
+    }
+
+    /**
+     * Добавить недостающие слоты провайдеров к уже активному ключу (миграция на мульти-провайдер).
+     * Не трогает ключи без user_tg_id или без ни одного KeyActivateUser.
+     *
+     * @param KeyActivate $key Активный ключ (должен быть status ACTIVE, user_tg_id и хотя бы один слот)
+     * @param bool $dryRun Если true — только возвращает, сколько слотов было бы добавлено, без создания
+     * @return int Количество добавленных слотов (или при dryRun — сколько бы добавили)
+     */
+    public function addMissingProviderSlots(KeyActivate $key, bool $dryRun = false): int
+    {
+        $slots = config('panel.multi_provider_slots', []);
+        $slots = is_array($slots) ? $slots : [];
+        if (empty($slots)) {
+            return 0;
+        }
+
+        if (!$key->user_tg_id) {
+            Log::warning('addMissingProviderSlots: key has no user_tg_id', ['key_id' => $key->id]);
+            return 0;
+        }
+
+        $key->load(['keyActivateUsers.serverUser.panel.server']);
+        $existingProviders = [];
+        foreach ($key->keyActivateUsers as $kau) {
+            if ($kau->serverUser && $kau->serverUser->panel && $kau->serverUser->panel->server) {
+                $p = $kau->serverUser->panel->server->provider;
+                if ($p !== null && $p !== '') {
+                    $existingProviders[$p] = true;
+                }
+            }
+        }
+
+        $wouldAdd = 0;
+        foreach ($slots as $provider) {
+            $provider = (string) $provider;
+            if (isset($existingProviders[$provider])) {
+                continue;
+            }
+            $panel = $this->panelRepository->getOptimizedMarzbanPanelForProvider($provider, null, true);
+            if (!$panel) {
+                Log::warning('addMissingProviderSlots: no panel for provider', [
+                    'key_id' => $key->id,
+                    'provider' => $provider,
+                    'source' => 'key_activate',
+                ]);
+                continue;
+            }
+            if ($dryRun) {
+                $wouldAdd++;
+                continue;
+            }
+            try {
+                $panelStrategy = new PanelStrategy($panel->panel ?? Panel::MARZBAN);
+                $panelStrategy->addServerUser(
+                    $panel->id,
+                    $key->user_tg_id,
+                    $key->traffic_limit,
+                    $key->finish_at,
+                    $key->id,
+                    ['max_connections' => config('panel.max_connections', 4)]
+                );
+                $wouldAdd++;
+            } catch (Exception $e) {
+                Log::error('addMissingProviderSlots: failed to add slot', [
+                    'key_id' => $key->id,
+                    'provider' => $provider,
+                    'error' => $e->getMessage(),
+                    'source' => 'key_activate',
+                ]);
+            }
+        }
+        return $wouldAdd;
+    }
+
+    /**
      * Создание ключа
      *
      * @param int|null $traffic_limit
@@ -251,68 +368,58 @@ class KeyActivateService
                 throw new RuntimeException('Ключ уже используется другим пользователем');
             }
 
-            // Определение панели для активации
-            // Проверяем наличие связанных данных
             if (!$key->packSalesman || !$key->packSalesman->salesman) {
                 throw new RuntimeException('Не найдена связь ключа с продавцом');
             }
 
-            $panel = $key->packSalesman->salesman->panel_id
-                ? $key->packSalesman->salesman->panel
-                : $this->panelRepository->getOptimizedMarzbanPanel(null, true); // Используем только кэш для быстрой активации
-
-            if (!$panel) {
+            $finishAt = time() + ($key->packSalesman->pack->period * \App\Constants\TimeConstants::SECONDS_IN_DAY);
+            $panels = $this->getPanelsForActivation($key, true);
+            if (empty($panels)) {
                 throw new RuntimeException('Активная панель Marzban не найдена');
             }
 
-//            $serverStrategy = new ServerStrategy($panel->server->provider);
-//            if (!$serverStrategy->ping($panel->server)) {
-//                $this->logger->error('Ошибка активации ключа', [
-//                    'key_id' => $key->id,
-//                    'user_id' => $userTgId,
-//                    'server_id' => $panel->server->id
-//                ]);
-//                throw new RuntimeException('Сервер не доступен');
-//            }else{
-//                $this->logger->warning('CЕРВЕР ПРОВЕРЕН И ДОСТУПЕН', [
-//                    'key_id' => $key->id,
-//                    'user_id' => $userTgId,
-//                    'server_id' => $panel->server->id,
-//                ]);
-//            }
+            $serverUsers = [];
+            foreach ($panels as $panel) {
+                try {
+                    $panelStrategy = new PanelStrategy($panel->panel ?? Panel::MARZBAN);
+                    $serverUser = $panelStrategy->addServerUser(
+                        $panel->id,
+                        $userTgId,
+                        $key->traffic_limit,
+                        $finishAt,
+                        $key->id,
+                        ['max_connections' => config('panel.max_connections', 4)]
+                    );
+                    $serverUsers[] = $serverUser;
+                } catch (Exception $e) {
+                    $this->logger->error('Ошибка активации ключа (слот)', [
+                        'key_id' => $key->id,
+                        'panel_id' => $panel->id,
+                        'error' => $e->getMessage(),
+                        'source' => 'key_activate',
+                    ]);
+                    $this->panelRepository->markPanelWithError($panel->id, 'Ошибка при создании пользователя: ' . $e->getMessage());
+                }
+            }
+            if (empty($serverUsers)) {
+                throw new RuntimeException('Не удалось создать пользователя ни на одной панели');
+            }
 
-            $finishAt = time() + ($key->packSalesman->pack->period * \App\Constants\TimeConstants::SECONDS_IN_DAY);
-
-            // Создаем стратегию для работы с панелью (используем тип панели из объекта)
-            $panelStrategy = new PanelStrategy($panel->panel ?? Panel::MARZBAN);
-            // Добавляем пользователя на сервер
-            $serverUser = $panelStrategy->addServerUser(
-                $panel->id,
-                $userTgId,
-                $key->traffic_limit,
-                $finishAt,
-                $key->id,
-                ['max_connections' => config('panel.max_connections', 4)]
-            );
-
-            // Обновляем данные активации
             $activatedKey = $this->keyActivateRepository->updateActivationData(
                 $key,
                 $userTgId,
                 KeyActivate::ACTIVE
             );
 
-            // Логирование
             $this->logger->info('Ключ успешно активирован', [
                 'key_id' => $activatedKey->id,
                 'user_id' => $userTgId,
-                'server_user_id' => $serverUser->id,
-                'panel_id' => $panel->id,
+                'server_user_ids' => array_map(fn ($su) => $su->id, $serverUsers),
+                'panel_ids' => array_map(fn ($su) => $su->panel_id, $serverUsers),
                 'traffic_limit' => $key->traffic_limit,
                 'finish_at' => $key->finish_at
-            ]);;
+            ]);
 
-            // Отправляем уведомление продавцу об активации ключа
             $this->notificationService->sendKeyActivatedNotification(
                 $key->packSalesman->salesman->telegram_id,
                 $key->id
@@ -364,50 +471,16 @@ class KeyActivateService
                 $finishAt = Carbon::now()->addMonth()->startOfMonth()->timestamp;
             }
 
-            // Создаем стратегию для работы с панелью (будет определена после выбора панели)
-            $panelStrategy = null;
+            $panels = $this->getPanelsForActivation($key, true);
+            if (empty($panels)) {
+                throw new RuntimeException('Активная панель Marzban не найдена');
+            }
 
-            // Список ID панелей, которые уже пробовали (чтобы не повторяться)
-            $attemptedPanelIds = [];
-            $maxAttempts = 10; // Максимум попыток на разных панелях
-            $serverUser = null;
+            $serverUsers = [];
             $lastError = null;
-
-            for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            foreach ($panels as $panel) {
                 try {
-                    // Выбираем панель
-                    if (!is_null($key->pack_salesman_id)) {
-                        if (!is_null($key->packSalesman->salesman->panel_id)) {
-                            // Если панель привязана к продавцу, используем её (только на первой попытке)
-                            if ($attempt === 0) {
-                                $panel = $key->packSalesman->salesman->panel;
-                            } else {
-                                // На последующих попытках используем общий алгоритм
-                                $panel = $this->panelRepository->getOptimizedMarzbanPanel(null, true); // Используем только кэш для быстрой активации
-                            }
-                        } else {
-                            $panel = $this->panelRepository->getOptimizedMarzbanPanel(null, true); // Используем только кэш для быстрой активации
-                        }
-                    } else {
-                        $panel = $this->panelRepository->getOptimizedMarzbanPanel(null, true); // Используем только кэш для быстрой активации
-                    }
-
-                    if (!$panel) {
-                        throw new RuntimeException('Активная панель Marzban не найдена');
-                    }
-
-                    // Проверяем, не пытались ли мы уже использовать эту панель
-                    if (in_array($panel->id, $attemptedPanelIds)) {
-                        // Если все панели уже пробовали, выбрасываем ошибку
-                        throw new RuntimeException('Все доступные панели уже были опробованы');
-                    }
-
-                    $attemptedPanelIds[] = $panel->id;
-
-                    // Создаем стратегию для работы с выбранной панелью
                     $panelStrategy = new PanelStrategy($panel->panel ?? Panel::MARZBAN);
-
-                    // Добавляем пользователя на сервер
                     $serverUser = $panelStrategy->addServerUser(
                         $panel->id,
                         $userTgId,
@@ -416,54 +489,39 @@ class KeyActivateService
                         $key->id,
                         ['max_connections' => config('panel.max_connections', 4)]
                     );
-
-                    // Если успешно, выходим из цикла
-                    break;
-
+                    $serverUsers[] = $serverUser;
                 } catch (Exception $e) {
                     $lastError = $e;
-
-                    // Сразу помечаем панель как имеющую ошибку и убираем из ротации
-                    if (isset($panel) && $panel) {
-                        $this->panelRepository->markPanelWithError(
-                            $panel->id,
-                            'Ошибка при создании пользователя: ' . $e->getMessage()
-                        );
-
-                        Log::warning('Panel marked with error and removed from rotation', [
-                            'panel_id' => $panel->id,
-                            'error' => $e->getMessage(),
-                            'source' => 'key',
-                            'attempt' => $attempt + 1,
-                        ]);
-                    }
-
-                    // Очищаем кэш выбора панелей, чтобы исключенная панель не выбиралась снова
+                    $this->panelRepository->markPanelWithError(
+                        $panel->id,
+                        'Ошибка при создании пользователя: ' . $e->getMessage()
+                    );
+                    $provider = $panel->server ? $panel->server->provider : '';
+                    Log::warning('Panel marked with error (multi-provider slot)', [
+                        'panel_id' => $panel->id,
+                        'provider' => $provider,
+                        'error' => $e->getMessage(),
+                        'source' => 'key',
+                    ]);
                     Cache::forget('optimized_marzban_panel_balanced');
                     Cache::forget('optimized_marzban_panel_traffic_based');
                     Cache::forget('optimized_marzban_panel_intelligent');
-
-                    // Продолжаем попытки на другой панели
-                    // Если это последняя попытка, выбрасываем исключение
-                    if ($attempt === $maxAttempts - 1) {
-                        throw new RuntimeException('Не удалось создать пользователя после попыток на ' . count($attemptedPanelIds) . ' панелях. Последняя ошибка: ' . $e->getMessage());
+                    if ($provider) {
+                        foreach (['balanced', 'traffic_based', 'intelligent'] as $strategy) {
+                            Cache::forget("optimized_marzban_panel_{$strategy}_provider_{$provider}");
+                        }
                     }
                 }
             }
 
-            if (!$serverUser) {
-                $errorMessage = 'Не удалось создать пользователя на панели';
+            if (empty($serverUsers)) {
+                $errorMessage = 'Не удалось создать пользователя ни на одной панели';
                 if ($lastError) {
                     $errorMessage .= ': ' . $lastError->getMessage();
-                } elseif (!empty($attemptedPanelIds)) {
-                    $errorMessage .= '. Попытки на панелях: ' . implode(', ', $attemptedPanelIds);
-                } else {
-                    $errorMessage .= '. Нет доступных панелей';
                 }
                 throw new RuntimeException($errorMessage);
             }
 
-            // Обновляем данные активации
             $activatedKey = $this->keyActivateRepository->updateActivationData(
                 $key,
                 $userTgId,
@@ -475,8 +533,8 @@ class KeyActivateService
                 'action' => 'activate',
                 'key_id' => $activatedKey->id,
                 'user_tg_id' => $userTgId,
-                'server_user_id' => $serverUser->id,
-                'panel_id' => $serverUser->panel_id,
+                'server_user_ids' => array_map(fn ($su) => $su->id, $serverUsers),
+                'panel_ids' => array_map(fn ($su) => $su->panel_id, $serverUsers),
                 'traffic_limit' => $key->traffic_limit,
                 'finish_at' => $key->finish_at
             ]);
@@ -524,51 +582,16 @@ class KeyActivateService
                 throw new RuntimeException('Ключ уже используется другим пользователем');
             }
 
-            // Создаем стратегию для работы с панелью (будет определена после выбора панели)
-            $panelStrategy = null;
+            $panels = $this->getPanelsForActivation($key, true);
+            if (empty($panels)) {
+                throw new RuntimeException('Активная панель Marzban не найдена');
+            }
 
-            // Список ID панелей, которые уже пробовали (чтобы не повторяться)
-            $attemptedPanelIds = [];
-            $maxAttempts = 10; // Максимум попыток на разных панелях
-            $serverUser = null;
+            $serverUsers = [];
             $lastError = null;
-
-            for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            foreach ($panels as $panel) {
                 try {
-                    // Выбираем панель
-                    if (!is_null($key->pack_salesman_id)) {
-                        if (!is_null($key->packSalesman->salesman->panel_id)) {
-                            // Если панель привязана к продавцу, используем её (только на первой попытке)
-                            if ($attempt === 0) {
-                                $panel = $key->packSalesman->salesman->panel;
-                            } else {
-                                // На последующих попытках используем общий алгоритм
-                                $panel = $this->panelRepository->getOptimizedMarzbanPanel(null, true); // Используем только кэш для быстрой активации
-                            }
-                        } else {
-                            $panel = $this->panelRepository->getOptimizedMarzbanPanel(null, true); // Используем только кэш для быстрой активации
-                        }
-                    } else {
-                        $panel = $this->panelRepository->getOptimizedMarzbanPanel(null, true); // Используем только кэш для быстрой активации
-                    }
-
-                    if (!$panel) {
-                        throw new RuntimeException('Активная панель Marzban не найдена');
-                    }
-
-                    // Проверяем, не пытались ли мы уже использовать эту панель
-                    if (in_array($panel->id, $attemptedPanelIds)) {
-                        // Если все панели уже пробовали, выбрасываем ошибку
-                        throw new RuntimeException('Все доступные панели уже были опробованы');
-                    }
-
-                    $attemptedPanelIds[] = $panel->id;
-
-                    // Создаем стратегию для работы с выбранной панелью
                     $panelStrategy = new PanelStrategy($panel->panel ?? Panel::MARZBAN);
-
-                    // Используем переданный finish_at вместо пересчета
-                    // Добавляем пользователя на сервер
                     $serverUser = $panelStrategy->addServerUser(
                         $panel->id,
                         $userTgId,
@@ -577,61 +600,41 @@ class KeyActivateService
                         $key->id,
                         ['max_connections' => config('panel.max_connections', 4)]
                     );
-
-                    // Если успешно, выходим из цикла
-                    break;
-
+                    $serverUsers[] = $serverUser;
                 } catch (Exception $e) {
                     $lastError = $e;
-
-                    // Сразу помечаем панель как имеющую ошибку и убираем из ротации
-                    if (isset($panel) && $panel) {
-                        $this->panelRepository->markPanelWithError(
-                            $panel->id,
-                            'Ошибка при создании пользователя: ' . $e->getMessage()
-                        );
-
-                        Log::warning('Panel marked with error and removed from rotation', [
-                            'panel_id' => $panel->id,
-                            'error' => $e->getMessage(),
-                            'source' => 'key',
-                            'attempt' => $attempt + 1,
-                        ]);
-                    }
-
-                    // Очищаем кэш выбора панелей, чтобы исключенная панель не выбиралась снова
-                    Cache::forget('optimized_marzban_panel_balanced');
-                    Cache::forget('optimized_marzban_panel_traffic_based');
-                    Cache::forget('optimized_marzban_panel_intelligent');
-
-                    // Продолжаем попытки на другой панели
-                    // Если это последняя попытка, выбрасываем исключение
-                    if ($attempt === $maxAttempts - 1) {
-                        throw new RuntimeException('Не удалось создать пользователя после попыток на ' . count($attemptedPanelIds) . ' панелях. Последняя ошибка: ' . $e->getMessage());
+                    $this->panelRepository->markPanelWithError(
+                        $panel->id,
+                        'Ошибка при создании пользователя: ' . $e->getMessage()
+                    );
+                    $provider = $panel->server ? $panel->server->provider : '';
+                    Log::warning('Panel marked with error (activateWithFinishAt)', [
+                        'panel_id' => $panel->id,
+                        'provider' => $provider,
+                        'error' => $e->getMessage(),
+                        'source' => 'key',
+                    ]);
+                    if ($provider) {
+                        foreach (['balanced', 'traffic_based', 'intelligent'] as $strategy) {
+                            Cache::forget("optimized_marzban_panel_{$strategy}_provider_{$provider}");
+                        }
                     }
                 }
             }
 
-            if (!$serverUser) {
-                $errorMessage = 'Не удалось создать пользователя на панели';
+            if (empty($serverUsers)) {
+                $errorMessage = 'Не удалось создать пользователя ни на одной панели';
                 if ($lastError) {
                     $errorMessage .= ': ' . $lastError->getMessage();
-                } elseif (!empty($attemptedPanelIds)) {
-                    $errorMessage .= '. Попытки на панелях: ' . implode(', ', $attemptedPanelIds);
-                } else {
-                    $errorMessage .= '. Нет доступных панелей';
                 }
                 throw new RuntimeException($errorMessage);
             }
 
-            // Обновляем данные активации
             $activatedKey = $this->keyActivateRepository->updateActivationData(
                 $key,
                 $userTgId,
                 KeyActivate::ACTIVE
             );
-
-            // Обновляем finish_at в ключе
             $activatedKey->finish_at = $finishAt;
             $activatedKey->save();
 
@@ -640,7 +643,7 @@ class KeyActivateService
                 'action' => 'activate_with_finish_at',
                 'key_id' => $activatedKey->id,
                 'user_tg_id' => $userTgId,
-                'server_user_id' => $serverUser->id,
+                'server_user_ids' => array_map(fn ($su) => $su->id, $serverUsers),
                 'traffic_limit' => $key->traffic_limit,
                 'finish_at' => $finishAt
             ]);

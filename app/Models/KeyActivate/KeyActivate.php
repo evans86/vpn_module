@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
@@ -24,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property PackSalesman|null $packSalesman
  * @property Salesman|null $moduleSalesman
  * @property KeyActivateUser|null $keyActivateUser
+ * @property \Illuminate\Database\Eloquent\Collection<int, KeyActivateUser> $keyActivateUsers
  * 
  * ВАЖНО: Реальный остаток трафика (data_limit - used_traffic) хранится на панели Marzban,
  * а НЕ в этом поле! Это поле содержит НАЧАЛЬНОЕ значение лимита.
@@ -64,11 +66,19 @@ class KeyActivate extends Model
     }
 
     /**
-     * Get the key activate user relation
+     * Get the key activate user relation (one, для обратной совместимости — первый слот)
      */
     public function keyActivateUser(): HasOne
     {
         return $this->hasOne(KeyActivateUser::class, 'key_activate_id');
+    }
+
+    /**
+     * Все слоты ключа (один или несколько провайдеров).
+     */
+    public function keyActivateUsers(): HasMany
+    {
+        return $this->hasMany(KeyActivateUser::class, 'key_activate_id');
     }
 
     public function getTgStatusText(): string

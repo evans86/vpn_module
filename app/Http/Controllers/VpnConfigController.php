@@ -107,11 +107,10 @@ class VpnConfigController extends Controller
                 ->orderBy('key_replaced_at', 'desc')
                 ->first();
 
-            // Ищем KeyActivateUser напрямую через репозиторий по key_activate_id
-            $keyActivateUser = $this->keyActivateUserRepository->findByKeyActivateIdWithRelations($key_activate_id);
+            // Все слоты ключа (один — старые ключи, несколько — мульти-провайдер)
+            $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
 
-            // Если KeyActivateUser не найден
-            if (!$keyActivateUser) {
+            if ($keyActivateUsers->isEmpty()) {
                 Log::warning('KeyActivateUser not found for KeyActivate', [
                     'key_activate_id' => $key_activate_id,
                     'source' => 'vpn'
@@ -129,7 +128,6 @@ class VpnConfigController extends Controller
                             'source' => 'vpn'
                         ]);
 
-                        // Показываем страницу ошибки с информацией о новом ключе
                         return response()->view('vpn.error', [
                             'message' => 'Ваш ключ доступа был заменен из-за нарушения лимита подключений. Пожалуйста, используйте новый ключ.',
                             'replacedKeyId' => $replacedViolation->replaced_key_id
@@ -146,58 +144,65 @@ class VpnConfigController extends Controller
                 ]);
             }
 
-            // Отношения уже загружены через findByKeyActivateIdWithRelations
+            // Собираем ссылки со всех слотов (провайдеров)
+            $connectionKeys = [];
+            $firstKeyActivateUser = null;
+            $firstServerUser = null;
 
-            // Получаем информацию о пользователе сервера
-            $serverUser = $keyActivateUser->serverUser;
-
-            // Если отношение не загружено, загружаем напрямую (без load)
-            if (!$serverUser && $keyActivateUser->server_user_id) {
-                $serverUser = ServerUser::with('panel:id,panel,panel_adress,auth_token,panel_login,panel_password,token_died_time')
-                    ->find($keyActivateUser->server_user_id);
-                if ($serverUser) {
-                    $keyActivateUser->setRelation('serverUser', $serverUser);
+            foreach ($keyActivateUsers as $kau) {
+                $serverUser = $kau->serverUser;
+                if (!$serverUser && $kau->server_user_id) {
+                    $serverUser = ServerUser::with('panel:id,panel,panel_adress,auth_token,panel_login,panel_password,token_died_time')
+                        ->find($kau->server_user_id);
+                    if ($serverUser) {
+                        $kau->setRelation('serverUser', $serverUser);
+                    }
+                }
+                if (!$serverUser && $kau->server_user_id) {
+                    $serverUser = $this->serverUserRepository->findById($kau->server_user_id);
+                    if ($serverUser) {
+                        $kau->setRelation('serverUser', $serverUser);
+                    }
+                }
+                if (!$serverUser) {
+                    Log::warning('Server user not found for KeyActivateUser slot', [
+                        'key_activate_user_id' => $kau->id,
+                        'key_activate_id' => $key_activate_id,
+                        'source' => 'vpn'
+                    ]);
+                    continue;
+                }
+                if ($firstKeyActivateUser === null) {
+                    $firstKeyActivateUser = $kau;
+                    $firstServerUser = $serverUser;
+                }
+                try {
+                    $links = $this->getFreshUserLinks($serverUser);
+                    if (!empty($links)) {
+                        $connectionKeys = array_merge($connectionKeys, $links);
+                    }
+                } catch (\App\Exceptions\KeyReplacedException $e) {
+                    throw $e;
+                } catch (Exception $e) {
+                    Log::warning('Failed to get fresh links for one slot, using stored', [
+                        'key_activate_user_id' => $kau->id,
+                        'server_user_id' => $serverUser->id,
+                        'error' => $e->getMessage(),
+                        'source' => 'vpn'
+                    ]);
+                    $stored = json_decode($serverUser->keys, true);
+                    if (!empty($stored)) {
+                        $connectionKeys = array_merge($connectionKeys, $stored);
+                    }
                 }
             }
 
-            // Если всё ещё не найден, пытаемся получить через репозиторий
-            if (!$serverUser && $keyActivateUser->server_user_id) {
-                $serverUser = $this->serverUserRepository->findById($keyActivateUser->server_user_id);
-
-                // Если найден через репозиторий, устанавливаем отношение
-                if ($serverUser) {
-                    $keyActivateUser->setRelation('serverUser', $serverUser);
-                }
-            }
-
-            // Если всё ещё не найден, логируем и показываем ошибку
-            if (!$serverUser) {
-                Log::error('Server user not found for KeyActivateUser', [
-                    'key_activate_user_id' => $keyActivateUser->id,
-                    'key_activate_id' => $key_activate_id,
-                    'server_user_id' => $keyActivateUser->server_user_id,
-                    'key_activate_user_data' => $keyActivateUser->toArray(),
-                    'source' => 'vpn'
-                ]);
-
-                if (app()->environment('local') && config('app.debug', false)) {
-                    return $this->showDemoPage($key_activate_id);
-                }
-
-                return response()->view('vpn.error', [
-                    'message' => 'Конфигурация VPN не найдена. Пожалуйста, проверьте правильность ссылки или обратитесь в поддержку.'
-                ]);
-            }
-
-            // Декодируем ключи подключения
-            $connectionKeys = json_decode($serverUser->keys, true);
-
-            //ЖЕСТОКИЙ КОСТЫЛЬ
-            // ВСЕГДА ПОЛУЧАЕМ АКТУАЛЬНЫЕ КЛЮЧИ ИЗ PANEL
-            $connectionKeys = $this->getFreshUserLinks($serverUser);
-
-            if (!$connectionKeys) {
+            if (empty($connectionKeys)) {
                 throw new RuntimeException('Invalid connection keys format');
+            }
+            if ($firstKeyActivateUser === null) {
+                $firstKeyActivateUser = $keyActivateUsers->first();
+                $firstServerUser = $firstKeyActivateUser->serverUser ?? $this->serverUserRepository->findById($firstKeyActivateUser->server_user_id);
             }
 
             $userAgent = request()->header('User-Agent') ?? 'Unknown';
@@ -212,9 +217,9 @@ class VpnConfigController extends Controller
                     ->header('Content-Type', 'text/plain');
             }
 
-            // Если это браузер - показываем HTML страницу
+            // Если это браузер - показываем HTML страницу (для отображения используем первый слот)
             if ($isBrowser) {
-                return $this->showBrowserPage($keyActivate, $keyActivateUser, $serverUser, $connectionKeys);
+                return $this->showBrowserPage($keyActivate, $firstKeyActivateUser, $firstServerUser, $connectionKeys);
             }
 
             // По умолчанию для неизвестных клиентов возвращаем конфигурацию

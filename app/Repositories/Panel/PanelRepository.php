@@ -351,6 +351,72 @@ class PanelRepository extends BaseRepository
     }
 
     /**
+     * Получить оптимизированную панель с минимальной нагрузкой для заданного провайдера (server.provider).
+     * Используется для мульти-провайдерных ключей: по одному слоту на провайдера.
+     *
+     * @param string $provider Значение server.provider (например Server::VDSINA, Server::TIMEWEB)
+     * @param string|null $panelType
+     * @param bool $useCacheOnly
+     * @return Panel|null
+     */
+    public function getOptimizedMarzbanPanelForProvider(string $provider, ?string $panelType = null, bool $useCacheOnly = false): ?Panel
+    {
+        $panelType = $panelType ?? Panel::MARZBAN;
+
+        $panels = $this->query()
+            ->where('panel_status', Panel::PANEL_CONFIGURED)
+            ->where('panel', $panelType)
+            ->where('has_error', false)
+            ->where('excluded_from_rotation', false)
+            ->whereNotIn('id', function ($query) {
+                $query->select('panel_id')
+                    ->from('salesman')
+                    ->whereNotNull('panel_id');
+            })
+            ->whereHas('server', fn ($q) => $q->where('provider', $provider))
+            ->with('server.location')
+            ->limit(1000)
+            ->get();
+
+        $excludedLocations = array_map('intval', array_filter(config('panel.excluded_locations', [])));
+        $excludedServerIPs = array_filter(config('panel.excluded_server_ips', []));
+        $excludedServerIDs = array_map('intval', array_filter(config('panel.excluded_server_ids', [])));
+
+        if (!empty($excludedLocations) || !empty($excludedServerIPs) || !empty($excludedServerIDs)) {
+            $panels = $panels->filter(function ($panel) use ($excludedLocations, $excludedServerIPs, $excludedServerIDs) {
+                if (!empty($excludedLocations) && $panel->server && $panel->server->location_id) {
+                    if (in_array($panel->server->location_id, $excludedLocations)) {
+                        return false;
+                    }
+                }
+                if (!empty($excludedServerIPs) && $panel->server && $panel->server->ip) {
+                    $serverIP = is_numeric($panel->server->ip) ? long2ip($panel->server->ip) : $panel->server->ip;
+                    if (in_array($serverIP, $excludedServerIPs)) {
+                        return false;
+                    }
+                }
+                if (!empty($excludedServerIDs) && $panel->server && $panel->server->id) {
+                    if (in_array($panel->server->id, $excludedServerIDs)) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+        }
+
+        if ($panels->isEmpty()) {
+            Log::info('PANEL_SELECTION: No panels for provider', ['provider' => $provider, 'source' => 'panel']);
+            return null;
+        }
+
+        $strategy = config('panel.selection_strategy', 'intelligent');
+        $cacheKey = "optimized_marzban_panel_{$strategy}_provider_{$provider}";
+        return Cache::remember($cacheKey, 15, function () use ($panels, $strategy, $useCacheOnly) {
+            return $this->selectPanelByStrategy($panels, $strategy, $useCacheOnly);
+        });
+    }
+
+    /**
      * Выбор панели в зависимости от стратегии
      * 
      * @param Collection $panels

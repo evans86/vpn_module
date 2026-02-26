@@ -206,6 +206,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/mass-transfer/run-batch', [ServerUserTransferController::class, 'massTransferBatch'])->name('mass-transfer.run-batch');
                 Route::post('/balance/stats', [ServerUserTransferController::class, 'balanceStats'])->name('balance.stats');
                 Route::post('/balance/step', [ServerUserTransferController::class, 'balanceStep'])->name('balance.step');
+                Route::post('/multi-provider-migration/count', [ServerUserTransferController::class, 'multiProviderMigrationCount'])->name('multi-provider-migration.count');
+                Route::post('/multi-provider-migration/check-key', [ServerUserTransferController::class, 'multiProviderMigrationCheckKey'])->name('multi-provider-migration.check-key');
+                Route::post('/multi-provider-migration/single-key', [ServerUserTransferController::class, 'multiProviderMigrationSingleKey'])->name('multi-provider-migration.single-key');
+                Route::post('/multi-provider-migration/run-batch', [ServerUserTransferController::class, 'multiProviderMigrationBatch'])->name('multi-provider-migration.run-batch');
                 Route::post('/panels', [ServerUserTransferController::class, 'getPanels'])->name('panels');
                 Route::post('/transfer', [ServerUserTransferController::class, 'transfer'])->name('transfer');
             });
