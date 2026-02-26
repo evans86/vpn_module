@@ -209,14 +209,14 @@
             <div class="flex items-center gap-4 mb-4 flex-wrap">
                 <label class="inline-flex items-center gap-2 text-sm text-gray-600">
                     <span>Порция за шаг:</span>
-                    <input type="number" id="multi-provider-batch-size" value="50" min="1" max="200" class="rounded border-gray-300 w-20 text-sm">
+                    <input type="number" id="multi-provider-batch-size" value="20" min="1" max="200" class="rounded border-gray-300 w-20 text-sm" title="Меньше порция — меньше риск таймаута (524)">
                 </label>
                 <label class="inline-flex items-center gap-2 text-sm text-gray-600">
                     <input type="checkbox" id="multi-provider-dry-run" class="rounded border-gray-300">
                     <span>Только проверка (dry-run)</span>
                 </label>
             </div>
-            <p class="text-sm text-gray-500 mb-3">Обработка идёт порциями (по «Порция за шаг» ключей за один шаг). Либо в этой вкладке — запросы по очереди, вкладку не закрывать; либо в фоне — через очередь, можно закрыть страницу и смотреть прогресс при следующем заходе.</p>
+            <p class="text-sm text-gray-500 mb-3">Обработка идёт порциями (по «Порция за шаг» ключей за один шаг). Либо в этой вкладке — запросы по очереди, вкладку не закрывать; либо в фоне — через очередь, можно закрыть страницу и смотреть прогресс при следующем заходе. <strong>При ошибке 524 (таймаут)</strong> уменьшите порцию до 10–20 или используйте «Запустить в фоне».</p>
             <div class="flex items-center gap-4 flex-wrap">
                 <button type="button" id="btn-multi-provider-run-background" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed" title="Запуск в очереди: нужны QUEUE_CONNECTION=database и php artisan queue:work">
                     <i class="fas fa-cloud-upload-alt mr-2"></i> Запустить в фоне (очередь)
@@ -864,7 +864,13 @@
                                     try { data = JSON.parse(text); } catch (e) { }
                                 }
                                 if (!data) {
-                                    data = { success: false, message: 'Сервер вернул страницу ошибки вместо JSON (возможно 500 или нехватка памяти). Проверьте storage/logs/laravel.log. Код ответа: ' + r.status + '.' };
+                                    var msg = 'Сервер вернул страницу ошибки вместо JSON. Код ответа: ' + r.status + '.';
+                                    if (r.status === 524) {
+                                        msg += ' Это таймаут (запрос слишком долгий). Уменьшите «Порция за шаг» до 10–20 или нажмите «Запустить в фоне (очередь)».';
+                                    } else {
+                                        msg += ' Проверьте storage/logs/laravel.log.';
+                                    }
+                                    data = { success: false, message: msg };
                                 }
                                 return { ok: r.ok, data: data };
                             });

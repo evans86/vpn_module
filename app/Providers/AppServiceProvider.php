@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Queue\WorkerNoPcntl;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Pagination\Paginator;
-use Illuminate\Support\Facades\Asset;
+use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -15,7 +17,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        //
+        // Воркер очереди без pcntl (для хостингов, где pcntl_signal отключён)
+        $this->app->singleton(\Illuminate\Queue\Worker::class, function ($app) {
+            $worker = new WorkerNoPcntl(
+                $app['queue'],
+                $app['events'],
+                $app[ExceptionHandler::class],
+                function () use ($app) {
+                    return $app->isDownForMaintenance();
+                }
+            );
+            if ($app->bound('cache')) {
+                $worker->setCache($app['cache']);
+            }
+            return $worker;
+        });
     }
 
     /**
@@ -30,7 +46,7 @@ class AppServiceProvider extends ServiceProvider
         date_default_timezone_set($timezone);
         
         if(config('app.env') === 'production') {
-            \URL::forceScheme('https');
+            URL::forceScheme('https');
             
             // Force HTTPS for all asset URLs
             if (!request()->secure()) {

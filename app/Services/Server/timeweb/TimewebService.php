@@ -89,10 +89,10 @@ class TimewebService
                 Log::info('Using default os_id 99 (Ubuntu 24.04)', ['source' => 'server']);
             }
 
-            // 3. Конфигурация: 2×3.3 ГГц, 2 ГБ, 40 ГБ NVMe, 1 Гбит/с — по тарифу (preset) или configurator для nl-1
+            // 3. Конфигурация: 2×3.3 ГГц, 4 ГБ, 40 ГБ NVMe, 1 Гбит/с — по тарифу (preset) или configurator для nl-1
             $requiredCpu = 2;
-            $requiredRam = 2048;
-            $requiredDisk = 40960;
+            $requiredRam = 4096;
+            $requiredDisk = 51200;
             $targetLocation = $timewebLocation['id']; // nl-1 или ru-1
 
             $presetId = null;
@@ -466,7 +466,7 @@ class TimewebService
 
     /**
      * Проверка статуса конкретного сервера у провайдера
-     * 
+     *
      * @param Server $server Сервер для проверки
      * @return bool true если сервер готов к настройке, false если еще не готов
      * @throws Exception При ошибках проверки
@@ -504,7 +504,7 @@ class TimewebService
                     'provider_id' => $server->provider_id,
                     'source' => 'server'
                 ]);
-                
+
                 return true;
             } else {
                 Log::info('Server not ready yet', [
@@ -512,7 +512,7 @@ class TimewebService
                     'provider_id' => $server->provider_id,
                     'source' => 'server'
                 ]);
-                
+
                 return false;
             }
         } catch (Exception $e) {
@@ -527,7 +527,7 @@ class TimewebService
             // Помечаем сервер как ошибочный
             $server->server_status = Server::SERVER_ERROR;
             $server->save();
-            
+
             throw $e;
         }
     }
@@ -687,7 +687,7 @@ class TimewebService
             }
 
             $serverData = $this->timewebApi->getServerById((int)$server->provider_id);
-            
+
             if (!isset($serverData['server'])) {
                 return false;
             }
