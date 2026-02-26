@@ -151,9 +151,13 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm">
                                 @if($key->keyActivateUser && $key->keyActivateUser->serverUser)
-                                    <a href="{{ route('admin.module.server-users.index', ['id' => $key->keyActivateUser->server_user_id]) }}"
-                                       class="btn btn-sm btn-primary">
+                                    <a href="{{ route('admin.module.server-users.index', ['key_activate_id' => $key->id]) }}"
+                                       class="btn btn-sm btn-primary"
+                                       title="Пользователи сервера по этому ключу (все слоты)">
                                         <i class="fas fa-user"></i>
+                                        @if(isset($key->key_activate_users_count) && $key->key_activate_users_count > 1)
+                                            <span class="ml-0.5">({{ $key->key_activate_users_count }})</span>
+                                        @endif
                                     </a>
                                 @else
                                     <span class="text-gray-400">—</span>

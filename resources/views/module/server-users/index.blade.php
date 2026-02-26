@@ -8,6 +8,9 @@
         <x-admin.card title="Пользователи сервера">
             <!-- Filters -->
             <x-admin.filter-form action="{{ route('admin.module.server-users.index') }}">
+                @if(request('key_activate_id'))
+                    <input type="hidden" name="key_activate_id" value="{{ request('key_activate_id') }}">
+                @endif
                 <x-admin.filter-input 
                     name="id" 
                     label="ID" 
@@ -34,6 +37,9 @@
                     title="Пользователи не найдены"
                     description="Попробуйте изменить параметры фильтрации" />
             @else
+                @if(request('key_activate_id'))
+                    <p class="text-sm text-indigo-600 mb-2">Показаны пользователи сервера по ключу <code class="text-xs">{{ request('key_activate_id') }}</code> (все слоты).</p>
+                @endif
                 <p class="text-xs text-gray-500 mb-2">При мульти-провайдере один ключ даёт несколько записей (по одной на каждый сервер/провайдер). Один Telegram ID может быть в нескольких строках.</p>
                 <x-admin.table :headers="['ID', 'Сервер', 'Провайдер', 'Панель', 'Telegram ID', 'Дата создания']">
                     @foreach($serverUsers as $user)

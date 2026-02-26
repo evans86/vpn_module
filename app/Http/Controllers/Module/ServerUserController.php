@@ -24,9 +24,18 @@ class ServerUserController extends Controller
             ->leftJoin('key_activate', 'key_activate_user.key_activate_id', '=', 'key_activate.id')
             ->with(['panel.server']);
 
-        // Фильтрация по ID
+        // Фильтрация по ID пользователя сервера
         if ($request->filled('id')) {
             $query->where('server_user.id', $request->input('id'));
+        }
+
+        // Фильтрация по ключу активации (показать всех пользователей сервера по этому ключу — все слоты мульти-провайдера)
+        if ($request->filled('key_activate_id')) {
+            $query->whereIn('server_user.id', function ($q) use ($request) {
+                $q->select('server_user_id')
+                    ->from('key_activate_user')
+                    ->where('key_activate_id', $request->input('key_activate_id'));
+            });
         }
 
         // Фильтрация по panel_id

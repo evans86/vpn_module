@@ -28,6 +28,7 @@ class KeyActivateRepository extends BaseRepository
     {
         $query = $this->query()
             ->with(['packSalesman.pack', 'packSalesman.salesman'])
+            ->withCount('keyActivateUsers')
             ->orderBy('created_at', 'desc');
 
         if (!empty($filters['id'])) {
