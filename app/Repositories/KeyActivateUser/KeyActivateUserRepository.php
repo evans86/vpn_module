@@ -44,7 +44,9 @@ class KeyActivateUserRepository extends BaseRepository
             ->where('key_activate_id', $keyActivateId)
             ->with([
                 'serverUser',
-                'serverUser.panel:id,panel,panel_adress,auth_token,panel_login,panel_password,token_died_time',
+                'serverUser.panel:id,server_id,panel,panel_adress,auth_token,panel_login,panel_password,token_died_time',
+                'serverUser.panel.server:id,name,location_id',
+                'serverUser.panel.server.location:id,code,emoji',
                 'keyActivate',
                 'keyActivate.packSalesman',
                 'keyActivate.packSalesman.salesman'
