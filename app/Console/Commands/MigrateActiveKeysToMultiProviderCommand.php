@@ -46,13 +46,14 @@ class MigrateActiveKeysToMultiProviderCommand extends Command
 
         $query = KeyActivate::query()
             ->where('status', KeyActivate::ACTIVE)
-            ->whereNotNull('user_tg_id');
+            ->whereNotNull('user_tg_id')
+            ->whereHas('keyActivateUsers');
 
         if ($keyId !== null && $keyId !== '') {
             $query->where('id', $keyId);
             $total = $query->count();
             if ($total === 0) {
-                $this->error("Ключ с ID \"{$keyId}\" не найден или не подходит (должен быть ACTIVE и с user_tg_id).");
+                $this->error("Ключ с ID \"{$keyId}\" не найден или не подходит (должен быть ACTIVE, с user_tg_id и хотя бы одним слотом).");
                 return 1;
             }
         } else {

@@ -115,6 +115,11 @@ class KeyActivateService
         }
 
         $key->load(['keyActivateUsers.serverUser.panel.server']);
+        if ($key->keyActivateUsers->isEmpty()) {
+            Log::warning('addMissingProviderSlots: key has no KeyActivateUser (no slots)', ['key_id' => $key->id]);
+            return 0;
+        }
+
         $existingProviders = [];
         foreach ($key->keyActivateUsers as $kau) {
             if ($kau->serverUser && $kau->serverUser->panel && $kau->serverUser->panel->server) {
@@ -144,13 +149,19 @@ class KeyActivateService
                 $wouldAdd++;
                 continue;
             }
+            $expire = (int) ($key->finish_at ?? 0);
+            if ($expire <= time()) {
+                $expire = time() + 86400;
+            }
+            $dataLimit = (int) ($key->traffic_limit ?? 0);
+            $userTgId = (int) $key->user_tg_id;
             try {
                 $panelStrategy = new PanelStrategy($panel->panel ?? Panel::MARZBAN);
                 $panelStrategy->addServerUser(
                     $panel->id,
-                    $key->user_tg_id,
-                    $key->traffic_limit,
-                    $key->finish_at,
+                    $userTgId,
+                    $dataLimit,
+                    $expire,
                     $key->id,
                     ['max_connections' => config('panel.max_connections', 4)]
                 );
