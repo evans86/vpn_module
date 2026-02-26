@@ -209,27 +209,23 @@ class VpnConfigController extends Controller
                 if (!empty($slotLinks)) {
                     $server = $serverUser->panel && $serverUser->panel->server ? $serverUser->panel->server : null;
                     $location = $server && $server->relationLoaded('location') ? $server->location : null;
-                    $flag = '';
+                    $locationCode = ''; // двухбуквенный код для картинки флага (nl, ru)
                     $name = 'Сервер';
                     if ($location) {
-                        $flag = $location->emoji ? $this->locationEmojiToFlag($location->emoji) : '';
+                        $locationCode = strtolower(trim($location->code ?? ''));
                         $name = $this->locationCodeToFullName($location->code ?: '');
                         if ($name === '') {
                             $name = $location->code ?: 'Сервер';
                         }
                     } elseif ($server && $server->name) {
-                        $flag = '🌐';
                         $name = $server->name;
-                    } else {
-                        $flag = '🌐';
-                        $name = 'Сервер';
                     }
                     $locKey = ($location ? $location->id : 0) . '_' . ($server ? $server->id : 0) . '_' . ($serverUser->panel_id ?? 0);
                     $locationCounts[$locKey] = isset($locationCounts[$locKey]) ? $locationCounts[$locKey] + 1 : 1;
                     $suffix = $locationCounts[$locKey] > 1 ? ' #' . $locationCounts[$locKey] : '';
                     $slotsWithLinks[] = [
-                        'location_label' => $name . $suffix,
-                        'location_flag'  => $flag,
+                        'location_label'  => $name . $suffix,
+                        'location_code'   => $locationCode,
                         'connection_keys' => $slotLinks,
                     ];
                 }
@@ -748,7 +744,7 @@ class VpnConfigController extends Controller
             foreach ($slotsWithLinks as $slot) {
                 $formattedKeysGrouped[] = [
                     'label' => $slot['location_label'],
-                    'flag'  => $slot['location_flag'] ?? '',
+                    'flag_code' => $slot['location_code'] ?? '',
                     'keys'  => $this->formatConnectionKeys($slot['connection_keys']),
                 ];
             }

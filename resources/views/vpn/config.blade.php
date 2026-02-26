@@ -264,7 +264,7 @@
                             @foreach($displayFormattedKeysGrouped as $index => $group)
                                 @php
                                     $groupLabel = $group['label'] ?? 'Сервер';
-                                    $groupFlag = $group['flag'] ?? '';
+                                    $groupFlagCode = $group['flag_code'] ?? '';
                                     $groupKeys = $group['keys'] ?? [];
                                     $groupTargetId = 'config-location-' . $index;
                                 @endphp
@@ -277,8 +277,8 @@
                                             <svg class="w-5 h-5 text-indigo-600 config-location-chevron flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                             </svg>
-                                            @if($groupFlag)
-                                                <span class="text-2xl leading-none" style="font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;" aria-hidden="true">{{ $groupFlag }}</span>
+                                            @if($groupFlagCode)
+                                                <img src="https://flagcdn.com/w40/{{ strtolower($groupFlagCode) }}.png" srcset="https://flagcdn.com/w80/{{ strtolower($groupFlagCode) }}.png 2x" width="28" height="21" alt="" class="rounded flex-shrink-0" loading="lazy">
                                             @endif
                                             <span>{{ $groupLabel }}</span>
                                         </span>
