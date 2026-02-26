@@ -212,20 +212,24 @@ class VpnConfigController extends Controller
                     $flag = '';
                     $name = 'Сервер';
                     if ($location) {
-                        $flag = $location->emoji ? $this->locationEmojiToFlag($location->emoji) . ' ' : '';
-                        $name = $location->code ?: 'Сервер';
+                        $flag = $location->emoji ? $this->locationEmojiToFlag($location->emoji) : '';
+                        $name = $this->locationCodeToFullName($location->code ?: '');
+                        if ($name === '') {
+                            $name = $location->code ?: 'Сервер';
+                        }
                     } elseif ($server && $server->name) {
-                        $flag = '🌐 ';
+                        $flag = '🌐';
                         $name = $server->name;
                     } else {
-                        $flag = '🌐 ';
+                        $flag = '🌐';
+                        $name = 'Сервер';
                     }
-                    $baseLabel = $flag . $name;
-                    $locKey = ($location ? $location->id : 0) . '_' . ($server ? $server->id : 0);
+                    $locKey = ($location ? $location->id : 0) . '_' . ($server ? $server->id : 0) . '_' . ($serverUser->panel_id ?? 0);
                     $locationCounts[$locKey] = isset($locationCounts[$locKey]) ? $locationCounts[$locKey] + 1 : 1;
                     $suffix = $locationCounts[$locKey] > 1 ? ' #' . $locationCounts[$locKey] : '';
                     $slotsWithLinks[] = [
-                        'location_label' => $baseLabel . $suffix,
+                        'location_label' => $name . $suffix,
+                        'location_flag'  => $flag,
                         'connection_keys' => $slotLinks,
                     ];
                 }
@@ -739,10 +743,14 @@ class VpnConfigController extends Controller
 
             // Форматируем ключи для отображения (плоский список для обратной совместимости)
             $formattedKeys = $this->formatConnectionKeys($connectionKeys);
-            // Группировка по локации/серверу для выпадающих блоков
+            // Группировка по локации/серверу (массив групп — без перезаписи, все протоколы сохраняются)
             $formattedKeysGrouped = [];
             foreach ($slotsWithLinks as $slot) {
-                $formattedKeysGrouped[$slot['location_label']] = $this->formatConnectionKeys($slot['connection_keys']);
+                $formattedKeysGrouped[] = [
+                    'label' => $slot['location_label'],
+                    'flag'  => $slot['location_flag'] ?? '',
+                    'keys'  => $this->formatConnectionKeys($slot['connection_keys']),
+                ];
             }
 
             // Добавляем ссылку на бота
@@ -1048,6 +1056,28 @@ class VpnConfigController extends Controller
             }
         }
         return $emoji;
+    }
+
+    /**
+     * Полное название локации по коду (NL → Нидерланды, RU → Россия).
+     *
+     * @param string $code location.code из БД
+     * @return string Полное название или пустая строка, если код неизвестен
+     */
+    private function locationCodeToFullName(string $code): string
+    {
+        $code = strtoupper(trim($code));
+        $names = [
+            'NL' => 'Нидерланды',
+            'RU' => 'Россия',
+            'DE' => 'Германия',
+            'US' => 'США',
+            'FR' => 'Франция',
+            'GB' => 'Великобритания',
+            'FI' => 'Финляндия',
+            'SG' => 'Сингапур',
+        ];
+        return $names[$code] ?? '';
     }
 
     /**

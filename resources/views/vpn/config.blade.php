@@ -144,7 +144,7 @@
                 // Используем данные нового ключа, если он был перевыпущен
                 $displayUserInfo = (isset($newKeyUserInfo) && $newKeyUserInfo) ? $newKeyUserInfo : $userInfo;
                 $displayFormattedKeys = (isset($newKeyFormattedKeys) && $newKeyFormattedKeys) ? $newKeyFormattedKeys : $formattedKeys;
-                // Группировка по локации (для перевыпущенного ключа пока нет группировки — плоский список)
+                // Группировка по локации: массив [ ['label' => ..., 'flag' => ..., 'keys' => [...]], ... ]
                 $displayFormattedKeysGrouped = (isset($formattedKeysGrouped) && is_array($formattedKeysGrouped) && !empty($formattedKeysGrouped) && !isset($newKeyFormattedKeys)) ? $formattedKeysGrouped : [];
 
                 // Определяем какой ключ отображается (новый или старый)
@@ -259,25 +259,34 @@
                         Доступные протоколы
                     </h2>
                     @if(!empty($displayFormattedKeysGrouped))
-                        {{-- Группировка по локации/серверу (Нидерланды #1, Нидерланды #2 и т.д.) --}}
+                        {{-- Группировка по локации: флаг + полное название (Нидерланды, Россия и т.д.) --}}
                         <div class="space-y-4">
-                            @foreach($displayFormattedKeysGrouped as $locationLabel => $keys)
+                            @foreach($displayFormattedKeysGrouped as $index => $group)
+                                @php
+                                    $groupLabel = $group['label'] ?? 'Сервер';
+                                    $groupFlag = $group['flag'] ?? '';
+                                    $groupKeys = $group['keys'] ?? [];
+                                    $groupTargetId = 'config-location-' . $index;
+                                @endphp
                                 <div class="border-2 border-gray-200 rounded-xl overflow-hidden bg-white">
                                     <button type="button"
                                             class="config-location-toggle w-full flex items-center justify-between px-5 py-4 text-left bg-gradient-to-r from-gray-50 to-indigo-50 hover:from-indigo-50 hover:to-indigo-100 transition-colors"
                                             aria-expanded="true"
-                                            data-target="config-location-{{ md5($locationLabel) }}">
-                                        <span class="font-bold text-gray-900 flex items-center">
-                                            <svg class="w-5 h-5 mr-2 text-indigo-600 config-location-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            data-target="{{ $groupTargetId }}">
+                                        <span class="font-bold text-gray-900 flex items-center gap-2">
+                                            <svg class="w-5 h-5 text-indigo-600 config-location-chevron flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                             </svg>
-                                            {{ $locationLabel }}
+                                            @if($groupFlag)
+                                                <span class="text-2xl leading-none" style="font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;" aria-hidden="true">{{ $groupFlag }}</span>
+                                            @endif
+                                            <span>{{ $groupLabel }}</span>
                                         </span>
-                                        <span class="text-sm text-gray-500">{{ count($keys) }} протокол(ов)</span>
+                                        <span class="text-sm text-gray-500">{{ count($groupKeys) }} протокол(ов)</span>
                                     </button>
-                                    <div id="config-location-{{ md5($locationLabel) }}" class="config-location-body border-t border-gray-200">
+                                    <div id="{{ $groupTargetId }}" class="config-location-body border-t border-gray-200">
                                         <div class="p-4 space-y-3">
-                                            @foreach($keys as $key)
+                                            @foreach($groupKeys as $key)
                                                 <div class="border border-gray-200 rounded-lg p-4 hover:border-indigo-300 hover:shadow transition-all bg-white">
                                                     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                                                         <div class="flex items-center flex-grow">
