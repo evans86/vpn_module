@@ -144,15 +144,17 @@ class VpnConfigController extends Controller
                 ]);
             }
 
-            // Собираем ссылки со всех слотов (провайдеров)
+            // Собираем ссылки по слотам (для браузера — группировка по локации/серверу)
             $connectionKeys = [];
+            $slotsWithLinks = [];
             $firstKeyActivateUser = null;
             $firstServerUser = null;
+            $locationCounts = [];
 
             foreach ($keyActivateUsers as $kau) {
                 $serverUser = $kau->serverUser;
                 if (!$serverUser && $kau->server_user_id) {
-                    $serverUser = ServerUser::with('panel:id,panel,panel_adress,auth_token,panel_login,panel_password,token_died_time')
+                    $serverUser = ServerUser::with(['panel.server.location'])
                         ->find($kau->server_user_id);
                     if ($serverUser) {
                         $kau->setRelation('serverUser', $serverUser);
@@ -160,6 +162,9 @@ class VpnConfigController extends Controller
                 }
                 if (!$serverUser && $kau->server_user_id) {
                     $serverUser = $this->serverUserRepository->findById($kau->server_user_id);
+                    if ($serverUser && !$serverUser->relationLoaded('panel')) {
+                        $serverUser->load(['panel.server.location']);
+                    }
                     if ($serverUser) {
                         $kau->setRelation('serverUser', $serverUser);
                     }
@@ -176,9 +181,14 @@ class VpnConfigController extends Controller
                     $firstKeyActivateUser = $kau;
                     $firstServerUser = $serverUser;
                 }
+                if ($serverUser->panel && !$serverUser->panel->relationLoaded('server')) {
+                    $serverUser->panel->load('server.location');
+                }
+                $slotLinks = [];
                 try {
                     $links = $this->getFreshUserLinks($serverUser);
                     if (!empty($links)) {
+                        $slotLinks = $links;
                         $connectionKeys = array_merge($connectionKeys, $links);
                     }
                 } catch (\App\Exceptions\KeyReplacedException $e) {
@@ -192,8 +202,21 @@ class VpnConfigController extends Controller
                     ]);
                     $stored = json_decode($serverUser->keys, true);
                     if (!empty($stored)) {
+                        $slotLinks = $stored;
                         $connectionKeys = array_merge($connectionKeys, $stored);
                     }
+                }
+                if (!empty($slotLinks)) {
+                    $server = $serverUser->panel && $serverUser->panel->server ? $serverUser->panel->server : null;
+                    $location = $server && $server->relationLoaded('location') ? $server->location : null;
+                    $baseLabel = ($location && $location->code) ? $location->code : ($server && $server->name ? $server->name : 'Сервер');
+                    $locKey = ($location ? $location->id : 0) . '_' . ($server ? $server->id : 0);
+                    $locationCounts[$locKey] = isset($locationCounts[$locKey]) ? $locationCounts[$locKey] + 1 : 1;
+                    $suffix = $locationCounts[$locKey] > 1 ? ' #' . $locationCounts[$locKey] : '';
+                    $slotsWithLinks[] = [
+                        'location_label' => $baseLabel . $suffix,
+                        'connection_keys' => $slotLinks,
+                    ];
                 }
             }
 
@@ -217,9 +240,9 @@ class VpnConfigController extends Controller
                     ->header('Content-Type', 'text/plain');
             }
 
-            // Если это браузер - показываем HTML страницу (для отображения используем первый слот)
+            // Если это браузер - показываем HTML страницу (с группировкой протоколов по локации)
             if ($isBrowser) {
-                return $this->showBrowserPage($keyActivate, $firstKeyActivateUser, $firstServerUser, $connectionKeys);
+                return $this->showBrowserPage($keyActivate, $firstKeyActivateUser, $firstServerUser, $connectionKeys, $slotsWithLinks);
             }
 
             // По умолчанию для неизвестных клиентов возвращаем конфигурацию
@@ -642,8 +665,9 @@ class VpnConfigController extends Controller
 
     /**
      * Показывает страницу для браузера
+     * @param array $slotsWithLinks Массив [ ['location_label' => string, 'connection_keys' => array], ... ] для группировки по локации
      */
-    private function showBrowserPage(KeyActivate $keyActivate, $keyActivateUser, $serverUser, $connectionKeys): Response
+    private function showBrowserPage(KeyActivate $keyActivate, $keyActivateUser, $serverUser, $connectionKeys, array $slotsWithLinks = []): Response
     {
         try {
             // Обновляем модель из базы данных, чтобы получить актуальные данные
@@ -702,8 +726,13 @@ class VpnConfigController extends Controller
                 'days_remaining' => $daysRemaining
             ];
 
-            // Форматируем ключи для отображения
+            // Форматируем ключи для отображения (плоский список для обратной совместимости)
             $formattedKeys = $this->formatConnectionKeys($connectionKeys);
+            // Группировка по локации/серверу для выпадающих блоков
+            $formattedKeysGrouped = [];
+            foreach ($slotsWithLinks as $slot) {
+                $formattedKeysGrouped[$slot['location_label']] = $this->formatConnectionKeys($slot['connection_keys']);
+            }
 
             // Добавляем ссылку на бота
             $botLink = $salesman->bot_link ?? '#';
@@ -798,9 +827,10 @@ class VpnConfigController extends Controller
             }
 
             return response()->view('vpn.config', compact(
-                'keyActivate',      // ← ДОБАВЛЕНО: передаем ключ со статусом из БД
+                'keyActivate',
                 'userInfo',
                 'formattedKeys',
+                'formattedKeysGrouped',
                 'botLink',
                 'netcheckUrl',
                 'isDemoMode',

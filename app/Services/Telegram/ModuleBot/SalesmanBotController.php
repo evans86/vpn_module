@@ -579,6 +579,9 @@ class SalesmanBotController extends AbstractTelegramBot
                 return;
             }
 
+            // Сервисное сообщение: пользователь видит, что процесс пошёл (активация может занять 10–30 сек)
+            $this->sendMessage("⏳ Начался процесс активации ключа");
+
             // Активируем ключ через сервис (в сервисе — блокировка по ключу, чтобы не было двойной активации при повторной доставке webhook)
             $result = $this->keyActivateService->activate($key, $this->chatId);
 

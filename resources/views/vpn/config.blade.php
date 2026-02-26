@@ -144,6 +144,8 @@
                 // Используем данные нового ключа, если он был перевыпущен
                 $displayUserInfo = (isset($newKeyUserInfo) && $newKeyUserInfo) ? $newKeyUserInfo : $userInfo;
                 $displayFormattedKeys = (isset($newKeyFormattedKeys) && $newKeyFormattedKeys) ? $newKeyFormattedKeys : $formattedKeys;
+                // Группировка по локации (для перевыпущенного ключа пока нет группировки — плоский список)
+                $displayFormattedKeysGrouped = (isset($formattedKeysGrouped) && is_array($formattedKeysGrouped) && !empty($formattedKeysGrouped) && !isset($newKeyFormattedKeys)) ? $formattedKeysGrouped : [];
 
                 // Определяем какой ключ отображается (новый или старый)
                 $displayedKey = (isset($newKeyActivate) && $newKeyActivate) ? $newKeyActivate : $keyActivate;
@@ -248,7 +250,7 @@
                     @endif
                 </div>
             @elseif($isKeyActive && $displayUserInfo['status'] === 'active')
-                <!-- Ключ активен И Marzban тоже активен - показываем протоколы -->
+                <!-- Ключ активен И Marzban тоже активен - показываем протоколы (по локации/серверу или плоский список) -->
                 <div>
                     <h2 class="text-2xl font-bold mb-6 text-gray-900 flex items-center">
                         <svg class="w-6 h-6 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -256,41 +258,116 @@
                         </svg>
                         Доступные протоколы
                     </h2>
-                    <div class="space-y-4">
-                        @foreach($displayFormattedKeys as $key)
-                            <div class="border-2 border-gray-200 rounded-xl p-5 hover:border-indigo-300 hover:shadow-lg transition-all bg-white">
-                                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                                    <div class="flex items-center flex-grow">
-                                        <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white font-bold text-lg mr-4 shadow-md">
-                                            {{ $key['icon'] }}
-                                        </div>
-                                        <div class="flex-grow min-w-0">
-                                            <div class="font-bold text-lg text-gray-900">{{ $key['protocol'] }}</div>
-                                            <div class="text-sm text-indigo-600 font-medium mt-1">{{ $key['connection_type'] }}</div>
-                                        </div>
-                                    </div>
-                                    <div class="flex flex-col sm:flex-row gap-3 md:ml-4 w-full md:w-auto">
-                                        <button onclick="copyToClipboard('{{ $key['link'] }}', '{{ $key['protocol'] }}')"
-                                                class="inline-flex items-center justify-center px-4 py-2.5 border-2 border-indigo-200 text-indigo-700 rounded-lg font-semibold bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all shadow-sm hover:shadow"
-                                                title="Нажмите, чтобы скопировать конфигурацию {{ $key['protocol'] }}">
-                                            <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                      d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                    @if(!empty($displayFormattedKeysGrouped))
+                        {{-- Группировка по локации/серверу (Нидерланды #1, Нидерланды #2 и т.д.) --}}
+                        <div class="space-y-4">
+                            @foreach($displayFormattedKeysGrouped as $locationLabel => $keys)
+                                <div class="border-2 border-gray-200 rounded-xl overflow-hidden bg-white">
+                                    <button type="button"
+                                            class="config-location-toggle w-full flex items-center justify-between px-5 py-4 text-left bg-gradient-to-r from-gray-50 to-indigo-50 hover:from-indigo-50 hover:to-indigo-100 transition-colors"
+                                            aria-expanded="true"
+                                            data-target="config-location-{{ md5($locationLabel) }}">
+                                        <span class="font-bold text-gray-900 flex items-center">
+                                            <svg class="w-5 h-5 mr-2 text-indigo-600 config-location-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                             </svg>
-                                            Копировать
-                                        </button>
-                                        <button onclick="showQR('{{ $key['link'] }}', '{{ $key['protocol'] }}')"
-                                                class="inline-flex items-center justify-center px-4 py-2.5 border-2 border-gray-200 text-gray-700 rounded-lg font-semibold bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all shadow-sm hover:shadow">
-                                            <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9h14a2 2 0 012 2v2m0 0H3a2 2 0 01-2-2V9a2 2 0 012-2h14a2 2 0 012 2v2zm0 0h2a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2h2z"/>
-                                            </svg>
-                                            QR-код
-                                        </button>
+                                            {{ $locationLabel }}
+                                        </span>
+                                        <span class="text-sm text-gray-500">{{ count($keys) }} протокол(ов)</span>
+                                    </button>
+                                    <div id="config-location-{{ md5($locationLabel) }}" class="config-location-body border-t border-gray-200">
+                                        <div class="p-4 space-y-3">
+                                            @foreach($keys as $key)
+                                                <div class="border border-gray-200 rounded-lg p-4 hover:border-indigo-300 hover:shadow transition-all bg-white">
+                                                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                                        <div class="flex items-center flex-grow">
+                                                            <div class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 text-white font-bold text-sm mr-3 shadow">
+                                                                {{ $key['icon'] }}
+                                                            </div>
+                                                            <div class="flex-grow min-w-0">
+                                                                <div class="font-bold text-gray-900">{{ $key['protocol'] }}</div>
+                                                                @if(!empty($key['connection_type']))
+                                                                    <div class="text-sm text-indigo-600 font-medium mt-0.5">{{ $key['connection_type'] }}</div>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                        <div class="flex flex-wrap gap-2 md:ml-4">
+                                                            <button onclick="copyToClipboard('{{ $key['link'] }}', '{{ $key['protocol'] }}')"
+                                                                    class="inline-flex items-center justify-center px-3 py-2 border-2 border-indigo-200 text-indigo-700 rounded-lg font-semibold text-sm bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
+                                                                    title="Скопировать {{ $key['protocol'] }}">
+                                                                <svg class="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                                                                Копировать
+                                                            </button>
+                                                            <button onclick="showQR('{{ $key['link'] }}', '{{ $key['protocol'] }}')"
+                                                                    class="inline-flex items-center justify-center px-3 py-2 border-2 border-gray-200 text-gray-700 rounded-lg font-semibold text-sm bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all">
+                                                                <svg class="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9h14a2 2 0 012 2v2m0 0H3a2 2 0 01-2-2V9a2 2 0 012-2h14a2 2 0 012 2v2zm0 0h2a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2h2z"/></svg>
+                                                                QR-код
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        @endforeach
-                    </div>
+                            @endforeach
+                        </div>
+                        <script>
+                            document.querySelectorAll('.config-location-toggle').forEach(function(btn) {
+                                btn.addEventListener('click', function() {
+                                    var targetId = this.getAttribute('data-target');
+                                    var body = document.getElementById(targetId);
+                                    var chevron = this.querySelector('.config-location-chevron');
+                                    if (body.classList.contains('hidden')) {
+                                        body.classList.remove('hidden');
+                                        if (chevron) chevron.style.transform = 'rotate(0deg)';
+                                        this.setAttribute('aria-expanded', 'true');
+                                    } else {
+                                        body.classList.add('hidden');
+                                        if (chevron) chevron.style.transform = 'rotate(-90deg)';
+                                        this.setAttribute('aria-expanded', 'false');
+                                    }
+                                });
+                            });
+                        </script>
+                    @else
+                        {{-- Плоский список (один слот или перевыпущенный ключ) --}}
+                        <div class="space-y-4">
+                            @foreach($displayFormattedKeys as $key)
+                                <div class="border-2 border-gray-200 rounded-xl p-5 hover:border-indigo-300 hover:shadow-lg transition-all bg-white">
+                                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                        <div class="flex items-center flex-grow">
+                                            <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white font-bold text-lg mr-4 shadow-md">
+                                                {{ $key['icon'] }}
+                                            </div>
+                                            <div class="flex-grow min-w-0">
+                                                <div class="font-bold text-lg text-gray-900">{{ $key['protocol'] }}</div>
+                                                <div class="text-sm text-indigo-600 font-medium mt-1">{{ $key['connection_type'] }}</div>
+                                            </div>
+                                        </div>
+                                        <div class="flex flex-col sm:flex-row gap-3 md:ml-4 w-full md:w-auto">
+                                            <button onclick="copyToClipboard('{{ $key['link'] }}', '{{ $key['protocol'] }}')"
+                                                    class="inline-flex items-center justify-center px-4 py-2.5 border-2 border-indigo-200 text-indigo-700 rounded-lg font-semibold bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all shadow-sm hover:shadow"
+                                                    title="Нажмите, чтобы скопировать конфигурацию {{ $key['protocol'] }}">
+                                                <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                                                </svg>
+                                                Копировать
+                                            </button>
+                                            <button onclick="showQR('{{ $key['link'] }}', '{{ $key['protocol'] }}')"
+                                                    class="inline-flex items-center justify-center px-4 py-2.5 border-2 border-gray-200 text-gray-700 rounded-lg font-semibold bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all shadow-sm hover:shadow">
+                                                <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9h14a2 2 0 012 2v2m0 0H3a2 2 0 01-2-2V9a2 2 0 012-2h14a2 2 0 012 2v2zm0 0h2a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2h2z"/>
+                                                </svg>
+                                                QR-код
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
             @else
                 <div class="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
