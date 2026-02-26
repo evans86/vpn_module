@@ -687,78 +687,92 @@ class ServerUserTransferController extends Controller
      */
     public function multiProviderMigrationCheckKey(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'key_id' => 'required|string|max:64',
-        ]);
-        $keyId = trim($validated['key_id']);
+        try {
+            $validated = $request->validate([
+                'key_id' => 'required|string|max:64',
+            ]);
+            $keyId = trim($validated['key_id']);
 
-        $slots = config('panel.multi_provider_slots', []);
-        $slots = is_array($slots) ? $slots : [];
-        if (empty($slots)) {
+            $slots = config('panel.multi_provider_slots', []);
+            $slots = is_array($slots) ? $slots : [];
+            if (empty($slots)) {
+                return response()->json([
+                    'success' => false,
+                    'valid' => false,
+                    'message' => 'Мульти-провайдер отключён. Задайте PANEL_MULTI_PROVIDER_SLOTS в .env.',
+                ], 400);
+            }
+
+            $key = KeyActivate::query()
+                ->where('id', $keyId)
+                ->with(['keyActivateUsers.serverUser.panel.server'])
+                ->first();
+
+            if (!$key) {
+                return response()->json([
+                    'success' => true,
+                    'valid' => false,
+                    'key_id' => $keyId,
+                    'message' => 'Ключ не найден.',
+                ]);
+            }
+
+            if ($key->status !== KeyActivate::ACTIVE) {
+                return response()->json([
+                    'success' => true,
+                    'valid' => false,
+                    'key_id' => $keyId,
+                    'message' => 'Ключ не активен (статус: ' . $key->status . '). Подходят только ключи со статусом ACTIVE.',
+                ]);
+            }
+
+            if (!$key->user_tg_id) {
+                return response()->json([
+                    'success' => true,
+                    'valid' => false,
+                    'key_id' => $keyId,
+                    'message' => 'У ключа нет user_tg_id (не активирован пользователем).',
+                ]);
+            }
+
+            $existingProviders = [];
+            foreach ($key->keyActivateUsers as $kau) {
+                if ($kau->serverUser && $kau->serverUser->panel && $kau->serverUser->panel->server) {
+                    $p = $kau->serverUser->panel->server->provider;
+                    if ($p !== null && $p !== '') {
+                        $existingProviders[$p] = true;
+                    }
+                }
+            }
+            $existingProviders = array_keys($existingProviders);
+            $missingSlots = array_values(array_diff($slots, $existingProviders));
+            $canAdd = count($missingSlots) > 0;
+
+            return response()->json([
+                'success' => true,
+                'valid' => true,
+                'key_id' => $key->id,
+                'existing_providers' => $existingProviders,
+                'required_slots' => $slots,
+                'missing_slots' => $missingSlots,
+                'can_add' => $canAdd,
+                'message' => $canAdd
+                    ? 'Ключ подходит. Есть слоты: ' . implode(', ', $existingProviders) . '. Добавить: ' . implode(', ', $missingSlots) . '.'
+                    : 'Ключ уже имеет все провайдеры: ' . implode(', ', $existingProviders) . '.',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::error('multiProviderMigrationCheckKey failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return response()->json([
                 'success' => false,
                 'valid' => false,
-                'message' => 'Мульти-провайдер отключён. Задайте PANEL_MULTI_PROVIDER_SLOTS в .env.',
-            ], 400);
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ], 500);
         }
-
-        $key = KeyActivate::query()
-            ->where('id', $keyId)
-            ->with(['keyActivateUsers.serverUser.panel.server'])
-            ->first();
-
-        if (!$key) {
-            return response()->json([
-                'success' => true,
-                'valid' => false,
-                'key_id' => $keyId,
-                'message' => 'Ключ не найден.',
-            ]);
-        }
-
-        if ($key->status !== KeyActivate::ACTIVE) {
-            return response()->json([
-                'success' => true,
-                'valid' => false,
-                'key_id' => $keyId,
-                'message' => 'Ключ не активен (статус: ' . $key->status . '). Подходят только ключи со статусом ACTIVE.',
-            ]);
-        }
-
-        if (!$key->user_tg_id) {
-            return response()->json([
-                'success' => true,
-                'valid' => false,
-                'key_id' => $keyId,
-                'message' => 'У ключа нет user_tg_id (не активирован пользователем).',
-            ]);
-        }
-
-        $existingProviders = [];
-        foreach ($key->keyActivateUsers as $kau) {
-            if ($kau->serverUser && $kau->serverUser->panel && $kau->serverUser->panel->server) {
-                $p = $kau->serverUser->panel->server->provider;
-                if ($p !== null && $p !== '') {
-                    $existingProviders[$p] = true;
-                }
-            }
-        }
-        $existingProviders = array_keys($existingProviders);
-        $missingSlots = array_values(array_diff($slots, $existingProviders));
-        $canAdd = count($missingSlots) > 0;
-
-        return response()->json([
-            'success' => true,
-            'valid' => true,
-            'key_id' => $key->id,
-            'existing_providers' => $existingProviders,
-            'required_slots' => $slots,
-            'missing_slots' => $missingSlots,
-            'can_add' => $canAdd,
-            'message' => $canAdd
-                ? 'Ключ подходит. Есть слоты: ' . implode(', ', $existingProviders) . '. Добавить: ' . implode(', ', $missingSlots) . '.'
-                : 'Ключ уже имеет все провайдеры: ' . implode(', ', $existingProviders) . '.',
-        ]);
     }
 
     /**
@@ -766,39 +780,39 @@ class ServerUserTransferController extends Controller
      */
     public function multiProviderMigrationSingleKey(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'key_id' => 'required|string|max:64',
-            'dry_run' => 'nullable|boolean',
-        ]);
-        $keyId = trim($validated['key_id']);
-        $dryRun = !empty($validated['dry_run']);
-
-        $slots = config('panel.multi_provider_slots', []);
-        $slots = is_array($slots) ? $slots : [];
-        if (empty($slots)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Мульти-провайдер отключён. Задайте PANEL_MULTI_PROVIDER_SLOTS в .env.',
-                'added' => 0,
-            ], 400);
-        }
-
-        $key = KeyActivate::query()
-            ->where('id', $keyId)
-            ->where('status', KeyActivate::ACTIVE)
-            ->whereNotNull('user_tg_id')
-            ->whereHas('keyActivateUsers')
-            ->first();
-
-        if (!$key) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Ключ не найден, не активен или без слотов. Сначала нажмите «Проверить ключ».',
-                'added' => 0,
-            ], 404);
-        }
-
         try {
+            $validated = $request->validate([
+                'key_id' => 'required|string|max:64',
+                'dry_run' => 'nullable|boolean',
+            ]);
+            $keyId = trim($validated['key_id']);
+            $dryRun = !empty($validated['dry_run']);
+
+            $slots = config('panel.multi_provider_slots', []);
+            $slots = is_array($slots) ? $slots : [];
+            if (empty($slots)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Мульти-провайдер отключён. Задайте PANEL_MULTI_PROVIDER_SLOTS в .env.',
+                    'added' => 0,
+                ], 400);
+            }
+
+            $key = KeyActivate::query()
+                ->where('id', $keyId)
+                ->where('status', KeyActivate::ACTIVE)
+                ->whereNotNull('user_tg_id')
+                ->whereHas('keyActivateUsers')
+                ->first();
+
+            if (!$key) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ключ не найден, не активен или без слотов. Сначала нажмите «Проверить ключ».',
+                    'added' => 0,
+                ], 404);
+            }
+
             $keyActivateService = app(KeyActivateService::class);
             $added = $keyActivateService->addMissingProviderSlots($key, $dryRun);
             return response()->json([
@@ -809,10 +823,13 @@ class ServerUserTransferController extends Controller
                     ? "Проверка: было бы добавлено слотов: {$added}."
                     : "Добавлено слотов: {$added}. Обновите подписку в боте — в ней появятся конфиги со всех провайдеров.",
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             Log::error('Multi-provider single key failed', [
-                'key_id' => $keyId,
+                'key_id' => $request->input('key_id'),
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
             return response()->json([
                 'success' => false,
@@ -828,28 +845,41 @@ class ServerUserTransferController extends Controller
      */
     public function multiProviderMigrationCount(Request $request): JsonResponse
     {
-        $slots = config('panel.multi_provider_slots', []);
-        $slots = is_array($slots) ? $slots : [];
-        if (empty($slots)) {
+        try {
+            $slots = config('panel.multi_provider_slots', []);
+            $slots = is_array($slots) ? $slots : [];
+            if (empty($slots)) {
+                return response()->json([
+                    'success' => true,
+                    'count' => 0,
+                    'slots' => [],
+                    'message' => 'Мульти-провайдер отключён (panel.multi_provider_slots пуст).',
+                ]);
+            }
+
+            $count = KeyActivate::query()
+                ->where('status', KeyActivate::ACTIVE)
+                ->whereNotNull('user_tg_id')
+                ->whereHas('keyActivateUsers')
+                ->count();
+
             return response()->json([
                 'success' => true,
+                'count' => $count,
+                'slots' => $slots,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('multiProviderMigrationCount failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'success' => false,
                 'count' => 0,
                 'slots' => [],
-                'message' => 'Мульти-провайдер отключён (panel.multi_provider_slots пуст).',
-            ]);
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ], 500);
         }
-
-        $count = KeyActivate::query()
-            ->where('status', KeyActivate::ACTIVE)
-            ->whereNotNull('user_tg_id')
-            ->whereHas('keyActivateUsers')
-            ->count();
-
-        return response()->json([
-            'success' => true,
-            'count' => $count,
-            'slots' => $slots,
-        ]);
     }
 
     /**
@@ -945,7 +975,9 @@ class ServerUserTransferController extends Controller
                     ? "Проверка: обработано {$processed} ключей, было бы добавлено слотов: {$addedTotal}."
                     : "Обработано {$processed} ключей, добавлено слотов: {$addedTotal}. Осталось ключей: {$remaining}.",
             ]);
-        } catch (Exception $e) {
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
             Log::error('Multi-provider migration batch failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
