@@ -94,16 +94,6 @@ class VpnConfigController extends Controller
                 ]);
             }
 
-            // Загружаем отношения для KeyActivate (только нужные поля)
-            $keyActivate->load([
-                'packSalesman' => function($query) {
-                    $query->select('id', 'salesman_id', 'pack_id');
-                },
-                'packSalesman.salesman' => function($query) {
-                    $query->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id');
-                }
-            ]);
-
             // Проверяем, был ли ключ заменен из-за нарушения (даже если ключ просрочен)
             // Это нужно проверить ДО проверки keyActivateUser, чтобы показать информацию о замене
             $replacedViolation = \App\Models\VPN\ConnectionLimitViolation::where('key_activate_id', $key_activate_id)
@@ -150,34 +140,38 @@ class VpnConfigController extends Controller
             }
 
             $userAgent = request()->header('User-Agent') ?? 'Unknown';
-            // Подписка (приложение): отдаём только текст из БД, без HTML. Таймаут бывает, когда ошибочно
-            // считали клиент браузером (много приложений шлют User-Agent вроде Mozilla/5.0) и отдавали тяжёлую страницу.
-            $isSubscriptionRequest = $this->isVpnClient($userAgent) || !$this->requestAcceptsHtml();
-            $isBrowser = !$isSubscriptionRequest && $this->isBrowserClient($userAgent);
+            // Подписка по умолчанию: отдаём plain text. HTML только если запрос явно от браузера (Accept: text/html + типичный UA).
+            $isSubscriptionRequest = $this->isVpnClient($userAgent)
+                || !$this->requestAcceptsHtml()
+                || !$this->hasVersionedBrowserInUserAgent($userAgent);
+            $isBrowser = !$isSubscriptionRequest && $this->requestAcceptsHtml() && $this->isBrowserClient($userAgent);
 
-            // Всегда только из БД: быстрый ответ. Долгое обновление — только по кнопке «Обновить» на странице.
-            $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id);
-
-            if ($isBrowser) {
-                $refreshUrl = route('vpn.config.refresh', ['token' => $key_activate_id]);
-                return $this->showBrowserPage(
-                    $keyActivate,
-                    $data['firstKeyActivateUser'],
-                    $data['firstServerUser'],
-                    $data['connectionKeys'],
-                    $data['slotsWithLinks'],
-                    true,
-                    false,
-                    null,
-                    $refreshUrl,
-                    $data['lastUpdated'] ?? null
-                );
+            if ($isSubscriptionRequest) {
+                // Быстрый путь: ссылки только из уже загруженных keyActivateUsers, без доп. запросов.
+                $connectionKeys = $this->collectConnectionKeysFromKeyActivateUsers($keyActivateUsers);
+                return response(implode("\n", $connectionKeys))
+                    ->header('Content-Type', 'text/plain; charset=utf-8');
             }
 
-            // Приложение / подписка: только сохранённые ссылки из БД, без запросов к панелям.
-            $connectionKeys = $data['connectionKeys'];
-            return response(implode("\n", $connectionKeys ?? []))
-                ->header('Content-Type', 'text/plain; charset=utf-8');
+            // Браузер: полная страница из БД (обновление — только по кнопке «Обновить»).
+            $keyActivate->load([
+                'packSalesman' => fn($q) => $q->select('id', 'salesman_id', 'pack_id'),
+                'packSalesman.salesman' => fn($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
+            ]);
+            $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id);
+            $refreshUrl = route('vpn.config.refresh', ['token' => $key_activate_id]);
+            return $this->showBrowserPage(
+                $keyActivate,
+                $data['firstKeyActivateUser'],
+                $data['firstServerUser'],
+                $data['connectionKeys'],
+                $data['slotsWithLinks'],
+                true,
+                false,
+                null,
+                $refreshUrl,
+                $data['lastUpdated'] ?? null
+            );
 
         } catch (\App\Exceptions\KeyReplacedException $e) {
             // Ключ был перевыпущен - показываем страницу ошибки с информацией о новом ключе
@@ -727,12 +721,44 @@ class VpnConfigController extends Controller
     }
 
     /**
+     * Собрать список ссылок (connection keys) из уже загруженных KeyActivateUser.
+     * Используется для быстрого ответа подписке без дополнительных запросов к БД.
+     */
+    private function collectConnectionKeysFromKeyActivateUsers(\Illuminate\Support\Collection $keyActivateUsers): array
+    {
+        $connectionKeys = [];
+        foreach ($keyActivateUsers as $kau) {
+            $serverUser = $kau->serverUser;
+            if (!$serverUser || empty($serverUser->keys)) {
+                continue;
+            }
+            $stored = json_decode($serverUser->keys, true);
+            if (is_array($stored)) {
+                $connectionKeys = array_merge($connectionKeys, $stored);
+            }
+        }
+        return $connectionKeys;
+    }
+
+    /**
      * Запрос явно принимает HTML (браузер) — иначе считаем подпиской и отдаём быстро.
      */
     private function requestAcceptsHtml(): bool
     {
         $accept = strtolower(request()->header('Accept', ''));
         return str_contains($accept, 'text/html');
+    }
+
+    /**
+     * В User-Agent есть типичная для браузера подпись с версией (Chrome/, Firefox/, Safari/, Edg/).
+     * Используется чтобы отдавать HTML только явным браузерам, а не приложениям с Mozilla в UA.
+     */
+    private function hasVersionedBrowserInUserAgent(string $userAgent): bool
+    {
+        $ua = strtolower($userAgent);
+        return str_contains($ua, 'chrome/') || str_contains($ua, 'firefox/')
+            || str_contains($ua, 'safari/') || str_contains($ua, 'edg/')
+            || str_contains($ua, 'opr/') || str_contains($ua, 'msie ');
     }
 
     /**
