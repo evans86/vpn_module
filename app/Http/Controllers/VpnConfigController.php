@@ -146,115 +146,21 @@ class VpnConfigController extends Controller
                 ]);
             }
 
-            // Недостающие провайдер-слоты добавляем в фоне (очередь), чтобы не тормозить страницу.
-            // При QUEUE_CONNECTION=sync джоб выполнится в том же запросе — страница будет медленной; используйте database/redis и воркер.
-            $multiProviderSlots = config('panel.multi_provider_slots', []);
-            if (!empty($multiProviderSlots) && is_array($multiProviderSlots) && $keyActivate->status === KeyActivate::ACTIVE) {
-                $slotCount = $keyActivateUsers->count();
-                $providerCount = count($multiProviderSlots);
-                if ($providerCount > 0 && $slotCount < $providerCount && config('queue.default') !== 'sync') {
-                    $cacheKey = 'vpn_config_multi_provider_checked_' . $key_activate_id;
-                    if (!Cache::has($cacheKey)) {
-                        AddMissingSlotsForKeyJob::dispatch($key_activate_id);
-                        Cache::put($cacheKey, 1, now()->addMinutes(10));
-                    }
-                }
+            $userAgent = request()->header('User-Agent') ?? 'Unknown';
+            $isBrowser = $this->isBrowserClient($userAgent);
+            // Браузер: сразу отдаём лёгкую страницу с прогресс-баром, данные подгрузит JS через /config/{id}/refresh
+            if ($isBrowser) {
+                return response()->view('vpn.config-loading', [
+                    'key_activate_id' => $key_activate_id,
+                    'refresh_url' => route('vpn.config.refresh', ['token' => $key_activate_id]),
+                ]);
             }
 
-            // Собираем ссылки по слотам (для браузера — группировка по локации/серверу)
-            $connectionKeys = [];
-            $slotsWithLinks = [];
-            $firstKeyActivateUser = null;
-            $firstServerUser = null;
-            $locationCounts = [];
-
-            foreach ($keyActivateUsers as $kau) {
-                $serverUser = $kau->serverUser;
-                if (!$serverUser && $kau->server_user_id) {
-                    $serverUser = ServerUser::with(['panel.server.location'])
-                        ->find($kau->server_user_id);
-                    if ($serverUser) {
-                        $kau->setRelation('serverUser', $serverUser);
-                    }
-                }
-                if (!$serverUser && $kau->server_user_id) {
-                    $serverUser = $this->serverUserRepository->findById($kau->server_user_id);
-                    if ($serverUser && !$serverUser->relationLoaded('panel')) {
-                        $serverUser->load(['panel.server.location']);
-                    }
-                    if ($serverUser) {
-                        $kau->setRelation('serverUser', $serverUser);
-                    }
-                }
-                if (!$serverUser) {
-                    Log::warning('Server user not found for KeyActivateUser slot', [
-                        'key_activate_user_id' => $kau->id,
-                        'key_activate_id' => $key_activate_id,
-                        'source' => 'vpn'
-                    ]);
-                    continue;
-                }
-                if ($firstKeyActivateUser === null) {
-                    $firstKeyActivateUser = $kau;
-                    $firstServerUser = $serverUser;
-                }
-                if ($serverUser->panel && !$serverUser->panel->relationLoaded('server')) {
-                    $serverUser->panel->load('server.location');
-                }
-                $slotLinks = [];
-                try {
-                    $links = $this->getFreshUserLinks($serverUser);
-                    if (!empty($links)) {
-                        $slotLinks = $links;
-                        $connectionKeys = array_merge($connectionKeys, $links);
-                    }
-                } catch (\App\Exceptions\KeyReplacedException $e) {
-                    throw $e;
-                } catch (Exception $e) {
-                    Log::warning('Failed to get fresh links for one slot, using stored', [
-                        'key_activate_user_id' => $kau->id,
-                        'server_user_id' => $serverUser->id,
-                        'error' => $e->getMessage(),
-                        'source' => 'vpn'
-                    ]);
-                    $stored = json_decode($serverUser->keys, true);
-                    if (!empty($stored)) {
-                        $slotLinks = $stored;
-                        $connectionKeys = array_merge($connectionKeys, $stored);
-                    }
-                }
-                if (!empty($slotLinks)) {
-                    $server = $serverUser->panel && $serverUser->panel->server ? $serverUser->panel->server : null;
-                    $location = $server && $server->relationLoaded('location') ? $server->location : null;
-                    $locationCode = ''; // двухбуквенный код для картинки флага (nl, ru)
-                    $name = 'Сервер';
-                    if ($location) {
-                        $locationCode = strtolower(trim($location->code ?? ''));
-                        $name = $this->locationCodeToFullName($location->code ?: '');
-                        if ($name === '') {
-                            $name = $location->code ?: 'Сервер';
-                        }
-                    } elseif ($server && $server->name) {
-                        $name = $server->name;
-                    }
-                    $locKey = ($location ? $location->id : 0) . '_' . ($server ? $server->id : 0) . '_' . ($serverUser->panel_id ?? 0);
-                    $locationCounts[$locKey] = isset($locationCounts[$locKey]) ? $locationCounts[$locKey] + 1 : 1;
-                    $suffix = $locationCounts[$locKey] > 1 ? ' #' . $locationCounts[$locKey] : '';
-                    $slotsWithLinks[] = [
-                        'location_label'  => $name . $suffix,
-                        'location_code'   => $locationCode,
-                        'connection_keys' => $slotLinks,
-                    ];
-                }
-            }
-
-            if (empty($connectionKeys)) {
-                throw new RuntimeException('Invalid connection keys format');
-            }
-            if ($firstKeyActivateUser === null) {
-                $firstKeyActivateUser = $keyActivateUsers->first();
-                $firstServerUser = $firstKeyActivateUser->serverUser ?? $this->serverUserRepository->findById($firstKeyActivateUser->server_user_id);
-            }
+            $data = $this->buildConnectionData($keyActivate, $key_activate_id, false);
+            $connectionKeys = $data['connectionKeys'];
+            $slotsWithLinks = $data['slotsWithLinks'];
+            $firstKeyActivateUser = $data['firstKeyActivateUser'];
+            $firstServerUser = $data['firstServerUser'];
 
             $userAgent = request()->header('User-Agent') ?? 'Unknown';
 
@@ -355,6 +261,202 @@ class VpnConfigController extends Controller
         }
     }
 
+    /**
+     * Фоновое обновление конфига для браузера: полная сборка данных и HTML страницы.
+     * Вызывается JS со страницы config-loading.
+     */
+    public function showConfigRefresh(string $token): Response
+    {
+        $key_activate_id = $token;
+        try {
+            $keyActivate = $this->keyActivateRepository->findById($key_activate_id);
+            if (!$keyActivate) {
+                return response()->json(['success' => false, 'message' => 'Ключ не найден'], 404);
+            }
+            $keyActivate->load([
+                'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
+                'packSalesman.salesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
+            ]);
+            $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
+            if ($keyActivateUsers->isEmpty()) {
+                return response()->json(['success' => false, 'message' => 'Нет слотов для ключа'], 404);
+            }
+            $data = $this->buildConnectionData($keyActivate, $key_activate_id, true);
+            $response = $this->showBrowserPage(
+                $keyActivate,
+                $data['firstKeyActivateUser'],
+                $data['firstServerUser'],
+                $data['connectionKeys'],
+                $data['slotsWithLinks']
+            );
+            return response()->json(['success' => true, 'html' => $response->getContent()]);
+        } catch (\Throwable $e) {
+            Log::warning('VpnConfig refresh failed', [
+                'key_activate_id' => $key_activate_id,
+                'error' => $e->getMessage(),
+                'source' => 'vpn',
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Собрать connectionKeys и slotsWithLinks: добавить недостающие слоты, обновить ссылки с панелей.
+     * @param bool $syncMultiProvider true при вызове из refresh — добавить слоты синхронно и вернуть полные данные
+     */
+    private function buildConnectionData(KeyActivate $keyActivate, string $key_activate_id, bool $syncMultiProvider = false): array
+    {
+        $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
+
+        $multiProviderSlots = config('panel.multi_provider_slots', []);
+        if (!empty($multiProviderSlots) && is_array($multiProviderSlots) && $keyActivate->status === KeyActivate::ACTIVE) {
+            $slotCount = $keyActivateUsers->count();
+            $providerCount = count($multiProviderSlots);
+            if ($providerCount > 0 && $slotCount < $providerCount) {
+                $cacheKey = 'vpn_config_multi_provider_checked_' . $key_activate_id;
+                $doAdd = $syncMultiProvider || !Cache::has($cacheKey);
+                if ($doAdd) {
+                    if ($syncMultiProvider) {
+                        try {
+                            $added = $this->keyActivateService->addMissingProviderSlots($keyActivate, false);
+                            if ($added > 0) {
+                                $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
+                            }
+                        } catch (Exception $e) {
+                            Log::warning('VpnConfig: addMissingProviderSlots failed', [
+                                'key_activate_id' => $key_activate_id,
+                                'error' => $e->getMessage(),
+                                'source' => 'vpn',
+                            ]);
+                        }
+                    } else {
+                        if (config('queue.default') !== 'sync') {
+                            AddMissingSlotsForKeyJob::dispatch($key_activate_id);
+                        } else {
+                            try {
+                                $added = $this->keyActivateService->addMissingProviderSlots($keyActivate, false);
+                                if ($added > 0) {
+                                    $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
+                                }
+                            } catch (Exception $e) {
+                                Log::warning('VpnConfig: addMissingProviderSlots failed', [
+                                    'key_activate_id' => $key_activate_id,
+                                    'error' => $e->getMessage(),
+                                    'source' => 'vpn',
+                                ]);
+                            }
+                        }
+                    }
+                    if (!$syncMultiProvider) {
+                        Cache::put($cacheKey, 1, now()->addMinutes(10));
+                    }
+                }
+            }
+        }
+
+        $connectionKeys = [];
+        $slotsWithLinks = [];
+        $firstKeyActivateUser = null;
+        $firstServerUser = null;
+        $locationCounts = [];
+
+        foreach ($keyActivateUsers as $kau) {
+            $serverUser = $kau->serverUser;
+            if (!$serverUser && $kau->server_user_id) {
+                $serverUser = ServerUser::with(['panel.server.location'])->find($kau->server_user_id);
+                if ($serverUser) {
+                    $kau->setRelation('serverUser', $serverUser);
+                }
+            }
+            if (!$serverUser && $kau->server_user_id) {
+                $serverUser = $this->serverUserRepository->findById($kau->server_user_id);
+                if ($serverUser && !$serverUser->relationLoaded('panel')) {
+                    $serverUser->load(['panel.server.location']);
+                }
+                if ($serverUser) {
+                    $kau->setRelation('serverUser', $serverUser);
+                }
+            }
+            if (!$serverUser) {
+                Log::warning('Server user not found for KeyActivateUser slot', [
+                    'key_activate_user_id' => $kau->id,
+                    'key_activate_id' => $key_activate_id,
+                    'source' => 'vpn',
+                ]);
+                continue;
+            }
+            if ($firstKeyActivateUser === null) {
+                $firstKeyActivateUser = $kau;
+                $firstServerUser = $serverUser;
+            }
+            if ($serverUser->panel && !$serverUser->panel->relationLoaded('server')) {
+                $serverUser->panel->load('server.location');
+            }
+            $slotLinks = [];
+            try {
+                $links = $this->getFreshUserLinks($serverUser);
+                if (!empty($links)) {
+                    $slotLinks = $links;
+                    $connectionKeys = array_merge($connectionKeys, $links);
+                }
+            } catch (\App\Exceptions\KeyReplacedException $e) {
+                throw $e;
+            } catch (Exception $e) {
+                Log::warning('Failed to get fresh links for one slot, using stored', [
+                    'key_activate_user_id' => $kau->id,
+                    'server_user_id' => $serverUser->id,
+                    'error' => $e->getMessage(),
+                    'source' => 'vpn',
+                ]);
+                $stored = json_decode($serverUser->keys, true);
+                if (!empty($stored)) {
+                    $slotLinks = $stored;
+                    $connectionKeys = array_merge($connectionKeys, $stored);
+                }
+            }
+            if (!empty($slotLinks)) {
+                $server = $serverUser->panel && $serverUser->panel->server ? $serverUser->panel->server : null;
+                $location = $server && $server->relationLoaded('location') ? $server->location : null;
+                $locationCode = '';
+                $name = 'Сервер';
+                if ($location) {
+                    $locationCode = strtolower(trim($location->code ?? ''));
+                    $name = $this->locationCodeToFullName($location->code ?: '');
+                    if ($name === '') {
+                        $name = $location->code ?: 'Сервер';
+                    }
+                } elseif ($server && $server->name) {
+                    $name = $server->name;
+                }
+                $locKey = ($location ? $location->id : 0) . '_' . ($server ? $server->id : 0) . '_' . ($serverUser->panel_id ?? 0);
+                $locationCounts[$locKey] = isset($locationCounts[$locKey]) ? $locationCounts[$locKey] + 1 : 1;
+                $suffix = $locationCounts[$locKey] > 1 ? ' #' . $locationCounts[$locKey] : '';
+                $slotsWithLinks[] = [
+                    'location_label'  => $name . $suffix,
+                    'location_code'   => $locationCode,
+                    'connection_keys' => $slotLinks,
+                ];
+            }
+        }
+
+        if (empty($connectionKeys)) {
+            throw new RuntimeException('Invalid connection keys format');
+        }
+        if ($firstKeyActivateUser === null) {
+            $firstKeyActivateUser = $keyActivateUsers->first();
+            $firstServerUser = $firstKeyActivateUser->serverUser ?? $this->serverUserRepository->findById($firstKeyActivateUser->server_user_id);
+        }
+
+        return [
+            'connectionKeys' => $connectionKeys,
+            'slotsWithLinks' => $slotsWithLinks,
+            'firstKeyActivateUser' => $firstKeyActivateUser,
+            'firstServerUser' => $firstServerUser,
+        ];
+    }
 
     /**
      * Получить актуальные ссылки пользователя из панели
