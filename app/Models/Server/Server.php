@@ -53,7 +53,7 @@ class Server extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        // Базовые типы
+        'server_status' => 'integer',
     ];
 
     /**
@@ -117,6 +117,8 @@ class Server extends Model
     // Провайдеры серверов
     public const VDSINA = 'vdsina';
     public const TIMEWEB = 'timeweb';
+    /** Провайдер без API — сервер добавлен вручную (IP, логин, пароль задаются в форме) */
+    public const MANUAL = 'manual';
 
     // Действия с сервером
     public const PASSWORD_UPDATE = 'password_update';

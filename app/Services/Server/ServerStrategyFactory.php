@@ -27,8 +27,7 @@ class ServerStrategyFactory
     private static array $strategyMap = [
         Server::VDSINA => \App\Services\Server\strategy\ServerVdsinaStrategy::class,
         Server::TIMEWEB => \App\Services\Server\strategy\ServerTimewebStrategy::class,
-        // Здесь можно добавить новые провайдеры:
-        // Server::NEW_PROVIDER => \App\Services\Server\strategy\ServerNewProviderStrategy::class,
+        Server::MANUAL => \App\Services\Server\strategy\ServerManualStrategy::class,
     ];
 
     /**

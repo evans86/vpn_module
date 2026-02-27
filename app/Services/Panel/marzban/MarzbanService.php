@@ -144,6 +144,10 @@ class MarzbanService
                 throw new RuntimeException("Failed to set execute permissions. Exit code: {$chmodExitStatus}. Output: " . substr($chmodOutput, 0, 1000));
             }
 
+            // Патчим скрипт: ufw выполнять только если установлен (на CentOS/минимальных образах ufw нет)
+            $ssh->exec("sed -i 's/^ufw disable$/command -v ufw \\&>\\/dev\\/null \\&\\& ufw disable \\|\\| true/' install_marzban.sh 2>&1");
+            Log::info('Patched install script to make ufw optional', ['source' => 'panel']);
+
             // Патчим скрипт: после загрузки docker-compose.yml подменяем образ на ghcr.io (обход лимита Docker Hub)
             $patchCmd = "sed -i '/File saved in.*docker-compose.yml/a sed -i '\\''s|gozargah/marzban|ghcr.io/gozargah/marzban|g'\\'' \"\$APP_DIR/docker-compose.yml\"' install_marzban.sh";
             $ssh->exec($patchCmd);

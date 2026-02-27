@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Server\Server;
 use App\Services\Server\ServerStrategy;
 use App\Services\Server\LogUploadService;
+use App\Services\Cloudflare\CloudflareService;
 use App\Repositories\Server\ServerRepository;
 use App\Logging\DatabaseLogger;
 use Exception;
@@ -198,6 +199,70 @@ class ServerController extends Controller
     }
 
     /**
+     * Добавить сервер вручную (провайдер без API).
+     * Принимает: location_id, name, ip, host (опц.), login (опц.), password (опц.).
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function storeManual(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'location_id' => 'required|integer|exists:location,id',
+                'name' => 'required|string|max:255',
+                'ip' => 'required|string|max:45',
+                'host' => 'nullable|string|max:255',
+                'login' => 'nullable|string|max:255',
+                'password' => 'nullable|string|max:500',
+            ]);
+
+            $server = new Server();
+            $server->location_id = $validated['location_id'];
+            $server->name = $validated['name'];
+            $server->ip = $validated['ip'];
+            $server->host = $validated['host'] ?? $validated['ip'];
+            $server->login = $validated['login'] ?? null;
+            $server->password = $validated['password'] ?? null;
+            $server->provider = Server::MANUAL;
+            $server->provider_id = null;
+            $server->server_status = Server::SERVER_CREATED;
+            $server->is_free = false;
+            $server->save();
+
+            $this->logger->info('Manual server created', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'server_id' => $server->id,
+                'location_id' => $server->location_id,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Сервер добавлен',
+                'data' => $server,
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ошибка валидации',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Exception $e) {
+            $this->logger->error('Error creating manual server', [
+                'source' => 'server',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Не удалось добавить сервер: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * @param Request $request
      * @param Server $server
      * @return RedirectResponse
@@ -287,6 +352,116 @@ class ServerController extends Controller
             return response()->json([
                 'message' => 'Error deleting server: ' . $e->getMessage()
             ], 400);
+        }
+    }
+
+    /**
+     * Настроить DNS (Cloudflare) для ручного сервера. Только для provider=manual и статуса «Создан».
+     *
+     * @param Server $server
+     * @return JsonResponse
+     */
+    public function setupDns(Server $server): JsonResponse
+    {
+        if (strtolower((string)$server->provider) !== Server::MANUAL) {
+            return response()->json(['success' => false, 'message' => 'Только для серверов, добавленных вручную'], 400);
+        }
+        if ((int)$server->server_status !== (int)Server::SERVER_CREATED) {
+            return response()->json(['success' => false, 'message' => 'DNS настраивается только для серверов со статусом «Создан»'], 400);
+        }
+        if (empty($server->ip)) {
+            return response()->json(['success' => false, 'message' => 'Укажите IP сервера'], 400);
+        }
+
+        try {
+            $baseName = preg_replace('/[^a-z0-9\-]/i', '-', strtolower(trim($server->name ?? '')));
+            $baseName = trim($baseName, '-');
+            if ($baseName === '') {
+                $baseName = 'server' . $server->id;
+            }
+            $locationCode = $server->location ? strtolower($server->location->code ?? '') : '';
+            if ($locationCode !== '') {
+                $baseName .= '-' . $locationCode;
+            }
+            $cloudflare = new CloudflareService();
+            $host = $cloudflare->createSubdomain($baseName, $server->ip);
+
+            $server->host = $host->name;
+            $server->dns_record_id = $host->id;
+            $server->save();
+
+            $this->logger->info('DNS configured for manual server', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'server_id' => $server->id,
+                'host' => $server->host,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'DNS запись создана: ' . $server->host,
+                'host' => $server->host,
+            ]);
+        } catch (Exception $e) {
+            $this->logger->error('DNS setup failed for manual server', [
+                'source' => 'server',
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Ошибка настройки DNS: ' . $e->getMessage(),
+            ], 400);
+        }
+    }
+
+    /**
+     * Пинг ручного сервера (TCP порт 22). При успехе — статус «Настроен».
+     *
+     * @param Server $server
+     * @return JsonResponse
+     */
+    public function pingAndConfigure(Server $server): JsonResponse
+    {
+        if (strtolower((string)$server->provider) !== Server::MANUAL) {
+            return response()->json(['success' => false, 'message' => 'Только для серверов, добавленных вручную'], 400);
+        }
+        if ((int)$server->server_status !== (int)Server::SERVER_CREATED) {
+            return response()->json(['success' => false, 'message' => 'Сервер уже настроен или удалён'], 400);
+        }
+
+        try {
+            $strategy = new ServerStrategy($server->provider);
+            $ok = $strategy->ping($server);
+            if (!$ok) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Сервер недоступен (порт 22). Проверьте хост/IP и фаервол.',
+                ], 400);
+            }
+            $server->server_status = Server::SERVER_CONFIGURED;
+            $server->save();
+
+            $this->logger->info('Manual server marked as configured after ping', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'server_id' => $server->id,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Сервер доступен, статус установлен: Настроен',
+            ]);
+        } catch (Exception $e) {
+            $this->logger->error('Ping/configure failed for manual server', [
+                'source' => 'server',
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ], 500);
         }
     }
 

@@ -11,31 +11,23 @@
     <div class="space-y-6">
         <x-admin.card title="Список серверов">
             <x-slot name="tools">
-                <div class="flex items-center space-x-3">
-                    @php
-                        $currentParams = request()->except(['page', 'show_deleted']);
-                        $showDeletedParam = isset($showDeleted) && $showDeleted;
-                    @endphp
-                    @if($showDeletedParam)
-                        <a href="{{ route('admin.module.server.index', $currentParams) }}" 
-                           class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                            <i class="fas fa-eye-slash mr-2"></i>
-                            Скрыть удаленные
-                        </a>
-                    @else
-                        <a href="{{ route('admin.module.server.index', array_merge($currentParams, ['show_deleted' => 1])) }}" 
-                           class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                            <i class="fas fa-eye mr-2"></i>
-                            Показать скрытые
-                        </a>
-                    @endif
-                    <button type="button" 
-                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                            onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createServerModal' } }))">
-                        <i class="fas fa-plus mr-2"></i>
-                        Добавить сервер
-                    </button>
-                </div>
+                @php
+                    $currentParams = request()->except(['page', 'show_deleted']);
+                    $showDeletedParam = isset($showDeleted) && $showDeleted;
+                @endphp
+                @if($showDeletedParam)
+                    <a href="{{ route('admin.module.server.index', $currentParams) }}" 
+                       class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        <i class="fas fa-eye-slash mr-2"></i>
+                        Скрыть удаленные
+                    </a>
+                @else
+                    <a href="{{ route('admin.module.server.index', array_merge($currentParams, ['show_deleted' => 1])) }}" 
+                       class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        <i class="fas fa-eye mr-2"></i>
+                        Показать скрытые
+                    </a>
+                @endif
             </x-slot>
 
             <!-- Filters -->
@@ -71,15 +63,38 @@
                     title="Серверы не найдены"
                     description="Попробуйте изменить параметры фильтрации или создать новый сервер">
                     <x-slot name="action">
-                        <button type="button" 
-                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                                onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createServerModal' } }))">
-                            <i class="fas fa-plus mr-2"></i>
-                            Добавить сервер
-                        </button>
+                        <div class="flex flex-wrap gap-2 justify-center">
+                            <button type="button" 
+                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                    onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createServerModal' } }))">
+                                <i class="fas fa-plus mr-2"></i>
+                                Добавить сервер (API)
+                            </button>
+                            <button type="button" 
+                                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                    onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createManualServerModal' } }))">
+                                <i class="fas fa-server mr-2"></i>
+                                Добавить вручную (без API)
+                            </button>
+                        </div>
                     </x-slot>
                 </x-admin.empty-state>
             @else
+                <div class="flex flex-wrap items-center gap-2 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <span class="text-sm text-gray-600 font-medium">Действия:</span>
+                    <button type="button" 
+                            class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createServerModal' } }))">
+                        <i class="fas fa-plus mr-2"></i>
+                        Добавить сервер (API)
+                    </button>
+                    <button type="button" 
+                            class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createManualServerModal' } }))">
+                        <i class="fas fa-server mr-2"></i>
+                        Добавить вручную (без API)
+                    </button>
+                </div>
                 <!-- Cards Grid -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     @foreach($servers as $server)
@@ -120,7 +135,7 @@
                                 <div class="flex items-center justify-between">
                                     <span class="text-sm font-medium text-gray-700">Провайдер:</span>
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                        {{ $server->provider === Server::VDSINA ? 'VDSina' : ($server->provider === Server::TIMEWEB ? 'Timeweb Cloud' : $server->provider) }}
+                                        {{ $server->provider === Server::VDSINA ? 'VDSina' : ($server->provider === Server::TIMEWEB ? 'Timeweb Cloud' : ($server->provider === Server::MANUAL ? 'Без API' : $server->provider)) }}
                                     </span>
                                 </div>
 
@@ -203,6 +218,23 @@
                             <!-- Card Footer -->
                             @if($server->server_status !== Server::SERVER_DELETED)
                                 <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg">
+                                    @if(strtolower((string)$server->provider) === 'manual' && (int)$server->server_status === (int)Server::SERVER_CREATED)
+                                        <div class="flex flex-col gap-2 mb-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                                            <p class="text-sm text-amber-800 font-medium">Настройте DNS и проверьте доступность:</p>
+                                            <div class="flex flex-wrap gap-2">
+                                                <button type="button" onclick="setupDnsManual({{ $server->id }})"
+                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300 transition-colors">
+                                                    <i class="fas fa-globe mr-2"></i>
+                                                    <span>Настроить DNS</span>
+                                                </button>
+                                                <button type="button" onclick="pingAndConfigureManual({{ $server->id }})"
+                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-green-800 bg-green-100 hover:bg-green-200 border border-green-300 transition-colors">
+                                                    <i class="fas fa-network-wired mr-2"></i>
+                                                    <span>Пинг и отметить настроенным</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    @endif
                                     <div class="grid grid-cols-2 gap-4">
                                         <!-- Left Side: Navigation Actions -->
                                         <div class="flex flex-col gap-2">
@@ -295,6 +327,50 @@
         </x-slot>
     </x-admin.modal>
 
+    <!-- Modal: Add manual server (no API) -->
+    <x-admin.modal id="createManualServerModal" title="Добавить сервер вручную (провайдер без API)">
+        <form id="createManualServerForm">
+            @csrf
+            <div class="mb-4">
+                <label for="manualServerLocation" class="block text-sm font-medium text-gray-700 mb-1">Локация <span class="text-red-500">*</span></label>
+                <select id="manualServerLocation" name="location_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" required>
+                    <option value="">Выберите локацию...</option>
+                    @foreach($locations as $location)
+                        <option value="{{ $location->id }}">{{ $location->code }} {{ $location->emoji }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="mb-4">
+                <label for="manualServerName" class="block text-sm font-medium text-gray-700 mb-1">Название <span class="text-red-500">*</span></label>
+                <input type="text" id="manualServerName" name="name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" placeholder="Например: VPS Finland" required>
+            </div>
+            <div class="mb-4">
+                <label for="manualServerIp" class="block text-sm font-medium text-gray-700 mb-1">IP-адрес <span class="text-red-500">*</span></label>
+                <input type="text" id="manualServerIp" name="ip" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" placeholder="1.2.3.4" required>
+            </div>
+            <div class="mb-4">
+                <label for="manualServerHost" class="block text-sm font-medium text-gray-700 mb-1">Хост (опционально)</label>
+                <input type="text" id="manualServerHost" name="host" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" placeholder="host.example.com или оставьте пустым">
+            </div>
+            <div class="mb-4">
+                <label for="manualServerLogin" class="block text-sm font-medium text-gray-700 mb-1">Логин (опционально)</label>
+                <input type="text" id="manualServerLogin" name="login" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" placeholder="root">
+            </div>
+            <div class="mb-4">
+                <label for="manualServerPassword" class="block text-sm font-medium text-gray-700 mb-1">Пароль (опционально)</label>
+                <input type="password" id="manualServerPassword" name="password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" placeholder="Пароль доступа к серверу">
+            </div>
+        </form>
+        <x-slot name="footer">
+            <button type="button" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" id="createManualServerBtn">
+                Добавить сервер
+            </button>
+            <button type="button" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" onclick="window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'createManualServerModal' } }))">
+                Отмена
+            </button>
+        </x-slot>
+    </x-admin.modal>
+
     @push('js')
         <script>
             // Функция копирования в буфер обмена
@@ -324,6 +400,54 @@
                         });
                     }
                     document.body.removeChild(textArea);
+                });
+            }
+
+            // Настроить DNS для ручного сервера (Cloudflare)
+            function setupDnsManual(id) {
+                $.ajax({
+                    url: '{{ route('admin.module.server.setup-dns', ['server' => ':id']) }}'.replace(':id', id),
+                    method: 'POST',
+                    data: { _token: '{{ csrf_token() }}' },
+                    beforeSend: function () {
+                        toastr.info('Создание DNS-записи...', '', { timeOut: 2000 });
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            toastr.success(response.message || 'DNS настроен');
+                            setTimeout(function () { window.location.reload(); }, 1500);
+                        } else {
+                            toastr.error(response.message || 'Ошибка настройки DNS');
+                        }
+                    },
+                    error: function (xhr) {
+                        var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Ошибка настройки DNS';
+                        toastr.error(msg);
+                    }
+                });
+            }
+
+            // Пинг и переход в статус «Настроен» для ручного сервера
+            function pingAndConfigureManual(id) {
+                $.ajax({
+                    url: '{{ route('admin.module.server.ping-and-configure', ['server' => ':id']) }}'.replace(':id', id),
+                    method: 'POST',
+                    data: { _token: '{{ csrf_token() }}' },
+                    beforeSend: function () {
+                        toastr.info('Проверка доступности (порт 22)...', '', { timeOut: 2000 });
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            toastr.success(response.message || 'Сервер отмечен как настроенный');
+                            setTimeout(function () { window.location.reload(); }, 1500);
+                        } else {
+                            toastr.error(response.message || 'Сервер недоступен');
+                        }
+                    },
+                    error: function (xhr) {
+                        var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Сервер недоступен или ошибка запроса';
+                        toastr.error(msg);
+                    }
                 });
             }
 
@@ -414,6 +538,64 @@
                         },
                         complete: function () {
                             // Возвращаем кнопку в исходное состояние
+                            btn.prop('disabled', false);
+                            btn.html(originalHtml);
+                        }
+                    });
+                });
+
+                // Добавить сервер вручную (без API)
+                $('#createManualServerBtn').on('click', function () {
+                    const btn = $(this);
+                    const location_id = $('#manualServerLocation').val();
+                    const name = $('#manualServerName').val().trim();
+                    const ip = $('#manualServerIp').val().trim();
+                    const host = $('#manualServerHost').val().trim();
+                    const login = $('#manualServerLogin').val().trim();
+                    const password = $('#manualServerPassword').val();
+
+                    if (!location_id || !name || !ip) {
+                        toastr.error('Заполните обязательные поля: Локация, Название, IP-адрес');
+                        return;
+                    }
+
+                    btn.prop('disabled', true);
+                    const originalHtml = btn.html();
+                    btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Добавление...');
+
+                    $.ajax({
+                        url: '{{ route('admin.module.server.store-manual') }}',
+                        method: 'POST',
+                        data: {
+                            _token: '{{ csrf_token() }}',
+                            location_id: location_id,
+                            name: name,
+                            ip: ip,
+                            host: host || null,
+                            login: login || null,
+                            password: password || null
+                        },
+                        success: function (response) {
+                            if (response.success) {
+                                toastr.success('Сервер добавлен');
+                                window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'createManualServerModal' } }));
+                                setTimeout(function () { window.location.reload(); }, 1000);
+                            } else {
+                                toastr.error(response.message || 'Ошибка при добавлении сервера');
+                            }
+                        },
+                        error: function (xhr) {
+                            let errorMessage = 'Ошибка при добавлении сервера';
+                            if (xhr.responseJSON) {
+                                if (xhr.responseJSON.errors) {
+                                    errorMessage = Object.values(xhr.responseJSON.errors).flat().join(' ');
+                                } else {
+                                    errorMessage = xhr.responseJSON.message || errorMessage;
+                                }
+                            }
+                            toastr.error(errorMessage);
+                        },
+                        complete: function () {
                             btn.prop('disabled', false);
                             btn.html(originalHtml);
                         }

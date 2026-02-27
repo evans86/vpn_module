@@ -127,6 +127,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::get('/', [ServerController::class, 'index'])->name('index');
                 Route::get('/{server}', [ServerController::class, 'show'])->name('show');
                 Route::post('/', [ServerController::class, 'store'])->name('store');
+                Route::post('/store-manual', [ServerController::class, 'storeManual'])->name('store-manual');
+                Route::post('/{server}/setup-dns', [ServerController::class, 'setupDns'])->name('setup-dns');
+                Route::post('/{server}/ping-and-configure', [ServerController::class, 'pingAndConfigure'])->name('ping-and-configure');
                 Route::put('/{server}', [ServerController::class, 'update'])->name('update');
                 Route::delete('/{server}', [ServerController::class, 'destroy'])->name('destroy');
                 Route::post('/{server}/toggle-status', [ServerController::class, 'toggleStatus'])->name('toggle-status');
