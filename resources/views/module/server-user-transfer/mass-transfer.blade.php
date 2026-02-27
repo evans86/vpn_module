@@ -106,60 +106,6 @@
             </div>
         </x-admin.card>
 
-        <x-admin.card title="Выравнивание нагрузки по панелям">
-            <p class="text-sm text-gray-600 mb-4">
-                Перенос ключей с самых загруженных панелей на наименее загруженные (тот же принцип, что и выше). Ссылка на конфиг не меняется — пользователю достаточно обновить подписку.
-            </p>
-            <div class="flex items-center gap-4 mb-4 flex-wrap">
-                <button type="button" id="btn-refresh-balance-stats" class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                    <i class="fas fa-sync-alt mr-1.5"></i> Обновить статистику
-                </button>
-                <label class="inline-flex items-center gap-2 text-sm text-gray-600">
-                    <span>Порция за шаг:</span>
-                    <input type="number" id="balance-batch-size" value="50" min="10" max="150" class="rounded border-gray-300 w-20 text-sm">
-                </label>
-                <label class="inline-flex items-center gap-2 text-sm text-gray-600">
-                    <span>Считать выровненным при разнице ≤</span>
-                    <input type="number" id="balance-threshold" value="100" min="0" max="2000" class="rounded border-gray-300 w-20 text-sm">
-                </label>
-            </div>
-            <div id="balance-summary" class="mb-4 p-3 bg-gray-50 rounded-lg text-sm hidden">
-                <p><strong>Всего пользователей:</strong> <span id="stats-total">—</span></p>
-                <p><strong>Среднее на панель:</strong> <span id="stats-average">—</span></p>
-                <p><strong>Разница (макс − мин):</strong> <span id="stats-diff">—</span></p>
-            </div>
-            <div class="overflow-x-auto border border-gray-200 rounded-md mb-4">
-                <table class="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Панель</th>
-                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Сервер</th>
-                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Активных пользователей</th>
-                        </tr>
-                    </thead>
-                    <tbody id="balance-table-body" class="bg-white divide-y divide-gray-200">
-                        <tr><td colspan="3" class="px-3 py-4 text-gray-500 text-center">Нажмите «Обновить статистику»</td></tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="flex items-center gap-4 flex-wrap">
-                <button type="button" id="btn-balance" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
-                    <i class="fas fa-balance-scale mr-2"></i> Выровнять нагрузку
-                </button>
-                <button type="button" id="btn-balance-stop" class="hidden inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md shadow-sm text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                    <i class="fas fa-stop mr-2"></i> Остановить
-                </button>
-            </div>
-            <div id="balance-progress" class="mt-6 p-4 rounded-lg border border-blue-200 bg-blue-50 hidden" aria-live="polite">
-                <h4 class="font-medium text-gray-900 mb-2">Прогресс</h4>
-                <p id="balance-progress-text" class="text-sm text-gray-700"></p>
-            </div>
-            <div id="balance-result" class="mt-6 p-4 rounded-lg border hidden" aria-live="polite">
-                <h4 class="font-medium text-gray-900 mb-2">Результат</h4>
-                <p id="balance-result-message" class="text-sm"></p>
-            </div>
-        </x-admin.card>
-
         <x-admin.card title="Миграция на мульти-провайдер">
             <p class="text-sm text-gray-600 mb-4">
                 Добавление недостающих провайдер-слотов к уже активным ключам. У каждого ключа будет по одному слоту на каждый провайдер из настройки (например VDSINA и Timeweb); подписка объединит конфиги — при падении одного сервера пользователь сможет переключиться на другой. Сначала обязательно запустите «Только проверка» или «Тест (2 ключа)». Полная миграция обрабатывает ключи порциями (не все сразу); можно запустить в фоне через очередь и наблюдать за прогрессом.
@@ -217,27 +163,6 @@
                 </label>
             </div>
             <p class="text-sm text-gray-500 mb-3">Обработка идёт порциями (по «Порция за шаг» ключей за один шаг). Либо в этой вкладке — запросы по очереди, вкладку не закрывать; либо в фоне — через очередь, можно закрыть страницу и смотреть прогресс при следующем заходе. <strong>При ошибке 524 (таймаут)</strong> уменьшите порцию до 10–20 или используйте «Запустить в фоне».</p>
-            <div class="mb-4 p-4 rounded-lg border border-indigo-200 bg-indigo-50">
-                <h4 class="font-medium text-gray-900 mb-2">Параллельный запуск</h4>
-                <p class="text-sm text-gray-600 mb-3">Несколько воркеров обрабатывают разные срезы ключей одновременно — миграция идёт быстрее. Нужно несколько процессов <code class="text-xs bg-white px-1 rounded">queue:work</code> (или один воркер с несколькими потоками).</p>
-                <div class="flex items-center gap-4 flex-wrap mb-3">
-                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                        <span>Количество воркеров:</span>
-                        <input type="number" id="multi-provider-num-workers" value="10" min="2" max="20" class="rounded border-gray-300 w-20 text-sm">
-                    </label>
-                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                        <span>Порция за шаг (параллель):</span>
-                        <input type="number" id="multi-provider-parallel-batch-size" value="500" min="50" max="500" class="rounded border-gray-300 w-20 text-sm">
-                    </label>
-                    <label class="inline-flex items-center gap-2 text-sm text-gray-600">
-                        <input type="checkbox" id="multi-provider-parallel-dry-run" class="rounded border-gray-300">
-                        <span>Только проверка (dry-run)</span>
-                    </label>
-                </div>
-                <button type="button" id="btn-multi-provider-run-parallel" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed" title="Запуск N воркеров в очереди: нужны queue:work (несколько воркеров или один с --tries и параллельными процессами)">
-                    <i class="fas fa-bolt mr-2"></i> Запустить параллельно в фоне
-                </button>
-            </div>
             <div class="flex items-center gap-4 flex-wrap">
                 <button type="button" id="btn-multi-provider-run-background" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed" title="Запуск в очереди: нужны QUEUE_CONNECTION=database и php artisan queue:work">
                     <i class="fas fa-cloud-upload-alt mr-2"></i> Запустить в фоне (очередь)
@@ -462,158 +387,11 @@
         });
 
         (function () {
-            var balancePanels = @json($panels->keyBy('id'));
-            var balanceStatsUrl = '{{ route('admin.module.server-user-transfer.balance.stats') }}';
-            var balanceStepUrl = '{{ route('admin.module.server-user-transfer.balance.step') }}';
-            var balanceCsrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content') || (document.querySelector('input[name="_token"]') && document.querySelector('input[name="_token"]').value);
-
-            function balanceRenderTable(counts) {
-                var tbody = document.getElementById('balance-table-body');
-                if (!counts || Object.keys(counts).length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-4 text-gray-500 text-center">Нет данных</td></tr>';
-                    return;
-                }
-                var rows = [];
-                Object.keys(counts).sort(function (a, b) { return parseInt(a, 10) - parseInt(b, 10); }).forEach(function (panelId) {
-                    var p = balancePanels[panelId];
-                    var name = p && p.server ? p.server.name : '—';
-                    rows.push('<tr><td class="px-3 py-2">Панель #' + panelId + '</td><td class="px-3 py-2">' + name + '</td><td class="px-3 py-2 text-right font-medium">' + counts[panelId] + '</td></tr>');
-                });
-                tbody.innerHTML = rows.join('');
-            }
-
-            function balanceUpdateSummary(data) {
-                document.getElementById('stats-total').textContent = data.total != null ? data.total : '—';
-                document.getElementById('stats-average').textContent = data.average != null ? data.average : '—';
-                document.getElementById('stats-diff').textContent = data.diff != null ? data.diff : '—';
-                document.getElementById('balance-summary').classList.remove('hidden');
-            }
-
-            function loadBalanceStats() {
-                var tbody = document.getElementById('balance-table-body');
-                tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-4 text-gray-500 text-center">Загрузка…</td></tr>';
-                fetch(balanceStatsUrl, {
-                    method: 'POST',
-                    headers: { 'X-CSRF-TOKEN': balanceCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
-                    body: JSON.stringify({}),
-                })
-                    .then(function (r) { return r.json(); })
-                    .then(function (data) {
-                        if (data.success && data.counts) {
-                            balanceRenderTable(data.counts);
-                            balanceUpdateSummary(data);
-                        } else {
-                            tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-4 text-red-500 text-center">Ошибка загрузки</td></tr>';
-                        }
-                    })
-                    .catch(function () {
-                        tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-4 text-red-500 text-center">Ошибка сети</td></tr>';
-                    });
-            }
-
-            document.getElementById('btn-refresh-balance-stats').addEventListener('click', loadBalanceStats);
-
-            var balanceAborted = false;
-            var btnBalanceStop = document.getElementById('btn-balance-stop');
-
-            document.getElementById('btn-balance').addEventListener('click', function () {
-                var btn = this;
-                var progressBlock = document.getElementById('balance-progress');
-                var progressText = document.getElementById('balance-progress-text');
-                var resultBlock = document.getElementById('balance-result');
-                var resultMessage = document.getElementById('balance-result-message');
-                var batchSize = parseInt(document.getElementById('balance-batch-size').value, 10) || 50;
-                var threshold = parseInt(document.getElementById('balance-threshold').value, 10) || 100;
-                balanceAborted = false;
-                btn.disabled = true;
-                if (btnBalanceStop) btnBalanceStop.classList.remove('hidden');
-                resultBlock.classList.add('hidden');
-                progressBlock.classList.remove('hidden');
-                progressText.textContent = 'Запуск выравнивания…';
-                var totalMoved = 0;
-
-                function runBalanceStep() {
-                    if (balanceAborted) return;
-                    fetch(balanceStepUrl, {
-                        method: 'POST',
-                        headers: { 'X-CSRF-TOKEN': balanceCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ batch_size: batchSize, max_diff_threshold: threshold }),
-                    })
-                        .then(function (r) { return r.json(); })
-                        .then(function (data) {
-                            if (balanceAborted) return;
-                            if (!data.success) {
-                                progressBlock.classList.add('hidden');
-                                resultBlock.classList.remove('hidden');
-                                resultBlock.classList.add('border-red-200', 'bg-red-50');
-                                resultMessage.textContent = data.message || 'Ошибка';
-                                btn.disabled = false;
-                                if (btnBalanceStop) btnBalanceStop.classList.add('hidden');
-                                if (typeof toastr !== 'undefined') toastr.error(data.message);
-                                return;
-                            }
-                            totalMoved += data.moved || 0;
-                            if (data.counts) {
-                                balanceRenderTable(data.counts);
-                                balanceUpdateSummary({
-                                    total: Object.values(data.counts).reduce(function (a, b) { return a + b; }, 0),
-                                    average: data.counts && Object.keys(data.counts).length ? Math.round(Object.values(data.counts).reduce(function (a, b) { return a + b; }, 0) / Object.keys(data.counts).length) : 0,
-                                    diff: data.counts && Object.keys(data.counts).length ? Math.max.apply(null, Object.values(data.counts)) - Math.min.apply(null, Object.values(data.counts)) : 0,
-                                });
-                            }
-                            progressText.textContent = (data.message || '') + ' Всего перенесено: ' + totalMoved;
-                            if (data.done) {
-                                progressBlock.classList.add('hidden');
-                                resultBlock.classList.remove('hidden');
-                                resultBlock.classList.remove('border-red-200', 'bg-red-50');
-                                resultBlock.classList.add('border-green-200', 'bg-green-50');
-                                resultMessage.textContent = 'Выравнивание завершено. Всего перенесено ключей: ' + totalMoved + '.';
-                                btn.disabled = false;
-                                if (btnBalanceStop) btnBalanceStop.classList.add('hidden');
-                                if (typeof toastr !== 'undefined') toastr.success('Выравнивание завершено.');
-                                loadBalanceStats();
-                                return;
-                            }
-                            if (balanceAborted) {
-                                progressBlock.classList.add('hidden');
-                                resultBlock.classList.remove('hidden');
-                                resultBlock.classList.remove('border-red-200', 'bg-red-50');
-                                resultBlock.classList.add('border-amber-200', 'bg-amber-50');
-                                resultMessage.textContent = 'Остановлено пользователем. Перенесено ключей: ' + totalMoved + '.';
-                                btn.disabled = false;
-                                if (btnBalanceStop) btnBalanceStop.classList.add('hidden');
-                                if (typeof toastr !== 'undefined') toastr.info('Выравнивание остановлено.');
-                                return;
-                            }
-                            runBalanceStep();
-                        })
-                        .catch(function (err) {
-                            if (balanceAborted) return;
-                            progressBlock.classList.add('hidden');
-                            resultBlock.classList.remove('hidden');
-                            resultBlock.classList.add('border-red-200', 'bg-red-50');
-                            resultMessage.textContent = 'Ошибка запроса: ' + (err.message || 'неизвестная ошибка');
-                            btn.disabled = false;
-                            if (btnBalanceStop) btnBalanceStop.classList.add('hidden');
-                            if (typeof toastr !== 'undefined') toastr.error('Ошибка запроса');
-                        });
-                }
-
-                btnBalanceStop && btnBalanceStop.addEventListener('click', function () {
-                    balanceAborted = true;
-                }, { once: true });
-
-                runBalanceStep();
-            });
-        })();
-
-        (function () {
             var multiProviderCountUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.count') }}';
             var multiProviderCheckKeyUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.check-key') }}';
             var multiProviderSingleKeyUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.single-key') }}';
             var multiProviderBatchUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.run-batch') }}';
             var multiProviderStartUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.start') }}';
-            var multiProviderStartParallelUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.start-parallel') }}';
             var multiProviderCancelUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.cancel') }}';
             var multiProviderStatusUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.status') }}';
             var multiProviderCsrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content') || (document.querySelector('input[name="_token"]') && document.querySelector('input[name="_token"]').value);
@@ -752,9 +530,6 @@
             document.getElementById('btn-multi-provider-run-background').addEventListener('click', function () {
                 runMultiProviderMigrationBackground();
             });
-            document.getElementById('btn-multi-provider-run-parallel').addEventListener('click', function () {
-                runMultiProviderMigrationParallel();
-            });
             document.getElementById('btn-multi-provider-test').addEventListener('click', function () {
                 runMultiProviderMigration(false, 2);
             });
@@ -795,8 +570,6 @@
                         var btnBg = document.getElementById('btn-multi-provider-run-background');
                         var btnRun = document.getElementById('btn-multi-provider-run');
                         var btnTest = document.getElementById('btn-multi-provider-test');
-                        var btnParallel = document.getElementById('btn-multi-provider-run-parallel');
-
                         if (s.done) {
                             multiProviderHideCancelButton();
                             resultBlock.classList.remove('hidden');
@@ -826,7 +599,6 @@
                             if (btnBg) btnBg.disabled = false;
                             if (btnRun) btnRun.disabled = false;
                             if (btnTest) btnTest.disabled = false;
-                            if (btnParallel) btnParallel.disabled = false;
                             return;
                         }
 
@@ -840,7 +612,6 @@
                         if (!isStale) {
                             if (btnRun) btnRun.disabled = true;
                             if (btnTest) btnTest.disabled = true;
-                            if (btnParallel) btnParallel.disabled = true;
                             if (btnBg) btnBg.disabled = false;
                         }
                         var pct = total > 0 ? (processed / total) * 100 : 0;
@@ -891,7 +662,6 @@
                                         if (btnBg) btnBg.disabled = false;
                                         if (btnRun) btnRun.disabled = false;
                                         if (btnTest) btnTest.disabled = false;
-                                        if (btnParallel) btnParallel.disabled = false;
                                         if (typeof toastr !== 'undefined') toastr.success(s.cancelled ? 'Миграция отменена.' : 'Миграция завершена.');
                                         return;
                                     }
@@ -922,11 +692,9 @@
                 var batchSize = parseInt(document.getElementById('multi-provider-batch-size').value, 10) || 50;
                 var isDryRun = document.getElementById('multi-provider-dry-run') && document.getElementById('multi-provider-dry-run').checked;
 
-                var btnParallel = document.getElementById('btn-multi-provider-run-parallel');
                 btnBg.disabled = true;
                 btnRun.disabled = true;
                 if (btnTest) btnTest.disabled = true;
-                if (btnParallel) btnParallel.disabled = true;
                 resultBlock.classList.add('hidden');
                 progressBlock.classList.remove('hidden');
                 progressBar.style.width = '0%';
@@ -941,7 +709,6 @@
                             btnBg.disabled = false;
                             btnRun.disabled = false;
                             if (btnTest) btnTest.disabled = false;
-                            if (btnParallel) btnParallel.disabled = false;
                             return Promise.reject(new Error('cancelled'));
                         }
                         progressText.textContent = 'Постановка в очередь…';
@@ -961,7 +728,6 @@
                             btnBg.disabled = false;
                             btnRun.disabled = false;
                             if (btnTest) btnTest.disabled = false;
-                            if (btnParallel) btnParallel.disabled = false;
                             return;
                         }
                         var runId = data.run_id;
@@ -1023,7 +789,6 @@
                                         btnBg.disabled = false;
                                         btnRun.disabled = false;
                                         if (btnTest) btnTest.disabled = false;
-                                        if (btnParallel) btnParallel.disabled = false;
                                         return;
                                     }
                                     setTimeout(poll, 2500);
@@ -1046,137 +811,6 @@
                         btnBg.disabled = false;
                         btnRun.disabled = false;
                         if (btnTest) btnTest.disabled = false;
-                        if (btnParallel) btnParallel.disabled = false;
-                    });
-            }
-
-            function runMultiProviderMigrationParallel() {
-                var btnBg = document.getElementById('btn-multi-provider-run-background');
-                var btnRun = document.getElementById('btn-multi-provider-run');
-                var btnTest = document.getElementById('btn-multi-provider-test');
-                var btnParallel = document.getElementById('btn-multi-provider-run-parallel');
-                var progressBlock = document.getElementById('multi-provider-progress');
-                var progressBar = document.getElementById('multi-provider-progress-bar');
-                var progressText = document.getElementById('multi-provider-progress-text');
-                var resultBlock = document.getElementById('multi-provider-result');
-                var resultMessage = document.getElementById('multi-provider-result-message');
-                var resultErrors = document.getElementById('multi-provider-result-errors');
-                var numWorkers = parseInt(document.getElementById('multi-provider-num-workers').value, 10) || 10;
-                numWorkers = Math.min(20, Math.max(2, numWorkers));
-                var batchSize = parseInt(document.getElementById('multi-provider-parallel-batch-size').value, 10) || 500;
-                batchSize = Math.min(500, Math.max(50, batchSize));
-                var isDryRun = document.getElementById('multi-provider-parallel-dry-run') && document.getElementById('multi-provider-parallel-dry-run').checked;
-
-                btnBg.disabled = true;
-                btnRun.disabled = true;
-                if (btnTest) btnTest.disabled = true;
-                if (btnParallel) btnParallel.disabled = true;
-                resultBlock.classList.add('hidden');
-                progressBlock.classList.remove('hidden');
-                progressBar.style.width = '0%';
-                progressText.textContent = 'Проверка количества…';
-
-                fetch(multiProviderCountUrl, { method: 'POST', headers: { 'X-CSRF-TOKEN': multiProviderCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: '{}' })
-                    .then(function (r) { return r.json(); })
-                    .then(function (countData) {
-                        var totalCount = (countData && countData.count != null) ? parseInt(countData.count, 10) : 0;
-                        if (!multiProviderConfirmLargeRun(totalCount, isDryRun, 'Запустить параллельную миграцию в фоне?')) {
-                            progressBlock.classList.add('hidden');
-                            btnBg.disabled = false;
-                            btnRun.disabled = false;
-                            if (btnTest) btnTest.disabled = false;
-                            if (btnParallel) btnParallel.disabled = false;
-                            return Promise.reject(new Error('cancelled'));
-                        }
-                        progressText.textContent = 'Постановка параллельных воркеров в очередь…';
-                        return fetch(multiProviderStartParallelUrl, {
-                            method: 'POST',
-                            headers: { 'X-CSRF-TOKEN': multiProviderCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ num_workers: numWorkers, batch_size: batchSize, dry_run: isDryRun }),
-                        }).then(function (r) { return r.json(); });
-                    })
-                    .then(function (data) {
-                        if (!data || !data.success || !data.run_id) {
-                            progressBlock.classList.add('hidden');
-                            resultBlock.classList.remove('hidden');
-                            resultBlock.classList.add('border-red-200', 'bg-red-50');
-                            resultMessage.textContent = (data && data.message) || 'Не удалось запустить. Проверьте очередь и queue:work.';
-                            if (typeof toastr !== 'undefined') toastr.error(data && data.message);
-                            btnBg.disabled = false;
-                            btnRun.disabled = false;
-                            if (btnTest) btnTest.disabled = false;
-                            if (btnParallel) btnParallel.disabled = false;
-                            return;
-                        }
-                        var runId = data.run_id;
-                        multiProviderShowCancelButton(runId);
-                        progressText.textContent = data.message && data.message.indexOf('уже запущена') !== -1 ? data.message : 'Параллельная миграция в фоне. Обновление прогресса…';
-
-                        function poll() {
-                            fetch(multiProviderStatusUrl + '?run_id=' + encodeURIComponent(runId), { method: 'GET', headers: { 'Accept': 'application/json' } })
-                                .then(function (r) { return r.json(); })
-                                .then(function (s) {
-                                    if (!s.found) {
-                                        progressText.textContent = 'Сессия не найдена.';
-                                        return;
-                                    }
-                                    var total = s.total || 0;
-                                    var processed = s.processed || 0;
-                                    var added = s.added_total || 0;
-                                    var pct = total > 0 ? (processed / total) * 100 : 0;
-                                    if (pct > 0 && pct < 1) pct = 1;
-                                    if (pct > 100) pct = 100;
-                                    progressBar.style.width = Math.round(pct) + '%';
-                                    progressText.textContent = 'Обработано: ' + processed + ' из ' + total + ', добавлено слотов: ' + added + '.';
-                                    if (s.done) {
-                                        multiProviderHideCancelButton();
-                                        progressBlock.classList.add('hidden');
-                                        resultBlock.classList.remove('hidden');
-                                        resultBlock.classList.remove('border-red-200', 'bg-red-50');
-                                        if (s.cancelled) {
-                                            resultBlock.classList.add('border-amber-200', 'bg-amber-50');
-                                            resultMessage.textContent = 'Миграция отменена. Обработано ключей: ' + processed + ', добавлено слотов: ' + added + (s.errors && s.errors.length ? ', ошибок: ' + s.errors.length : '') + '.';
-                                        } else {
-                                            resultBlock.classList.add('border-green-200', 'bg-green-50');
-                                            resultMessage.textContent = (isDryRun ? 'Проверка завершена. ' : 'Параллельная миграция завершена. ') + 'Обработано ключей: ' + processed + ', добавлено слотов: ' + added + (s.errors && s.errors.length ? ', ошибок: ' + s.errors.length : '') + '.';
-                                        }
-                                        if (s.errors && s.errors.length > 0) {
-                                            resultErrors.classList.remove('hidden');
-                                            resultErrors.innerHTML = '<ul class="list-disc pl-5">' + s.errors.slice(0, 30).map(function (e) {
-                                                return '<li>' + (e.key_id || '') + ': ' + (e.message || '') + '</li>';
-                                            }).join('') + (s.errors.length > 30 ? '<li class="text-gray-500">… и ещё ' + (s.errors.length - 30) + ' ошибок</li>' : '') + '</ul>';
-                                        } else {
-                                            resultErrors.classList.add('hidden');
-                                            resultErrors.innerHTML = '';
-                                        }
-                                        if (typeof toastr !== 'undefined') toastr.success(s.cancelled ? 'Миграция отменена.' : (isDryRun ? 'Проверка завершена.' : 'Миграция завершена.'));
-                                        btnBg.disabled = false;
-                                        btnRun.disabled = false;
-                                        if (btnTest) btnTest.disabled = false;
-                                        if (btnParallel) btnParallel.disabled = false;
-                                        return;
-                                    }
-                                    setTimeout(poll, 2500);
-                                })
-                                .catch(function () {
-                                    progressText.textContent = 'Ошибка запроса статуса. Повтор через 5 сек…';
-                                    setTimeout(poll, 5000);
-                                });
-                        }
-                        setTimeout(poll, 1500);
-                    })
-                    .catch(function (err) {
-                        if (err && err.message === 'cancelled') return;
-                        multiProviderHideCancelButton();
-                        progressBlock.classList.add('hidden');
-                        resultBlock.classList.remove('hidden');
-                        resultBlock.classList.add('border-red-200', 'bg-red-50');
-                        resultMessage.textContent = 'Ошибка запуска: ' + (err.message || 'неизвестная ошибка');
-                        if (typeof toastr !== 'undefined') toastr.error('Ошибка запуска');
-                        btnBg.disabled = false;
-                        btnRun.disabled = false;
-                        if (btnTest) btnTest.disabled = false;
-                        if (btnParallel) btnParallel.disabled = false;
                     });
             }
 
@@ -1184,7 +818,6 @@
                 var btnBg = document.getElementById('btn-multi-provider-run-background');
                 var btnRun = document.getElementById('btn-multi-provider-run');
                 var btnTest = document.getElementById('btn-multi-provider-test');
-                var btnParallel = document.getElementById('btn-multi-provider-run-parallel');
                 var progressBlock = document.getElementById('multi-provider-progress');
                 var progressBar = document.getElementById('multi-provider-progress-bar');
                 var progressText = document.getElementById('multi-provider-progress-text');
@@ -1197,7 +830,6 @@
                 btnBg.disabled = true;
                 btnRun.disabled = true;
                 if (btnTest) btnTest.disabled = true;
-                if (btnParallel) btnParallel.disabled = true;
                 resultBlock.classList.add('hidden');
                 progressBlock.classList.remove('hidden');
                 progressBar.style.width = '0%';
@@ -1251,7 +883,6 @@
                                 btnBg.disabled = false;
                                 btnRun.disabled = false;
                                 if (btnTest) btnTest.disabled = false;
-                                if (btnParallel) btnParallel.disabled = false;
                                 return;
                             }
                             var d = res.data;
@@ -1282,7 +913,6 @@
                                 btnBg.disabled = false;
                                 btnRun.disabled = false;
                                 if (btnTest) btnTest.disabled = false;
-                                if (btnParallel) btnParallel.disabled = false;
                                 return;
                             }
                             runBatch(d.next_offset != null ? d.next_offset : offset + (d.processed || 0));
@@ -1297,7 +927,6 @@
                             btnBg.disabled = false;
                             btnRun.disabled = false;
                             if (btnTest) btnTest.disabled = false;
-                            if (btnParallel) btnParallel.disabled = false;
                         });
                 }
 

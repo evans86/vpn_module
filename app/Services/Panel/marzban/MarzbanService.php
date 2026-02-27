@@ -1959,18 +1959,11 @@ class MarzbanService
                 ? null
                 : KeyActivate::query()->where('id', $key_activate_id)->firstOrFail();
 
-            Log::info('Creating server user', [
+            // При массовой миграции не пишем info-логи — только ошибки (меньше I/O, быстрее обработка).
+            Log::debug('Creating server user', [
                 'panel_id' => $panel_id,
-                'data_limit' => $data_limit,
-                'expire' => $expire,
-                'expire_date' => date('Y-m-d H:i:s', $expire),
-                'key_finish_at' => $key_activate ? $key_activate->finish_at : null,
-                'key_finish_at_date' => $key_activate && $key_activate->finish_at ? date('Y-m-d H:i:s', $key_activate->finish_at) : null,
-                'current_time' => time(),
-                'current_date' => date('Y-m-d H:i:s'),
-                'days_until_expire' => ceil(($expire - time()) / 86400),
+                'key_activate_id' => $key_activate_id,
                 'source' => 'panel',
-                'key_activate_id' => $key_activate_id
             ]);
 
             $panel = self::updateMarzbanToken($panel_id);
@@ -2020,11 +2013,7 @@ class MarzbanService
                 }
             }
 
-            Log::info('Server user created successfully', [
-                'user_id' => $userId,
-                'panel_id' => $panel_id,
-                'source' => 'panel'
-            ]);
+            Log::debug('Server user created successfully', ['user_id' => $userId, 'panel_id' => $panel_id, 'source' => 'panel']);
 
             return $serverUser;
         } catch (RuntimeException $r) {

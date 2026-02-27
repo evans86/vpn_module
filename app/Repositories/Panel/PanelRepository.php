@@ -427,6 +427,10 @@ class PanelRepository extends BaseRepository
     private function selectPanelByStrategy(Collection $panels, string $strategy, bool $useCacheOnly = false): ?Panel
     {
         switch ($strategy) {
+            case 'first':
+                // Первая подходящая панель по id, без выравнивания по нагрузке (быстро, без API)
+                return $panels->sortBy('id')->first();
+
             case 'balanced':
                 // Старая система - равномерное распределение (быстро, не требует API)
                 return $this->getConfiguredMarzbanPanel();

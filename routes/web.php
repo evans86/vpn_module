@@ -211,7 +211,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/multi-provider-migration/single-key', [ServerUserTransferController::class, 'multiProviderMigrationSingleKey'])->name('multi-provider-migration.single-key');
                 Route::post('/multi-provider-migration/run-batch', [ServerUserTransferController::class, 'multiProviderMigrationBatch'])->name('multi-provider-migration.run-batch');
                 Route::post('/multi-provider-migration/start', [ServerUserTransferController::class, 'multiProviderMigrationStart'])->name('multi-provider-migration.start');
-                Route::post('/multi-provider-migration/start-parallel', [ServerUserTransferController::class, 'multiProviderMigrationStartParallel'])->name('multi-provider-migration.start-parallel');
                 Route::post('/multi-provider-migration/cancel', [ServerUserTransferController::class, 'multiProviderMigrationCancel'])->name('multi-provider-migration.cancel');
                 Route::get('/multi-provider-migration/status', [ServerUserTransferController::class, 'multiProviderMigrationStatus'])->name('multi-provider-migration.status');
                 Route::post('/key-slots', [ServerUserTransferController::class, 'getKeySlots'])->name('key-slots');

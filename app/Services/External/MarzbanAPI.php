@@ -250,12 +250,16 @@ class MarzbanAPI
                     ],
                     'level' => $level // ← ДОБАВЛЯЕМ УРОВЕНЬ ПОЛИТИКИ
                 ],
-                'verify' => false
+                'verify' => false,
+                'timeout' => 20,
+                'connect_timeout' => 10,
             ];
 
             $client = new Client([
                 'base_uri' => $this->host . '/api/',
-                'verify' => false
+                'verify' => false,
+                'timeout' => 20,
+                'connect_timeout' => 10,
             ]);
 
             $response = $client->post($action, $requestParam);

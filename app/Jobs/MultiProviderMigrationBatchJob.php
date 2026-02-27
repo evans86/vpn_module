@@ -39,7 +39,8 @@ class MultiProviderMigrationBatchJob implements ShouldQueue
 
     public function handle(): void
     {
-        ini_set('memory_limit', '2048M');
+        // Ограничение памяти: при нескольких воркерах 2G на каждый может исчерпать RAM и положить MySQL (OOM).
+        ini_set('memory_limit', '512M');
 
         $cancelKey = 'multi_provider_migration_cancel_' . $this->runId;
         if (Cache::get($cancelKey)) {
