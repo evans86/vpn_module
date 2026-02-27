@@ -14,10 +14,8 @@
                 </svg>
             </div>
             <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-indigo-800">Обновление конфигурации и серверов…</p>
-                <div class="mt-2 w-full bg-indigo-200 rounded-full h-2 overflow-hidden">
-                    <div id="config-progress-fill" class="h-full bg-indigo-600 rounded-full transition-all duration-300" style="width: 0%"></div>
-                </div>
+                <p class="text-sm font-medium text-indigo-800">Загрузка актуальных данных с серверов… Подождите.</p>
+                <p class="text-xs text-indigo-600 mt-1">Ниже уже показаны сохранённые данные; блок обновится, когда загрузка завершится.</p>
             </div>
         </div>
     </div>
@@ -31,21 +29,16 @@
         var url = @json($configRefreshUrl ?? '');
         if (!url) return;
         var bar = document.getElementById('config-progress-bar');
-        var fill = document.getElementById('config-progress-fill');
-        var start = Date.now();
-        var t = setInterval(function(){ if (fill) { var p = Math.min(90, 15 + (Date.now()-start)/8000*75); fill.style.width = p + '%'; } }, 200);
         fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
             .then(function(r){ return r.json(); })
             .then(function(d){
-                clearInterval(t);
-                if (fill) fill.style.width = '100%';
                 if (d.success && d.html) {
                     var el = document.getElementById('config-content');
                     if (el) el.innerHTML = d.html;
-                    if (bar) bar.remove();
                 }
+                if (bar) bar.remove();
             })
-            .catch(function(){ clearInterval(t); if (bar) bar.remove(); });
+            .catch(function(){ if (bar) bar.remove(); });
     })();
     </script>
     @endif

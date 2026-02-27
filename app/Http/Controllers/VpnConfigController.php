@@ -148,7 +148,7 @@ class VpnConfigController extends Controller
 
             $userAgent = request()->header('User-Agent') ?? 'Unknown';
             $isBrowser = $this->isBrowserClient($userAgent);
-            // Браузер: сразу отдаём страницу с данными из БД (без запросов к панелям), прогресс-бар сверху; JS подгрузит актуальные данные и обновит блок контента
+            // Браузер: сразу отдаём страницу с данными из БД (без запросов к панелям), сверху — индикатор «загрузка с серверов»; JS фоново запросит актуальные данные и обновит блок.
             if ($isBrowser) {
                 $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id);
                 $refreshUrl = route('vpn.config.refresh', ['token' => $key_activate_id]);
@@ -164,6 +164,7 @@ class VpnConfigController extends Controller
                 );
             }
 
+            // Не браузер (VPN-приложение: v2rayNG, Clash, Hiddify и т.д.): полная сборка с панелями и сразу актуальный конфиг text/plain для подписки.
             $data = $this->buildConnectionData($keyActivate, $key_activate_id, false);
             $connectionKeys = $data['connectionKeys'];
             $slotsWithLinks = $data['slotsWithLinks'];
@@ -176,7 +177,7 @@ class VpnConfigController extends Controller
             $isVpnClient = $this->isVpnClient($userAgent);
             $isBrowser = $this->isBrowserClient($userAgent);
 
-            // Если это VPN клиент или запрос JSON - возвращаем конфигурацию
+            // VPN-клиент или JSON: отдаём актуальные ссылки (уже собраны выше)
             if ($isVpnClient || request()->wantsJson()) {
                 return response(implode("\n", $connectionKeys))
                     ->header('Content-Type', 'text/plain');
