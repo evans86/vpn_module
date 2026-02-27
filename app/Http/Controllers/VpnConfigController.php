@@ -150,7 +150,10 @@ class VpnConfigController extends Controller
             }
 
             $userAgent = request()->header('User-Agent') ?? 'Unknown';
-            $isBrowser = $this->isBrowserClient($userAgent);
+            // Подписка (приложение): отдаём только текст из БД, без HTML. Таймаут бывает, когда ошибочно
+            // считали клиент браузером (много приложений шлют User-Agent вроде Mozilla/5.0) и отдавали тяжёлую страницу.
+            $isSubscriptionRequest = $this->isVpnClient($userAgent) || !$this->requestAcceptsHtml();
+            $isBrowser = !$isSubscriptionRequest && $this->isBrowserClient($userAgent);
 
             // Всегда только из БД: быстрый ответ. Долгое обновление — только по кнопке «Обновить» на странице.
             $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id);
@@ -171,7 +174,7 @@ class VpnConfigController extends Controller
                 );
             }
 
-            // Не браузер (приложение, подписка): только сохранённые ссылки, без запросов к панелям.
+            // Приложение / подписка: только сохранённые ссылки из БД, без запросов к панелям.
             $connectionKeys = $data['connectionKeys'];
             return response(implode("\n", $connectionKeys ?? []))
                 ->header('Content-Type', 'text/plain; charset=utf-8');
