@@ -167,26 +167,27 @@ class VpnConfigController extends Controller
                 );
             }
 
-            // VPN-приложение (Hiddify, v2rayNG, Clash и т.д.): отдаём ответ быстро, иначе клиент обрывает по таймауту.
-            // Сначала пробуем сохранённые ссылки из БД (без запросов к панелям) — ответ за 1–2 сек.
-            $userAgent = request()->header('User-Agent') ?? 'Unknown';
-            $isVpnClient = $this->isVpnClient($userAgent);
+            // Запрос подписки (VPN-приложение или запрос без Accept: text/html): отдаём ответ быстро, иначе клиент обрывает по таймауту.
+            $userAgent = request()->header('User-Agent') ?? '';
+            $isSubscriptionRequest = $this->isVpnClient($userAgent)
+                || request()->wantsJson()
+                || !$this->requestAcceptsHtml();
 
-            if ($isVpnClient || request()->wantsJson()) {
+            if ($isSubscriptionRequest) {
                 $storedData = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id);
                 $connectionKeys = $storedData['connectionKeys'];
                 if (!empty($connectionKeys)) {
                     return response(implode("\n", $connectionKeys))
-                        ->header('Content-Type', 'text/plain');
+                        ->header('Content-Type', 'text/plain; charset=utf-8');
                 }
-                // Сохранённых ссылок нет (ключ ещё ни разу не открывали в браузере / не обновляли): полная сборка (может занять 30+ сек, клиент может оборвать)
+                // Сохранённых ссылок нет: полная сборка (может занять 30+ сек)
                 $data = $this->buildConnectionData($keyActivate, $key_activate_id, false);
                 $connectionKeys = $data['connectionKeys'];
                 return response(implode("\n", $connectionKeys))
-                    ->header('Content-Type', 'text/plain');
+                    ->header('Content-Type', 'text/plain; charset=utf-8');
             }
 
-            // Не браузер и не VPN (редко): полная сборка и text/plain
+            // Явный запрос HTML (редкий не-браузер): полная сборка и страница
             $data = $this->buildConnectionData($keyActivate, $key_activate_id, false);
             $connectionKeys = $data['connectionKeys'];
             $slotsWithLinks = $data['slotsWithLinks'];
@@ -198,7 +199,7 @@ class VpnConfigController extends Controller
             }
 
             return response(implode("\n", $connectionKeys))
-                ->header('Content-Type', 'text/plain');
+                ->header('Content-Type', 'text/plain; charset=utf-8');
 
         } catch (\App\Exceptions\KeyReplacedException $e) {
             // Ключ был перевыпущен - показываем страницу ошибки с информацией о новом ключе
@@ -727,14 +728,26 @@ class VpnConfigController extends Controller
     }
 
     /**
+     * Запрос явно принимает HTML (браузер) — иначе считаем подпиской и отдаём быстро.
+     */
+    private function requestAcceptsHtml(): bool
+    {
+        $accept = strtolower(request()->header('Accept', ''));
+        return str_contains($accept, 'text/html');
+    }
+
+    /**
      * Определяет, является ли клиент VPN приложением (без учета регистра)
      */
     private function isVpnClient(string $userAgent): bool
     {
         $userAgentLower = strtolower($userAgent);
+        if ($userAgentLower === '' || $userAgentLower === 'unknown') {
+            return false;
+        }
 
         $vpnPatterns = [
-            'v2rayng', 'nekobox', 'nekoray', 'singbox', 'hiddify', 'shadowrocket',
+            'v2rayng', 'nekobox', 'nekoray', 'singbox', 'hiddify', 'hiddifynext', 'shadowrocket',
             'surge', 'quantumult', 'loon', 'streisand', 'clash', 'v2rayu', 'v2rayn',
             'v2rayx', 'qv2ray', 'trojan', 'wireguard', 'openvpn', 'openconnect',
             'softether', 'shadowsocks', 'shadowsocksr', 'ssr', 'outline', 'zerotier',
@@ -743,7 +756,8 @@ class VpnConfigController extends Controller
             'ipsec', 'l2tp', 'pptp', 'v2raytun', 'happ', 'v2box', 'happproxy',
             'hexasoftware', 'v2rayg', 'anxray', 'kitsunebi', 'potatso', 'rocket',
             'pharos', 'stash', 'mellow', 'leaf', 'hysteria', 'tuic', 'naive', 'brook',
-            'vnet', 'http injector', 'anonym', 'proxy', 'vpn', 'sub', 'subscribe'
+            'vnet', 'http injector', 'anonym', 'proxy', 'vpn', 'sub', 'subscribe',
+            'subscription', 'hiddifynext'
         ];
 
         foreach ($vpnPatterns as $pattern) {
