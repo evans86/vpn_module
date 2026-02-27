@@ -54,9 +54,12 @@ class VpnConfigController extends Controller
 
     public function show(string $key_activate_id): Response
     {
-        // Лимит памяти для отображения конфигурации (совпадает с bootstrap, чтобы не падать при тяжёлых связях)
-        if ((int) ini_get('memory_limit') < 512) {
-            @ini_set('memory_limit', '512M');
+        // Лимит памяти и времени: тяжёлая сборка по слотам и запросы к панелям (VPN-клиент и refresh)
+        if ((int) ini_get('memory_limit') < 1024) {
+            @ini_set('memory_limit', '1024M');
+        }
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(180);
         }
 
         try {
@@ -276,6 +279,12 @@ class VpnConfigController extends Controller
      */
     public function showConfigRefresh(string $token): Response
     {
+        if ((int) ini_get('memory_limit') < 1024) {
+            @ini_set('memory_limit', '1024M');
+        }
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(180);
+        }
         $key_activate_id = $token;
         try {
             $keyActivate = $this->keyActivateRepository->findById($key_activate_id);
@@ -497,6 +506,7 @@ class VpnConfigController extends Controller
                     $slotLinks = $links;
                     $connectionKeys = array_merge($connectionKeys, $links);
                 }
+                unset($links);
             } catch (\App\Exceptions\KeyReplacedException $e) {
                 throw $e;
             } catch (Exception $e) {
@@ -511,6 +521,7 @@ class VpnConfigController extends Controller
                     $slotLinks = $stored;
                     $connectionKeys = array_merge($connectionKeys, $stored);
                 }
+                unset($stored);
             }
             if (!empty($slotLinks)) {
                 $server = $serverUser->panel && $serverUser->panel->server ? $serverUser->panel->server : null;
@@ -535,6 +546,7 @@ class VpnConfigController extends Controller
                     'connection_keys' => $slotLinks,
                 ];
             }
+            unset($slotLinks);
         }
 
         if (empty($connectionKeys)) {
