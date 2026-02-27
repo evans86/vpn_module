@@ -151,9 +151,11 @@ class VpnConfigController extends Controller
 
             $userAgent = request()->header('User-Agent') ?? 'Unknown';
             $isBrowser = $this->isBrowserClient($userAgent);
-            // Браузер: только из БД, без запросов к панелям. Обновление — только по кнопке «Обновить».
+
+            // Всегда только из БД: быстрый ответ. Долгое обновление — только по кнопке «Обновить» на странице.
+            $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id);
+
             if ($isBrowser) {
-                $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id);
                 $refreshUrl = route('vpn.config.refresh', ['token' => $key_activate_id]);
                 return $this->showBrowserPage(
                     $keyActivate,
@@ -169,37 +171,9 @@ class VpnConfigController extends Controller
                 );
             }
 
-            // Запрос подписки (VPN-приложение или запрос без Accept: text/html): отдаём ответ быстро, иначе клиент обрывает по таймауту.
-            $userAgent = request()->header('User-Agent') ?? '';
-            $isSubscriptionRequest = $this->isVpnClient($userAgent)
-                || request()->wantsJson()
-                || !$this->requestAcceptsHtml();
-
-            if ($isSubscriptionRequest) {
-                $storedData = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id);
-                $connectionKeys = $storedData['connectionKeys'];
-                if (!empty($connectionKeys)) {
-                    return response(implode("\n", $connectionKeys))
-                        ->header('Content-Type', 'text/plain; charset=utf-8');
-                }
-                // Сохранённых ссылок нет — не дергаем панели (таймаут). Отдаём пустую конфигурацию.
-                return response('')
-                    ->header('Content-Type', 'text/plain; charset=utf-8');
-            }
-
-            // Явный запрос HTML (редкий не-браузер): полная сборка и страница
-            $data = $this->buildConnectionData($keyActivate, $key_activate_id, false);
+            // Не браузер (приложение, подписка): только сохранённые ссылки, без запросов к панелям.
             $connectionKeys = $data['connectionKeys'];
-            $slotsWithLinks = $data['slotsWithLinks'];
-            $firstKeyActivateUser = $data['firstKeyActivateUser'];
-            $firstServerUser = $data['firstServerUser'];
-
-            if ($this->isBrowserClient($userAgent)) {
-                $refreshUrl = route('vpn.config.refresh', ['token' => $key_activate_id]);
-                return $this->showBrowserPage($keyActivate, $firstKeyActivateUser, $firstServerUser, $connectionKeys, $slotsWithLinks, false, false, null, $refreshUrl, $data['lastUpdated'] ?? null);
-            }
-
-            return response(implode("\n", $connectionKeys))
+            return response(implode("\n", $connectionKeys ?? []))
                 ->header('Content-Type', 'text/plain; charset=utf-8');
 
         } catch (\App\Exceptions\KeyReplacedException $e) {

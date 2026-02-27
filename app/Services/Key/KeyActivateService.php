@@ -16,8 +16,8 @@ use App\Services\External\BottApi;
 use App\Services\Panel\PanelStrategy;
 use App\Services\Notification\NotificationService;
 use App\Services\Server\ServerStrategy;
-use App\Jobs\WarmConfigForKeyJob;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Http;
 use DomainException;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -452,7 +452,7 @@ class KeyActivateService
                 $key->id
             );
 
-            WarmConfigForKeyJob::dispatch((string) $activatedKey->id);
+            $this->warmConfigSync((string) $activatedKey->id);
 
             return $activatedKey;
         } catch (Exception $e) {
@@ -573,7 +573,7 @@ class KeyActivateService
                     $this->notificationService->sendKeyActivatedNotification($packSalesman->salesman->telegram_id, $keyLocked->id);
                 }
 
-                WarmConfigForKeyJob::dispatch((string) $activatedKey->id);
+                $this->warmConfigSync((string) $activatedKey->id);
 
                 return $activatedKey;
             });
@@ -684,7 +684,7 @@ class KeyActivateService
                 $this->notificationService->sendKeyActivatedNotification($packSalesman->salesman->telegram_id, $key->id);
             }
 
-            WarmConfigForKeyJob::dispatch((string) $activatedKey->id);
+            $this->warmConfigSync((string) $activatedKey->id);
 
             return $activatedKey;
         } catch (Exception $e) {
@@ -698,6 +698,24 @@ class KeyActivateService
             ]);
 
             throw new RuntimeException($e->getMessage());
+        }
+    }
+
+    /**
+     * Синхронный прогрев конфига: запрос к панелям и сохранение ссылок в БД.
+     * Вызывается после активации ключа, чтобы страница и приложение сразу получали конфиг из БД (без очередей).
+     */
+    private function warmConfigSync(string $keyActivateId): void
+    {
+        try {
+            $path = route('vpn.config.refresh', ['token' => $keyActivateId], false);
+            $url = rtrim(config('app.url'), '/') . $path;
+            Http::timeout(180)->withHeaders(['Accept' => 'application/json'])->get($url);
+        } catch (\Throwable $e) {
+            Log::warning('warmConfigSync failed', [
+                'key_activate_id' => $keyActivateId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
