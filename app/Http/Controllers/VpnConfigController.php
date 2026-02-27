@@ -144,6 +144,23 @@ class VpnConfigController extends Controller
                 ]);
             }
 
+            // При открытии конфига/подписки — добавить недостающие провайдер-слоты (мульти-провайдер на лету)
+            $multiProviderSlots = config('panel.multi_provider_slots', []);
+            if (!empty($multiProviderSlots) && is_array($multiProviderSlots) && $keyActivate->status === KeyActivate::ACTIVE) {
+                try {
+                    $added = $this->keyActivateService->addMissingProviderSlots($keyActivate, false);
+                    if ($added > 0) {
+                        $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
+                    }
+                } catch (Exception $e) {
+                    Log::warning('VpnConfig: addMissingProviderSlots failed', [
+                        'key_activate_id' => $key_activate_id,
+                        'error' => $e->getMessage(),
+                        'source' => 'vpn',
+                    ]);
+                }
+            }
+
             // Собираем ссылки по слотам (для браузера — группировка по локации/серверу)
             $connectionKeys = [];
             $slotsWithLinks = [];
