@@ -217,6 +217,27 @@
                 </label>
             </div>
             <p class="text-sm text-gray-500 mb-3">Обработка идёт порциями (по «Порция за шаг» ключей за один шаг). Либо в этой вкладке — запросы по очереди, вкладку не закрывать; либо в фоне — через очередь, можно закрыть страницу и смотреть прогресс при следующем заходе. <strong>При ошибке 524 (таймаут)</strong> уменьшите порцию до 10–20 или используйте «Запустить в фоне».</p>
+            <div class="mb-4 p-4 rounded-lg border border-indigo-200 bg-indigo-50">
+                <h4 class="font-medium text-gray-900 mb-2">Параллельный запуск</h4>
+                <p class="text-sm text-gray-600 mb-3">Несколько воркеров обрабатывают разные срезы ключей одновременно — миграция идёт быстрее. Нужно несколько процессов <code class="text-xs bg-white px-1 rounded">queue:work</code> (или один воркер с несколькими потоками).</p>
+                <div class="flex items-center gap-4 flex-wrap mb-3">
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <span>Количество воркеров:</span>
+                        <input type="number" id="multi-provider-num-workers" value="10" min="2" max="20" class="rounded border-gray-300 w-20 text-sm">
+                    </label>
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <span>Порция за шаг (параллель):</span>
+                        <input type="number" id="multi-provider-parallel-batch-size" value="500" min="50" max="500" class="rounded border-gray-300 w-20 text-sm">
+                    </label>
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-600">
+                        <input type="checkbox" id="multi-provider-parallel-dry-run" class="rounded border-gray-300">
+                        <span>Только проверка (dry-run)</span>
+                    </label>
+                </div>
+                <button type="button" id="btn-multi-provider-run-parallel" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed" title="Запуск N воркеров в очереди: нужны queue:work (несколько воркеров или один с --tries и параллельными процессами)">
+                    <i class="fas fa-bolt mr-2"></i> Запустить параллельно в фоне
+                </button>
+            </div>
             <div class="flex items-center gap-4 flex-wrap">
                 <button type="button" id="btn-multi-provider-run-background" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed" title="Запуск в очереди: нужны QUEUE_CONNECTION=database и php artisan queue:work">
                     <i class="fas fa-cloud-upload-alt mr-2"></i> Запустить в фоне (очередь)
@@ -229,7 +250,12 @@
                 </button>
             </div>
             <div id="multi-provider-progress" class="mt-6 p-4 rounded-lg border border-blue-200 bg-blue-50 hidden" aria-live="polite">
-                <h4 class="font-medium text-gray-900 mb-2">Прогресс</h4>
+                <div class="flex items-center justify-between gap-4 flex-wrap mb-2">
+                    <h4 class="font-medium text-gray-900">Прогресс</h4>
+                    <button type="button" id="btn-multi-provider-cancel" class="hidden inline-flex items-center px-3 py-1.5 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500" title="Остановить постановку следующих порций в очередь. Уже обработанные ключи сохранятся.">
+                        <i class="fas fa-stop mr-1.5"></i> Отменить миграцию
+                    </button>
+                </div>
                 <div class="w-full bg-gray-200 rounded-full h-3 mb-2">
                     <div id="multi-provider-progress-bar" class="bg-indigo-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
                 </div>
@@ -587,8 +613,28 @@
             var multiProviderSingleKeyUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.single-key') }}';
             var multiProviderBatchUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.run-batch') }}';
             var multiProviderStartUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.start') }}';
+            var multiProviderStartParallelUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.start-parallel') }}';
+            var multiProviderCancelUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.cancel') }}';
             var multiProviderStatusUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.status') }}';
             var multiProviderCsrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content') || (document.querySelector('input[name="_token"]') && document.querySelector('input[name="_token"]').value);
+
+            function multiProviderShowCancelButton(runId) {
+                var progressBlock = document.getElementById('multi-provider-progress');
+                var btnCancel = document.getElementById('btn-multi-provider-cancel');
+                if (progressBlock) progressBlock.dataset.currentRunId = runId || '';
+                if (btnCancel) btnCancel.classList.remove('hidden');
+            }
+            function multiProviderHideCancelButton() {
+                var progressBlock = document.getElementById('multi-provider-progress');
+                var btnCancel = document.getElementById('btn-multi-provider-cancel');
+                if (progressBlock) delete progressBlock.dataset.currentRunId;
+                if (btnCancel) btnCancel.classList.add('hidden');
+            }
+            var MULTI_PROVIDER_CONFIRM_THRESHOLD = 200;
+            function multiProviderConfirmLargeRun(count, isDryRun, label) {
+                if (isDryRun || count < MULTI_PROVIDER_CONFIRM_THRESHOLD) return true;
+                return confirm('Ключей к обработке: ' + count + '. ' + (label || 'Запустить миграцию в фоне?'));
+            }
 
             var lastCheckedKeyId = null;
             var lastCheckCanAdd = false;
@@ -706,8 +752,32 @@
             document.getElementById('btn-multi-provider-run-background').addEventListener('click', function () {
                 runMultiProviderMigrationBackground();
             });
+            document.getElementById('btn-multi-provider-run-parallel').addEventListener('click', function () {
+                runMultiProviderMigrationParallel();
+            });
             document.getElementById('btn-multi-provider-test').addEventListener('click', function () {
                 runMultiProviderMigration(false, 2);
+            });
+            document.getElementById('btn-multi-provider-cancel').addEventListener('click', function () {
+                var progressBlock = document.getElementById('multi-provider-progress');
+                var runId = progressBlock && progressBlock.dataset.currentRunId;
+                if (!runId) return;
+                var btnCancel = document.getElementById('btn-multi-provider-cancel');
+                if (btnCancel) btnCancel.disabled = true;
+                fetch(multiProviderCancelUrl, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': multiProviderCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ run_id: runId }),
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (typeof toastr !== 'undefined') toastr.info(data.message || 'Запрос на отмену отправлен.');
+                        if (btnCancel) btnCancel.disabled = false;
+                    })
+                    .catch(function () {
+                        if (typeof toastr !== 'undefined') toastr.error('Ошибка запроса отмены');
+                        if (btnCancel) btnCancel.disabled = false;
+                    });
             });
 
             function checkLatestMigrationAndResumePolling() {
@@ -725,8 +795,10 @@
                         var btnBg = document.getElementById('btn-multi-provider-run-background');
                         var btnRun = document.getElementById('btn-multi-provider-run');
                         var btnTest = document.getElementById('btn-multi-provider-test');
+                        var btnParallel = document.getElementById('btn-multi-provider-run-parallel');
 
                         if (s.done) {
+                            multiProviderHideCancelButton();
                             resultBlock.classList.remove('hidden');
                             progressBlock.classList.add('hidden');
                             if (s.error) {
@@ -734,8 +806,13 @@
                                 resultMessage.textContent = s.error;
                             } else {
                                 resultBlock.classList.remove('border-red-200', 'bg-red-50');
-                                resultBlock.classList.add('border-green-200', 'bg-green-50');
-                                resultMessage.textContent = 'Миграция завершена. Обработано ключей: ' + (s.processed || 0) + ', добавлено слотов: ' + (s.added_total || 0) + (s.errors && s.errors.length ? ', ошибок: ' + s.errors.length : '') + '.';
+                                if (s.cancelled) {
+                                    resultBlock.classList.add('border-amber-200', 'bg-amber-50');
+                                    resultMessage.textContent = 'Миграция отменена. Обработано ключей: ' + (s.processed || 0) + ', добавлено слотов: ' + (s.added_total || 0) + (s.errors && s.errors.length ? ', ошибок: ' + s.errors.length : '') + '.';
+                                } else {
+                                    resultBlock.classList.add('border-green-200', 'bg-green-50');
+                                    resultMessage.textContent = 'Миграция завершена. Обработано ключей: ' + (s.processed || 0) + ', добавлено слотов: ' + (s.added_total || 0) + (s.errors && s.errors.length ? ', ошибок: ' + s.errors.length : '') + '.';
+                                }
                                 if (s.errors && s.errors.length > 0) {
                                     resultErrors.classList.remove('hidden');
                                     resultErrors.innerHTML = '<ul class="list-disc pl-5">' + s.errors.slice(0, 30).map(function (e) {
@@ -749,11 +826,13 @@
                             if (btnBg) btnBg.disabled = false;
                             if (btnRun) btnRun.disabled = false;
                             if (btnTest) btnTest.disabled = false;
+                            if (btnParallel) btnParallel.disabled = false;
                             return;
                         }
 
                         progressBlock.classList.remove('hidden');
                         resultBlock.classList.add('hidden');
+                        multiProviderShowCancelButton(runId);
                         var total = s.total || 0;
                         var processed = s.processed || 0;
                         var added = s.added_total || 0;
@@ -761,6 +840,7 @@
                         if (!isStale) {
                             if (btnRun) btnRun.disabled = true;
                             if (btnTest) btnTest.disabled = true;
+                            if (btnParallel) btnParallel.disabled = true;
                             if (btnBg) btnBg.disabled = false;
                         }
                         var pct = total > 0 ? (processed / total) * 100 : 0;
@@ -783,6 +863,7 @@
                                     progressBar.style.width = Math.round(pct) + '%';
                                     progressText.textContent = 'Обработано: ' + processed + ' из ' + total + ', добавлено слотов: ' + added + '.';
                                     if (s.done) {
+                                        multiProviderHideCancelButton();
                                         progressBlock.classList.add('hidden');
                                         resultBlock.classList.remove('hidden');
                                         if (s.error) {
@@ -790,8 +871,13 @@
                                             resultMessage.textContent = s.error;
                                         } else {
                                             resultBlock.classList.remove('border-red-200', 'bg-red-50');
-                                            resultBlock.classList.add('border-green-200', 'bg-green-50');
-                                            resultMessage.textContent = 'Миграция завершена. Обработано ключей: ' + processed + ', добавлено слотов: ' + added + (s.errors && s.errors.length ? ', ошибок: ' + s.errors.length : '') + '.';
+                                            if (s.cancelled) {
+                                                resultBlock.classList.add('border-amber-200', 'bg-amber-50');
+                                                resultMessage.textContent = 'Миграция отменена. Обработано ключей: ' + processed + ', добавлено слотов: ' + added + (s.errors && s.errors.length ? ', ошибок: ' + s.errors.length : '') + '.';
+                                            } else {
+                                                resultBlock.classList.add('border-green-200', 'bg-green-50');
+                                                resultMessage.textContent = 'Миграция завершена. Обработано ключей: ' + processed + ', добавлено слотов: ' + added + (s.errors && s.errors.length ? ', ошибок: ' + s.errors.length : '') + '.';
+                                            }
                                             if (s.errors && s.errors.length > 0) {
                                                 resultErrors.classList.remove('hidden');
                                                 resultErrors.innerHTML = '<ul class="list-disc pl-5">' + s.errors.slice(0, 30).map(function (e) {
@@ -805,7 +891,8 @@
                                         if (btnBg) btnBg.disabled = false;
                                         if (btnRun) btnRun.disabled = false;
                                         if (btnTest) btnTest.disabled = false;
-                                        if (typeof toastr !== 'undefined') toastr.success('Миграция завершена.');
+                                        if (btnParallel) btnParallel.disabled = false;
+                                        if (typeof toastr !== 'undefined') toastr.success(s.cancelled ? 'Миграция отменена.' : 'Миграция завершена.');
                                         return;
                                     }
                                     setTimeout(poll, 2500);
@@ -835,33 +922,50 @@
                 var batchSize = parseInt(document.getElementById('multi-provider-batch-size').value, 10) || 50;
                 var isDryRun = document.getElementById('multi-provider-dry-run') && document.getElementById('multi-provider-dry-run').checked;
 
+                var btnParallel = document.getElementById('btn-multi-provider-run-parallel');
                 btnBg.disabled = true;
                 btnRun.disabled = true;
                 if (btnTest) btnTest.disabled = true;
+                if (btnParallel) btnParallel.disabled = true;
                 resultBlock.classList.add('hidden');
                 progressBlock.classList.remove('hidden');
                 progressBar.style.width = '0%';
-                progressText.textContent = 'Постановка в очередь…';
+                progressText.textContent = 'Проверка количества…';
 
-                fetch(multiProviderStartUrl, {
-                    method: 'POST',
-                    headers: { 'X-CSRF-TOKEN': multiProviderCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ batch_size: batchSize, dry_run: isDryRun }),
-                })
+                fetch(multiProviderCountUrl, { method: 'POST', headers: { 'X-CSRF-TOKEN': multiProviderCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: '{}' })
                     .then(function (r) { return r.json(); })
-                    .then(function (data) {
-                        if (!data.success || !data.run_id) {
+                    .then(function (countData) {
+                        var totalCount = (countData && countData.count != null) ? parseInt(countData.count, 10) : 0;
+                        if (!multiProviderConfirmLargeRun(totalCount, isDryRun, 'Запустить миграцию в фоне?')) {
                             progressBlock.classList.add('hidden');
-                            resultBlock.classList.remove('hidden');
-                            resultBlock.classList.add('border-red-200', 'bg-red-50');
-                            resultMessage.textContent = data.message || 'Не удалось запустить. Проверьте: QUEUE_CONNECTION=database и php artisan queue:work.';
-                            if (typeof toastr !== 'undefined') toastr.error(data.message);
                             btnBg.disabled = false;
                             btnRun.disabled = false;
                             if (btnTest) btnTest.disabled = false;
+                            if (btnParallel) btnParallel.disabled = false;
+                            return Promise.reject(new Error('cancelled'));
+                        }
+                        progressText.textContent = 'Постановка в очередь…';
+                        return fetch(multiProviderStartUrl, {
+                            method: 'POST',
+                            headers: { 'X-CSRF-TOKEN': multiProviderCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ batch_size: batchSize, dry_run: isDryRun }),
+                        }).then(function (r) { return r.json(); });
+                    })
+                    .then(function (data) {
+                        if (!data || !data.success || !data.run_id) {
+                            progressBlock.classList.add('hidden');
+                            resultBlock.classList.remove('hidden');
+                            resultBlock.classList.add('border-red-200', 'bg-red-50');
+                            resultMessage.textContent = (data && data.message) || 'Не удалось запустить. Проверьте: QUEUE_CONNECTION=database и php artisan queue:work.';
+                            if (typeof toastr !== 'undefined') toastr.error(data && data.message);
+                            btnBg.disabled = false;
+                            btnRun.disabled = false;
+                            if (btnTest) btnTest.disabled = false;
+                            if (btnParallel) btnParallel.disabled = false;
                             return;
                         }
                         var runId = data.run_id;
+                        multiProviderShowCancelButton(runId);
                         if (data.message && data.message.indexOf('уже запущена') !== -1) {
                             progressText.textContent = data.message;
                             if (typeof toastr !== 'undefined') toastr.info(data.message);
@@ -890,6 +994,7 @@
                                     progressText.textContent = 'Обработано: ' + processed + ' из ' + total + ', добавлено слотов: ' + added + '.';
 
                                     if (s.done) {
+                                        multiProviderHideCancelButton();
                                         progressBlock.classList.add('hidden');
                                         resultBlock.classList.remove('hidden');
                                         if (s.error) {
@@ -897,8 +1002,13 @@
                                             resultMessage.textContent = s.error;
                                         } else {
                                             resultBlock.classList.remove('border-red-200', 'bg-red-50');
-                                            resultBlock.classList.add('border-green-200', 'bg-green-50');
-                                            resultMessage.textContent = (isDryRun ? 'Проверка завершена. ' : 'Миграция завершена. ') + 'Обработано ключей: ' + processed + ', добавлено слотов: ' + added + (s.errors && s.errors.length ? ', ошибок: ' + s.errors.length : '') + '.';
+                                            if (s.cancelled) {
+                                                resultBlock.classList.add('border-amber-200', 'bg-amber-50');
+                                                resultMessage.textContent = 'Миграция отменена. Обработано ключей: ' + processed + ', добавлено слотов: ' + added + (s.errors && s.errors.length ? ', ошибок: ' + s.errors.length : '') + '.';
+                                            } else {
+                                                resultBlock.classList.add('border-green-200', 'bg-green-50');
+                                                resultMessage.textContent = (isDryRun ? 'Проверка завершена. ' : 'Миграция завершена. ') + 'Обработано ключей: ' + processed + ', добавлено слотов: ' + added + (s.errors && s.errors.length ? ', ошибок: ' + s.errors.length : '') + '.';
+                                            }
                                             if (s.errors && s.errors.length > 0) {
                                                 resultErrors.classList.remove('hidden');
                                                 resultErrors.innerHTML = '<ul class="list-disc pl-5">' + s.errors.slice(0, 30).map(function (e) {
@@ -909,10 +1019,11 @@
                                                 resultErrors.innerHTML = '';
                                             }
                                         }
-                                        if (typeof toastr !== 'undefined') toastr.success(isDryRun ? 'Проверка завершена.' : 'Миграция завершена.');
+                                        if (typeof toastr !== 'undefined') toastr.success(s.cancelled ? 'Миграция отменена.' : (isDryRun ? 'Проверка завершена.' : 'Миграция завершена.'));
                                         btnBg.disabled = false;
                                         btnRun.disabled = false;
                                         if (btnTest) btnTest.disabled = false;
+                                        if (btnParallel) btnParallel.disabled = false;
                                         return;
                                     }
                                     setTimeout(poll, 2500);
@@ -925,6 +1036,8 @@
                         setTimeout(poll, 1500);
                     })
                     .catch(function (err) {
+                        if (err && err.message === 'cancelled') return;
+                        multiProviderHideCancelButton();
                         progressBlock.classList.add('hidden');
                         resultBlock.classList.remove('hidden');
                         resultBlock.classList.add('border-red-200', 'bg-red-50');
@@ -933,6 +1046,137 @@
                         btnBg.disabled = false;
                         btnRun.disabled = false;
                         if (btnTest) btnTest.disabled = false;
+                        if (btnParallel) btnParallel.disabled = false;
+                    });
+            }
+
+            function runMultiProviderMigrationParallel() {
+                var btnBg = document.getElementById('btn-multi-provider-run-background');
+                var btnRun = document.getElementById('btn-multi-provider-run');
+                var btnTest = document.getElementById('btn-multi-provider-test');
+                var btnParallel = document.getElementById('btn-multi-provider-run-parallel');
+                var progressBlock = document.getElementById('multi-provider-progress');
+                var progressBar = document.getElementById('multi-provider-progress-bar');
+                var progressText = document.getElementById('multi-provider-progress-text');
+                var resultBlock = document.getElementById('multi-provider-result');
+                var resultMessage = document.getElementById('multi-provider-result-message');
+                var resultErrors = document.getElementById('multi-provider-result-errors');
+                var numWorkers = parseInt(document.getElementById('multi-provider-num-workers').value, 10) || 10;
+                numWorkers = Math.min(20, Math.max(2, numWorkers));
+                var batchSize = parseInt(document.getElementById('multi-provider-parallel-batch-size').value, 10) || 500;
+                batchSize = Math.min(500, Math.max(50, batchSize));
+                var isDryRun = document.getElementById('multi-provider-parallel-dry-run') && document.getElementById('multi-provider-parallel-dry-run').checked;
+
+                btnBg.disabled = true;
+                btnRun.disabled = true;
+                if (btnTest) btnTest.disabled = true;
+                if (btnParallel) btnParallel.disabled = true;
+                resultBlock.classList.add('hidden');
+                progressBlock.classList.remove('hidden');
+                progressBar.style.width = '0%';
+                progressText.textContent = 'Проверка количества…';
+
+                fetch(multiProviderCountUrl, { method: 'POST', headers: { 'X-CSRF-TOKEN': multiProviderCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: '{}' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (countData) {
+                        var totalCount = (countData && countData.count != null) ? parseInt(countData.count, 10) : 0;
+                        if (!multiProviderConfirmLargeRun(totalCount, isDryRun, 'Запустить параллельную миграцию в фоне?')) {
+                            progressBlock.classList.add('hidden');
+                            btnBg.disabled = false;
+                            btnRun.disabled = false;
+                            if (btnTest) btnTest.disabled = false;
+                            if (btnParallel) btnParallel.disabled = false;
+                            return Promise.reject(new Error('cancelled'));
+                        }
+                        progressText.textContent = 'Постановка параллельных воркеров в очередь…';
+                        return fetch(multiProviderStartParallelUrl, {
+                            method: 'POST',
+                            headers: { 'X-CSRF-TOKEN': multiProviderCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ num_workers: numWorkers, batch_size: batchSize, dry_run: isDryRun }),
+                        }).then(function (r) { return r.json(); });
+                    })
+                    .then(function (data) {
+                        if (!data || !data.success || !data.run_id) {
+                            progressBlock.classList.add('hidden');
+                            resultBlock.classList.remove('hidden');
+                            resultBlock.classList.add('border-red-200', 'bg-red-50');
+                            resultMessage.textContent = (data && data.message) || 'Не удалось запустить. Проверьте очередь и queue:work.';
+                            if (typeof toastr !== 'undefined') toastr.error(data && data.message);
+                            btnBg.disabled = false;
+                            btnRun.disabled = false;
+                            if (btnTest) btnTest.disabled = false;
+                            if (btnParallel) btnParallel.disabled = false;
+                            return;
+                        }
+                        var runId = data.run_id;
+                        multiProviderShowCancelButton(runId);
+                        progressText.textContent = data.message && data.message.indexOf('уже запущена') !== -1 ? data.message : 'Параллельная миграция в фоне. Обновление прогресса…';
+
+                        function poll() {
+                            fetch(multiProviderStatusUrl + '?run_id=' + encodeURIComponent(runId), { method: 'GET', headers: { 'Accept': 'application/json' } })
+                                .then(function (r) { return r.json(); })
+                                .then(function (s) {
+                                    if (!s.found) {
+                                        progressText.textContent = 'Сессия не найдена.';
+                                        return;
+                                    }
+                                    var total = s.total || 0;
+                                    var processed = s.processed || 0;
+                                    var added = s.added_total || 0;
+                                    var pct = total > 0 ? (processed / total) * 100 : 0;
+                                    if (pct > 0 && pct < 1) pct = 1;
+                                    if (pct > 100) pct = 100;
+                                    progressBar.style.width = Math.round(pct) + '%';
+                                    progressText.textContent = 'Обработано: ' + processed + ' из ' + total + ', добавлено слотов: ' + added + '.';
+                                    if (s.done) {
+                                        multiProviderHideCancelButton();
+                                        progressBlock.classList.add('hidden');
+                                        resultBlock.classList.remove('hidden');
+                                        resultBlock.classList.remove('border-red-200', 'bg-red-50');
+                                        if (s.cancelled) {
+                                            resultBlock.classList.add('border-amber-200', 'bg-amber-50');
+                                            resultMessage.textContent = 'Миграция отменена. Обработано ключей: ' + processed + ', добавлено слотов: ' + added + (s.errors && s.errors.length ? ', ошибок: ' + s.errors.length : '') + '.';
+                                        } else {
+                                            resultBlock.classList.add('border-green-200', 'bg-green-50');
+                                            resultMessage.textContent = (isDryRun ? 'Проверка завершена. ' : 'Параллельная миграция завершена. ') + 'Обработано ключей: ' + processed + ', добавлено слотов: ' + added + (s.errors && s.errors.length ? ', ошибок: ' + s.errors.length : '') + '.';
+                                        }
+                                        if (s.errors && s.errors.length > 0) {
+                                            resultErrors.classList.remove('hidden');
+                                            resultErrors.innerHTML = '<ul class="list-disc pl-5">' + s.errors.slice(0, 30).map(function (e) {
+                                                return '<li>' + (e.key_id || '') + ': ' + (e.message || '') + '</li>';
+                                            }).join('') + (s.errors.length > 30 ? '<li class="text-gray-500">… и ещё ' + (s.errors.length - 30) + ' ошибок</li>' : '') + '</ul>';
+                                        } else {
+                                            resultErrors.classList.add('hidden');
+                                            resultErrors.innerHTML = '';
+                                        }
+                                        if (typeof toastr !== 'undefined') toastr.success(s.cancelled ? 'Миграция отменена.' : (isDryRun ? 'Проверка завершена.' : 'Миграция завершена.'));
+                                        btnBg.disabled = false;
+                                        btnRun.disabled = false;
+                                        if (btnTest) btnTest.disabled = false;
+                                        if (btnParallel) btnParallel.disabled = false;
+                                        return;
+                                    }
+                                    setTimeout(poll, 2500);
+                                })
+                                .catch(function () {
+                                    progressText.textContent = 'Ошибка запроса статуса. Повтор через 5 сек…';
+                                    setTimeout(poll, 5000);
+                                });
+                        }
+                        setTimeout(poll, 1500);
+                    })
+                    .catch(function (err) {
+                        if (err && err.message === 'cancelled') return;
+                        multiProviderHideCancelButton();
+                        progressBlock.classList.add('hidden');
+                        resultBlock.classList.remove('hidden');
+                        resultBlock.classList.add('border-red-200', 'bg-red-50');
+                        resultMessage.textContent = 'Ошибка запуска: ' + (err.message || 'неизвестная ошибка');
+                        if (typeof toastr !== 'undefined') toastr.error('Ошибка запуска');
+                        btnBg.disabled = false;
+                        btnRun.disabled = false;
+                        if (btnTest) btnTest.disabled = false;
+                        if (btnParallel) btnParallel.disabled = false;
                     });
             }
 
@@ -940,6 +1184,7 @@
                 var btnBg = document.getElementById('btn-multi-provider-run-background');
                 var btnRun = document.getElementById('btn-multi-provider-run');
                 var btnTest = document.getElementById('btn-multi-provider-test');
+                var btnParallel = document.getElementById('btn-multi-provider-run-parallel');
                 var progressBlock = document.getElementById('multi-provider-progress');
                 var progressBar = document.getElementById('multi-provider-progress-bar');
                 var progressText = document.getElementById('multi-provider-progress-text');
@@ -952,6 +1197,7 @@
                 btnBg.disabled = true;
                 btnRun.disabled = true;
                 if (btnTest) btnTest.disabled = true;
+                if (btnParallel) btnParallel.disabled = true;
                 resultBlock.classList.add('hidden');
                 progressBlock.classList.remove('hidden');
                 progressBar.style.width = '0%';
@@ -1005,6 +1251,7 @@
                                 btnBg.disabled = false;
                                 btnRun.disabled = false;
                                 if (btnTest) btnTest.disabled = false;
+                                if (btnParallel) btnParallel.disabled = false;
                                 return;
                             }
                             var d = res.data;
@@ -1035,6 +1282,7 @@
                                 btnBg.disabled = false;
                                 btnRun.disabled = false;
                                 if (btnTest) btnTest.disabled = false;
+                                if (btnParallel) btnParallel.disabled = false;
                                 return;
                             }
                             runBatch(d.next_offset != null ? d.next_offset : offset + (d.processed || 0));
@@ -1049,6 +1297,7 @@
                             btnBg.disabled = false;
                             btnRun.disabled = false;
                             if (btnTest) btnTest.disabled = false;
+                            if (btnParallel) btnParallel.disabled = false;
                         });
                 }
 

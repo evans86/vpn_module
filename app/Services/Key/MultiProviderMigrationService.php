@@ -79,7 +79,9 @@ class MultiProviderMigrationService
             ->pluck('ka.id');
 
         $total = null;
-        if ($maxTotal === null || $offset === 0) {
+        if ($maxTotal !== null) {
+            $total = $maxTotal - $offset;
+        } elseif ($offset === 0) {
             $total = (int) DB::table('key_activate as ka')
                 ->where('ka.status', KeyActivate::ACTIVE)
                 ->whereNotNull('ka.user_tg_id')
@@ -119,7 +121,9 @@ class MultiProviderMigrationService
         if ($total === null) {
             $total = $nextOffset;
         }
-        $remaining = max(0, $total - $nextOffset);
+        $remaining = $maxTotal !== null
+            ? max(0, $maxTotal - $nextOffset)
+            : ($total > 0 ? max(0, $total - $nextOffset) : 0);
         $isTestRun = $maxTotal !== null && $processed >= $maxTotal;
         $done = $remaining <= 0 || $isTestRun;
 

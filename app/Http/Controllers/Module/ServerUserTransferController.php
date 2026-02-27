@@ -1030,6 +1030,150 @@ class ServerUserTransferController extends Controller
     }
 
     /**
+     * Запустить параллельную миграцию: N воркеров (срезов), каждый обрабатывает свой диапазон ключей.
+     * Требуется очередь (queue:work). Возвращает run_id для опроса — статус агрегируется по всем срезам.
+     */
+    public function multiProviderMigrationStartParallel(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'num_workers' => 'sometimes|integer|min:2|max:20',
+                'batch_size' => 'sometimes|integer|min:50|max:500',
+                'dry_run' => 'nullable|boolean',
+            ]);
+            $numWorkers = (int) ($validated['num_workers'] ?? 10);
+            $batchSize = (int) ($validated['batch_size'] ?? 500);
+            $dryRun = !empty($validated['dry_run']);
+
+            $slots = config('panel.multi_provider_slots', []);
+            $slots = is_array($slots) ? $slots : [];
+            if (empty($slots)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Мульти-провайдер отключён. Задайте PANEL_MULTI_PROVIDER_SLOTS в .env.',
+                ], 400);
+            }
+
+            $service = app(MultiProviderMigrationService::class);
+            $totalCount = $service->getTotalCount();
+            if ($totalCount < 1) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Нет ключей-кандидатов для миграции.',
+                ], 400);
+            }
+
+            $existingRunId = Cache::get('multi_provider_migration_latest_run_id');
+            if ($existingRunId) {
+                $parallelMeta = Cache::get('multi_provider_migration_parallel_' . $existingRunId);
+                if ($parallelMeta) {
+                    $runIds = $parallelMeta['run_ids'] ?? [];
+                    $agg = ['processed' => 0, 'added_total' => 0, 'done' => true];
+                    foreach ($runIds as $rid) {
+                        $p = Cache::get('multi_provider_migration_' . $rid, []);
+                        $agg['processed'] += (int) ($p['processed'] ?? 0);
+                        $agg['added_total'] += (int) ($p['added_total'] ?? 0);
+                        if (empty($p['done'])) {
+                            $agg['done'] = false;
+                        }
+                    }
+                    if (!$agg['done']) {
+                        return response()->json([
+                            'success' => true,
+                            'run_id' => $existingRunId,
+                            'message' => 'Параллельная миграция уже запущена (' . $agg['processed'] . ' из ' . ($parallelMeta['total'] ?? 0) . '). Запустите воркер: bash scripts/start-queue-worker-loop.sh',
+                        ]);
+                    }
+                } else {
+                    $existing = Cache::get('multi_provider_migration_' . $existingRunId);
+                    if (!empty($existing) && empty($existing['done'])) {
+                        return response()->json([
+                            'success' => true,
+                            'run_id' => $existingRunId,
+                            'message' => 'Миграция уже запущена. Запустите воркер: bash scripts/start-queue-worker-loop.sh',
+                        ]);
+                    }
+                }
+            }
+
+            $parentRunId = 'mp_par_' . Str::random(12);
+            $sliceSize = (int) ceil($totalCount / $numWorkers);
+            $runIds = [];
+
+            for ($i = 0; $i < $numWorkers; $i++) {
+                $offset = $i * $sliceSize;
+                $endOffset = min(($i + 1) * $sliceSize, $totalCount);
+                if ($offset >= $endOffset) {
+                    continue;
+                }
+                $runId = $parentRunId . '_' . $i;
+                $runIds[] = $runId;
+                Cache::put('multi_provider_migration_' . $runId, [
+                    'total' => 0,
+                    'processed' => 0,
+                    'added_total' => 0,
+                    'errors' => [],
+                    'done' => false,
+                    'message' => 'Срез ' . ($i + 1) . '…',
+                    'started_at' => now()->toIso8601String(),
+                ], now()->addHours(3));
+                MultiProviderMigrationBatchJob::dispatch($runId, $offset, $batchSize, $dryRun, $endOffset);
+            }
+
+            Cache::put('multi_provider_migration_parallel_' . $parentRunId, [
+                'run_ids' => $runIds,
+                'total' => $totalCount,
+                'started_at' => now()->toIso8601String(),
+            ], now()->addHours(3));
+            Cache::put('multi_provider_migration_latest_run_id', $parentRunId, now()->addHours(3));
+
+            return response()->json([
+                'success' => true,
+                'run_id' => $parentRunId,
+                'message' => 'Параллельная миграция запущена: ' . count($runIds) . ' воркеров. Запустите воркер на сервере: bash scripts/start-queue-worker-loop.sh',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Multi-provider migration start-parallel failed', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Отмена текущей или указанной миграции. Останавливает постановку следующих порций в очередь;
+     * уже обработанные ключи остаются. Для параллельного запуска отменяются все срезы.
+     */
+    public function multiProviderMigrationCancel(Request $request): JsonResponse
+    {
+        $runId = $request->input('run_id');
+        if (!$runId || !is_string($runId)) {
+            $runId = Cache::get('multi_provider_migration_latest_run_id');
+        }
+        if (!$runId || !is_string($runId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Нет активного запуска для отмены.',
+            ], 400);
+        }
+
+        $parallelMeta = Cache::get('multi_provider_migration_parallel_' . $runId);
+        if ($parallelMeta && !empty($parallelMeta['run_ids'])) {
+            foreach ($parallelMeta['run_ids'] as $rid) {
+                Cache::put('multi_provider_migration_cancel_' . $rid, true, now()->addHours(1));
+            }
+        } else {
+            Cache::put('multi_provider_migration_cancel_' . $runId, true, now()->addHours(1));
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Запрос на отмену отправлен. Текущие порции доработают, новые не будут поставлены в очередь.',
+        ]);
+    }
+
+    /**
      * Статус фоновой миграции по run_id (для опроса с интерфейса).
      * Если run_id не передан — возвращается статус последнего запуска (после перезагрузки страницы).
      */
@@ -1047,6 +1191,47 @@ class ServerUserTransferController extends Controller
                 'message' => 'Нет активного или последнего запуска миграции.',
             ]);
         }
+
+        $parallelMeta = Cache::get('multi_provider_migration_parallel_' . $runId);
+        if ($parallelMeta && !empty($parallelMeta['run_ids'])) {
+            $total = (int) ($parallelMeta['total'] ?? 0);
+            $processed = 0;
+            $addedTotal = 0;
+            $errors = [];
+            $allDone = true;
+            $cancelled = false;
+            $startedAt = $parallelMeta['started_at'] ?? null;
+            foreach ($parallelMeta['run_ids'] as $rid) {
+                $p = Cache::get('multi_provider_migration_' . $rid, []);
+                $processed += (int) ($p['processed'] ?? 0);
+                $addedTotal += (int) ($p['added_total'] ?? 0);
+                $errors = array_merge($errors, $p['errors'] ?? []);
+                if (empty($p['done'])) {
+                    $allDone = false;
+                }
+                if (!empty($p['cancelled'])) {
+                    $cancelled = true;
+                }
+            }
+            $msg = $allDone
+                ? ($cancelled ? 'Миграция отменена.' : 'Параллельная миграция завершена.')
+                : ('Обработано ' . $processed . ' из ' . $total);
+            return response()->json([
+                'success' => true,
+                'run_id' => $runId,
+                'found' => true,
+                'total' => $total,
+                'processed' => $processed,
+                'added_total' => $addedTotal,
+                'errors' => $errors,
+                'done' => $allDone,
+                'cancelled' => $cancelled,
+                'message' => $msg,
+                'error' => null,
+                'started_at' => $startedAt,
+            ]);
+        }
+
         $cacheKey = 'multi_provider_migration_' . $runId;
         $progress = Cache::get($cacheKey);
         if (!$progress) {
@@ -1084,6 +1269,7 @@ class ServerUserTransferController extends Controller
             'added_total' => (int) ($progress['added_total'] ?? 0),
             'errors' => $progress['errors'] ?? [],
             'done' => (bool) ($progress['done'] ?? false),
+            'cancelled' => (bool) ($progress['cancelled'] ?? false),
             'message' => $progress['message'] ?? '',
             'error' => $progress['error'] ?? null,
             'started_at' => $progress['started_at'] ?? null,

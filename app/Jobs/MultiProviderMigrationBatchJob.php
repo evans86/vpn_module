@@ -25,18 +25,35 @@ class MultiProviderMigrationBatchJob implements ShouldQueue
     protected $batchSize;
     /** @var bool */
     protected $dryRun;
+    /** @var int|null Конечный offset среза (exclusive). Если задан — обрабатываем только [offset, maxTotal), не цепочку до конца. */
+    protected $maxTotal;
 
-    public function __construct(string $runId, int $offset, int $batchSize, bool $dryRun)
+    public function __construct(string $runId, int $offset, int $batchSize, bool $dryRun, ?int $maxTotal = null)
     {
         $this->runId = $runId;
         $this->offset = $offset;
         $this->batchSize = $batchSize;
         $this->dryRun = $dryRun;
+        $this->maxTotal = $maxTotal;
     }
 
     public function handle(): void
     {
         ini_set('memory_limit', '2048M');
+
+        $cancelKey = 'multi_provider_migration_cancel_' . $this->runId;
+        if (Cache::get($cancelKey)) {
+            $cacheKey = 'multi_provider_migration_' . $this->runId;
+            $progress = Cache::get($cacheKey, []);
+            $progress['done'] = true;
+            $progress['message'] = 'Отменено пользователем';
+            $progress['cancelled'] = true;
+            if (!isset($progress['started_at'])) {
+                $progress['started_at'] = now()->toIso8601String();
+            }
+            Cache::put($cacheKey, $progress, now()->addHours(3));
+            return;
+        }
 
         try {
             $cacheKey = 'multi_provider_migration_' . $this->runId;
@@ -54,14 +71,18 @@ class MultiProviderMigrationBatchJob implements ShouldQueue
             }
 
             if ($this->offset === 0 && ($progress['total'] ?? 0) === 0) {
-                $service = app(MultiProviderMigrationService::class);
-                $progress['total'] = $service->getTotalCount();
+                if ($this->maxTotal !== null) {
+                    $progress['total'] = $this->maxTotal;
+                } else {
+                    $service = app(MultiProviderMigrationService::class);
+                    $progress['total'] = $service->getTotalCount();
+                }
                 $progress['message'] = 'Подсчёт завершён. Обработка первой порции…';
                 Cache::put($cacheKey, $progress, now()->addHours(3));
             }
 
             $service = app(MultiProviderMigrationService::class);
-            $result = $service->runOneBatch($this->offset, $this->batchSize, $this->dryRun, null);
+            $result = $service->runOneBatch($this->offset, $this->batchSize, $this->dryRun, $this->maxTotal);
 
             $progress = Cache::get($cacheKey, [
                 'total' => 0,
@@ -85,13 +106,25 @@ class MultiProviderMigrationBatchJob implements ShouldQueue
 
             Cache::put($cacheKey, $progress, now()->addHours(3));
 
+            if (Cache::get($cancelKey)) {
+                $progress['done'] = true;
+                $progress['message'] = 'Отменено пользователем';
+                $progress['cancelled'] = true;
+                Cache::put($cacheKey, $progress, now()->addHours(3));
+                return;
+            }
             if (!$result['done'] && $result['success']) {
-                self::dispatch(
-                    $this->runId,
-                    $result['next_offset'],
-                    $this->batchSize,
-                    $this->dryRun
-                )->onQueue($this->queue);
+                $nextOffset = $result['next_offset'];
+                $withinSlice = $this->maxTotal === null || $nextOffset < $this->maxTotal;
+                if ($withinSlice) {
+                    self::dispatch(
+                        $this->runId,
+                        $nextOffset,
+                        $this->batchSize,
+                        $this->dryRun,
+                        $this->maxTotal
+                    )->onQueue($this->queue);
+                }
             }
         } catch (\Throwable $e) {
             Log::error('MultiProviderMigrationBatchJob failed', [
