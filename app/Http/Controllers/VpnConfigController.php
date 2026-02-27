@@ -167,31 +167,36 @@ class VpnConfigController extends Controller
                 );
             }
 
-            // Не браузер (VPN-приложение: v2rayNG, Clash, Hiddify и т.д.): полная сборка с панелями и сразу актуальный конфиг text/plain для подписки.
+            // VPN-приложение (Hiddify, v2rayNG, Clash и т.д.): отдаём ответ быстро, иначе клиент обрывает по таймауту.
+            // Сначала пробуем сохранённые ссылки из БД (без запросов к панелям) — ответ за 1–2 сек.
+            $userAgent = request()->header('User-Agent') ?? 'Unknown';
+            $isVpnClient = $this->isVpnClient($userAgent);
+
+            if ($isVpnClient || request()->wantsJson()) {
+                $storedData = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id);
+                $connectionKeys = $storedData['connectionKeys'];
+                if (!empty($connectionKeys)) {
+                    return response(implode("\n", $connectionKeys))
+                        ->header('Content-Type', 'text/plain');
+                }
+                // Сохранённых ссылок нет (ключ ещё ни разу не открывали в браузере / не обновляли): полная сборка (может занять 30+ сек, клиент может оборвать)
+                $data = $this->buildConnectionData($keyActivate, $key_activate_id, false);
+                $connectionKeys = $data['connectionKeys'];
+                return response(implode("\n", $connectionKeys))
+                    ->header('Content-Type', 'text/plain');
+            }
+
+            // Не браузер и не VPN (редко): полная сборка и text/plain
             $data = $this->buildConnectionData($keyActivate, $key_activate_id, false);
             $connectionKeys = $data['connectionKeys'];
             $slotsWithLinks = $data['slotsWithLinks'];
             $firstKeyActivateUser = $data['firstKeyActivateUser'];
             $firstServerUser = $data['firstServerUser'];
 
-            $userAgent = request()->header('User-Agent') ?? 'Unknown';
-
-            // Определяем тип клиента
-            $isVpnClient = $this->isVpnClient($userAgent);
-            $isBrowser = $this->isBrowserClient($userAgent);
-
-            // VPN-клиент или JSON: отдаём актуальные ссылки (уже собраны выше)
-            if ($isVpnClient || request()->wantsJson()) {
-                return response(implode("\n", $connectionKeys))
-                    ->header('Content-Type', 'text/plain');
-            }
-
-            // Если это браузер - показываем HTML страницу (с группировкой протоколов по локации)
-            if ($isBrowser) {
+            if ($this->isBrowserClient($userAgent)) {
                 return $this->showBrowserPage($keyActivate, $firstKeyActivateUser, $firstServerUser, $connectionKeys, $slotsWithLinks);
             }
 
-            // По умолчанию для неизвестных клиентов возвращаем конфигурацию
             return response(implode("\n", $connectionKeys))
                 ->header('Content-Type', 'text/plain');
 
