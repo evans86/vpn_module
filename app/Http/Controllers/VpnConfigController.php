@@ -321,8 +321,6 @@ class VpnConfigController extends Controller
         $slotsWithLinks = [];
         $firstKeyActivateUser = null;
         $firstServerUser = null;
-        $providerToIndex = [];
-        $nextProviderIndex = 1;
         $lastUpdated = null;
 
         foreach ($keyActivateUsers as $kau) {
@@ -372,11 +370,9 @@ class VpnConfigController extends Controller
                 } elseif ($server && $server->name) {
                     $name = $server->name;
                 }
-                $providerKey = $server && trim((string)($server->provider ?? '')) !== '' ? strtolower(trim($server->provider)) : ($server && trim((string)($server->name ?? '')) !== '' ? strtolower(trim($server->name)) : 'server');
-                if (!isset($providerToIndex[$providerKey])) {
-                    $providerToIndex[$providerKey] = $nextProviderIndex++;
-                }
-                $locationLabel = $name . ' #' . $providerToIndex[$providerKey];
+                $name = $this->normalizeLocationLabelName($name);
+                $sectionNumber = count($slotsWithLinks) + 1;
+                $locationLabel = $name . ' #' . $sectionNumber;
                 $slotsWithLinks[] = [
                     'location_label'  => $locationLabel,
                     'location_code'   => $locationCode,
@@ -459,8 +455,6 @@ class VpnConfigController extends Controller
         $slotsWithLinks = [];
         $firstKeyActivateUser = null;
         $firstServerUser = null;
-        $providerToIndex = [];
-        $nextProviderIndex = 1;
         $lastUpdated = null;
 
         foreach ($keyActivateUsers as $kau) {
@@ -536,11 +530,9 @@ class VpnConfigController extends Controller
                 } elseif ($server && $server->name) {
                     $name = $server->name;
                 }
-                $providerKey = $server && trim((string)($server->provider ?? '')) !== '' ? strtolower(trim($server->provider)) : ($server && trim((string)($server->name ?? '')) !== '' ? strtolower(trim($server->name)) : 'server');
-                if (!isset($providerToIndex[$providerKey])) {
-                    $providerToIndex[$providerKey] = $nextProviderIndex++;
-                }
-                $locationLabel = $name . ' #' . $providerToIndex[$providerKey];
+                $name = $this->normalizeLocationLabelName($name);
+                $sectionNumber = count($slotsWithLinks) + 1;
+                $locationLabel = $name . ' #' . $sectionNumber;
                 $slotsWithLinks[] = [
                     'location_label'  => $locationLabel,
                     'location_code'   => $locationCode,
@@ -1338,6 +1330,20 @@ class VpnConfigController extends Controller
             'SG' => 'Сингапур',
         ];
         return $names[$code] ?? '';
+    }
+
+    /**
+     * Нормализация названия локации для заголовка раздела (исправление опечаток).
+     *
+     * @param string $name Название из location или сервера
+     * @return string
+     */
+    private function normalizeLocationLabelName(string $name): string
+    {
+        $typos = [
+            'Финлядния' => 'Финляндия',
+        ];
+        return $typos[$name] ?? $name;
     }
 
     /**
