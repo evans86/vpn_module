@@ -45,7 +45,7 @@ class KeyActivateUserRepository extends BaseRepository
             ->with([
                 'serverUser',
                 'serverUser.panel:id,server_id,panel,panel_adress,auth_token,panel_login,panel_password,token_died_time',
-                'serverUser.panel.server:id,name,location_id',
+                'serverUser.panel.server:id,name,location_id,provider',
                 'serverUser.panel.server.location:id,code,emoji',
                 'keyActivate',
                 'keyActivate.packSalesman',
