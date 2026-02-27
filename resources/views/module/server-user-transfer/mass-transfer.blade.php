@@ -754,15 +754,18 @@
 
                         progressBlock.classList.remove('hidden');
                         resultBlock.classList.add('hidden');
-                        if (btnBg) btnBg.disabled = true;
-                        if (btnRun) btnRun.disabled = true;
-                        if (btnTest) btnTest.disabled = true;
                         var total = s.total || 0;
                         var processed = s.processed || 0;
                         var added = s.added_total || 0;
+                        var isStale = (total === 0 && processed === 0);
+                        if (!isStale) {
+                            if (btnBg) btnBg.disabled = true;
+                            if (btnRun) btnRun.disabled = true;
+                            if (btnTest) btnTest.disabled = true;
+                        }
                         var pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
                         progressBar.style.width = pct + '%';
-                        progressText.textContent = (s.message || '') + ' Обработано: ' + processed + ' из ' + total + ', добавлено слотов: ' + added + '.';
+                        progressText.textContent = (s.message || '') + ' Обработано: ' + processed + ' из ' + total + ', добавлено слотов: ' + added + (isStale ? '. Можно нажать «Запустить в фоне» для нового запуска.' : '.');
 
                         function poll() {
                             fetch(multiProviderStatusUrl + '?run_id=' + encodeURIComponent(runId), { method: 'GET', headers: { 'Accept': 'application/json' } })

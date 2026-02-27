@@ -1043,6 +1043,24 @@ class ServerUserTransferController extends Controller
                 'message' => 'Сессия не найдена или уже удалена.',
             ]);
         }
+        $total = (int) ($progress['total'] ?? 0);
+        $processed = (int) ($progress['processed'] ?? 0);
+        $startedAt = $progress['started_at'] ?? null;
+        if ($total === 0 && $processed === 0 && $startedAt) {
+            try {
+                $started = new \DateTimeImmutable($startedAt);
+                if ($started->modify('+15 minutes') < new \DateTimeImmutable('now')) {
+                    return response()->json([
+                        'success' => true,
+                        'run_id' => $runId,
+                        'found' => false,
+                        'message' => 'Предыдущий запуск не обновился (возможно, завершился с ошибкой). Нажмите «Запустить в фоне» для нового запуска.',
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                // игнорируем ошибки парсинга даты
+            }
+        }
         return response()->json([
             'success' => true,
             'run_id' => $runId,
