@@ -321,7 +321,8 @@ class VpnConfigController extends Controller
         $slotsWithLinks = [];
         $firstKeyActivateUser = null;
         $firstServerUser = null;
-        $locationCounts = [];
+        $providerToIndex = [];
+        $nextProviderIndex = 1;
         $lastUpdated = null;
 
         foreach ($keyActivateUsers as $kau) {
@@ -371,11 +372,11 @@ class VpnConfigController extends Controller
                 } elseif ($server && $server->name) {
                     $name = $server->name;
                 }
-                $locKey = ($location ? $location->id : 0) . '_' . ($server ? $server->id : 0) . '_' . ($serverUser->panel_id ?? 0);
-                $locationCounts[$locKey] = isset($locationCounts[$locKey]) ? $locationCounts[$locKey] + 1 : 1;
-                $suffix = $locationCounts[$locKey] > 1 ? ' #' . $locationCounts[$locKey] : '';
-                $providerName = ($server && trim((string)($server->provider ?? '')) !== '') ? trim($server->provider) : (($server && trim((string)($server->name ?? '')) !== '') ? trim($server->name) : 'Сервер');
-                $locationLabel = 'протоколы ' . $providerName . ' это ' . $name . $suffix;
+                $providerKey = $server && trim((string)($server->provider ?? '')) !== '' ? strtolower(trim($server->provider)) : ($server && trim((string)($server->name ?? '')) !== '' ? strtolower(trim($server->name)) : 'server');
+                if (!isset($providerToIndex[$providerKey])) {
+                    $providerToIndex[$providerKey] = $nextProviderIndex++;
+                }
+                $locationLabel = $name . ' #' . $providerToIndex[$providerKey];
                 $slotsWithLinks[] = [
                     'location_label'  => $locationLabel,
                     'location_code'   => $locationCode,
@@ -458,7 +459,8 @@ class VpnConfigController extends Controller
         $slotsWithLinks = [];
         $firstKeyActivateUser = null;
         $firstServerUser = null;
-        $locationCounts = [];
+        $providerToIndex = [];
+        $nextProviderIndex = 1;
         $lastUpdated = null;
 
         foreach ($keyActivateUsers as $kau) {
@@ -534,11 +536,11 @@ class VpnConfigController extends Controller
                 } elseif ($server && $server->name) {
                     $name = $server->name;
                 }
-                $locKey = ($location ? $location->id : 0) . '_' . ($server ? $server->id : 0) . '_' . ($serverUser->panel_id ?? 0);
-                $locationCounts[$locKey] = isset($locationCounts[$locKey]) ? $locationCounts[$locKey] + 1 : 1;
-                $suffix = $locationCounts[$locKey] > 1 ? ' #' . $locationCounts[$locKey] : '';
-                $providerName = ($server && trim((string)($server->provider ?? '')) !== '') ? trim($server->provider) : (($server && trim((string)($server->name ?? '')) !== '') ? trim($server->name) : 'Сервер');
-                $locationLabel = 'протоколы ' . $providerName . ' это ' . $name . $suffix;
+                $providerKey = $server && trim((string)($server->provider ?? '')) !== '' ? strtolower(trim($server->provider)) : ($server && trim((string)($server->name ?? '')) !== '' ? strtolower(trim($server->name)) : 'server');
+                if (!isset($providerToIndex[$providerKey])) {
+                    $providerToIndex[$providerKey] = $nextProviderIndex++;
+                }
+                $locationLabel = $name . ' #' . $providerToIndex[$providerKey];
                 $slotsWithLinks[] = [
                     'location_label'  => $locationLabel,
                     'location_code'   => $locationCode,
