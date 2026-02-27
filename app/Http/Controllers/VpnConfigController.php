@@ -148,12 +148,20 @@ class VpnConfigController extends Controller
 
             $userAgent = request()->header('User-Agent') ?? 'Unknown';
             $isBrowser = $this->isBrowserClient($userAgent);
-            // Браузер: сразу отдаём лёгкую страницу с прогресс-баром, данные подгрузит JS через /config/{id}/refresh
+            // Браузер: сразу отдаём страницу с данными из БД (без запросов к панелям), прогресс-бар сверху; JS подгрузит актуальные данные и обновит блок контента
             if ($isBrowser) {
-                return response()->view('vpn.config-loading', [
-                    'key_activate_id' => $key_activate_id,
-                    'refresh_url' => route('vpn.config.refresh', ['token' => $key_activate_id]),
-                ]);
+                $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id);
+                $refreshUrl = route('vpn.config.refresh', ['token' => $key_activate_id]);
+                return $this->showBrowserPage(
+                    $keyActivate,
+                    $data['firstKeyActivateUser'],
+                    $data['firstServerUser'],
+                    $data['connectionKeys'],
+                    $data['slotsWithLinks'],
+                    true,
+                    false,
+                    $refreshUrl
+                );
             }
 
             $data = $this->buildConnectionData($keyActivate, $key_activate_id, false);
@@ -287,7 +295,10 @@ class VpnConfigController extends Controller
                 $data['firstKeyActivateUser'],
                 $data['firstServerUser'],
                 $data['connectionKeys'],
-                $data['slotsWithLinks']
+                $data['slotsWithLinks'],
+                false,
+                true,
+                null
             );
             return response()->json(['success' => true, 'html' => $response->getContent()]);
         } catch (\Throwable $e) {
@@ -301,6 +312,89 @@ class VpnConfigController extends Controller
                 'message' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Быстрая сборка только из БД: сохранённые ссылки (server_user.keys), без запросов к панелям.
+     * Для первого отображения страницы в браузере.
+     */
+    private function buildConnectionDataFromStored(KeyActivate $keyActivate, string $key_activate_id): array
+    {
+        $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
+        $connectionKeys = [];
+        $slotsWithLinks = [];
+        $firstKeyActivateUser = null;
+        $firstServerUser = null;
+        $locationCounts = [];
+
+        foreach ($keyActivateUsers as $kau) {
+            $serverUser = $kau->serverUser;
+            if (!$serverUser && $kau->server_user_id) {
+                $serverUser = ServerUser::with(['panel.server.location'])->find($kau->server_user_id);
+                if ($serverUser) {
+                    $kau->setRelation('serverUser', $serverUser);
+                }
+            }
+            if (!$serverUser && $kau->server_user_id) {
+                $serverUser = $this->serverUserRepository->findById($kau->server_user_id);
+                if ($serverUser && !$serverUser->relationLoaded('panel')) {
+                    $serverUser->load(['panel.server.location']);
+                }
+                if ($serverUser) {
+                    $kau->setRelation('serverUser', $serverUser);
+                }
+            }
+            if (!$serverUser) {
+                continue;
+            }
+            if ($firstKeyActivateUser === null) {
+                $firstKeyActivateUser = $kau;
+                $firstServerUser = $serverUser;
+            }
+            if ($serverUser->panel && !$serverUser->panel->relationLoaded('server')) {
+                $serverUser->panel->load('server.location');
+            }
+            $stored = json_decode($serverUser->keys ?? '[]', true);
+            $slotLinks = is_array($stored) ? $stored : [];
+            if (!empty($slotLinks)) {
+                $connectionKeys = array_merge($connectionKeys, $slotLinks);
+                $server = $serverUser->panel && $serverUser->panel->server ? $serverUser->panel->server : null;
+                $location = $server && $server->relationLoaded('location') ? $server->location : null;
+                $locationCode = '';
+                $name = 'Сервер';
+                if ($location) {
+                    $locationCode = strtolower(trim($location->code ?? ''));
+                    $name = $this->locationCodeToFullName($location->code ?: '');
+                    if ($name === '') {
+                        $name = $location->code ?: 'Сервер';
+                    }
+                } elseif ($server && $server->name) {
+                    $name = $server->name;
+                }
+                $locKey = ($location ? $location->id : 0) . '_' . ($server ? $server->id : 0) . '_' . ($serverUser->panel_id ?? 0);
+                $locationCounts[$locKey] = isset($locationCounts[$locKey]) ? $locationCounts[$locKey] + 1 : 1;
+                $suffix = $locationCounts[$locKey] > 1 ? ' #' . $locationCounts[$locKey] : '';
+                $slotsWithLinks[] = [
+                    'location_label'  => $name . $suffix,
+                    'location_code'   => $locationCode,
+                    'connection_keys' => $slotLinks,
+                ];
+            }
+        }
+
+        if ($firstKeyActivateUser === null) {
+            $firstKeyActivateUser = $keyActivateUsers->first();
+            $firstServerUser = $firstKeyActivateUser && $firstKeyActivateUser->server_user_id
+                ? $this->serverUserRepository->findById($firstKeyActivateUser->server_user_id)
+                : null;
+        }
+
+        return [
+            'connectionKeys' => $connectionKeys,
+            'slotsWithLinks' => $slotsWithLinks,
+            'firstKeyActivateUser' => $firstKeyActivateUser,
+            'firstServerUser' => $firstServerUser,
+        ];
     }
 
     /**
@@ -795,59 +889,51 @@ class VpnConfigController extends Controller
 
     /**
      * Показывает страницу для браузера
-     * @param array $slotsWithLinks Массив [ ['location_label' => string, 'connection_keys' => array], ... ] для группировки по локации
+     * @param array $slotsWithLinks Массив [ ['location_label' => string, 'connection_keys' => array], ... ]
+     * @param bool $useStoredOnly не дергать панель (userInfo из ключа), для быстрого первого отображения
+     * @param bool $partialOnly вернуть только HTML блока контента (для ответа refresh)
+     * @param string|null $configRefreshUrl URL для фонового обновления; при заданном — на странице прогресс-бар и скрипт подмены контента
      */
-    private function showBrowserPage(KeyActivate $keyActivate, $keyActivateUser, $serverUser, $connectionKeys, array $slotsWithLinks = []): Response
+    private function showBrowserPage(KeyActivate $keyActivate, $keyActivateUser, $serverUser, $connectionKeys, array $slotsWithLinks = [], bool $useStoredOnly = false, bool $partialOnly = false, ?string $configRefreshUrl = null): Response
     {
         try {
-            // Обновляем модель из базы данных, чтобы получить актуальные данные
             $keyActivate->refresh();
-
-            // Загружаем отношения заново (только нужные поля)
             if (!$keyActivate->relationLoaded('packSalesman')) {
                 $keyActivate->load([
-                    'packSalesman' => function($query) {
-                        $query->select('id', 'salesman_id', 'pack_id');
-                    },
-                    'packSalesman.salesman' => function($query) {
-                        $query->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id');
-                    }
+                    'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
+                    'packSalesman.salesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
                 ]);
             }
 
-            // ШАГ 1: Проверяем finish_at из БД (локальная дата, может быть изменена в админке)
             $keyActivate = $this->keyActivateService->checkAndUpdateStatus($keyActivate);
 
-            // ШАГ 2: Получаем данные из Marzban API (expire из панели). При ошибке (cURL 18, таймаут) показываем страницу по сохранённым данным.
             $info = [];
-            try {
-                $panel_strategy = new PanelStrategy($serverUser->panel->panel);
-                $info = $panel_strategy->getSubscribeInfo($serverUser->panel->id, $serverUser->id);
-                if (isset($info['key_status_updated']) && $info['key_status_updated'] === true) {
-                    $keyActivate->refresh();
+            if (!$useStoredOnly && $serverUser && $serverUser->panel) {
+                try {
+                    $panel_strategy = new PanelStrategy($serverUser->panel->panel);
+                    $info = $panel_strategy->getSubscribeInfo($serverUser->panel->id, $serverUser->id);
+                    if (isset($info['key_status_updated']) && $info['key_status_updated'] === true) {
+                        $keyActivate->refresh();
+                    }
+                } catch (Exception $e) {
+                    Log::warning('Error showing browser page: could not fetch subscribe info from panel', [
+                        'error' => $e->getMessage(),
+                        'key_activate_id' => $keyActivate->id,
+                        'source' => 'vpn'
+                    ]);
                 }
-            } catch (Exception $e) {
-                Log::warning('Error showing browser page: could not fetch subscribe info from panel, using stored data', [
-                    'error' => $e->getMessage(),
-                    'key_activate_id' => $keyActivate->id,
-                    'panel_id' => $serverUser->panel_id,
-                    'source' => 'vpn'
-                ]);
             }
 
-            // Получаем данные из KeyActivate (который уже загружен с отношениями)
             $packSalesman = $keyActivate->packSalesman ?? null;
             $salesman = $packSalesman->salesman ?? null;
-
             $finishAt = $keyActivate->finish_at ?? null;
-
             $daysRemaining = null;
             if ($finishAt && $finishAt > 0) {
                 $daysRemaining = ceil(($finishAt - time()) / \App\Constants\TimeConstants::SECONDS_IN_DAY);
             }
 
             $userInfo = [
-                'username' => $serverUser->id,
+                'username' => $serverUser ? $serverUser->id : '',
                 'status' => $info['status'] ?? 'active',
                 'data_limit' => $info['data_limit'] ?? ($keyActivate->traffic_limit ?? 0),
                 'data_limit_tariff' => $keyActivate->traffic_limit ?? 0,
@@ -893,31 +979,19 @@ class VpnConfigController extends Controller
             $newKeyFormattedKeys = null;
             $newKeyUserInfo = null;
 
-            if ($replacedViolation && $replacedViolation->replaced_key_id) {
-                // Находим новый ключ
+            if ($replacedViolation && $replacedViolation->replaced_key_id && !$useStoredOnly) {
                 $newKeyActivate = $this->keyActivateRepository->findById($replacedViolation->replaced_key_id);
 
                 if ($newKeyActivate) {
-                    // Загружаем отношения для нового ключа (только нужные поля)
                     $newKeyActivate->load([
-                        'packSalesman' => function($query) {
-                            $query->select('id', 'salesman_id', 'pack_id');
-                        },
-                        'packSalesman.salesman' => function($query) {
-                            $query->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id');
-                        }
+                        'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
+                        'packSalesman.salesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
                     ]);
-
-                    // Проверяем finish_at нового ключа перед запросом к Marzban
                     $newKeyActivate = $this->keyActivateService->checkAndUpdateStatus($newKeyActivate);
-
-                    // Ищем KeyActivateUser для нового ключа
                     $newKeyActivateUser = $this->keyActivateUserRepository->findByKeyActivateIdWithRelations($newKeyActivate->id);
 
                     if ($newKeyActivateUser && $newKeyActivateUser->serverUser) {
                         $newServerUser = $newKeyActivateUser->serverUser;
-
-                        // Получаем актуальные ключи для нового ключа
                         try {
                             $newConnectionKeys = $this->getFreshUserLinks($newServerUser);
 
@@ -960,7 +1034,7 @@ class VpnConfigController extends Controller
                 }
             }
 
-            return response()->view('vpn.config', compact(
+            $viewData = compact(
                 'keyActivate',
                 'userInfo',
                 'formattedKeys',
@@ -973,7 +1047,15 @@ class VpnConfigController extends Controller
                 'newKeyActivate',
                 'newKeyFormattedKeys',
                 'newKeyUserInfo'
-            ));
+            );
+            if (!$partialOnly) {
+                $viewData['configRefreshUrl'] = $configRefreshUrl;
+            }
+            if ($partialOnly) {
+                return response(view('vpn.partials.config-content', $viewData)->render())
+                    ->header('Content-Type', 'text/html; charset=UTF-8');
+            }
+            return response()->view('vpn.config', $viewData);
 
         } catch (Exception $e) {
             Log::error('Error showing browser page:', [
