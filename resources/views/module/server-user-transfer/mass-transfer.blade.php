@@ -151,6 +151,7 @@
                     <span x-text="'Ключей-кандидатов: ' + multiProviderCount"></span>
                     <span x-show="multiProviderSlots.length" x-text="'. Провайдеры: ' + multiProviderSlots.join(', ')"></span>
                 </p>
+                <p id="multi-provider-count-fallback" class="text-sm text-gray-600 ml-2" style="display: none;" aria-live="polite"></p>
             </div>
             <div class="flex items-center gap-4 mb-4 flex-wrap">
                 <label class="inline-flex items-center gap-2 text-sm text-gray-600">
@@ -395,6 +396,31 @@
             var multiProviderCancelUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.cancel') }}';
             var multiProviderStatusUrl = '{{ route('admin.module.server-user-transfer.multi-provider-migration.status') }}';
             var multiProviderCsrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content') || (document.querySelector('input[name="_token"]') && document.querySelector('input[name="_token"]').value);
+
+            document.getElementById('btn-multi-provider-count').addEventListener('click', function () {
+                var btn = this;
+                var fallbackEl = document.getElementById('multi-provider-count-fallback');
+                btn.disabled = true;
+                fetch(multiProviderCountUrl, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': multiProviderCsrf, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                    body: '{}',
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        if (fallbackEl) {
+                            var count = d.count != null ? d.count : 0;
+                            var slots = d.slots && d.slots.length ? '. Провайдеры: ' + d.slots.join(', ') : '';
+                            fallbackEl.textContent = 'Ключей-кандидатов: ' + count + slots;
+                            fallbackEl.style.display = '';
+                        }
+                        if (!d.success && d.message && typeof toastr !== 'undefined') toastr.warning(d.message);
+                    })
+                    .catch(function () {
+                        if (typeof toastr !== 'undefined') toastr.error('Ошибка запроса счётчика');
+                    })
+                    .finally(function () { btn.disabled = false; });
+            });
 
             function multiProviderShowCancelButton(runId) {
                 var progressBlock = document.getElementById('multi-provider-progress');
