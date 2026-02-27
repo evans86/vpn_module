@@ -985,6 +985,20 @@ class ServerUserTransferController extends Controller
                 ], 400);
             }
 
+            $existingRunId = Cache::get('multi_provider_migration_latest_run_id');
+            if ($existingRunId) {
+                $existing = Cache::get('multi_provider_migration_' . $existingRunId);
+                if (!empty($existing) && empty($existing['done'])) {
+                    $total = (int) ($existing['total'] ?? 0);
+                    $processed = (int) ($existing['processed'] ?? 0);
+                    return response()->json([
+                        'success' => true,
+                        'run_id' => $existingRunId,
+                        'message' => 'Миграция уже запущена (' . $processed . ' из ' . $total . '). Чтобы продолжить, запустите воркер на сервере: bash scripts/start-queue-worker-loop.sh',
+                    ]);
+                }
+            }
+
             $runId = 'mp_' . Str::random(16);
             $cacheKey = 'multi_provider_migration_' . $runId;
             Cache::put($cacheKey, [

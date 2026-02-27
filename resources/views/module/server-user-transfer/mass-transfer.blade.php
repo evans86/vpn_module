@@ -759,12 +759,14 @@
                         var added = s.added_total || 0;
                         var isStale = (total === 0 && processed === 0);
                         if (!isStale) {
-                            if (btnBg) btnBg.disabled = true;
                             if (btnRun) btnRun.disabled = true;
                             if (btnTest) btnTest.disabled = true;
+                            if (btnBg) btnBg.disabled = false;
                         }
-                        var pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
-                        progressBar.style.width = pct + '%';
+                        var pct = total > 0 ? (processed / total) * 100 : 0;
+                        if (pct > 0 && pct < 1) pct = 1;
+                        if (pct > 100) pct = 100;
+                        progressBar.style.width = Math.round(pct) + '%';
                         progressText.textContent = (s.message || '') + ' Обработано: ' + processed + ' из ' + total + ', добавлено слотов: ' + added + (isStale ? '. Можно нажать «Запустить в фоне» для нового запуска.' : '.');
 
                         function poll() {
@@ -775,9 +777,11 @@
                                     var total = s.total || 0;
                                     var processed = s.processed || 0;
                                     var added = s.added_total || 0;
-                                    var pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
-                                    progressBar.style.width = pct + '%';
-                                    progressText.textContent = (s.message || '') + ' Обработано: ' + processed + ' из ' + total + ', добавлено слотов: ' + added + '.';
+                                    var pct = total > 0 ? (processed / total) * 100 : 0;
+                                    if (pct > 0 && pct < 1) pct = 1;
+                                    if (pct > 100) pct = 100;
+                                    progressBar.style.width = Math.round(pct) + '%';
+                                    progressText.textContent = 'Обработано: ' + processed + ' из ' + total + ', добавлено слотов: ' + added + '.';
                                     if (s.done) {
                                         progressBlock.classList.add('hidden');
                                         resultBlock.classList.remove('hidden');
@@ -858,7 +862,12 @@
                             return;
                         }
                         var runId = data.run_id;
-                        progressText.textContent = 'Миграция в фоне. Обновление прогресса…';
+                        if (data.message && data.message.indexOf('уже запущена') !== -1) {
+                            progressText.textContent = data.message;
+                            if (typeof toastr !== 'undefined') toastr.info(data.message);
+                        } else {
+                            progressText.textContent = 'Миграция в фоне. Обновление прогресса…';
+                        }
 
                         function poll() {
                             fetch(multiProviderStatusUrl + '?run_id=' + encodeURIComponent(runId), {
@@ -874,9 +883,11 @@
                                     var total = s.total || 0;
                                     var processed = s.processed || 0;
                                     var added = s.added_total || 0;
-                                    var pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
-                                    progressBar.style.width = pct + '%';
-                                    progressText.textContent = (s.message || '') + ' Обработано: ' + processed + ' из ' + total + ', добавлено слотов: ' + added + '.';
+                                    var pct = total > 0 ? (processed / total) * 100 : 0;
+                                    if (pct > 0 && pct < 1) pct = 1;
+                                    if (pct > 100) pct = 100;
+                                    progressBar.style.width = Math.round(pct) + '%';
+                                    progressText.textContent = 'Обработано: ' + processed + ' из ' + total + ', добавлено слотов: ' + added + '.';
 
                                     if (s.done) {
                                         progressBlock.classList.add('hidden');
