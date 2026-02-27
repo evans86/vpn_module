@@ -374,8 +374,10 @@ class VpnConfigController extends Controller
                 $locKey = ($location ? $location->id : 0) . '_' . ($server ? $server->id : 0) . '_' . ($serverUser->panel_id ?? 0);
                 $locationCounts[$locKey] = isset($locationCounts[$locKey]) ? $locationCounts[$locKey] + 1 : 1;
                 $suffix = $locationCounts[$locKey] > 1 ? ' #' . $locationCounts[$locKey] : '';
+                $providerName = $server && !empty($server->provider) ? $server->provider : 'Сервер';
+                $locationLabel = 'протоколы ' . $providerName . ' это ' . $name . $suffix;
                 $slotsWithLinks[] = [
-                    'location_label'  => $name . $suffix,
+                    'location_label'  => $locationLabel,
                     'location_code'   => $locationCode,
                     'connection_keys' => $slotLinks,
                 ];
@@ -535,8 +537,10 @@ class VpnConfigController extends Controller
                 $locKey = ($location ? $location->id : 0) . '_' . ($server ? $server->id : 0) . '_' . ($serverUser->panel_id ?? 0);
                 $locationCounts[$locKey] = isset($locationCounts[$locKey]) ? $locationCounts[$locKey] + 1 : 1;
                 $suffix = $locationCounts[$locKey] > 1 ? ' #' . $locationCounts[$locKey] : '';
+                $providerName = $server && !empty($server->provider) ? $server->provider : 'Сервер';
+                $locationLabel = 'протоколы ' . $providerName . ' это ' . $name . $suffix;
                 $slotsWithLinks[] = [
-                    'location_label'  => $name . $suffix,
+                    'location_label'  => $locationLabel,
                     'location_code'   => $locationCode,
                     'connection_keys' => $slotLinks,
                 ];
