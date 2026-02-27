@@ -14,6 +14,7 @@ use App\Services\Panel\marzban\MarzbanService;
 use App\Services\Panel\PanelStrategy;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
@@ -144,20 +145,26 @@ class VpnConfigController extends Controller
                 ]);
             }
 
-            // При открытии конфига/подписки — добавить недостающие провайдер-слоты (мульти-провайдер на лету)
+            // При открытии конфига/подписки — добавить недостающие провайдер-слоты (мульти-провайдер на лету).
+            // Кэш 10 минут по ключу: не дергать панели на каждом запросе.
             $multiProviderSlots = config('panel.multi_provider_slots', []);
             if (!empty($multiProviderSlots) && is_array($multiProviderSlots) && $keyActivate->status === KeyActivate::ACTIVE) {
-                try {
-                    $added = $this->keyActivateService->addMissingProviderSlots($keyActivate, false);
-                    if ($added > 0) {
-                        $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
+                $cacheKey = 'vpn_config_multi_provider_checked_' . $key_activate_id;
+                if (!Cache::has($cacheKey)) {
+                    try {
+                        $added = $this->keyActivateService->addMissingProviderSlots($keyActivate, false);
+                        Cache::put($cacheKey, 1, now()->addMinutes(10));
+                        if ($added > 0) {
+                            $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
+                        }
+                    } catch (Exception $e) {
+                        Log::warning('VpnConfig: addMissingProviderSlots failed', [
+                            'key_activate_id' => $key_activate_id,
+                            'error' => $e->getMessage(),
+                            'source' => 'vpn',
+                        ]);
+                        Cache::put($cacheKey, 1, now()->addMinutes(5)); // при ошибке — повторить через 5 мин
                     }
-                } catch (Exception $e) {
-                    Log::warning('VpnConfig: addMissingProviderSlots failed', [
-                        'key_activate_id' => $key_activate_id,
-                        'error' => $e->getMessage(),
-                        'source' => 'vpn',
-                    ]);
                 }
             }
 

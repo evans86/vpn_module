@@ -120,20 +120,27 @@ class KeyActivateService
             return 0;
         }
 
+        // Нормализуем провайдер для сравнения (VDSINA vs vdsina), и запоминаем занятые panel_id
         $existingProviders = [];
+        $existingPanelIds = [];
         foreach ($key->keyActivateUsers as $kau) {
             if ($kau->serverUser && $kau->serverUser->panel && $kau->serverUser->panel->server) {
                 $p = $kau->serverUser->panel->server->provider;
                 if ($p !== null && $p !== '') {
-                    $existingProviders[$p] = true;
+                    $existingProviders[strtolower(trim((string) $p))] = true;
                 }
+                $existingPanelIds[$kau->serverUser->panel_id] = true;
             }
         }
 
         $wouldAdd = 0;
         foreach ($slots as $provider) {
-            $provider = (string) $provider;
-            if (isset($existingProviders[$provider])) {
+            $provider = trim((string) $provider);
+            if ($provider === '') {
+                continue;
+            }
+            $providerKey = strtolower($provider);
+            if (isset($existingProviders[$providerKey])) {
                 continue;
             }
             $panel = $this->panelRepository->getOptimizedMarzbanPanelForProvider($provider, null, true);
@@ -143,6 +150,11 @@ class KeyActivateService
                     'provider' => $provider,
                     'source' => 'key_activate',
                 ]);
+                continue;
+            }
+            // Уже есть слот на эту панель (другой провайдер в конфиге мог указать на ту же панель)
+            if (isset($existingPanelIds[$panel->id])) {
+                $existingProviders[$providerKey] = true;
                 continue;
             }
             if ($dryRun) {
@@ -166,6 +178,8 @@ class KeyActivateService
                     ['max_connections' => config('panel.max_connections', 4)]
                 );
                 $wouldAdd++;
+                $existingProviders[$providerKey] = true;
+                $existingPanelIds[$panel->id] = true;
             } catch (Exception $e) {
                 Log::error('addMissingProviderSlots: failed to add slot', [
                     'key_id' => $key->id,
