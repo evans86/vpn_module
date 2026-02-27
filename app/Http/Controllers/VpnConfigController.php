@@ -153,12 +153,12 @@ class VpnConfigController extends Controller
                     ->header('Content-Type', 'text/plain; charset=utf-8');
             }
 
-            // Браузер: полная страница из БД (обновление — только по кнопке «Обновить»).
+            // Браузер: полная страница из БД (обновление — только по кнопке «Обновить»). Используем уже загруженные keyActivateUsers — без повторного запроса.
             $keyActivate->load([
                 'packSalesman' => fn($q) => $q->select('id', 'salesman_id', 'pack_id'),
                 'packSalesman.salesman' => fn($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
             ]);
-            $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id);
+            $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id, $keyActivateUsers);
             $refreshUrl = route('vpn.config.refresh', ['token' => $key_activate_id]);
             return $this->showBrowserPage(
                 $keyActivate,
@@ -310,10 +310,13 @@ class VpnConfigController extends Controller
     /**
      * Быстрая сборка только из БД: сохранённые ссылки (server_user.keys), без запросов к панелям.
      * Для первого отображения страницы в браузере.
+     * @param \Illuminate\Support\Collection|null $keyActivateUsers уже загруженные слоты — если переданы, повторный запрос не выполняется.
      */
-    private function buildConnectionDataFromStored(KeyActivate $keyActivate, string $key_activate_id): array
+    private function buildConnectionDataFromStored(KeyActivate $keyActivate, string $key_activate_id, ?\Illuminate\Support\Collection $keyActivateUsers = null): array
     {
-        $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
+        if ($keyActivateUsers === null) {
+            $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
+        }
         $connectionKeys = [];
         $slotsWithLinks = [];
         $firstKeyActivateUser = null;
