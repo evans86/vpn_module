@@ -6,6 +6,7 @@ use App\Models\KeyActivate\KeyActivate;
 use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Models\ServerUser\ServerUser;
 use App\Models\VPN\ConnectionLimitViolation;
+use App\Jobs\AddMissingSlotsForKeyJob;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Repositories\KeyActivateUser\KeyActivateUserRepository;
 use App\Repositories\ServerUser\ServerUserRepository;
@@ -145,25 +146,17 @@ class VpnConfigController extends Controller
                 ]);
             }
 
-            // При открытии конфига/подписки — добавить недостающие провайдер-слоты (мульти-провайдер на лету).
-            // Кэш 10 минут по ключу: не дергать панели на каждом запросе.
+            // Недостающие провайдер-слоты добавляем в фоне (очередь), чтобы не тормозить страницу.
+            // При QUEUE_CONNECTION=sync джоб выполнится в том же запросе — страница будет медленной; используйте database/redis и воркер.
             $multiProviderSlots = config('panel.multi_provider_slots', []);
             if (!empty($multiProviderSlots) && is_array($multiProviderSlots) && $keyActivate->status === KeyActivate::ACTIVE) {
-                $cacheKey = 'vpn_config_multi_provider_checked_' . $key_activate_id;
-                if (!Cache::has($cacheKey)) {
-                    try {
-                        $added = $this->keyActivateService->addMissingProviderSlots($keyActivate, false);
+                $slotCount = $keyActivateUsers->count();
+                $providerCount = count($multiProviderSlots);
+                if ($providerCount > 0 && $slotCount < $providerCount && config('queue.default') !== 'sync') {
+                    $cacheKey = 'vpn_config_multi_provider_checked_' . $key_activate_id;
+                    if (!Cache::has($cacheKey)) {
+                        AddMissingSlotsForKeyJob::dispatch($key_activate_id);
                         Cache::put($cacheKey, 1, now()->addMinutes(10));
-                        if ($added > 0) {
-                            $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
-                        }
-                    } catch (Exception $e) {
-                        Log::warning('VpnConfig: addMissingProviderSlots failed', [
-                            'key_activate_id' => $key_activate_id,
-                            'error' => $e->getMessage(),
-                            'source' => 'vpn',
-                        ]);
-                        Cache::put($cacheKey, 1, now()->addMinutes(5)); // при ошибке — повторить через 5 мин
                     }
                 }
             }
