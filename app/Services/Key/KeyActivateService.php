@@ -16,6 +16,7 @@ use App\Services\External\BottApi;
 use App\Services\Panel\PanelStrategy;
 use App\Services\Notification\NotificationService;
 use App\Services\Server\ServerStrategy;
+use App\Jobs\WarmConfigForKeyJob;
 use Carbon\Carbon;
 use DomainException;
 use GuzzleHttp\Exception\GuzzleException;
@@ -451,6 +452,8 @@ class KeyActivateService
                 $key->id
             );
 
+            WarmConfigForKeyJob::dispatch((string) $activatedKey->id);
+
             return $activatedKey;
         } catch (Exception $e) {
             $this->logger->error('Ошибка активации ключа', [
@@ -570,6 +573,8 @@ class KeyActivateService
                     $this->notificationService->sendKeyActivatedNotification($packSalesman->salesman->telegram_id, $keyLocked->id);
                 }
 
+                WarmConfigForKeyJob::dispatch((string) $activatedKey->id);
+
                 return $activatedKey;
             });
         } catch (Exception $e) {
@@ -678,6 +683,8 @@ class KeyActivateService
                 $packSalesman = $this->packSalesmanRepository->findByIdOrFail($key->pack_salesman_id);
                 $this->notificationService->sendKeyActivatedNotification($packSalesman->salesman->telegram_id, $key->id);
             }
+
+            WarmConfigForKeyJob::dispatch((string) $activatedKey->id);
 
             return $activatedKey;
         } catch (Exception $e) {

@@ -151,7 +151,7 @@ class VpnConfigController extends Controller
 
             $userAgent = request()->header('User-Agent') ?? 'Unknown';
             $isBrowser = $this->isBrowserClient($userAgent);
-            // Браузер: сразу отдаём страницу с данными из БД (без запросов к панелям), сверху — индикатор «загрузка с серверов»; JS фоново запросит актуальные данные и обновит блок.
+            // Браузер: только из БД, без запросов к панелям. Обновление — только по кнопке «Обновить».
             if ($isBrowser) {
                 $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id);
                 $refreshUrl = route('vpn.config.refresh', ['token' => $key_activate_id]);
@@ -163,7 +163,9 @@ class VpnConfigController extends Controller
                     $data['slotsWithLinks'],
                     true,
                     false,
-                    $refreshUrl
+                    null,
+                    $refreshUrl,
+                    $data['lastUpdated'] ?? null
                 );
             }
 
@@ -180,10 +182,8 @@ class VpnConfigController extends Controller
                     return response(implode("\n", $connectionKeys))
                         ->header('Content-Type', 'text/plain; charset=utf-8');
                 }
-                // Сохранённых ссылок нет: полная сборка (может занять 30+ сек)
-                $data = $this->buildConnectionData($keyActivate, $key_activate_id, false);
-                $connectionKeys = $data['connectionKeys'];
-                return response(implode("\n", $connectionKeys))
+                // Сохранённых ссылок нет — не дергаем панели (таймаут). Отдаём пустую конфигурацию.
+                return response('')
                     ->header('Content-Type', 'text/plain; charset=utf-8');
             }
 
@@ -195,7 +195,8 @@ class VpnConfigController extends Controller
             $firstServerUser = $data['firstServerUser'];
 
             if ($this->isBrowserClient($userAgent)) {
-                return $this->showBrowserPage($keyActivate, $firstKeyActivateUser, $firstServerUser, $connectionKeys, $slotsWithLinks);
+                $refreshUrl = route('vpn.config.refresh', ['token' => $key_activate_id]);
+                return $this->showBrowserPage($keyActivate, $firstKeyActivateUser, $firstServerUser, $connectionKeys, $slotsWithLinks, false, false, null, $refreshUrl, $data['lastUpdated'] ?? null);
             }
 
             return response(implode("\n", $connectionKeys))
@@ -314,9 +315,14 @@ class VpnConfigController extends Controller
                 $data['slotsWithLinks'],
                 false,
                 true,
+                null,
+                null,
                 null
             );
-            return response()->json(['success' => true, 'html' => $response->getContent()]);
+            $lastUpdated = isset($data['lastUpdated']) && $data['lastUpdated']
+                ? $data['lastUpdated']->format('d.m.Y H:i')
+                : null;
+            return response()->json(['success' => true, 'html' => $response->getContent(), 'lastUpdated' => $lastUpdated]);
         } catch (\Throwable $e) {
             Log::warning('VpnConfig refresh failed', [
                 'key_activate_id' => $key_activate_id,
@@ -342,6 +348,7 @@ class VpnConfigController extends Controller
         $firstKeyActivateUser = null;
         $firstServerUser = null;
         $locationCounts = [];
+        $lastUpdated = null;
 
         foreach ($keyActivateUsers as $kau) {
             $serverUser = $kau->serverUser;
@@ -373,6 +380,9 @@ class VpnConfigController extends Controller
             $stored = json_decode($serverUser->keys ?? '[]', true);
             $slotLinks = is_array($stored) ? $stored : [];
             if (!empty($slotLinks)) {
+                if ($serverUser->updated_at && (!$lastUpdated || $serverUser->updated_at > $lastUpdated)) {
+                    $lastUpdated = $serverUser->updated_at;
+                }
                 $connectionKeys = array_merge($connectionKeys, $slotLinks);
                 $server = $serverUser->panel && $serverUser->panel->server ? $serverUser->panel->server : null;
                 $location = $server && $server->relationLoaded('location') ? $server->location : null;
@@ -410,6 +420,7 @@ class VpnConfigController extends Controller
             'slotsWithLinks' => $slotsWithLinks,
             'firstKeyActivateUser' => $firstKeyActivateUser,
             'firstServerUser' => $firstServerUser,
+            'lastUpdated' => $lastUpdated,
         ];
     }
 
@@ -472,6 +483,7 @@ class VpnConfigController extends Controller
         $firstKeyActivateUser = null;
         $firstServerUser = null;
         $locationCounts = [];
+        $lastUpdated = null;
 
         foreach ($keyActivateUsers as $kau) {
             $serverUser = $kau->serverUser;
@@ -511,6 +523,9 @@ class VpnConfigController extends Controller
                 if (!empty($links)) {
                     $slotLinks = $links;
                     $connectionKeys = array_merge($connectionKeys, $links);
+                    if ($serverUser->updated_at && (!$lastUpdated || $serverUser->updated_at > $lastUpdated)) {
+                        $lastUpdated = $serverUser->updated_at;
+                    }
                 }
                 unset($links);
             } catch (\App\Exceptions\KeyReplacedException $e) {
@@ -568,6 +583,7 @@ class VpnConfigController extends Controller
             'slotsWithLinks' => $slotsWithLinks,
             'firstKeyActivateUser' => $firstKeyActivateUser,
             'firstServerUser' => $firstServerUser,
+            'lastUpdated' => $lastUpdated,
         ];
     }
 
@@ -924,9 +940,11 @@ class VpnConfigController extends Controller
      * @param array $slotsWithLinks Массив [ ['location_label' => string, 'connection_keys' => array], ... ]
      * @param bool $useStoredOnly не дергать панель (userInfo из ключа), для быстрого первого отображения
      * @param bool $partialOnly вернуть только HTML блока контента (для ответа refresh)
-     * @param string|null $configRefreshUrl URL для фонового обновления; при заданном — на странице прогресс-бар и скрипт подмены контента
+     * @param string|null $configRefreshUrl не используется (оставлен для совместимости)
+     * @param string|null $configRefreshUrlForButton URL для кнопки «Обновить»
+     * @param \DateTimeInterface|null $lastUpdated время последнего обновления конфига в БД
      */
-    private function showBrowserPage(KeyActivate $keyActivate, $keyActivateUser, $serverUser, $connectionKeys, array $slotsWithLinks = [], bool $useStoredOnly = false, bool $partialOnly = false, ?string $configRefreshUrl = null): Response
+    private function showBrowserPage(KeyActivate $keyActivate, $keyActivateUser, $serverUser, $connectionKeys, array $slotsWithLinks = [], bool $useStoredOnly = false, bool $partialOnly = false, ?string $configRefreshUrl = null, ?string $configRefreshUrlForButton = null, $lastUpdated = null): Response
     {
         try {
             $keyActivate->refresh();
@@ -1081,7 +1099,8 @@ class VpnConfigController extends Controller
                 'newKeyUserInfo'
             );
             if (!$partialOnly) {
-                $viewData['configRefreshUrl'] = $configRefreshUrl;
+                $viewData['configRefreshUrlForButton'] = $configRefreshUrlForButton;
+                $viewData['configLastUpdated'] = $lastUpdated ? $lastUpdated->format('d.m.Y H:i') : null;
             }
             if ($partialOnly) {
                 return response(view('vpn.partials.config-content', $viewData)->render())
