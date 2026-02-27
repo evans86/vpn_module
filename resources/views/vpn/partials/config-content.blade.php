@@ -315,24 +315,6 @@
                                 </div>
                             @endforeach
                         </div>
-                        <script>
-                            document.querySelectorAll('.config-location-toggle').forEach(function(btn) {
-                                btn.addEventListener('click', function() {
-                                    var targetId = this.getAttribute('data-target');
-                                    var body = document.getElementById(targetId);
-                                    var chevron = this.querySelector('.config-location-chevron');
-                                    if (body.classList.contains('hidden')) {
-                                        body.classList.remove('hidden');
-                                        if (chevron) chevron.style.transform = 'rotate(0deg)';
-                                        this.setAttribute('aria-expanded', 'true');
-                                    } else {
-                                        body.classList.add('hidden');
-                                        if (chevron) chevron.style.transform = 'rotate(-90deg)';
-                                        this.setAttribute('aria-expanded', 'false');
-                                    }
-                                });
-                            });
-                        </script>
                     @else
                         {{-- Плоский список (один слот или перевыпущенный ключ) --}}
                         <div class="space-y-4">
