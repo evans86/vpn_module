@@ -130,9 +130,9 @@ class TimewebCloudAPI
             $statusCode = $e->getCode();
             $message = $e->getMessage();
             
-            // Получаем тело ответа для более детальной информации
+            // Получаем тело ответа для более детальной информации (только если есть ответ; у ConnectException его нет)
             $responseBody = '';
-            if ($e->hasResponse()) {
+            if (method_exists($e, 'hasResponse') && $e->hasResponse()) {
                 try {
                     $responseBody = $e->getResponse()->getBody()->getContents();
                     $responseData = json_decode($responseBody, true);
