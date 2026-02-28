@@ -70,9 +70,9 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+        <div class="bg-white rounded-2xl shadow-lg p-6 md:p-8" id="config-content-wrapper" data-all-config-links="{{ !empty($allConfigLinks) ? e(json_encode($allConfigLinks)) : '[]' }}">
             <!-- Action Buttons -->
-            <div class="mb-8 flex flex-col sm:flex-row gap-3">
+            <div class="mb-8 flex flex-col sm:flex-row gap-3 flex-wrap">
                 <button onclick="copyCurrentUrl()"
                         class="inline-flex items-center justify-center px-4 py-3 border-2 border-indigo-200 text-indigo-700 rounded-xl font-medium bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all shadow-sm hover:shadow">
                     <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -81,6 +81,16 @@
                     </svg>
                     Скопировать ссылку
                 </button>
+                @if(!empty($allConfigLinks))
+                <button onclick="copyAllConfigurations()"
+                        class="inline-flex items-center justify-center px-4 py-3 border-2 border-green-200 text-green-700 rounded-xl font-medium bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all shadow-sm hover:shadow"
+                        title="Скопировать все протоколы в текстовом виде (по одному на строку)">
+                    <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    Скопировать конфигурации
+                </button>
+                @endif
 
                 <button onclick="showUrlQR('{{ url()->current() }}')"
                         class="inline-flex items-center justify-center px-4 py-3 border-2 border-gray-200 text-gray-700 rounded-xl font-medium bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all shadow-sm hover:shadow">
@@ -140,6 +150,20 @@
                 $displayFormattedKeys = (isset($newKeyFormattedKeys) && $newKeyFormattedKeys) ? $newKeyFormattedKeys : $formattedKeys;
                 // Группировка по локации: массив [ ['label' => ..., 'flag' => ..., 'keys' => [...]], ... ]
                 $displayFormattedKeysGrouped = (isset($formattedKeysGrouped) && is_array($formattedKeysGrouped) && !empty($formattedKeysGrouped) && !isset($newKeyFormattedKeys)) ? $formattedKeysGrouped : [];
+
+                // Все ссылки протоколов для кнопки «Скопировать конфигурации» (по одной на строку)
+                $allConfigLinks = [];
+                if (!empty($displayFormattedKeysGrouped)) {
+                    foreach ($displayFormattedKeysGrouped as $g) {
+                        foreach ($g['keys'] ?? [] as $k) {
+                            $allConfigLinks[] = $k['link'];
+                        }
+                    }
+                } elseif (!empty($displayFormattedKeys)) {
+                    foreach ($displayFormattedKeys as $k) {
+                        $allConfigLinks[] = $k['link'];
+                    }
+                }
 
                 // Определяем какой ключ отображается (новый или старый)
                 $displayedKey = (isset($newKeyActivate) && $newKeyActivate) ? $newKeyActivate : $keyActivate;
@@ -262,7 +286,9 @@
                                     $groupKeys = $group['keys'] ?? [];
                                     $groupTargetId = 'config-location-' . $index;
                                 @endphp
-                                <div class="border-2 border-gray-200 rounded-xl overflow-hidden bg-white">
+                                <div class="border-2 border-gray-200 rounded-xl overflow-hidden bg-white config-location-group"
+                                     data-group-links="{{ e(json_encode(array_column($groupKeys, 'link'))) }}"
+                                     data-group-label="{{ e($groupLabel) }}">
                                     <button type="button"
                                             class="config-location-toggle w-full flex items-center justify-between px-5 py-4 text-left bg-gradient-to-r from-gray-50 to-indigo-50 hover:from-indigo-50 hover:to-indigo-100 transition-colors"
                                             aria-expanded="true"
@@ -276,7 +302,15 @@
                                             @endif
                                             <span>{{ $groupLabel }}</span>
                                         </span>
-                                        <span class="text-sm text-gray-500">{{ count($groupKeys) }} протокол(ов)</span>
+                                        <span class="flex items-center gap-2">
+                                            <button type="button" onclick="event.stopPropagation(); copyGroupConfigurations(this);"
+                                                    class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-lg border border-green-200 text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-green-500"
+                                                    title="Скопировать протоколы этой группы в текстовом виде">
+                                                <svg class="h-3.5 w-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                                Скопировать конфигурации
+                                            </button>
+                                            <span class="text-sm text-gray-500">{{ count($groupKeys) }} протокол(ов)</span>
+                                        </span>
                                     </button>
                                     <div id="{{ $groupTargetId }}" class="config-location-body border-t border-gray-200">
                                         <div class="p-4 space-y-3">
@@ -422,6 +456,53 @@
                     showCopyNotification(`✓ Конфигурация ${protocol} скопирована!`);
                 }).catch(() => {
                     alert('Не удалось скопировать конфигурацию.');
+                });
+            }
+
+            /** Скопировать все протоколы в буфер (по одному на строку). */
+            function copyAllConfigurations() {
+                const wrapper = document.getElementById('config-content-wrapper');
+                if (!wrapper) return;
+                const raw = wrapper.getAttribute('data-all-config-links');
+                let links = [];
+                try {
+                    links = JSON.parse(raw || '[]');
+                } catch (e) {
+                    console.warn('copyAllConfigurations: invalid data', e);
+                }
+                if (links.length === 0) {
+                    showCopyNotification('Нет протоколов для копирования.');
+                    return;
+                }
+                const text = links.join('\n');
+                navigator.clipboard.writeText(text).then(() => {
+                    showCopyNotification('✓ Все конфигурации скопированы (' + links.length + ' протокол(ов))!');
+                }).catch(() => {
+                    alert('Не удалось скопировать конфигурации.');
+                });
+            }
+
+            /** Скопировать протоколы одной группы (выпадающего списка) в буфер. */
+            function copyGroupConfigurations(buttonEl) {
+                const group = buttonEl.closest('.config-location-group');
+                if (!group) return;
+                const raw = group.getAttribute('data-group-links');
+                const label = group.getAttribute('data-group-label') || 'Группа';
+                let links = [];
+                try {
+                    links = JSON.parse(raw || '[]');
+                } catch (e) {
+                    console.warn('copyGroupConfigurations: invalid data', e);
+                }
+                if (links.length === 0) {
+                    showCopyNotification('В этой группе нет протоколов.');
+                    return;
+                }
+                const text = links.join('\n');
+                navigator.clipboard.writeText(text).then(() => {
+                    showCopyNotification('✓ Конфигурации «' + label + '» скопированы (' + links.length + ')!');
+                }).catch(() => {
+                    alert('Не удалось скопировать конфигурации.');
                 });
             }
 
