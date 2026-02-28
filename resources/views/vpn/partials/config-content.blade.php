@@ -1,4 +1,21 @@
     <div class="container mx-auto px-4 py-8 max-w-6xl">
+        @php
+            // Вычисляем все ссылки протоколов в начале, чтобы кнопка «Скопировать конфигурации» и data-атрибуты были корректны
+            $allConfigLinks = [];
+            $keysSource = (isset($newKeyFormattedKeys) && $newKeyFormattedKeys) ? $newKeyFormattedKeys : (isset($formattedKeys) ? $formattedKeys : []);
+            $groupsSource = (!isset($newKeyFormattedKeys) && isset($formattedKeysGrouped) && is_array($formattedKeysGrouped) && !empty($formattedKeysGrouped)) ? $formattedKeysGrouped : [];
+            if (!empty($groupsSource)) {
+                foreach ($groupsSource as $g) {
+                    foreach ($g['keys'] ?? [] as $k) {
+                        $allConfigLinks[] = stripslashes($k['link'] ?? '');
+                    }
+                }
+            } elseif (!empty($keysSource)) {
+                foreach ($keysSource as $k) {
+                    $allConfigLinks[] = stripslashes($k['link'] ?? '');
+                }
+            }
+        @endphp
         @if(isset($isDemoMode) && $isDemoMode && app()->environment('local'))
             <!-- Demo Mode Banner -->
             <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-r-lg">
@@ -70,7 +87,7 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-lg p-6 md:p-8" id="config-content-wrapper" data-all-config-links="{{ !empty($allConfigLinks) ? e(json_encode($allConfigLinks)) : '[]' }}">
+        <div class="bg-white rounded-2xl shadow-lg p-6 md:p-8" id="config-content-wrapper" data-all-config-links="{{ !empty($allConfigLinks) ? base64_encode(json_encode($allConfigLinks)) : '' }}">
             <!-- Action Buttons -->
             <div class="mb-8 flex flex-col sm:flex-row gap-3 flex-wrap">
                 <button onclick="copyCurrentUrl()"
@@ -287,7 +304,7 @@
                                     $groupTargetId = 'config-location-' . $index;
                                 @endphp
                                 <div class="border-2 border-gray-200 rounded-xl overflow-hidden bg-white config-location-group"
-                                     data-group-links="{{ e(json_encode(array_column($groupKeys, 'link'))) }}"
+                                     data-group-links="{{ base64_encode(json_encode(array_map('stripslashes', array_column($groupKeys, 'link')))) }}"
                                      data-group-label="{{ e($groupLabel) }}">
                                     <button type="button"
                                             class="config-location-toggle w-full flex items-center justify-between px-5 py-4 text-left bg-gradient-to-r from-gray-50 to-indigo-50 hover:from-indigo-50 hover:to-indigo-100 transition-colors"
@@ -466,7 +483,7 @@
                 const raw = wrapper.getAttribute('data-all-config-links');
                 let links = [];
                 try {
-                    links = JSON.parse(raw || '[]');
+                    if (raw) links = JSON.parse(atob(raw));
                 } catch (e) {
                     console.warn('copyAllConfigurations: invalid data', e);
                 }
@@ -490,7 +507,7 @@
                 const label = group.getAttribute('data-group-label') || 'Группа';
                 let links = [];
                 try {
-                    links = JSON.parse(raw || '[]');
+                    if (raw) links = JSON.parse(atob(raw));
                 } catch (e) {
                     console.warn('copyGroupConfigurations: invalid data', e);
                 }
