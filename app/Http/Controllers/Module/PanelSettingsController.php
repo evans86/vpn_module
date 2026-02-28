@@ -41,8 +41,8 @@ class PanelSettingsController extends Controller
         // Получаем статистику и сравнение стратегий с кэшированием
         $panelRepository = app(\App\Repositories\Panel\PanelRepository::class);
 
-        // Кэшируем сравнение на 5 минут, чтобы не делать запросы к API при каждой загрузке
-        $comparison = Cache::remember('panel_strategies_comparison', 300, function () use ($panelRepository) {
+        // Кэшируем сравнение на 15 минут, чтобы не перегружать API панелей и не получать 499 при частых загрузках
+        $comparison = Cache::remember('panel_strategies_comparison', 900, function () use ($panelRepository) {
             return $panelRepository->compareAllStrategies();
         });
 
