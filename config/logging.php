@@ -38,7 +38,7 @@ return [
         'stack' => [
             'driver' => 'stack',
             'channels' => ['single', 'database'],
-            'ignore_exceptions' => false,
+            'ignore_exceptions' => true,
         ],
 
         'single' => [

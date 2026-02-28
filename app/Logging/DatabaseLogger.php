@@ -171,12 +171,16 @@ class DatabaseLoggerHandler extends AbstractProcessingHandler
 
             ApplicationLog::create($data);
         } catch (Throwable $e) {
-            // Не логируем весь $record — он может быть огромным и снова исчерпать память
-            error_log(sprintf(
-                'Failed to write log entry. Message: %s. Error: %s',
-                isset($record['message']) ? substr($record['message'], 0, 500) : 'n/a',
-                $e->getMessage()
-            ));
+            // При недоступности БД не используем error_log — иначе Nginx error.log забивается дубликатами.
+            // Пишем одну короткую строку в отдельный файл.
+            $failLog = storage_path('logs/database_logger_failures.log');
+            if (function_exists('storage_path') && is_writable(dirname($failLog))) {
+                @file_put_contents(
+                    $failLog,
+                    date('c') . ' DB log write failed: ' . $e->getMessage() . "\n",
+                    LOCK_EX | FILE_APPEND
+                );
+            }
         }
     }
 }

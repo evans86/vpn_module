@@ -27,8 +27,10 @@ class ConnectionLimitViolationController extends Controller
      */
     public function index(Request $request): View
     {
-        // ЕДИНСТВЕННОЕ ИЗМЕНЕНИЕ: увеличение лимита памяти
-        ini_set('memory_limit', '256M');
+        // Увеличение лимита памяти (страница со статистикой и списком нарушений)
+        if (function_exists('ini_set') && (int) ini_get('memory_limit') < 512) {
+            @ini_set('memory_limit', '512M');
+        }
 
         // ВОЗВРАЩАЕМ ОРИГИНАЛЬНЫЙ РАБОЧИЙ ЗАПРОС
         $query = ConnectionLimitViolation::with([

@@ -5,8 +5,8 @@
 | Memory limit (prevent "Allowed memory size exhausted" on heavy BelongsTo loads)
 |--------------------------------------------------------------------------
 */
-if (!ini_get('memory_limit') || (int) ini_get('memory_limit') < 512) {
-    @ini_set('memory_limit', '512M');
+if (!ini_get('memory_limit') || (int) ini_get('memory_limit') < 768) {
+    @ini_set('memory_limit', '768M');
 }
 
 /*
