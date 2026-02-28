@@ -718,6 +718,7 @@ class VpnConfigController extends Controller
     /**
      * Собрать список ссылок (connection keys) из уже загруженных KeyActivateUser.
      * Используется для быстрого ответа подписке без дополнительных запросов к БД.
+     * Подпись (fragment) в ссылках подменяется на «Локация · Протокол» для понятных названий в клиенте.
      */
     private function collectConnectionKeysFromKeyActivateUsers(\Illuminate\Support\Collection $keyActivateUsers): array
     {
@@ -727,9 +728,33 @@ class VpnConfigController extends Controller
             if (!$serverUser || empty($serverUser->keys)) {
                 continue;
             }
+            if (!$serverUser->relationLoaded('panel')) {
+                $serverUser->load('panel.server.location');
+            }
+            $locationLabel = null;
+            if ($serverUser->panel && $serverUser->panel->server) {
+                $server = $serverUser->panel->server;
+                $server->loadMissing('location');
+                if ($server->location) {
+                    $code = $server->location->code ?? '';
+                    $locationLabel = $this->locationCodeToFullName($code);
+                    if ($locationLabel === '') {
+                        $locationLabel = $code ?: 'VPN';
+                    }
+                } elseif (!empty($server->name)) {
+                    $locationLabel = $server->name;
+                }
+            }
+            if ($locationLabel === null) {
+                $locationLabel = 'VPN';
+            }
             $stored = json_decode($serverUser->keys, true);
-            if (is_array($stored)) {
-                $connectionKeys = array_merge($connectionKeys, $stored);
+            if (!is_array($stored)) {
+                continue;
+            }
+            $formatted = $this->formatConnectionKeys($stored, $locationLabel);
+            foreach ($formatted as $key) {
+                $connectionKeys[] = stripslashes($key['link']);
             }
         }
         return $connectionKeys;
@@ -997,14 +1022,15 @@ class VpnConfigController extends Controller
             ];
 
             // Форматируем ключи для отображения (плоский список для обратной совместимости)
-            $formattedKeys = $this->formatConnectionKeys($connectionKeys);
+            $firstLocationLabel = (count($slotsWithLinks) === 1) ? ($slotsWithLinks[0]['location_label'] ?? null) : null;
+            $formattedKeys = $this->formatConnectionKeys($connectionKeys, $firstLocationLabel);
             // Группировка по локации/серверу (массив групп — без перезаписи, все протоколы сохраняются)
             $formattedKeysGrouped = [];
             foreach ($slotsWithLinks as $slot) {
                 $formattedKeysGrouped[] = [
                     'label' => $slot['location_label'],
                     'flag_code' => $slot['location_code'] ?? '',
-                    'keys'  => $this->formatConnectionKeys($slot['connection_keys']),
+                    'keys'  => $this->formatConnectionKeys($slot['connection_keys'], $slot['location_label'] ?? null),
                 ];
             }
 
@@ -1050,7 +1076,21 @@ class VpnConfigController extends Controller
                             $newConnectionKeys = $this->getFreshUserLinks($newServerUser);
 
                             if ($newConnectionKeys) {
-                                $newKeyFormattedKeys = $this->formatConnectionKeys($newConnectionKeys);
+                                $newLocationLabel = 'VPN';
+                                if ($newServerUser->panel && $newServerUser->panel->server) {
+                                    $newServer = $newServerUser->panel->server;
+                                    $newServer->loadMissing('location');
+                                    if ($newServer->location) {
+                                        $code = $newServer->location->code ?? '';
+                                        $newLocationLabel = $this->locationCodeToFullName($code);
+                                        if ($newLocationLabel === '') {
+                                            $newLocationLabel = $code ?: 'VPN';
+                                        }
+                                    } elseif (!empty($newServer->name)) {
+                                        $newLocationLabel = $newServer->name;
+                                    }
+                                }
+                                $newKeyFormattedKeys = $this->formatConnectionKeys($newConnectionKeys, $newLocationLabel);
 
                                 // Получаем информацию о подписке для нового ключа
                                 $panel_strategy = new PanelStrategy($newServerUser->panel->panel);
@@ -1347,11 +1387,30 @@ class VpnConfigController extends Controller
     }
 
     /**
+     * Заменить подпись (fragment после #) в ссылке протокола.
+     * Эта подпись отображается в VPN-клиенте (v2rayNG, Nekoray и т.д.) как название конфигурации.
+     *
+     * @param string $link Ссылка (vless://..., vmess://... и т.д.)
+     * @param string $remark Новая подпись, например "Финляндия #1 · VLESS TCP"
+     * @return string Ссылка с обновлённым fragment (для вставки в HTML по-прежнему с addslashes)
+     */
+    private function setLinkRemark(string $link, string $remark): string
+    {
+        $link = stripslashes($link);
+        $hashPos = strpos($link, '#');
+        $base = $hashPos !== false ? substr($link, 0, $hashPos) : $link;
+        $newLink = $base . '#' . rawurlencode(trim($remark));
+        return addslashes($newLink);
+    }
+
+    /**
      * Format connection keys for display
-     * @param array $connectionKeys
+     *
+     * @param array $connectionKeys Массив сырых ссылок
+     * @param string|null $locationLabel Подпись локации для отображения в клиенте (например "Финляндия #1"). Если задана, подменяет стандартную подпись Marz (uuid) на понятную.
      * @return array
      */
-    private function formatConnectionKeys(array $connectionKeys): array
+    private function formatConnectionKeys(array $connectionKeys, ?string $locationLabel = null): array
     {
         $protocolDescriptions = [
             'vless' => [
@@ -1388,14 +1447,20 @@ class VpnConfigController extends Controller
                     'icon' => substr(strtoupper($protocol), 0, 1)
                 ];
 
-                // Извлекаем тип подключения из комментария
+                // Извлекаем тип подключения из комментария (например [VLESS - tcp] -> "tcp")
                 preg_match('/\[(.*?)\]$/', $configString, $typeMatches);
                 $connectionType = $typeMatches[1] ?? '';
+
+                $link = addslashes($configString);
+                if ($locationLabel !== null && $locationLabel !== '') {
+                    $remark = $locationLabel . ' · ' . $protocolInfo['name'] . ($connectionType !== '' ? ' ' . $connectionType : '');
+                    $link = $this->setLinkRemark($configString, $remark);
+                }
 
                 $formattedKeys[] = [
                     'protocol' => $protocolInfo['name'],
                     'icon' => $protocolInfo['icon'],
-                    'link' => addslashes($configString),
+                    'link' => $link,
                     'connection_type' => $connectionType
                 ];
             }
