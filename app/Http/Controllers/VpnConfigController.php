@@ -752,9 +752,18 @@ class VpnConfigController extends Controller
             if (!is_array($stored)) {
                 continue;
             }
-            $formatted = $this->formatConnectionKeys($stored, $locationLabel);
-            foreach ($formatted as $key) {
-                $connectionKeys[] = stripslashes($key['link']);
+            try {
+                $formatted = $this->formatConnectionKeys($stored, $locationLabel);
+                foreach ($formatted as $key) {
+                    $connectionKeys[] = stripslashes($key['link']);
+                }
+            } catch (\Throwable $e) {
+                // При любой ошибке форматирования отдаём сырые ссылки без подмены подписи
+                foreach ($stored as $rawLink) {
+                    if (is_string($rawLink) && $rawLink !== '') {
+                        $connectionKeys[] = stripslashes($rawLink);
+                    }
+                }
             }
         }
         return $connectionKeys;
@@ -1396,10 +1405,14 @@ class VpnConfigController extends Controller
      */
     private function setLinkRemark(string $link, string $remark): string
     {
-        $link = stripslashes($link);
+        $link = stripslashes((string) $link);
+        if ($link === '') {
+            return addslashes($link);
+        }
+        $remark = trim((string) $remark);
         $hashPos = strpos($link, '#');
         $base = $hashPos !== false ? substr($link, 0, $hashPos) : $link;
-        $newLink = $base . '#' . rawurlencode(trim($remark));
+        $newLink = $remark !== '' ? $base . '#' . rawurlencode($remark) : $base;
         return addslashes($newLink);
     }
 
