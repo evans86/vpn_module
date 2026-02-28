@@ -26,7 +26,7 @@ php artisan key:generate
 ```
 
 Отредактируйте файл `.env`, установив правильные значения для:
-- Подключения к базе данных (DB_*)
+- Подключения к базе данных (DB)
 - TELEGRAM_BOT_TOKEN
 - TELEGRAM_WEBHOOK_URL
 - CLOUDFLARE_API_KEY (если используется)
