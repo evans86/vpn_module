@@ -60,6 +60,15 @@ class AppServiceProvider extends ServiceProvider
                 $this->app['request']->server->set('HTTPS', true);
             }
         }
+
+        // Генерация ссылок на тот же хост, с которого пришёл запрос (основной домен или зеркало)
+        $allowedHosts = config('app.allowed_url_hosts', []);
+        if (!empty($allowedHosts) && request()->hasHeader('Host')) {
+            $host = request()->getHost();
+            if (in_array($host, $allowedHosts, true)) {
+                URL::forceRootUrl(request()->getSchemeAndHttpHost());
+            }
+        }
         
         Paginator::useBootstrap();
     }
