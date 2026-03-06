@@ -28,7 +28,11 @@ abstract class AbstractTelegramBot
     protected PackSalesmanRepository $packSalesmanRepository;
     protected SalesmanRepository $salesmanRepository;
     protected KeyActivateService $keyActivateService;
-    protected const WEBHOOK_BASE_URL = 'https://vpn-telegram.com/';
+    /** URL приложения для webhook (используется APP_URL). */
+    protected static function webhookBaseUrl(): string
+    {
+        return rtrim(config('app.url', 'https://vpn-telegram.com'), '/') . '/';
+    }
     protected const BOT_TYPE_FATHER = 'father';
     protected const BOT_TYPE_SALESMAN = 'salesman';
 
@@ -122,7 +126,7 @@ abstract class AbstractTelegramBot
                 "api/telegram/father-bot/{$token}/init" :
                 "api/telegram/salesman-bot/{$token}/init";
 
-            $webhookUrl = rtrim(self::WEBHOOK_BASE_URL, '/') . '/' . $path;
+            $webhookUrl = rtrim(self::webhookBaseUrl(), '/') . '/' . $path;
 
             Log::info('Setting webhook URL', [
                 'url' => $webhookUrl,

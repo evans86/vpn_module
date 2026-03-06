@@ -74,7 +74,7 @@ class NotificationService
                     [
                         [
                             'text' => 'Открыть конфигурацию',
-                            'url' => "https://vpn-telegram.com/config/{$keyId}"
+                            'url' => \App\Helpers\UrlHelper::configUrl($keyId)
                         ]
                     ]
                 ]
@@ -109,7 +109,7 @@ class NotificationService
                     [
                         [
                             'text' => 'Открыть конфигурацию',
-                            'url' => "https://vpn-telegram.com/config/{$keyId}"
+                            'url' => \App\Helpers\UrlHelper::configUrl($keyId)
                         ]
                     ]
                 ]

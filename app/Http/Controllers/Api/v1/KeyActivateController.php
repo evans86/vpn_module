@@ -73,7 +73,7 @@ class KeyActivateController extends Controller
 
             return ApiHelpers::success([
                 'key' => $activatedKey->id,
-                'config_url' => "https://vpn-telegram.com/config/$activatedKey->id",
+                'config_url' => \App\Helpers\UrlHelper::configUrl($activatedKey->id),
                 'traffic_limit' => $activatedKey->traffic_limit,
                 'traffic_limit_gb' => round($activatedKey->traffic_limit / 1024 / 1024 / 1024, 1),
                 'finish_at' => $activatedKey->finish_at,
@@ -126,7 +126,7 @@ class KeyActivateController extends Controller
             if ($hasExistingKey) {
                 return ApiHelpers::success([
                     'key' => $hasExistingKey->id,
-                    'config_url' => "https://vpn-telegram.com/config/{$hasExistingKey->id}",
+                    'config_url' => \App\Helpers\UrlHelper::configUrl($hasExistingKey->id),
                     'traffic_limit' => $hasExistingKey->traffic_limit,
                     'traffic_limit_gb' => \App\Constants\ProductConstants::FREE_KEY_SIZE_GB,
                     'finish_at' => $hasExistingKey->finish_at,
@@ -144,7 +144,7 @@ class KeyActivateController extends Controller
 
             return ApiHelpers::success([
                 'key' => $activatedKey->id,
-                'config_url' => "https://vpn-telegram.com/config/{$activatedKey->id}",
+                'config_url' => \App\Helpers\UrlHelper::configUrl($activatedKey->id),
                 'traffic_limit' => $activatedKey->traffic_limit,
                 'traffic_limit_gb' => 5,
                 'finish_at' => $activatedKey->finish_at,
@@ -300,7 +300,7 @@ class KeyActivateController extends Controller
 
             $resultKey = [
                 'key' => $key->id,
-                'config_url' => "https://vpn-telegram.com/config/{$key->id}",
+                'config_url' => \App\Helpers\UrlHelper::configUrl($key->id),
                 'traffic_limit' => $key->traffic_limit,
                 'traffic_limit_gb' => round($key->traffic_limit / \App\Constants\DataConstants::BYTES_IN_GB, 1),
                 'finish_at' => $key->finish_at,
@@ -449,7 +449,7 @@ class KeyActivateController extends Controller
                 ->map(function ($key) {
                     return [
                         'key' => $key->id,
-                        'config_url' => "https://vpn-telegram.com/config/{$key->id}",
+                        'config_url' => \App\Helpers\UrlHelper::configUrl($key->id),
                         'traffic_limit' => $key->traffic_limit,
                         'traffic_limit_gb' => round($key->traffic_limit / \App\Constants\DataConstants::BYTES_IN_GB, 1),
                         'finish_at' => $key->finish_at,

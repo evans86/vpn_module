@@ -686,7 +686,7 @@ class ConnectionLimitMonitorService
                 [
                     [
                         'text' => '🔗 Открыть конфигурацию',
-                        'url' => "https://vpn-telegram.com/config/{$violation->keyActivate->id}"
+                        'url' => \App\Helpers\UrlHelper::configUrl($violation->keyActivate->id)
                     ]
                 ]
             ]
@@ -697,7 +697,7 @@ class ConnectionLimitMonitorService
             $keyboard['inline_keyboard'][] = [
                 [
                     'text' => '🆕 Новый ключ',
-                    'url' => "https://vpn-telegram.com/config/{$violation->keyActivate->id}"
+                    'url' => \App\Helpers\UrlHelper::configUrl($violation->keyActivate->id)
                 ]
             ];
         }

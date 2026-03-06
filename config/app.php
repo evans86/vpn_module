@@ -64,6 +64,12 @@ return [
     'allowed_url_hosts' => array_filter(array_map('trim', explode(',', env('APP_ALLOWED_URL_HOSTS', 'vpn-telegram.com,link.telegram-planet.ru')))),
 
     /*
+    | URL для ссылок в боте, уведомлениях, API (нет «текущего запроса»).
+    | По умолчанию = APP_URL. Можно задать зеркало (APP_PUBLIC_URL=https://link.telegram-planet.ru).
+    */
+    'public_url' => rtrim(env('APP_PUBLIC_URL', env('APP_URL', 'http://localhost')), '/'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------

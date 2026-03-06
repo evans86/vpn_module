@@ -362,7 +362,7 @@ class SalesmanService
             $salesman->save();
 
             // Устанавливаем вебхук для бота продавца
-            $webhookUrl = rtrim('https://vpn-telegram.com', '/') . '/api/telegram/salesman-bot/' . $token . '/init';
+            $webhookUrl = rtrim(config('app.url', 'https://vpn-telegram.com'), '/') . '/api/telegram/salesman-bot/' . $token . '/init';
             $telegram->setWebhook(['url' => $webhookUrl]);
 
             $this->logger->info('Bot token updated successfully', [

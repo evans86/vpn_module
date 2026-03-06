@@ -200,7 +200,7 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                 @if($key->status == \App\Models\KeyActivate\KeyActivate::ACTIVE)
-                                    <a href="https://vpn-telegram.com/config/{{ $key->id }}"
+                                    <a href="{{ \App\Helpers\UrlHelper::configUrl($key->id) }}"
                                        target="_blank"
                                        class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                                        title="Открыть конфигурацию">

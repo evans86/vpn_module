@@ -321,7 +321,7 @@ class SalesmanBotController extends AbstractTelegramBot
                     $message .= "📊 Использовано: {$trafficUsedGB} GB\n";
                 }
 
-                $message .= "🔗 [Открыть конфигурацию](https://vpn-telegram.com/config/{$key->id})\n\n";
+                $message .= "🔗 [Открыть конфигурацию](" . \App\Helpers\UrlHelper::configUrl($key->id) . ")\n\n";
             }
 
             $message .= "Страница " . ($page + 1) . " из $totalPages";
@@ -411,7 +411,7 @@ class SalesmanBotController extends AbstractTelegramBot
 //                    $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
                 }
 
-                $message .= "🔗 [Открыть конфигурацию](https://vpn-telegram.com/config/{$key->id})\n\n";
+                $message .= "🔗 [Открыть конфигурацию](" . \App\Helpers\UrlHelper::configUrl($key->id) . ")\n\n";
             }
 
             $message .= "Страница " . ($page + 1) . " из $totalPages";
@@ -484,7 +484,7 @@ class SalesmanBotController extends AbstractTelegramBot
                 $message .= "📊 Использовано: {$trafficUsedGB} GB\n";
             }
 
-            $message .= "🔗 [Открыть конфигурацию](https://vpn-telegram.com/config/{$key->id})\n\n";
+            $message .= "🔗 [Открыть конфигурацию](" . \App\Helpers\UrlHelper::configUrl($key->id) . ")\n\n";
 
             // Кнопка "Назад к списку подписок"
             $keyboard = [
@@ -599,7 +599,7 @@ class SalesmanBotController extends AbstractTelegramBot
                 if ((int) $keyRefreshed->user_tg_id === (int) $this->chatId) {
                     return; // Дубликат доставки — не дублируем сообщение
                 }
-                $this->sendMessage("✅ Ключ уже был активирован ранее. Ваша конфигурация: https://vpn-telegram.com/config/{$keyRefreshed->id}");
+                $this->sendMessage("✅ Ключ уже был активирован ранее. Ваша конфигурация: " . \App\Helpers\UrlHelper::configUrl($keyRefreshed->id));
                 return;
             }
             $this->sendErrorMessage();
@@ -615,7 +615,7 @@ class SalesmanBotController extends AbstractTelegramBot
 
         $text .= "🔗 <b>Ваша VPN-конфигурация:</b>\n\n";
         $text .= "[Открыть конфигурацию]\n";
-        $text .= "https://vpn-telegram.com/config/{$key->id}\n\n";
+        $text .= \App\Helpers\UrlHelper::configUrl($key->id) . "\n\n";
 
         $text .= "📝 <b>Инструкция по настройке:</b>\n\n";
         $text .= "1️⃣ Установите VPN-клиент на Ваше устройство\n";

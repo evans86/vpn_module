@@ -207,7 +207,7 @@ class KeyActivate extends Model
 
     public function getConfigUrlAttribute()
     {
-        return "https://vpn-telegram.com/config/{$this->id}";
+        return \App\Helpers\UrlHelper::configUrl($this->id);
     }
 
     public function hasConfig()

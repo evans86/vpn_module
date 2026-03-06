@@ -1396,7 +1396,7 @@ class FatherBotController extends AbstractTelegramBot
 
                 // Устанавливаем вебхук для бота продавца
                 $salesmanBot = new Api($token);
-                $webhookUrl = rtrim(self::WEBHOOK_BASE_URL, '/') . '/api/telegram/salesman-bot/' . $token . '/init';
+                $webhookUrl = rtrim(self::webhookBaseUrl(), '/') . '/api/telegram/salesman-bot/' . $token . '/init';
                 $salesmanBot->setWebhook(['url' => $webhookUrl]);
 
                 $message = "✅ Бот успешно добавлен!\n\nТеперь вы можете купить пакет VPN-доступов.";
@@ -1603,7 +1603,7 @@ class FatherBotController extends AbstractTelegramBot
             $salesmanBot = new Api($salesman->token);
 
             // Устанавливаем вебхук для бота продавца
-            $webhookUrl = rtrim(self::WEBHOOK_BASE_URL, '/') . '/api/telegram/salesman-bot/' . $salesman->token . '/init';
+            $webhookUrl = rtrim(self::webhookBaseUrl(), '/') . '/api/telegram/salesman-bot/' . $salesman->token . '/init';
             $salesmanBot->setWebhook(['url' => $webhookUrl]);
 
             $this->sendMessage("✅ Бот успешно перезагружен, Webhook обновлен.");

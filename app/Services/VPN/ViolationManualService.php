@@ -694,20 +694,20 @@ class ViolationManualService
             $message .= "Превышен лимит нарушений правил использования.\n";
             $message .= "Ваш ключ доступа был автоматически заменен.\n\n";
             $message .= "Новый ключ: <code>{$newKey->id}</code>\n";
-            $message .= "🔗 Конфигурация: https://vpn-telegram.com/config/{$newKey->id}";
+            $message .= "🔗 Конфигурация: " . \App\Helpers\UrlHelper::configUrl($newKey->id);
 
             $keyboard = [
                 'inline_keyboard' => [
                     [
                         [
                             'text' => '🔗 Открыть конфигурацию',
-                            'url' => "https://vpn-telegram.com/config/{$newKey->id}"
+                            'url' => \App\Helpers\UrlHelper::configUrl($newKey->id)
                         ]
                     ],
                     [
                         [
                             'text' => '🆕 Новый ключ',
-                            'url' => "https://vpn-telegram.com/config/{$newKey->id}"
+                            'url' => \App\Helpers\UrlHelper::configUrl($newKey->id)
                         ]
                     ]
                 ]

@@ -2131,7 +2131,7 @@ class MarzbanService
                     $message .= "🔗 Для продолжения работы:\n";
                     $message .= "• Заново вставьте ссылку-подключение в клиент VPN, или\n";
                     $message .= "• При выключенном VPN нажмите кнопку обновления конфигурации\n\n";
-                    $message .= "🔗 Ссылка: https://vpn-telegram.com/config/{$key_activate->id}";
+                    $message .= "🔗 Ссылка: " . \App\Helpers\UrlHelper::configUrl($key_activate->id);
 
                     try {
                         if (!is_null($key_activate->module_salesman_id)) {
