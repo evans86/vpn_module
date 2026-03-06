@@ -97,17 +97,19 @@
             }, 200);
 
             fetch(refreshUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
-                .then(function(r){ if (!r.ok) throw new Error(); return r.json(); })
-                .then(function(d){
+                .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, data: d }; }).catch(function(){ return { ok: false, data: {} }; }); })
+                .then(function(res){
                     clearInterval(t);
                     if (fill) fill.style.width = '100%';
-                    if (d.success && d.html) {
+                    if (res.ok && res.data.success && res.data.html) {
                         var el = document.getElementById('config-content');
-                        if (el) el.innerHTML = d.html;
+                        if (el) el.innerHTML = res.data.html;
+                        if (res.data.lastUpdated && lastUpdatedEl) lastUpdatedEl.textContent = res.data.lastUpdated;
+                        progressBar.classList.add('hidden');
+                        refreshBar.classList.remove('hidden');
+                    } else {
+                        if (errBlock) errBlock.classList.remove('hidden');
                     }
-                    if (d.lastUpdated && lastUpdatedEl) lastUpdatedEl.textContent = d.lastUpdated;
-                    progressBar.classList.add('hidden');
-                    refreshBar.classList.remove('hidden');
                 })
                 .catch(function(){
                     clearInterval(t);

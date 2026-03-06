@@ -308,11 +308,12 @@ class VpnConfigController extends Controller
             Log::warning('VpnConfig refresh failed', [
                 'key_activate_id' => $key_activate_id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'source' => 'vpn',
             ]);
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => 'Не удалось обновить конфигурацию. Попробуйте позже.',
             ], 500);
         }
     }
