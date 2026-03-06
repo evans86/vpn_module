@@ -153,6 +153,13 @@ class VpnConfigController extends Controller
                     ->header('Content-Type', 'text/plain; charset=utf-8');
             }
 
+            // Браузер: отдаём из кэша при повторном открытии (90 сек) — страница открывается мгновенно.
+            $configPageCacheKey = 'vpn_config_html_' . $key_activate_id;
+            $cachedHtml = Cache::get($configPageCacheKey);
+            if ($cachedHtml !== null) {
+                return response($cachedHtml)->header('Content-Type', 'text/html; charset=utf-8');
+            }
+
             // Браузер: полная страница из БД (обновление — только по кнопке «Обновить»). Используем уже загруженные keyActivateUsers — без повторного запроса.
             $keyActivate->load([
                 'packSalesman' => fn($q) => $q->select('id', 'salesman_id', 'pack_id'),
@@ -160,7 +167,7 @@ class VpnConfigController extends Controller
             ]);
             $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id, $keyActivateUsers);
             $refreshUrl = route('vpn.config.refresh', ['token' => $key_activate_id]);
-            return $this->showBrowserPage(
+            $response = $this->showBrowserPage(
                 $keyActivate,
                 $data['firstKeyActivateUser'],
                 $data['firstServerUser'],
@@ -172,6 +179,8 @@ class VpnConfigController extends Controller
                 $refreshUrl,
                 $data['lastUpdated'] ?? null
             );
+            Cache::put($configPageCacheKey, $response->getContent(), now()->addSeconds(90));
+            return $response;
 
         } catch (\App\Exceptions\KeyReplacedException $e) {
             // Ключ был перевыпущен - показываем страницу ошибки с информацией о новом ключе
@@ -264,6 +273,7 @@ class VpnConfigController extends Controller
             @set_time_limit(180);
         }
         $key_activate_id = $token;
+        Cache::forget('vpn_config_html_' . $key_activate_id);
         try {
             $keyActivate = $this->keyActivateRepository->findById($key_activate_id);
             if (!$keyActivate) {
@@ -985,15 +995,22 @@ class VpnConfigController extends Controller
     private function showBrowserPage(KeyActivate $keyActivate, $keyActivateUser, $serverUser, $connectionKeys, array $slotsWithLinks = [], bool $useStoredOnly = false, bool $partialOnly = false, ?string $configRefreshUrl = null, ?string $configRefreshUrlForButton = null, $lastUpdated = null): Response
     {
         try {
-            $keyActivate->refresh();
-            if (!$keyActivate->relationLoaded('packSalesman')) {
+            // При первом открытии (useStoredOnly) не дергаем БД и не обновляем статус — страница отдаётся быстрее; статус обновится по кнопке «Обновить».
+            if (!$useStoredOnly) {
+                $keyActivate->refresh();
+                if (!$keyActivate->relationLoaded('packSalesman')) {
+                    $keyActivate->load([
+                        'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
+                        'packSalesman.salesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
+                    ]);
+                }
+                $keyActivate = $this->keyActivateService->checkAndUpdateStatus($keyActivate);
+            } elseif (!$keyActivate->relationLoaded('packSalesman')) {
                 $keyActivate->load([
                     'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
                     'packSalesman.salesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
                 ]);
             }
-
-            $keyActivate = $this->keyActivateService->checkAndUpdateStatus($keyActivate);
 
             $info = [];
             if (!$useStoredOnly && $serverUser && $serverUser->panel) {
