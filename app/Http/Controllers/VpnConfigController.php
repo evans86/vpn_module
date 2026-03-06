@@ -266,13 +266,18 @@ class VpnConfigController extends Controller
      */
     public function showConfigRefresh(string $token): Response
     {
+        $key_activate_id = $token;
+        Log::info('VpnConfig refresh request started', [
+            'key_activate_id' => $key_activate_id,
+            'source' => 'vpn',
+        ]);
+
         if ((int) ini_get('memory_limit') < 1024) {
             @ini_set('memory_limit', '1024M');
         }
         if (function_exists('set_time_limit')) {
             @set_time_limit(180);
         }
-        $key_activate_id = $token;
         Cache::forget('vpn_config_html_' . $key_activate_id);
         try {
             $keyActivate = $this->keyActivateRepository->findById($key_activate_id);
