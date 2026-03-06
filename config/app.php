@@ -66,8 +66,9 @@ return [
     /*
     | URL для ссылок в боте, уведомлениях, API (нет «текущего запроса»).
     | По умолчанию = APP_URL. Можно задать зеркало (APP_PUBLIC_URL=https://link.telegram-planet.ru).
+    | Пустое значение не допускается — иначе в боте будут относительные ссылки /config/...
     */
-    'public_url' => rtrim(env('APP_PUBLIC_URL', env('APP_URL', 'http://localhost')), '/'),
+    'public_url' => rtrim(env('APP_PUBLIC_URL') ?: env('APP_URL', 'http://localhost'), '/'),
 
     /*
     |--------------------------------------------------------------------------
