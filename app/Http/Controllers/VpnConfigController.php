@@ -267,7 +267,7 @@ class VpnConfigController extends Controller
     public function showConfigRefresh(string $token): Response
     {
         $key_activate_id = $token;
-        Log::info('VpnConfig refresh request started', [
+        Log::warning('VpnConfig refresh request started', [
             'key_activate_id' => $key_activate_id,
             'source' => 'vpn',
         ]);
@@ -315,7 +315,7 @@ class VpnConfigController extends Controller
                     'source' => 'vpn',
                 ]);
             } else {
-                Log::info('VpnConfig refresh success', [
+                Log::warning('VpnConfig refresh success', [
                     'key_activate_id' => $key_activate_id,
                     'source' => 'vpn',
                 ]);
