@@ -303,7 +303,19 @@ class VpnConfigController extends Controller
             $lastUpdated = isset($data['lastUpdated']) && $data['lastUpdated']
                 ? $data['lastUpdated']->format('d.m.Y H:i')
                 : null;
-            return response()->json(['success' => true, 'html' => $response->getContent(), 'lastUpdated' => $lastUpdated]);
+            $html = $response->getContent();
+            if ($html === '' || $html === false) {
+                Log::warning('VpnConfig refresh: success but empty html', [
+                    'key_activate_id' => $key_activate_id,
+                    'source' => 'vpn',
+                ]);
+            } else {
+                Log::info('VpnConfig refresh success', [
+                    'key_activate_id' => $key_activate_id,
+                    'source' => 'vpn',
+                ]);
+            }
+            return response()->json(['success' => true, 'html' => $html ?: '', 'lastUpdated' => $lastUpdated]);
         } catch (\Throwable $e) {
             Log::warning('VpnConfig refresh failed', [
                 'key_activate_id' => $key_activate_id,
