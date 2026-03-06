@@ -11,7 +11,6 @@ use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\SalesmanOnly;
 use App\Http\Middleware\TrimStrings;
 use App\Http\Middleware\TrustHosts;
-use App\Http\Middleware\LogConfigRefreshRequest;
 use App\Http\Middleware\TrustProxies;
 use App\Http\Middleware\VerifyCsrfToken;
 use Fruitcake\Cors\HandleCors;
@@ -42,7 +41,6 @@ class Kernel extends HttpKernel
      */
     protected $middleware = [
 //        TrustHosts::class,
-        LogConfigRefreshRequest::class,
         TrustProxies::class,
         HandleCors::class,
         PreventRequestsDuringMaintenance::class,

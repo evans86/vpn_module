@@ -166,7 +166,8 @@ class VpnConfigController extends Controller
                 'packSalesman.salesman' => fn($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
             ]);
             $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id, $keyActivateUsers);
-            $refreshUrl = route('vpn.config.refresh', ['token' => $key_activate_id]);
+            // Относительный URL — запрос пойдёт на тот же хост, с которого открыта страница (зеркало или основной), без CORS
+            $refreshUrl = route('vpn.config.refresh', ['token' => $key_activate_id], false);
             $response = $this->showBrowserPage(
                 $keyActivate,
                 $data['firstKeyActivateUser'],
@@ -267,10 +268,6 @@ class VpnConfigController extends Controller
     public function showConfigRefresh(string $token): Response
     {
         $key_activate_id = $token;
-        Log::warning('VpnConfig refresh request started', [
-            'key_activate_id' => $key_activate_id,
-            'source' => 'vpn',
-        ]);
 
         if ((int) ini_get('memory_limit') < 1024) {
             @ini_set('memory_limit', '1024M');
@@ -309,17 +306,6 @@ class VpnConfigController extends Controller
                 ? $data['lastUpdated']->format('d.m.Y H:i')
                 : null;
             $html = $response->getContent();
-            if ($html === '' || $html === false) {
-                Log::warning('VpnConfig refresh: success but empty html', [
-                    'key_activate_id' => $key_activate_id,
-                    'source' => 'vpn',
-                ]);
-            } else {
-                Log::warning('VpnConfig refresh success', [
-                    'key_activate_id' => $key_activate_id,
-                    'source' => 'vpn',
-                ]);
-            }
             return response()->json(['success' => true, 'html' => $html ?: '', 'lastUpdated' => $lastUpdated]);
         } catch (\Throwable $e) {
             Log::warning('VpnConfig refresh failed', [
