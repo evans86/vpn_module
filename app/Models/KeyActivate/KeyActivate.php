@@ -4,6 +4,7 @@ namespace App\Models\KeyActivate;
 
 use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Models\PackSalesman\PackSalesman;
+use App\Models\VPN\ConnectionLimitViolation;
 use App\Models\Salesman\Salesman;
 use App\Models\TelegramUser\TelegramUser;
 use Carbon\Carbon;
@@ -79,6 +80,28 @@ class KeyActivate extends Model
     public function keyActivateUsers(): HasMany
     {
         return $this->hasMany(KeyActivateUser::class, 'key_activate_id');
+    }
+
+    /**
+     * Активные нарушения лимита подключений (для страницы конфига).
+     */
+    public function activeViolations(): HasMany
+    {
+        return $this->hasMany(ConnectionLimitViolation::class, 'key_activate_id')
+            ->where('status', ConnectionLimitViolation::STATUS_ACTIVE)
+            ->whereNull('key_replaced_at')
+            ->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Последнее нарушение с перевыпуском ключа (для страницы конфига).
+     */
+    public function replacedViolation(): HasOne
+    {
+        return $this->hasOne(ConnectionLimitViolation::class, 'key_activate_id')
+            ->whereNotNull('key_replaced_at')
+            ->whereNotNull('replaced_key_id')
+            ->orderBy('key_replaced_at', 'desc');
     }
 
     public function getTgStatusText(): string

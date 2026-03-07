@@ -68,8 +68,8 @@ class VpnConfigController extends Controller
                 return $this->showError();
             }
 
-            // Сначала находим KeyActivate по ID (это ID из таблицы key_activate)
-            $keyActivate = $this->keyActivateRepository->findById($key_activate_id);
+            // Одна загрузка ключа со всеми слотыми и связями для первого отображения в браузере (без лишних запросов и без auth_token панелей)
+            $keyActivate = $this->keyActivateRepository->findWithConfigRelationsForBrowser($key_activate_id);
 
             // Если KeyActivate не найден
             if (!$keyActivate) {
@@ -94,16 +94,9 @@ class VpnConfigController extends Controller
                 ]);
             }
 
-            // Проверяем, был ли ключ заменен из-за нарушения (даже если ключ просрочен)
-            // Это нужно проверить ДО проверки keyActivateUser, чтобы показать информацию о замене
-            $replacedViolation = \App\Models\VPN\ConnectionLimitViolation::where('key_activate_id', $key_activate_id)
-                ->whereNotNull('key_replaced_at')
-                ->whereNotNull('replaced_key_id')
-                ->orderBy('key_replaced_at', 'desc')
-                ->first();
-
-            // Все слоты ключа (один — старые ключи, несколько — мульти-провайдер)
-            $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
+            // Слоты и нарушения уже загружены в findWithConfigRelationsForBrowser
+            $keyActivateUsers = $keyActivate->keyActivateUsers;
+            $replacedViolation = $keyActivate->replacedViolation;
 
             if ($keyActivateUsers->isEmpty()) {
                 Log::warning('KeyActivateUser not found for KeyActivate', [
@@ -160,11 +153,7 @@ class VpnConfigController extends Controller
                 return response($cachedHtml)->header('Content-Type', 'text/html; charset=utf-8');
             }
 
-            // Браузер: полная страница из БД (обновление — только по кнопке «Обновить»). Используем уже загруженные keyActivateUsers — без повторного запроса.
-            $keyActivate->load([
-                'packSalesman' => fn($q) => $q->select('id', 'salesman_id', 'pack_id'),
-                'packSalesman.salesman' => fn($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
-            ]);
+            // packSalesman и salesman уже загружены в findWithConfigRelationsForBrowser
             $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id, $keyActivateUsers);
             // Относительный URL — запрос пойдёт на тот же хост, с которого открыта страница (зеркало или основной), без CORS
             $refreshUrl = route('vpn.config.refresh', ['token' => $key_activate_id], false);
@@ -1071,19 +1060,25 @@ class VpnConfigController extends Controller
             $netcheckUrl = route('netcheck.index');
             $isDemoMode = false; // Это реальная страница, не демо
 
-            // Получаем активные нарушения для этого ключа
-            $violations = ConnectionLimitViolation::where('key_activate_id', $keyActivate->id)
-                ->where('status', ConnectionLimitViolation::STATUS_ACTIVE)
-                ->whereNull('key_replaced_at')
-                ->orderBy('created_at', 'desc')
-                ->get();
-
-            // Проверяем, был ли ключ перевыпущен
-            $replacedViolation = ConnectionLimitViolation::where('key_activate_id', $keyActivate->id)
-                ->whereNotNull('key_replaced_at')
-                ->whereNotNull('replaced_key_id')
-                ->orderBy('key_replaced_at', 'desc')
-                ->first();
+            // Нарушения: используем уже загруженные при первом открытии (findWithConfigRelationsForBrowser), иначе запрос (refresh)
+            if ($keyActivate->relationLoaded('activeViolations')) {
+                $violations = $keyActivate->activeViolations;
+            } else {
+                $violations = ConnectionLimitViolation::where('key_activate_id', $keyActivate->id)
+                    ->where('status', ConnectionLimitViolation::STATUS_ACTIVE)
+                    ->whereNull('key_replaced_at')
+                    ->orderBy('created_at', 'desc')
+                    ->get();
+            }
+            if ($keyActivate->relationLoaded('replacedViolation')) {
+                $replacedViolation = $keyActivate->replacedViolation;
+            } else {
+                $replacedViolation = ConnectionLimitViolation::where('key_activate_id', $keyActivate->id)
+                    ->whereNotNull('key_replaced_at')
+                    ->whereNotNull('replaced_key_id')
+                    ->orderBy('key_replaced_at', 'desc')
+                    ->first();
+            }
 
             $newKeyActivate = null;
             $newKeyFormattedKeys = null;
