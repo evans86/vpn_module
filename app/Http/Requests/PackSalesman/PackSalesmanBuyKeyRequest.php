@@ -25,7 +25,8 @@ class PackSalesmanBuyKeyRequest extends FormRequest
     {
         return [
             'public_key' => 'required|string',
-            'user_tg_id' => 'required', //тг id покупателя
+            'user_tg_id' => 'required', // тг id покупателя
+            'user_secret_key' => 'required|string', // секретный ключ из бота для проверки пользователя
             'product_id' => 'required|integer',
         ];
     }

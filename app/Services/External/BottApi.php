@@ -14,14 +14,18 @@ class BottApi
      * Проверка $secret_key
      *
      * @param int $telegram_id
-     * @param string $secret_key
+     * @param string|null $secret_key
      * @param string $public_key
      * @param string $private_key
      * @return mixed
      * @throws GuzzleException
      */
-    public static function checkUser(int $telegram_id, string $secret_key, string $public_key, string $private_key)
+    public static function checkUser(int $telegram_id, ?string $secret_key, string $public_key, string $private_key)
     {
+        if ($secret_key === null || $secret_key === '') {
+            return ['result' => false, 'message' => 'Секретный ключ не указан', 'data' => []];
+        }
+
         $requestParam = [
             'public_key' => $public_key,
             'private_key' => $private_key,
