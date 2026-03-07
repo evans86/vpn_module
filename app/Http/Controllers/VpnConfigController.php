@@ -68,79 +68,44 @@ class VpnConfigController extends Controller
                 return $this->showError();
             }
 
-            // Одна загрузка ключа со всеми слотыми и связями для первого отображения в браузере (без лишних запросов и без auth_token панелей)
-            $keyActivate = $this->keyActivateRepository->findWithConfigRelationsForBrowser($key_activate_id);
+            // Быстрая проверка существования ключа (один лёгкий запрос) — для браузера не тянем слоты и связи.
+            $keyActivate = $this->keyActivateRepository->findById($key_activate_id);
 
-            // Если KeyActivate не найден
             if (!$keyActivate) {
-                // Демо-страница ТОЛЬКО в локальной среде с включенным debug
-                // Во всех остальных случаях (включая продакшен) показываем ошибку
                 $showDemo = app()->environment('local') && config('app.debug', false);
-
                 if ($showDemo) {
                     return $this->showDemoPage($key_activate_id);
                 }
-
-                // В продакшене или при любых сомнениях показываем ошибку
                 if (request()->wantsJson()) {
-                    return response()->json([
-                        'status' => 'error',
-                        'message' => 'Configuration not found'
-                    ], 404);
+                    return response()->json(['status' => 'error', 'message' => 'Configuration not found'], 404);
                 }
-
-                return response()->view('vpn.error', [
-                    'message' => 'Конфигурация VPN не найдена. Пожалуйста, проверьте правильность ссылки или обратитесь в поддержку.'
-                ]);
-            }
-
-            // Слоты и нарушения уже загружены в findWithConfigRelationsForBrowser
-            $keyActivateUsers = $keyActivate->keyActivateUsers;
-            $replacedViolation = $keyActivate->replacedViolation;
-
-            if ($keyActivateUsers->isEmpty()) {
-                Log::warning('KeyActivateUser not found for KeyActivate', [
-                    'key_activate_id' => $key_activate_id,
-                    'source' => 'vpn'
-                ]);
-
-                // Если ключ был заменен, показываем информацию о замене даже без keyActivateUser
-                if ($replacedViolation && $replacedViolation->replaced_key_id) {
-                    $newKey = $this->keyActivateRepository->findById($replacedViolation->replaced_key_id);
-                    
-                    if ($newKey) {
-                        Log::info('Key was replaced, showing replacement info even without keyActivateUser', [
-                            'old_key_id' => $key_activate_id,
-                            'new_key_id' => $replacedViolation->replaced_key_id,
-                            'violation_id' => $replacedViolation->id,
-                            'source' => 'vpn'
-                        ]);
-
-                        return response()->view('vpn.error', [
-                            'message' => 'Ваш ключ доступа был заменен из-за нарушения лимита подключений. Пожалуйста, используйте новый ключ.',
-                            'replacedKeyId' => $replacedViolation->replaced_key_id
-                        ]);
-                    }
-                }
-
-                if (app()->environment('local') && config('app.debug', false)) {
-                    return $this->showDemoPage($key_activate_id);
-                }
-
                 return response()->view('vpn.error', [
                     'message' => 'Конфигурация VPN не найдена. Пожалуйста, проверьте правильность ссылки или обратитесь в поддержку.'
                 ]);
             }
 
             $userAgent = request()->header('User-Agent') ?? 'Unknown';
-            // Подписка по умолчанию: отдаём plain text. HTML только если запрос явно от браузера (Accept: text/html + типичный UA).
             $isSubscriptionRequest = $this->isVpnClient($userAgent)
                 || !$this->requestAcceptsHtml()
                 || !$this->hasVersionedBrowserInUserAgent($userAgent);
-            $isBrowser = !$isSubscriptionRequest && $this->requestAcceptsHtml() && $this->isBrowserClient($userAgent);
 
             if ($isSubscriptionRequest) {
-                // Быстрый путь: ссылки только из уже загруженных keyActivateUsers, без доп. запросов.
+                $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
+                if ($keyActivateUsers->isEmpty()) {
+                    Log::warning('KeyActivateUser not found for KeyActivate', ['key_activate_id' => $key_activate_id, 'source' => 'vpn']);
+                    $replacedViolation = ConnectionLimitViolation::where('key_activate_id', $key_activate_id)
+                        ->whereNotNull('key_replaced_at')->whereNotNull('replaced_key_id')->orderBy('key_replaced_at', 'desc')->first();
+                    if ($replacedViolation && $replacedViolation->replaced_key_id) {
+                        return response()->view('vpn.error', [
+                            'message' => 'Ваш ключ доступа был заменен из-за нарушения лимита подключений. Пожалуйста, используйте новый ключ.',
+                            'replacedKeyId' => $replacedViolation->replaced_key_id
+                        ]);
+                    }
+                    if (app()->environment('local') && config('app.debug', false)) {
+                        return $this->showDemoPage($key_activate_id);
+                    }
+                    return response()->view('vpn.error', ['message' => 'Конфигурация VPN не найдена.']);
+                }
                 $connectionKeys = $this->collectConnectionKeysFromKeyActivateUsers($keyActivateUsers);
                 return response(implode("\n", $connectionKeys))
                     ->header('Content-Type', 'text/plain; charset=utf-8');
@@ -153,24 +118,12 @@ class VpnConfigController extends Controller
                 return response($cachedHtml)->header('Content-Type', 'text/html; charset=utf-8');
             }
 
-            // packSalesman и salesman уже загружены в findWithConfigRelationsForBrowser
-            $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id, $keyActivateUsers);
-            // Относительный URL — запрос пойдёт на тот же хост, с которого открыта страница (зеркало или основной), без CORS
-            $refreshUrl = route('vpn.config.refresh', ['token' => $key_activate_id], false);
-            $response = $this->showBrowserPage(
-                $keyActivate,
-                $data['firstKeyActivateUser'],
-                $data['firstServerUser'],
-                $data['connectionKeys'],
-                $data['slotsWithLinks'],
-                true,
-                false,
-                null,
-                $refreshUrl,
-                $data['lastUpdated'] ?? null
-            );
-            Cache::put($configPageCacheKey, $response->getContent(), now()->addSeconds(90));
-            return $response;
+            // Быстрый ответ: отдаём лёгкую оболочку (shell), контент подгрузится по /config/{token}/content — DOMContentLoaded будет ~0.5 с вместо 15+ с.
+            return response()->view('vpn.config-shell', [
+                'token' => $key_activate_id,
+                'contentUrl' => route('vpn.config.content', ['token' => $key_activate_id], false),
+                'refreshUrl' => route('vpn.config.refresh', ['token' => $key_activate_id], false),
+            ]);
 
         } catch (\App\Exceptions\KeyReplacedException $e) {
             // Ключ был перевыпущен - показываем страницу ошибки с информацией о новом ключе
@@ -251,6 +204,66 @@ class VpnConfigController extends Controller
     }
 
     /**
+     * Контент страницы конфига (только из БД, без панелей). Для быстрой отрисовки: сначала отдаётся shell, потом fetch этого URL.
+     * Возвращает JSON { success, html?, lastUpdated?, message? }.
+     */
+    public function showConfigContent(string $token): Response
+    {
+        $key_activate_id = $token;
+        $cacheKey = 'vpn_config_content_' . $key_activate_id;
+        $cached = Cache::get($cacheKey);
+        if ($cached !== null && is_array($cached)) {
+            return response()->json(['success' => true, 'html' => $cached['html'] ?? '', 'lastUpdated' => $cached['lastUpdated'] ?? null]);
+        }
+
+        try {
+            $keyActivate = $this->keyActivateRepository->findWithConfigRelationsForBrowser($key_activate_id);
+            if (!$keyActivate) {
+                return response()->json(['success' => false, 'message' => 'Ключ не найден'], 404);
+            }
+            $keyActivateUsers = $keyActivate->keyActivateUsers;
+            if ($keyActivateUsers->isEmpty()) {
+                $replacedViolation = $keyActivate->replacedViolation;
+                if ($replacedViolation && $replacedViolation->replaced_key_id) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Ваш ключ доступа был заменен из-за нарушения лимита подключений. Пожалуйста, используйте новый ключ.',
+                        'replacedKeyId' => $replacedViolation->replaced_key_id,
+                    ], 404);
+                }
+                return response()->json(['success' => false, 'message' => 'Конфигурация не найдена.'], 404);
+            }
+            $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id, $keyActivateUsers);
+            $refreshUrl = route('vpn.config.refresh', ['token' => $key_activate_id], false);
+            $response = $this->showBrowserPage(
+                $keyActivate,
+                $data['firstKeyActivateUser'],
+                $data['firstServerUser'],
+                $data['connectionKeys'],
+                $data['slotsWithLinks'],
+                true,
+                true,
+                null,
+                null,
+                $data['lastUpdated'] ?? null
+            );
+            $html = $response->getContent();
+            $lastUpdated = isset($data['lastUpdated']) && $data['lastUpdated']
+                ? $data['lastUpdated']->format('d.m.Y H:i')
+                : null;
+            Cache::put($cacheKey, ['html' => $html, 'lastUpdated' => $lastUpdated], now()->addSeconds(90));
+            return response()->json(['success' => true, 'html' => $html, 'lastUpdated' => $lastUpdated]);
+        } catch (\Throwable $e) {
+            Log::warning('VpnConfig content failed', [
+                'key_activate_id' => $key_activate_id,
+                'error' => $e->getMessage(),
+                'source' => 'vpn',
+            ]);
+            return response()->json(['success' => false, 'message' => 'Не удалось загрузить конфигурацию.'], 500);
+        }
+    }
+
+    /**
      * Фоновое обновление конфига для браузера: полная сборка данных и HTML страницы.
      * Вызывается JS со страницы config-loading.
      */
@@ -295,6 +308,7 @@ class VpnConfigController extends Controller
                 ? $data['lastUpdated']->format('d.m.Y H:i')
                 : null;
             $html = $response->getContent();
+            Cache::put('vpn_config_content_' . $key_activate_id, ['html' => $html ?: '', 'lastUpdated' => $lastUpdated], now()->addSeconds(90));
             return response()->json(['success' => true, 'html' => $html ?: '', 'lastUpdated' => $lastUpdated]);
         } catch (\Throwable $e) {
             Log::warning('VpnConfig refresh failed', [

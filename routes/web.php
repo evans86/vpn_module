@@ -80,6 +80,7 @@ Route::get('/config/error', [VpnConfigController::class, 'showError'])->name('vp
 
 // VPN Config Download
 Route::get('/config/{token}', [VpnConfigController::class, 'show'])->name('vpn.config.show');
+Route::get('/config/{token}/content', [VpnConfigController::class, 'showConfigContent'])->name('vpn.config.content');
 Route::get('/config/{token}/refresh', [VpnConfigController::class, 'showConfigRefresh'])->name('vpn.config.refresh');
 
 // Public Network Check
