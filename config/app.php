@@ -71,6 +71,13 @@ return [
     'public_url' => rtrim(env('APP_PUBLIC_URL') ?: env('APP_URL', 'http://localhost'), '/'),
 
     /*
+    | Failover mirror для Service Worker: при недоступности основного сайта браузер
+    | перенаправляется на этот URL (например https://link.telegram-planet.ru).
+    | Задаётся только на основном домене (vpn-telegram.com). На зеркале оставить пустым.
+    */
+    'failover_mirror_url' => rtrim(env('APP_FAILOVER_MIRROR_URL', ''), '/'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------

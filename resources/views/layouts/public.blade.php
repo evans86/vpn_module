@@ -144,6 +144,15 @@
     </div>
 </footer>
 
+@if(config('app.failover_mirror_url'))
+<script>
+(function(){
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('{{ url("/service-worker.js") }}', { scope: '/' }).catch(function(){});
+  }
+})();
+</script>
+@endif
 @stack('scripts')
 </body>
 </html>

@@ -75,6 +75,18 @@ Route::prefix('personal')->name('personal.')->group(function () {
 // Telegram Bot Webhook
 Route::post('/telegram/webhook/{token}', [FatherBotController::class, 'handle'])->name('telegram.webhook');
 
+// Service Worker для failover на зеркало (отдаётся только если задан APP_FAILOVER_MIRROR_URL)
+Route::get('/service-worker.js', function () {
+    $mirror = config('app.failover_mirror_url');
+    if (empty($mirror)) {
+        return response('', 404);
+    }
+    return response()->view('service-worker', ['mirrorOrigin' => $mirror], 200, [
+        'Content-Type' => 'application/javascript; charset=UTF-8',
+        'Cache-Control' => 'max-age=0, must-revalidate',
+    ]);
+})->name('service-worker');
+
 // VPN Error Page (только для локальной разработки) - должен быть ПЕРЕД /config/{token}
 Route::get('/config/error', [VpnConfigController::class, 'showError'])->name('vpn.config.error');
 
