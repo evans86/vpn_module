@@ -54,6 +54,77 @@
             </div>
         </div>
     </div>
+    <style>
+        .notification { position: fixed; bottom: 24px; right: 24px; padding: 16px 24px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15); font-size: 15px; font-weight: 500; z-index: 1000; opacity: 0; transform: translateY(20px) scale(0.95); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .notification.hidden { opacity: 0; transform: translateY(20px) scale(0.95); }
+        .notification:not(.hidden) { opacity: 1; transform: translateY(0) scale(1); }
+    </style>
+    <script src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
+    <script>
+    (function(){
+        var copyNotificationTimeout, currentQR = null;
+        function showCopyNotification(message) {
+            var notification = document.getElementById('copy-notification');
+            if (!notification) return;
+            notification.textContent = message;
+            notification.classList.remove('hidden');
+            if (copyNotificationTimeout) clearTimeout(copyNotificationTimeout);
+            copyNotificationTimeout = setTimeout(function() { notification.classList.add('hidden'); }, 3000);
+        }
+        window.copyCurrentUrl = function() {
+            navigator.clipboard.writeText(window.location.href).then(function() { showCopyNotification('✓ Ссылка скопирована в буфер обмена!'); }).catch(function() { alert('Не удалось скопировать ссылку.'); });
+        };
+        window.copyAllConfigurations = function() {
+            var wrapper = document.getElementById('config-content-wrapper');
+            if (!wrapper) return;
+            var raw = wrapper.getAttribute('data-all-config-links');
+            var links = [];
+            try { if (raw) links = JSON.parse(atob(raw)); } catch (e) { console.warn('copyAllConfigurations: invalid data', e); }
+            if (links.length === 0) { showCopyNotification('Нет протоколов для копирования.'); return; }
+            navigator.clipboard.writeText(links.join('\n')).then(function() { showCopyNotification('✓ Все конфигурации скопированы (' + links.length + ' протокол(ов))!'); }).catch(function() { alert('Не удалось скопировать конфигурации.'); });
+        };
+        window.copyToClipboard = function(text, protocol) {
+            navigator.clipboard.writeText(text).then(function() { showCopyNotification('✓ Конфигурация ' + (protocol || '') + ' скопирована!'); }).catch(function() { alert('Не удалось скопировать конфигурацию.'); });
+        };
+        window.copyGroupConfigurations = function(buttonEl) {
+            var group = buttonEl.closest('.config-location-group');
+            if (!group) return;
+            var raw = group.getAttribute('data-group-links');
+            var label = group.getAttribute('data-group-label') || 'Группа';
+            var links = [];
+            try { if (raw) links = JSON.parse(atob(raw)); } catch (e) { console.warn('copyGroupConfigurations: invalid data', e); }
+            if (links.length === 0) { showCopyNotification('В этой группе нет протоколов.'); return; }
+            navigator.clipboard.writeText(links.join('\n')).then(function() { showCopyNotification('✓ Конфигурации «' + label + '» скопированы (' + links.length + ')!'); }).catch(function() { alert('Не удалось скопировать конфигурации.'); });
+        };
+        window.showUrlQR = function(url) {
+            window.showQR(url || window.location.href, 'конфигурации');
+        };
+        window.showQR = function(link, protocol) {
+            if (!link) { alert('Ссылка для QR-кода отсутствует или некорректна.'); return; }
+            var qrcodeElement = document.getElementById('qrcode');
+            var qrTitle = document.getElementById('qrTitle');
+            var qrDescription = document.getElementById('qrDescription');
+            if (!qrcodeElement || typeof QRCodeStyling === 'undefined') { alert('QR-библиотека не загружена.'); return; }
+            qrcodeElement.innerHTML = '';
+            if (qrTitle) qrTitle.textContent = protocol ? 'QR-код для ' + protocol : 'QR-код';
+            if (qrDescription) qrDescription.textContent = protocol ? 'Отсканируйте этот код в вашем VPN-клиенте' : 'Отсканируйте этот код для быстрого доступа';
+            var qrCode = new QRCodeStyling({ width: 300, height: 300, type: 'svg', data: link, dotsOptions: { color: '#4f46e5', type: 'rounded' }, backgroundOptions: { color: '#ffffff' }, image: '', imageOptions: { crossOrigin: 'anonymous', margin: 10 } });
+            qrCode.append(qrcodeElement);
+            currentQR = qrCode;
+            var qrModal = document.getElementById('qrModal');
+            if (qrModal) { qrModal.classList.remove('hidden'); qrModal.classList.add('flex'); }
+        };
+        window.closeQR = function() {
+            var qrModal = document.getElementById('qrModal');
+            if (qrModal) { qrModal.classList.add('hidden'); qrModal.classList.remove('flex'); }
+            if (currentQR) {
+                var qrcodeElement = document.getElementById('qrcode');
+                if (qrcodeElement) qrcodeElement.innerHTML = '';
+                currentQR = null;
+            }
+        };
+    })();
+    </script>
     <script>
     (function(){
         var contentUrl = @json($contentUrl);
