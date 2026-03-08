@@ -54,4 +54,24 @@ class KeyActivateUserRepository extends BaseRepository
             ->orderBy('id')
             ->get();
     }
+
+    /**
+     * Слоты ключа только для отдачи подписки (plain text): минимум связей, без auth_token и ключа/продавца.
+     * Быстрее чем findAllByKeyActivateId при запросе из VPN-приложения.
+     *
+     * @return Collection<int, KeyActivateUser>
+     */
+    public function findAllByKeyActivateIdForSubscription(string $keyActivateId): Collection
+    {
+        return $this->query()
+            ->where('key_activate_id', $keyActivateId)
+            ->with([
+                'serverUser:id,keys,panel_id,updated_at',
+                'serverUser.panel:id,server_id',
+                'serverUser.panel.server:id,name,location_id',
+                'serverUser.panel.server.location:id,code,emoji',
+            ])
+            ->orderBy('id')
+            ->get();
+    }
 }

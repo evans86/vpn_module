@@ -85,12 +85,16 @@ class VpnConfigController extends Controller
             }
 
             $userAgent = request()->header('User-Agent') ?? 'Unknown';
-            $isSubscriptionRequest = $this->isVpnClient($userAgent)
+            // Явный параметр для подписки (обход подмены заголовков прокси/зеркалом): ?format=subscription или ?sub=1
+            $forceSubscription = in_array(request()->query('format'), ['subscription', 'sub', 'txt'], true)
+                || request()->query('sub') === '1';
+            $isSubscriptionRequest = $forceSubscription
+                || $this->isVpnClient($userAgent)
                 || !$this->requestAcceptsHtml()
                 || !$this->hasVersionedBrowserInUserAgent($userAgent);
 
             if ($isSubscriptionRequest) {
-                $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
+                $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateIdForSubscription($key_activate_id);
                 if ($keyActivateUsers->isEmpty()) {
                     Log::warning('KeyActivateUser not found for KeyActivate', ['key_activate_id' => $key_activate_id, 'source' => 'vpn']);
                     $replacedViolation = ConnectionLimitViolation::where('key_activate_id', $key_activate_id)
@@ -217,7 +221,7 @@ class VpnConfigController extends Controller
         }
 
         try {
-            $keyActivate = $this->keyActivateRepository->findWithConfigRelationsForBrowser($key_activate_id);
+            $keyActivate = $this->keyActivateRepository->findWithConfigRelationsForContent($key_activate_id);
             if (!$keyActivate) {
                 return response()->json(['success' => false, 'message' => 'Ключ не найден'], 404);
             }
@@ -1074,24 +1078,18 @@ class VpnConfigController extends Controller
             $netcheckUrl = route('netcheck.index');
             $isDemoMode = false; // Это реальная страница, не демо
 
-            // Нарушения: используем уже загруженные при первом открытии (findWithConfigRelationsForBrowser), иначе запрос (refresh)
-            if ($keyActivate->relationLoaded('activeViolations')) {
+            // Нарушения: используем уже загруженные связи или один общий запрос (меньше round-trip к БД)
+            if ($keyActivate->relationLoaded('activeViolations') && $keyActivate->relationLoaded('replacedViolation')) {
                 $violations = $keyActivate->activeViolations;
-            } else {
-                $violations = ConnectionLimitViolation::where('key_activate_id', $keyActivate->id)
-                    ->where('status', ConnectionLimitViolation::STATUS_ACTIVE)
-                    ->whereNull('key_replaced_at')
-                    ->orderBy('created_at', 'desc')
-                    ->get();
-            }
-            if ($keyActivate->relationLoaded('replacedViolation')) {
                 $replacedViolation = $keyActivate->replacedViolation;
             } else {
-                $replacedViolation = ConnectionLimitViolation::where('key_activate_id', $keyActivate->id)
-                    ->whereNotNull('key_replaced_at')
-                    ->whereNotNull('replaced_key_id')
-                    ->orderBy('key_replaced_at', 'desc')
-                    ->first();
+                $allViolations = ConnectionLimitViolation::where('key_activate_id', $keyActivate->id)->get();
+                $violations = $keyActivate->relationLoaded('activeViolations')
+                    ? $keyActivate->activeViolations
+                    : $allViolations->where('status', ConnectionLimitViolation::STATUS_ACTIVE)->whereNull('key_replaced_at')->sortByDesc('created_at')->values();
+                $replacedViolation = $keyActivate->relationLoaded('replacedViolation')
+                    ? $keyActivate->replacedViolation
+                    : $allViolations->whereNotNull('key_replaced_at')->whereNotNull('replaced_key_id')->sortByDesc('key_replaced_at')->first();
             }
 
             $newKeyActivate = null;
