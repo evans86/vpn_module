@@ -1029,9 +1029,10 @@ class VpnConfigController extends Controller
             // Всегда запрашиваем used_traffic/data_limit с панели при наличии serverUser,
             // иначе при первой загрузке (useStoredOnly) показывается 0 GB и пользователь видит «сброс» трафика.
             $info = [];
-            if ($serverUser && $serverUser->panel) {
+            $panelType = $serverUser && $serverUser->panel ? $serverUser->panel->panel : null;
+            if ($panelType !== null && $panelType !== '') {
                 try {
-                    $panel_strategy = new PanelStrategy($serverUser->panel->panel);
+                    $panel_strategy = new PanelStrategy($panelType);
                     $info = $panel_strategy->getSubscribeInfo($serverUser->panel->id, $serverUser->id);
                     if (!$useStoredOnly && isset($info['key_status_updated']) && $info['key_status_updated'] === true) {
                         $keyActivate->refresh();
