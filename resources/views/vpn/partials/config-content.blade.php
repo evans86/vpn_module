@@ -225,7 +225,7 @@
                             </div>
                             <div class="flex items-center justify-between">
                                 <span class="text-gray-600 font-medium">Использовано:</span>
-                                <span class="font-bold text-gray-900">{{ number_format($displayUserInfo['data_used'] / (1024*1024*1024), 2) }} GB</span>
+                                <span class="font-bold text-gray-900">{{ number_format(($displayUserInfo['data_used'] ?? 0) / (1024*1024*1024), 2) }} GB</span>
                             </div>
                         </div>
                     </div>

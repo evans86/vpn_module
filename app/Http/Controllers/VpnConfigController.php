@@ -22,6 +22,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 class VpnConfigController extends Controller
 {
+    /** Время кэширования HTML контента страницы конфига (секунды). */
+    private const CONFIG_CONTENT_CACHE_TTL_SECONDS = 180;
+
     /**
      * @var KeyActivateRepository
      */
@@ -255,7 +258,7 @@ class VpnConfigController extends Controller
             $lastUpdated = isset($data['lastUpdated']) && $data['lastUpdated']
                 ? $data['lastUpdated']->format('d.m.Y H:i')
                 : null;
-            Cache::put($cacheKey, ['html' => $html, 'lastUpdated' => $lastUpdated], now()->addSeconds(90));
+            Cache::put($cacheKey, ['html' => $html, 'lastUpdated' => $lastUpdated], now()->addSeconds(self::CONFIG_CONTENT_CACHE_TTL_SECONDS));
             return response()->json(['success' => true, 'html' => $html, 'lastUpdated' => $lastUpdated]);
         } catch (\Throwable $e) {
             Log::warning('VpnConfig content failed', [
@@ -312,7 +315,7 @@ class VpnConfigController extends Controller
                 ? $data['lastUpdated']->format('d.m.Y H:i')
                 : null;
             $html = $response->getContent();
-            Cache::put('vpn_config_content_' . $key_activate_id, ['html' => $html ?: '', 'lastUpdated' => $lastUpdated], now()->addSeconds(90));
+            Cache::put('vpn_config_content_' . $key_activate_id, ['html' => $html ?: '', 'lastUpdated' => $lastUpdated], now()->addSeconds(self::CONFIG_CONTENT_CACHE_TTL_SECONDS));
             return response()->json(['success' => true, 'html' => $html ?: '', 'lastUpdated' => $lastUpdated]);
         } catch (\Throwable $e) {
             Log::warning('VpnConfig refresh failed', [
@@ -1023,12 +1026,14 @@ class VpnConfigController extends Controller
                 ]);
             }
 
+            // Всегда запрашиваем used_traffic/data_limit с панели при наличии serverUser,
+            // иначе при первой загрузке (useStoredOnly) показывается 0 GB и пользователь видит «сброс» трафика.
             $info = [];
-            if (!$useStoredOnly && $serverUser && $serverUser->panel) {
+            if ($serverUser && $serverUser->panel) {
                 try {
                     $panel_strategy = new PanelStrategy($serverUser->panel->panel);
                     $info = $panel_strategy->getSubscribeInfo($serverUser->panel->id, $serverUser->id);
-                    if (isset($info['key_status_updated']) && $info['key_status_updated'] === true) {
+                    if (!$useStoredOnly && isset($info['key_status_updated']) && $info['key_status_updated'] === true) {
                         $keyActivate->refresh();
                     }
                 } catch (Exception $e) {
