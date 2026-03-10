@@ -176,8 +176,9 @@
                                 })">
                                     <button @click="open = !open" 
                                             x-ref="button"
-                                            class="text-gray-400 hover:text-gray-600 focus:outline-none">
-                                        <i class="fas fa-cog"></i>
+                                            class="text-gray-400 hover:text-gray-600 focus:outline-none"
+                                            title="Действия">
+                                        <i class="fas fa-ellipsis-v"></i>
                                     </button>
                                     
                                     <div x-show="open" 
@@ -263,8 +264,11 @@
             <button type="button" 
                     class="btn btn-primary" 
                     id="confirm-renew-key">
-                <span class="spinner spinner-border-sm d-none" role="status"></span>
-                Да, перевыпустить
+                <span class="confirm-renew-text">Да, перевыпустить</span>
+                <span class="confirm-renew-loading d-none" role="status">
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                    <span class="ml-2">Отправка…</span>
+                </span>
             </button>
             <button type="button" 
                     class="btn btn-secondary" 
@@ -431,7 +435,8 @@
             $('#confirm-renew-key').on('click', function () {
                 const keyId = $(this).data('key-id');
                 const submitBtn = $(this);
-                const spinner = submitBtn.find('.spinner');
+                const textEl = submitBtn.find('.confirm-renew-text');
+                const loadingEl = submitBtn.find('.confirm-renew-loading');
 
                 if (!keyId) {
                     toastr.error('Ошибка: не указан ID ключа');
@@ -439,7 +444,8 @@
                 }
 
                 submitBtn.prop('disabled', true);
-                spinner.removeClass('d-none');
+                textEl.addClass('d-none');
+                loadingEl.removeClass('d-none');
 
                 $.ajax({
                     url: '{{ route('admin.module.key-activate.renew') }}',
@@ -485,7 +491,8 @@
                     },
                     complete: function () {
                         submitBtn.prop('disabled', false);
-                        spinner.addClass('d-none');
+                        loadingEl.addClass('d-none');
+                        textEl.removeClass('d-none');
                     }
                 });
             });
