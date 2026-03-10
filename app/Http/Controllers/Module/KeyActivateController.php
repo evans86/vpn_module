@@ -433,9 +433,13 @@ class KeyActivateController extends Controller
      */
     public function renew(Request $request): JsonResponse
     {
-        // Временно увеличиваем лимит памяти для этой операции
         ini_set('memory_limit', '256M');
-        
+
+        Log::info('KeyActivateController::renew — запрос получен', [
+            'key_id' => $request->input('key_id'),
+            'has_csrf' => (bool) $request->header('X-CSRF-TOKEN'),
+        ]);
+
         try {
             $validated = $request->validate([
                 'key_id' => 'required|uuid|exists:key_activate,id'
@@ -506,6 +510,12 @@ class KeyActivateController extends Controller
                 ]
             ]);
 
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::warning('KeyActivateController::renew — ошибка валидации', [
+                'key_id' => $request->input('key_id'),
+                'errors' => $e->errors(),
+            ]);
+            throw $e;
         } catch (\Throwable $e) {
             $this->logger->error('Ошибка при перевыпуске ключа', [
                 'source' => 'key_activate',
@@ -517,6 +527,14 @@ class KeyActivateController extends Controller
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString()
+            ]);
+
+            Log::error('KeyActivateController::renew — исключение', [
+                'key_id' => $request->input('key_id'),
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([

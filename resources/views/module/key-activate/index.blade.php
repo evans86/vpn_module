@@ -236,6 +236,7 @@
 
     <!-- Modal: Renew Key -->
     <x-admin.modal id="renewKeyModal" title="Перевыпуск ключа" size="md">
+        <input type="hidden" id="renew-key-id" value="">
         <div class="mb-4">
             <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
                 <div class="flex">
@@ -418,15 +419,14 @@
 
                 $('#renew-user-tg-id').text(userTgId);
 
-                // Сохраняем ID ключа в data-атрибут кнопки подтверждения
-                $('#confirm-renew-key').data('key-id', keyId);
+                $('#renew-key-id').val(keyId || '');
 
                 window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'renewKeyModal' } }));
             });
 
             // Обработчик подтверждения перевыпуска
             $('#confirm-renew-key').on('click', function () {
-                const keyId = $(this).data('key-id');
+                const keyId = $('#renew-key-id').val();
                 const btn = $(this);
                 const originalText = 'Да, перевыпустить';
 
@@ -441,7 +441,8 @@
                     url: '{{ route('admin.module.key-activate.renew') }}',
                     method: 'POST',
                     headers: {
-                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'),
+                        'Accept': 'application/json'
                     },
                     data: { key_id: keyId },
                     success: function () {
@@ -451,14 +452,25 @@
                     },
                     error: function (xhr) {
                         let msg = 'Неизвестная ошибка';
-                        if (xhr.responseJSON && xhr.responseJSON.message) {
-                            msg = xhr.responseJSON.message;
-                        } else if (xhr.status === 500) {
-                            msg = 'Ошибка сервера. Попробуйте позже или обратитесь в поддержку.';
-                        } else if (xhr.status === 0) {
-                            msg = 'Ошибка сети. Проверьте подключение.';
+                        if (xhr.responseJSON) {
+                            if (xhr.responseJSON.message) {
+                                msg = xhr.responseJSON.message;
+                            }
+                            if (xhr.responseJSON.errors && typeof xhr.responseJSON.errors.key_id !== 'undefined') {
+                                msg = xhr.responseJSON.errors.key_id[0] || msg;
+                            }
                         }
-                        toastr.error('Ошибка при перевыпуске: ' + msg);
+                        if (xhr.status === 419) {
+                            msg = 'Сессия истекла. Обновите страницу и попробуйте снова.';
+                        } else if (xhr.status === 422) {
+                            msg = msg || 'Неверные данные (ключ не найден или форма изменилась).';
+                        } else if (xhr.status === 500) {
+                            msg = msg || 'Ошибка сервера. Проверьте storage/logs/laravel.log.';
+                        } else if (xhr.status === 0) {
+                            msg = 'Ошибка сети или запрос заблокирован.';
+                        }
+                        console.error('Перевыпуск ключа: HTTP ' + xhr.status, xhr.responseJSON || xhr.responseText);
+                        toastr.error(msg);
                     },
                     complete: function () {
                         btn.prop('disabled', false).text(originalText);
