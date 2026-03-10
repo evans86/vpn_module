@@ -471,7 +471,9 @@
                         } else if (!msg) {
                             msg = 'Ошибка (HTTP ' + xhr.status + '). Проверьте раздел «Логи» в админке.';
                         }
-                        console.error('Перевыпуск ключа: HTTP ' + xhr.status, raw || xhr.responseText);
+                        // В консоль всегда выводим тело ответа (для отладки 500)
+                        var body = typeof xhr.responseText === 'string' ? xhr.responseText : '';
+                        console.error('Перевыпуск ключа: HTTP ' + xhr.status + '. Ответ сервера:', body ? (body.length > 500 ? body.substring(0, 500) + '...' : body) : '(пусто)', raw);
                         toastr.error(msg);
                     },
                     complete: function () {
