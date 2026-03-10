@@ -76,5 +76,21 @@ class Handler extends ExceptionHandler
             }
             return null;
         });
+
+        // Для любых необработанных ошибок при JSON-запросе возвращаем JSON с текстом ошибки
+        // (иначе при 500 приходит HTML и во фронте показывается «См. laravel.log»)
+        $this->renderable(function (Throwable $e, Request $request) {
+            if ($e instanceof ValidationException) {
+                return null; // Laravel сам вернёт 422
+            }
+            if ($request->expectsJson() || $request->ajax()) {
+                $message = $e->getMessage() ?: 'Внутренняя ошибка сервера';
+                return response()->json([
+                    'message' => $message,
+                    'error' => class_basename($e),
+                ], 500);
+            }
+            return null;
+        });
     }
 }

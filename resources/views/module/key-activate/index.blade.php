@@ -463,13 +463,13 @@
                         } else if (xhr.status === 422) {
                             msg = msg || 'Неверные данные (ключ не найден или форма изменилась).';
                         } else if (xhr.status === 500) {
-                            msg = msg || 'Ошибка сервера. См. storage/logs/laravel.log.';
+                            msg = msg || 'Ошибка сервера. Проверьте раздел «Логи» в админке.';
                         } else if (xhr.status === 0) {
                             msg = 'Ошибка сети или таймаут. Перевыпуск может занять минуту — попробуйте ещё раз.';
                         } else if (xhr.status === 502 || xhr.status === 503 || xhr.status === 504) {
                             msg = 'Сервер не успел ответить (таймаут). Попробуйте снова через минуту.';
                         } else if (!msg) {
-                            msg = 'Ошибка (HTTP ' + xhr.status + '). Откройте консоль (F12) и логи сервера.';
+                            msg = 'Ошибка (HTTP ' + xhr.status + '). Проверьте раздел «Логи» в админке.';
                         }
                         console.error('Перевыпуск ключа: HTTP ' + xhr.status, raw || xhr.responseText);
                         toastr.error(msg);

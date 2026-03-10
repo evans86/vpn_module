@@ -1022,8 +1022,9 @@ class KeyActivateService
                 'file' => $e->getFile(),
                 'line' => $e->getLine()
             ]);
-            // Прямая запись в application_logs, чтобы ошибка точно отображалась в админке
+            // Прямая запись в application_logs, чтобы ошибка точно отображалась в админке (trace обрезаем)
             try {
+                $trace = $e->getTraceAsString();
                 ApplicationLog::create([
                     'level' => 'error',
                     'source' => 'key_activate',
@@ -1034,7 +1035,7 @@ class KeyActivateService
                         'error_class' => get_class($e),
                         'file' => $e->getFile(),
                         'line' => $e->getLine(),
-                        'trace' => $e->getTraceAsString(),
+                        'trace' => strlen($trace) > 8000 ? substr($trace, 0, 8000) . "\n...[обрезано]" : $trace,
                     ],
                     'user_id' => auth()->check() ? (string) auth()->id() : null,
                     'ip_address' => request()->ip(),

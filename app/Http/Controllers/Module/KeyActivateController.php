@@ -501,8 +501,9 @@ class KeyActivateController extends Controller
                     'line' => $serviceException->getLine(),
                     'trace' => $serviceException->getTraceAsString()
                 ]);
-                // Прямая запись в application_logs — видно в админке в разделе «Логи»
+                // Прямая запись в application_logs — видно в админке (trace обрезаем)
                 try {
+                    $trace = $serviceException->getTraceAsString();
                     ApplicationLog::create([
                         'level' => 'error',
                         'source' => 'key_activate',
@@ -513,7 +514,7 @@ class KeyActivateController extends Controller
                             'error_class' => get_class($serviceException),
                             'file' => $serviceException->getFile(),
                             'line' => $serviceException->getLine(),
-                            'trace' => $serviceException->getTraceAsString(),
+                            'trace' => strlen($trace) > 8000 ? substr($trace, 0, 8000) . "\n...[обрезано]" : $trace,
                         ],
                         'user_id' => auth()->check() ? (string) auth()->id() : null,
                         'ip_address' => $request->ip(),
@@ -571,7 +572,8 @@ class KeyActivateController extends Controller
                     'line' => $e->getLine(),
                     'trace' => $e->getTraceAsString()
                 ]);
-                // Прямая запись в application_logs — видно в админке в разделе «Логи»
+                // Прямая запись в application_logs — видно в админке в разделе «Логи» (trace обрезаем, чтобы не превысить лимит JSON в БД)
+                $trace = $e->getTraceAsString();
                 ApplicationLog::create([
                     'level' => 'error',
                     'source' => 'key_activate',
@@ -582,7 +584,7 @@ class KeyActivateController extends Controller
                         'error_class' => get_class($e),
                         'file' => $e->getFile(),
                         'line' => $e->getLine(),
-                        'trace' => $e->getTraceAsString(),
+                        'trace' => strlen($trace) > 8000 ? substr($trace, 0, 8000) . "\n...[обрезано]" : $trace,
                     ],
                     'user_id' => auth()->check() ? (string) auth()->id() : null,
                     'ip_address' => $request->ip(),
