@@ -12,6 +12,7 @@ use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Repositories\PackSalesman\PackSalesmanRepository;
 use App\Repositories\Panel\PanelRepository;
 use App\Logging\DatabaseLogger;
+use App\Models\Log\ApplicationLog;
 use App\Services\External\BottApi;
 use App\Services\Panel\PanelStrategy;
 use App\Services\Notification\NotificationService;
@@ -1011,6 +1012,7 @@ class KeyActivateService
 
             return $activatedKey;
         } catch (\Throwable $e) {
+            $msg = 'Перевыпуск ключа — ОШИБКА: ' . $e->getMessage();
             $this->logger->error('Ошибка при перевыпуске ключа', [
                 'source' => 'key_activate',
                 'action' => 'renew',
@@ -1020,6 +1022,27 @@ class KeyActivateService
                 'file' => $e->getFile(),
                 'line' => $e->getLine()
             ]);
+            // Прямая запись в application_logs, чтобы ошибка точно отображалась в админке
+            try {
+                ApplicationLog::create([
+                    'level' => 'error',
+                    'source' => 'key_activate',
+                    'message' => $msg,
+                    'context' => [
+                        'action' => 'renew',
+                        'key_id' => $key->id,
+                        'error_class' => get_class($e),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                        'trace' => $e->getTraceAsString(),
+                    ],
+                    'user_id' => auth()->check() ? (string) auth()->id() : null,
+                    'ip_address' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
+                ]);
+            } catch (\Throwable $logEx) {
+                // не ломаем ответ при сбое записи лога
+            }
 
             throw new RuntimeException('Ошибка при перевыпуске ключа: ' . $e->getMessage(), 0, $e);
         }

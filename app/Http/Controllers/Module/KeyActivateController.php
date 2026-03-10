@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Module;
 
 use App\Models\KeyActivate\KeyActivate;
+use App\Models\Log\ApplicationLog;
 use App\Logging\DatabaseLogger;
 use App\Http\Controllers\Controller;
 use App\Models\Pack\Pack;
@@ -481,6 +482,7 @@ class KeyActivateController extends Controller
             try {
                 $renewedKey = $this->keyActivateService->renew($key);
             } catch (\Throwable $serviceException) {
+                $errMsg = 'Перевыпуск ключа — ОШИБКА: ' . $serviceException->getMessage();
                 Log::error('KeyActivateController::renew — ошибка в сервисе', [
                     'key_id' => $key->id,
                     'error' => $serviceException->getMessage(),
@@ -499,6 +501,27 @@ class KeyActivateController extends Controller
                     'line' => $serviceException->getLine(),
                     'trace' => $serviceException->getTraceAsString()
                 ]);
+                // Прямая запись в application_logs — видно в админке в разделе «Логи»
+                try {
+                    ApplicationLog::create([
+                        'level' => 'error',
+                        'source' => 'key_activate',
+                        'message' => $errMsg,
+                        'context' => [
+                            'action' => 'renew',
+                            'key_id' => $key->id,
+                            'error_class' => get_class($serviceException),
+                            'file' => $serviceException->getFile(),
+                            'line' => $serviceException->getLine(),
+                            'trace' => $serviceException->getTraceAsString(),
+                        ],
+                        'user_id' => auth()->check() ? (string) auth()->id() : null,
+                        'ip_address' => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                    ]);
+                } catch (\Throwable $logEx) {
+                    // не ломаем ответ при сбое записи лога
+                }
                 throw $serviceException;
             }
 
@@ -528,6 +551,7 @@ class KeyActivateController extends Controller
             throw $e;
         } catch (\Throwable $e) {
             $errorMessage = $e->getMessage();
+            $errMsg = 'Перевыпуск ключа — ОШИБКА: ' . $errorMessage;
             try {
                 Log::error('KeyActivateController::renew — исключение', [
                     'key_id' => $request->input('key_id'),
@@ -546,6 +570,23 @@ class KeyActivateController extends Controller
                     'file' => $e->getFile(),
                     'line' => $e->getLine(),
                     'trace' => $e->getTraceAsString()
+                ]);
+                // Прямая запись в application_logs — видно в админке в разделе «Логи»
+                ApplicationLog::create([
+                    'level' => 'error',
+                    'source' => 'key_activate',
+                    'message' => $errMsg,
+                    'context' => [
+                        'action' => 'renew',
+                        'key_id' => $request->input('key_id'),
+                        'error_class' => get_class($e),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                        'trace' => $e->getTraceAsString(),
+                    ],
+                    'user_id' => auth()->check() ? (string) auth()->id() : null,
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
                 ]);
             } catch (\Throwable $logException) {
                 // не даём падению логирования сломать ответ
