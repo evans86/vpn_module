@@ -435,7 +435,7 @@ class KeyActivateController extends Controller
     {
         ini_set('memory_limit', '256M');
         if (function_exists('set_time_limit')) {
-            @set_time_limit(120);
+            @set_time_limit(180);
         }
 
         Log::info('KeyActivateController::renew — запрос получен', [
