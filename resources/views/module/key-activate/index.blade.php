@@ -445,10 +445,10 @@
                         'Accept': 'application/json'
                     },
                     data: { key_id: keyId },
-                    success: function () {
+                    success: function (data) {
                         window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'renewKeyModal' } }));
-                        toastr.success('Ключ успешно перевыпущен');
-                        setTimeout(function () { window.location.reload(); }, 800);
+                        toastr.success(data.message || 'Перевыпуск запущен. Обновите страницу через минуту.');
+                        setTimeout(function () { window.location.reload(); }, 2500);
                     },
                     error: function (xhr) {
                         var raw = xhr.responseJSON || (function () {

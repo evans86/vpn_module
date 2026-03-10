@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Module;
 
+use App\Jobs\RenewKeyJob;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\Log\ApplicationLog;
 use App\Logging\DatabaseLogger;
@@ -469,79 +470,20 @@ class KeyActivateController extends Controller
                 ], 400);
             }
 
-            $this->logger->info('Начало перевыпуска ключа', [
+            $this->logger->info('Перевыпуск ключа поставлен в очередь', [
                 'source' => 'key_activate',
                 'action' => 'renew',
                 'user_id' => auth()->id(),
                 'key_id' => $key->id,
                 'user_tg_id' => $key->user_tg_id,
-                'traffic_limit' => $key->traffic_limit,
-                'finish_at' => $key->finish_at
             ]);
 
-            try {
-                $renewedKey = $this->keyActivateService->renew($key);
-            } catch (\Throwable $serviceException) {
-                $errMsg = 'Перевыпуск ключа — ОШИБКА: ' . $serviceException->getMessage();
-                Log::error('KeyActivateController::renew — ошибка в сервисе', [
-                    'key_id' => $key->id,
-                    'error' => $serviceException->getMessage(),
-                    'file' => $serviceException->getFile(),
-                    'line' => $serviceException->getLine(),
-                    'trace' => $serviceException->getTraceAsString()
-                ]);
-                $this->logger->error('Ошибка в KeyActivateService->renew()', [
-                    'source' => 'key_activate',
-                    'action' => 'renew',
-                    'user_id' => auth()->id(),
-                    'key_id' => $key->id,
-                    'error' => $serviceException->getMessage(),
-                    'error_class' => get_class($serviceException),
-                    'file' => $serviceException->getFile(),
-                    'line' => $serviceException->getLine(),
-                    'trace' => $serviceException->getTraceAsString()
-                ]);
-                // Прямая запись в application_logs — видно в админке (trace обрезаем)
-                try {
-                    $trace = $serviceException->getTraceAsString();
-                    ApplicationLog::create([
-                        'level' => 'error',
-                        'source' => 'key_activate',
-                        'message' => $errMsg,
-                        'context' => [
-                            'action' => 'renew',
-                            'key_id' => $key->id,
-                            'error_class' => get_class($serviceException),
-                            'file' => $serviceException->getFile(),
-                            'line' => $serviceException->getLine(),
-                            'trace' => strlen($trace) > 8000 ? substr($trace, 0, 8000) . "\n...[обрезано]" : $trace,
-                        ],
-                        'user_id' => auth()->check() ? (string) auth()->id() : null,
-                        'ip_address' => $request->ip(),
-                        'user_agent' => $request->userAgent(),
-                    ]);
-                } catch (\Throwable $logEx) {
-                    // не ломаем ответ при сбое записи лога
-                }
-                throw $serviceException;
-            }
-
-            $this->logger->info('Перевыпуск ключа выполнен успешно', [
-                'source' => 'key_activate',
-                'action' => 'renew',
-                'user_id' => auth()->id(),
-                'key_id' => $renewedKey->id,
-                'new_status' => $renewedKey->status
-            ]);
+            RenewKeyJob::dispatch($key->id)->onConnection('database');
 
             return response()->json([
                 'success' => true,
-                'message' => 'Ключ успешно перевыпущен',
-                'key' => [
-                    'id' => $renewedKey->id,
-                    'status' => $renewedKey->status,
-                    'status_text' => $renewedKey->getStatusText()
-                ]
+                'message' => 'Перевыпуск запущен. Обновите страницу через минуту.',
+                'queued' => true,
             ]);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
