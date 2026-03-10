@@ -526,15 +526,15 @@ class VpnConfigController extends Controller
                 unset($links);
             } catch (\App\Exceptions\KeyReplacedException $e) {
                 throw $e;
-            } catch (Exception $e) {
+            } catch (\Throwable $e) {
                 Log::warning('Failed to get fresh links for one slot, using stored', [
                     'key_activate_user_id' => $kau->id,
                     'server_user_id' => $serverUser->id,
                     'error' => $e->getMessage(),
                     'source' => 'vpn',
                 ]);
-                $stored = json_decode($serverUser->keys, true);
-                if (!empty($stored)) {
+                $stored = json_decode($serverUser->keys ?? '[]', true);
+                if (!empty($stored) && is_array($stored)) {
                     $slotLinks = $stored;
                     $connectionKeys = array_merge($connectionKeys, $stored);
                 }
@@ -598,8 +598,12 @@ class VpnConfigController extends Controller
                 throw new \RuntimeException('Panel not found for server user');
             }
 
+            $panelType = $panel->panel ?? \App\Models\Panel\Panel::MARZBAN;
+            if ($panelType === '') {
+                $panelType = \App\Models\Panel\Panel::MARZBAN;
+            }
             $panelStrategyFactory = new \App\Services\Panel\PanelStrategyFactory();
-            $panelStrategy = $panelStrategyFactory->create($panel->panel);
+            $panelStrategy = $panelStrategyFactory->create($panelType);
 
             // Обновляем токен через стратегию
             $panel = $panelStrategy->updateToken($panel->id);
