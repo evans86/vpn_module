@@ -261,17 +261,10 @@
             <p class="text-sm text-gray-600">Вы уверены, что хотите продолжить?</p>
         </div>
         <x-slot name="footer">
-            <button type="button" 
-                    class="btn btn-primary" 
-                    id="confirm-renew-key">
-                <span class="confirm-renew-text">Да, перевыпустить</span>
-                <span class="confirm-renew-loading d-none" role="status">
-                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-                    <span class="ml-2">Отправка…</span>
-                </span>
+            <button type="button" class="btn btn-primary" id="confirm-renew-key">
+                Да, перевыпустить
             </button>
-            <button type="button" 
-                    class="btn btn-secondary" 
+            <button type="button" class="btn btn-secondary"
                     onclick="window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'renewKeyModal' } }))">
                 Отмена
             </button>
@@ -434,18 +427,15 @@
             // Обработчик подтверждения перевыпуска
             $('#confirm-renew-key').on('click', function () {
                 const keyId = $(this).data('key-id');
-                const submitBtn = $(this);
-                const textEl = submitBtn.find('.confirm-renew-text');
-                const loadingEl = submitBtn.find('.confirm-renew-loading');
+                const btn = $(this);
+                const originalText = 'Да, перевыпустить';
 
                 if (!keyId) {
                     toastr.error('Ошибка: не указан ID ключа');
                     return;
                 }
 
-                submitBtn.prop('disabled', true);
-                textEl.addClass('d-none');
-                loadingEl.removeClass('d-none');
+                btn.prop('disabled', true).text('Выполняется…');
 
                 $.ajax({
                     url: '{{ route('admin.module.key-activate.renew') }}',
@@ -453,46 +443,25 @@
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                     },
-                    data: {
-                        key_id: keyId
-                    },
-                    success: function (response) {
+                    data: { key_id: keyId },
+                    success: function () {
                         window.dispatchEvent(new CustomEvent('close-modal', { detail: { id: 'renewKeyModal' } }));
                         toastr.success('Ключ успешно перевыпущен');
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1000);
+                        setTimeout(function () { window.location.reload(); }, 800);
                     },
                     error: function (xhr) {
-                        console.error('Renew key error:', xhr);
-                        
-                        let errorMessage = 'Неизвестная ошибка';
-                        
-                        if (xhr.responseJSON) {
-                            // Есть JSON ответ
-                            errorMessage = xhr.responseJSON.message || errorMessage;
-                            
-                            // Добавляем debug info если есть
-                            if (xhr.responseJSON.debug) {
-                                console.error('Debug info:', xhr.responseJSON.debug);
-                                errorMessage += ' (см. консоль для деталей)';
-                            }
-                        } else if (xhr.responseText) {
-                            // Есть текстовый ответ (возможно HTML ошибка)
-                            console.error('Response text:', xhr.responseText);
-                            errorMessage = 'Ошибка сервера (HTTP ' + xhr.status + '). См. консоль для деталей.';
+                        let msg = 'Неизвестная ошибка';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            msg = xhr.responseJSON.message;
+                        } else if (xhr.status === 500) {
+                            msg = 'Ошибка сервера. Попробуйте позже или обратитесь в поддержку.';
                         } else if (xhr.status === 0) {
-                            errorMessage = 'Ошибка сети. Проверьте подключение к интернету.';
-                        } else {
-                            errorMessage = 'HTTP ошибка ' + xhr.status + ': ' + xhr.statusText;
+                            msg = 'Ошибка сети. Проверьте подключение.';
                         }
-                        
-                        toastr.error('Ошибка при перевыпуске ключа: ' + errorMessage);
+                        toastr.error('Ошибка при перевыпуске: ' + msg);
                     },
                     complete: function () {
-                        submitBtn.prop('disabled', false);
-                        loadingEl.addClass('d-none');
-                        textEl.removeClass('d-none');
+                        btn.prop('disabled', false).text(originalText);
                     }
                 });
             });

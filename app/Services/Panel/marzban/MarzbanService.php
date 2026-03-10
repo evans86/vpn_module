@@ -2004,11 +2004,12 @@ class MarzbanService
             // Создаем запись key_activate_user только для реальных ключей (не для теста проверки панели)
             if ($key_activate !== null) {
                 $keyActivateUserService = new KeyActivateUserService();
+                $locationId = $panel->server && isset($panel->server->location_id) ? $panel->server->location_id : null;
                 try {
                     $keyActivateUserService->create(
                         $serverUser->id,
                         $key_activate_id,
-                        $panel->server->location_id
+                        $locationId
                     );
                 } catch (Exception $e) {
                     // Если не удалось создать key_activate_user, удаляем созданного пользователя

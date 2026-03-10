@@ -15,26 +15,27 @@ class KeyActivateUserService
     /**
      * @param string $server_user_id
      * @param string $key_activate_id
-     * @param int $location_id локация ключа
+     * @param int|null $location_id локация ключа (null допустим, если у сервера не задана локация)
      * @return KeyActivateUserDto
      * @throws Exception
      */
-    public function create(string $server_user_id, string $key_activate_id, int $location_id): KeyActivateUserDto
+    public function create(string $server_user_id, string $key_activate_id, ?int $location_id): KeyActivateUserDto
     {
         try {
-            /**
-             * @var Location $location
-             */
-            $location = Location::query()->where('id', $location_id)->firstOrFail();
-
-            $key_activate_user = new  KeyActivateUser();
-
+            $key_activate_user = new KeyActivateUser();
             $key_activate_user->server_user_id = $server_user_id;
             $key_activate_user->key_activate_id = $key_activate_id;
-            $key_activate_user->location_id = $location->id;
 
-            if (!$key_activate_user->save())
+            if ($location_id !== null) {
+                $location = Location::query()->where('id', $location_id)->firstOrFail();
+                $key_activate_user->location_id = $location->id;
+            } else {
+                $key_activate_user->location_id = null;
+            }
+
+            if (!$key_activate_user->save()) {
                 throw new \RuntimeException('Key Activate User dont create');
+            }
 
             return KeyActivateUserFactory::fromEntity($key_activate_user);
         } catch (RuntimeException $r) {
