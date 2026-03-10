@@ -527,29 +527,33 @@ class KeyActivateController extends Controller
             ]);
             throw $e;
         } catch (\Throwable $e) {
-            $this->logger->error('Ошибка при перевыпуске ключа', [
-                'source' => 'key_activate',
-                'action' => 'renew',
-                'user_id' => auth()->id(),
-                'key_id' => $request->input('key_id'),
-                'error' => $e->getMessage(),
-                'error_class' => get_class($e),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            Log::error('KeyActivateController::renew — исключение', [
-                'key_id' => $request->input('key_id'),
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+            $errorMessage = $e->getMessage();
+            try {
+                Log::error('KeyActivateController::renew — исключение', [
+                    'key_id' => $request->input('key_id'),
+                    'error' => $errorMessage,
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+                $this->logger->error('Ошибка при перевыпуске ключа', [
+                    'source' => 'key_activate',
+                    'action' => 'renew',
+                    'user_id' => auth()->id(),
+                    'key_id' => $request->input('key_id'),
+                    'error' => $errorMessage,
+                    'error_class' => get_class($e),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+            } catch (\Throwable $logException) {
+                // не даём падению логирования сломать ответ
+            }
 
             return response()->json([
                 'success' => false,
-                'message' => 'Ошибка при перевыпуске ключа: ' . $e->getMessage()
+                'message' => 'Ошибка при перевыпуске ключа: ' . $errorMessage
             ], 500);
         }
     }
