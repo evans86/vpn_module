@@ -434,6 +434,9 @@ class KeyActivateController extends Controller
     public function renew(Request $request): JsonResponse
     {
         ini_set('memory_limit', '256M');
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(120);
+        }
 
         Log::info('KeyActivateController::renew — запрос получен', [
             'key_id' => $request->input('key_id'),
@@ -478,6 +481,13 @@ class KeyActivateController extends Controller
             try {
                 $renewedKey = $this->keyActivateService->renew($key);
             } catch (\Throwable $serviceException) {
+                Log::error('KeyActivateController::renew — ошибка в сервисе', [
+                    'key_id' => $key->id,
+                    'error' => $serviceException->getMessage(),
+                    'file' => $serviceException->getFile(),
+                    'line' => $serviceException->getLine(),
+                    'trace' => $serviceException->getTraceAsString()
+                ]);
                 $this->logger->error('Ошибка в KeyActivateService->renew()', [
                     'source' => 'key_activate',
                     'action' => 'renew',

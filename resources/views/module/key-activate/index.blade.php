@@ -451,25 +451,27 @@
                         setTimeout(function () { window.location.reload(); }, 800);
                     },
                     error: function (xhr) {
-                        let msg = 'Неизвестная ошибка';
-                        if (xhr.responseJSON) {
-                            if (xhr.responseJSON.message) {
-                                msg = xhr.responseJSON.message;
-                            }
-                            if (xhr.responseJSON.errors && typeof xhr.responseJSON.errors.key_id !== 'undefined') {
-                                msg = xhr.responseJSON.errors.key_id[0] || msg;
-                            }
+                        var raw = xhr.responseJSON || (function () {
+                            try { return xhr.responseText ? JSON.parse(xhr.responseText) : null; } catch (e) { return null; }
+                        })();
+                        var msg = (raw && raw.message) ? raw.message : '';
+                        if (raw && raw.errors && raw.errors.key_id && raw.errors.key_id[0]) {
+                            msg = raw.errors.key_id[0];
                         }
                         if (xhr.status === 419) {
                             msg = 'Сессия истекла. Обновите страницу и попробуйте снова.';
                         } else if (xhr.status === 422) {
                             msg = msg || 'Неверные данные (ключ не найден или форма изменилась).';
                         } else if (xhr.status === 500) {
-                            msg = msg || 'Ошибка сервера. Проверьте storage/logs/laravel.log.';
+                            msg = msg || 'Ошибка сервера. См. storage/logs/laravel.log.';
                         } else if (xhr.status === 0) {
-                            msg = 'Ошибка сети или запрос заблокирован.';
+                            msg = 'Ошибка сети или таймаут. Перевыпуск может занять минуту — попробуйте ещё раз.';
+                        } else if (xhr.status === 502 || xhr.status === 503 || xhr.status === 504) {
+                            msg = 'Сервер не успел ответить (таймаут). Попробуйте снова через минуту.';
+                        } else if (!msg) {
+                            msg = 'Ошибка (HTTP ' + xhr.status + '). Откройте консоль (F12) и логи сервера.';
                         }
-                        console.error('Перевыпуск ключа: HTTP ' + xhr.status, xhr.responseJSON || xhr.responseText);
+                        console.error('Перевыпуск ключа: HTTP ' + xhr.status, raw || xhr.responseText);
                         toastr.error(msg);
                     },
                     complete: function () {
