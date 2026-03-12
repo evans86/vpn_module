@@ -454,11 +454,11 @@ class KeyActivateController extends Controller
             /** @var KeyActivate $key */
             $key = KeyActivate::findOrFail($validated['key_id']);
 
-            // Проверяем, что ключ просрочен
-            if ($key->status !== KeyActivate::EXPIRED) {
+            // Разрешаем перевыпуск для просроченных и активных (чтобы исправить «битые» ключи с некорректными слотами/конфигом)
+            if (!in_array($key->status, [KeyActivate::EXPIRED, KeyActivate::ACTIVE], true)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Ключ не может быть перевыпущен. Только просроченные ключи могут быть перевыпущены.'
+                    'message' => 'Перевыпуск доступен только для активированных или просроченных ключей.'
                 ], 400);
             }
 

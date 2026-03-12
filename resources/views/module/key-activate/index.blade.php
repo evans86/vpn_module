@@ -196,7 +196,7 @@
                                              right: (buttonRect ? (window.innerWidth - buttonRect.right) + 'px' : '0')
                                          }">
                                         <div class="py-1">
-                                            @if($key->status === \App\Models\KeyActivate\KeyActivate::EXPIRED && $key->user_tg_id)
+                                            @if(in_array($key->status, [\App\Models\KeyActivate\KeyActivate::EXPIRED, \App\Models\KeyActivate\KeyActivate::ACTIVE], true) && $key->user_tg_id)
                                                 <button type="button"
                                                         class="block w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 btn-renew-key"
                                                         data-key-id="{{ $key->id }}"

@@ -20,7 +20,8 @@ class RenewKeyJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $timeout = 300;
+    /** Перевыпуск может занимать время (несколько панелей, удаление/создание слотов). */
+    public $timeout = 600;
 
     protected string $keyActivateId;
 
@@ -36,8 +37,8 @@ class RenewKeyJob implements ShouldQueue
             Log::warning('RenewKeyJob: ключ не найден', ['key_id' => $this->keyActivateId]);
             return;
         }
-        if ($key->status !== KeyActivate::EXPIRED) {
-            Log::info('RenewKeyJob: ключ уже не просрочен, пропуск', ['key_id' => $this->keyActivateId, 'status' => $key->status]);
+        if (!in_array($key->status, [KeyActivate::EXPIRED, KeyActivate::ACTIVE], true)) {
+            Log::info('RenewKeyJob: перевыпуск только для активированных/просроченных', ['key_id' => $this->keyActivateId, 'status' => $key->status]);
             return;
         }
         if (!$key->user_tg_id) {

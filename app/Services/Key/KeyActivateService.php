@@ -711,7 +711,7 @@ class KeyActivateService
         try {
             $path = route('vpn.config.refresh', ['token' => $keyActivateId], false);
             $url = rtrim(config('app.url'), '/') . $path;
-            Http::timeout(180)->withHeaders(['Accept' => 'application/json'])->get($url);
+            Http::timeout(60)->withHeaders(['Accept' => 'application/json'])->get($url);
         } catch (\Throwable $e) {
             Log::warning('warmConfigSync failed', [
                 'key_activate_id' => $keyActivateId,
@@ -880,8 +880,9 @@ class KeyActivateService
     public function renew(KeyActivate $key): KeyActivate
     {
         try {
-            if ($key->status !== KeyActivate::EXPIRED) {
-                throw new RuntimeException('Ключ не может быть перевыпущен. Только просроченные ключи могут быть перевыпущены.');
+            // Разрешаем перевыпуск для просроченных и активных (исправление битых ключей)
+            if (!in_array($key->status, [KeyActivate::EXPIRED, KeyActivate::ACTIVE], true)) {
+                throw new RuntimeException('Перевыпуск доступен только для активированных или просроченных ключей.');
             }
 
             if (!$key->user_tg_id) {
