@@ -57,6 +57,7 @@ class VpnConfigController extends Controller
 
     public function show(string $key_activate_id): Response
     {
+        $key_activate_id = trim($key_activate_id);
         // Лимит памяти и времени: тяжёлая сборка по слотам и запросы к панелям (VPN-клиент и refresh)
         if ((int) ini_get('memory_limit') < 1024) {
             @ini_set('memory_limit', '1024M');
@@ -216,7 +217,7 @@ class VpnConfigController extends Controller
      */
     public function showConfigContent(string $token): Response
     {
-        $key_activate_id = $token;
+        $key_activate_id = trim($token);
         $cacheKey = 'vpn_config_content_' . $key_activate_id;
         $cached = Cache::get($cacheKey);
         if ($cached !== null && is_array($cached)) {
@@ -229,6 +230,12 @@ class VpnConfigController extends Controller
                 return response()->json(['success' => false, 'message' => 'Ключ не найден'], 404);
             }
             $keyActivateUsers = $keyActivate->keyActivateUsers;
+            if ($keyActivateUsers->isEmpty()) {
+                $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
+                if ($keyActivateUsers->isNotEmpty()) {
+                    $keyActivate->setRelation('keyActivateUsers', $keyActivateUsers);
+                }
+            }
             if ($keyActivateUsers->isEmpty()) {
                 $replacedViolation = $keyActivate->replacedViolation;
                 if ($replacedViolation && $replacedViolation->replaced_key_id) {
@@ -276,7 +283,7 @@ class VpnConfigController extends Controller
      */
     public function showConfigRefresh(string $token): Response
     {
-        $key_activate_id = $token;
+        $key_activate_id = trim($token);
 
         if ((int) ini_get('memory_limit') < 1024) {
             @ini_set('memory_limit', '1024M');
