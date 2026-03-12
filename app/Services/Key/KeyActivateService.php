@@ -947,6 +947,9 @@ class KeyActivateService
                 }
             }
 
+            // Удаляем старые слоты из БД, иначе новые добавятся к старым и получится 7+ или 13 слотов
+            $key->keyActivateUsers()->delete();
+
             $panels = $this->getPanelsForActivation($key, true);
             if (empty($panels)) {
                 throw new RuntimeException('Активная панель Marzban не найдена');
