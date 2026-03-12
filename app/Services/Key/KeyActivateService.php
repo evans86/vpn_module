@@ -92,7 +92,12 @@ class KeyActivateService
                 $panels[$panel->id] = $panel;
             }
         }
-        return array_values($panels);
+        $list = array_values($panels);
+        $maxSlots = (int) config('panel.max_provider_slots', 3);
+        if ($maxSlots > 0 && count($list) > $maxSlots) {
+            $list = array_slice($list, 0, $maxSlots);
+        }
+        return $list;
     }
 
     /**

@@ -117,11 +117,16 @@ return [
     | Пустой = старый режим (один провайдер на ключ). Чтобы включить: в .env задать
     | PANEL_MULTI_PROVIDER_SLOTS=vdsina,timeweb (через запятую, без пробелов или с пробелами).
     |
+    | max_provider_slots — максимум слотов на ключ (по умолчанию 3). Если провайдеров в списке
+    | больше, берутся только первые N панелей. Так у всех ключей будет не больше 3 слотов.
+    |
     */
 
     'multi_provider_slots' => array_filter(
         array_map('trim', explode(',', env('PANEL_MULTI_PROVIDER_SLOTS', '')))
     ),
+
+    'max_provider_slots' => (int) env('PANEL_MAX_PROVIDER_SLOTS', 3),
 ];
 
 
