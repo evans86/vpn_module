@@ -110,6 +110,7 @@ class KeyActivateService
      */
     public function addMissingProviderSlots(KeyActivate $key, bool $dryRun = false): int
     {
+        $maxSlots = (int) config('panel.max_provider_slots', 3);
         $slots = config('panel.multi_provider_slots', []);
         $slots = is_array($slots) ? $slots : [];
         if (empty($slots)) {
@@ -124,6 +125,11 @@ class KeyActivateService
         $key->load(['keyActivateUsers.serverUser.panel.server']);
         if ($key->keyActivateUsers->isEmpty()) {
             Log::warning('addMissingProviderSlots: key has no KeyActivateUser (no slots)', ['key_id' => $key->id]);
+            return 0;
+        }
+
+        // Не добавляем слотов сверх лимита (у всех ключей макс. max_provider_slots)
+        if ($maxSlots > 0 && $key->keyActivateUsers->count() >= $maxSlots) {
             return 0;
         }
 
@@ -163,6 +169,11 @@ class KeyActivateService
             if (isset($existingPanelIds[$panel->id])) {
                 $existingProviders[$providerKey] = true;
                 continue;
+            }
+            // Не превышаем лимит слотов на ключ
+            $currentCount = count($existingPanelIds) + $wouldAdd;
+            if ($maxSlots > 0 && $currentCount >= $maxSlots) {
+                break;
             }
             if ($dryRun) {
                 $wouldAdd++;
