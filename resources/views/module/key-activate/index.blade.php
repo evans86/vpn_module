@@ -277,6 +277,7 @@
         <form id="transfer-key-form">
             <input type="hidden" id="transfer-key-id" name="key_id">
             <input type="hidden" id="transfer-source-panel-id" name="source_panel_id" value="">
+            <input type="hidden" id="transfer-source-server-user-id" name="source_server_user_id" value="">
             <div id="transfer-slot-block" class="mb-4 d-none">
                 <label for="source-slot-select" class="block text-sm font-medium text-gray-700 mb-1">
                     Какой слот переносить
@@ -487,6 +488,7 @@
                 const keyId = $(this).data('key-id');
                 $('#transfer-key-id').val(keyId);
                 $('#transfer-source-panel-id').val('');
+                $('#transfer-source-server-user-id').val('');
                 $('#source-slot-select').empty().off('change');
 
                 $.ajax({
@@ -503,25 +505,38 @@
                             toastr.error('У ключа нет слотов для переноса');
                             return;
                         }
-                        var sourcePanelId = slots[0].panel_id;
+                        var firstSlot = slots[0];
+                        var firstServerUserId = firstSlot.server_user_id;
                         if (slots.length > 1) {
                             $('#transfer-slot-block').removeClass('d-none');
                             var slotSelect = $('#source-slot-select');
                             slotSelect.append('<option value="">Выберите слот</option>');
-                            slots.forEach(function (s) {
+                            slots.forEach(function (s, idx) {
                                 var name = (s.server_name || 'Сервер') + ' (' + s.panel_id + ')';
                                 var label = s.provider ? name + ', ' + s.provider : name;
-                                slotSelect.append('<option value="' + s.panel_id + '">' + label + '</option>');
+                                if (slots.filter(function (x) { return x.panel_id === s.panel_id; }).length > 1) {
+                                    label += ' — слот ' + (idx + 1);
+                                }
+                                slotSelect.append('<option value="' + (s.server_user_id || '') + '">' + label + '</option>');
                             });
-                            slotSelect.val(sourcePanelId);
+                            slotSelect.val(firstServerUserId);
                             slotSelect.off('change').on('change', function () {
                                 var v = $(this).val();
-                                if (v) $('#transfer-source-panel-id').val(v);
+                                if (v) {
+                                    $('#transfer-source-server-user-id').val(v);
+                                    var slot = slots.find(function (s) { return s.server_user_id === v; });
+                                    if (slot) $('#transfer-source-panel-id').val(slot.panel_id);
+                                } else {
+                                    $('#transfer-source-server-user-id').val('');
+                                    $('#transfer-source-panel-id').val('');
+                                }
                             });
-                            $('#transfer-source-panel-id').val(sourcePanelId);
+                            $('#transfer-source-server-user-id').val(firstServerUserId);
+                            $('#transfer-source-panel-id').val(firstSlot.panel_id);
                         } else {
                             $('#transfer-slot-block').addClass('d-none');
-                            $('#transfer-source-panel-id').val(sourcePanelId);
+                            $('#transfer-source-server-user-id').val(firstServerUserId);
+                            $('#transfer-source-panel-id').val(firstSlot.panel_id);
                         }
                         var select = $('#target-panel-select');
                         select.empty();
@@ -551,6 +566,7 @@
 
                 var keyId = $('#transfer-key-id').val();
                 var targetPanelId = $('#target-panel-select').val();
+                var sourceServerUserId = $('#transfer-source-server-user-id').val();
                 var sourcePanelId = $('#transfer-source-panel-id').val();
 
                 if (!targetPanelId) {
@@ -570,7 +586,8 @@
                     key_id: keyId,
                     target_panel_id: targetPanelId
                 };
-                if (sourcePanelId) payload.source_panel_id = sourcePanelId;
+                if (sourceServerUserId) payload.source_server_user_id = sourceServerUserId;
+                else if (sourcePanelId) payload.source_panel_id = sourcePanelId;
 
                 $.ajax({
                     url: '{{ route('admin.module.server-user-transfer.transfer') }}',

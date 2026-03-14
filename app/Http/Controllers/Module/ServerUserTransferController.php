@@ -86,13 +86,14 @@ class ServerUserTransferController extends Controller
                     $panel = $kau->serverUser ? $kau->serverUser->panel : null;
                     $server = $panel ? $panel->server : null;
                     return [
+                        'server_user_id' => $kau->server_user_id,
                         'panel_id' => $panel ? $panel->id : null,
                         'server_name' => $server ? $server->name : ('Панель #' . ($panel ? $panel->id : '?')),
                         'provider' => $server ? $server->provider : '',
                     ];
                 })
                 ->filter(function ($s) {
-                    return !empty($s['panel_id']);
+                    return !empty($s['panel_id']) && !empty($s['server_user_id']);
                 })
                 ->values()
                 ->all();
@@ -214,21 +215,30 @@ class ServerUserTransferController extends Controller
                 'key_id' => 'required|uuid|exists:key_activate,id',
                 'target_panel_id' => 'required|integer|exists:panel,id',
                 'source_panel_id' => 'nullable|integer|exists:panel,id',
+                'source_server_user_id' => 'nullable|uuid|exists:server_user,id',
             ]);
 
             $keyId = $validated['key_id'];
 
-            // При мульти-провайдере переносим слот с выбранной исходной панели; иначе — первый слот ключа
-            $keyActivateUser = KeyActivateUser::query()
-                ->select('server_user_id')
-                ->where('key_activate_id', $keyId);
-            if (!empty($validated['source_panel_id'])) {
-                $keyActivateUser = $keyActivateUser->whereHas(
-                    'serverUser',
-                    fn ($q) => $q->where('panel_id', (int) $validated['source_panel_id'])
-                );
+            // Конкретный слот по server_user_id либо по панели (для обратной совместимости)
+            if (!empty($validated['source_server_user_id'])) {
+                $keyActivateUser = KeyActivateUser::query()
+                    ->select('server_user_id')
+                    ->where('key_activate_id', $keyId)
+                    ->where('server_user_id', $validated['source_server_user_id'])
+                    ->firstOrFail();
+            } else {
+                $keyActivateUser = KeyActivateUser::query()
+                    ->select('server_user_id')
+                    ->where('key_activate_id', $keyId);
+                if (!empty($validated['source_panel_id'])) {
+                    $keyActivateUser = $keyActivateUser->whereHas(
+                        'serverUser',
+                        fn ($q) => $q->where('panel_id', (int) $validated['source_panel_id'])
+                    );
+                }
+                $keyActivateUser = $keyActivateUser->firstOrFail();
             }
-            $keyActivateUser = $keyActivateUser->firstOrFail();
 
             $serverUser = ServerUser::select('panel_id')->where('id', $keyActivateUser->server_user_id)->firstOrFail();
             $sourcePanel_id = (int) $serverUser->panel_id;
