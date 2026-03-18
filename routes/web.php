@@ -298,6 +298,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/', [\App\Http\Controllers\Module\BroadcastController::class, 'store'])->name('store');
                 Route::get('/{broadcast}', [\App\Http\Controllers\Module\BroadcastController::class, 'show'])->name('show');
                 Route::post('/{broadcast}/start', [\App\Http\Controllers\Module\BroadcastController::class, 'start'])->name('start');
+                Route::post('/{broadcast}/cancel', [\App\Http\Controllers\Module\BroadcastController::class, 'cancel'])->name('cancel');
+                Route::post('/{broadcast}/test-send', [\App\Http\Controllers\Module\BroadcastController::class, 'testSend'])->name('test-send');
             });
 
             // Очередь заданий (перевыпуск ключей, рассылки, миграции)
