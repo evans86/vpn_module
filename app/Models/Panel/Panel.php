@@ -317,7 +317,7 @@ class Panel extends Model
     const CONFIG_TYPE_REALITY_STABLE = 'reality_stable';
 
     /**
-     * @var string Тип конфига: SS + Trojan + VLESS + 2 VLESS REALITY (без VMess)
+     * @var string Тип конфига: SS + Trojan + 2 VLESS REALITY (все VLESS — REALITY, без VLESS-WS и VMess)
      */
     const CONFIG_TYPE_MIXED = 'mixed';
 
@@ -521,7 +521,7 @@ class Panel extends Model
             case self::CONFIG_TYPE_REALITY_STABLE:
                 return 'REALITY стабильный (только REALITY)';
             case self::CONFIG_TYPE_MIXED:
-                return 'SS + Trojan + VLESS + 2 REALITY';
+                return 'SS + Trojan + 2 REALITY';
             default:
                 return 'Неизвестно';
         }

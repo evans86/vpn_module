@@ -261,7 +261,7 @@
                                                 <button type="submit" 
                                                         class="w-full min-h-[3.25rem] flex flex-col items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-md text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors
                                                         {{ $panel->config_type === 'mixed' ? 'ring-2 ring-amber-500 shadow-sm' : '' }}"
-                                                        title="SS + Trojan + VLESS + 2 стабильных VLESS REALITY (без VMess)">
+                                                        title="SS + Trojan + 2 VLESS REALITY (все VLESS — REALITY)">
                                                     <i class="fas fa-layer-group text-sm shrink-0"></i>
                                                     <span class="leading-tight text-center break-words">Смешанный</span>
                                                 </button>

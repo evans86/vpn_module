@@ -1500,6 +1500,34 @@ class MarzbanService
     }
 
     /**
+     * Только Trojan + SS (без VLESS-WS). Для смешанного пресета, где все VLESS — REALITY.
+     */
+    private function buildStableBasicInboundsForMixed(?Panel $panel = null): array
+    {
+        return [
+            [
+                'tag' => 'TROJAN-WS',
+                'listen' => '0.0.0.0',
+                'port' => 2097,
+                'protocol' => 'trojan',
+                'settings' => ['clients' => [], 'level' => 0],
+                'streamSettings' => array_merge([
+                    'network' => 'ws',
+                    'wsSettings' => ['path' => '/trojan'],
+                ], $this->getSecuritySettings($panel, true)),
+                'sniffing' => ['enabled' => true, 'destOverride' => ['http', 'tls']],
+            ],
+            [
+                'tag' => 'Shadowsocks-TCP',
+                'listen' => '0.0.0.0',
+                'port' => 8388,
+                'protocol' => 'shadowsocks',
+                'settings' => ['clients' => [], 'network' => 'tcp,udp', 'level' => 0],
+            ],
+        ];
+    }
+
+    /**
      * Два стабильных VLESS REALITY: TCP (Microsoft) и TCP ALT (Google).
      */
     private function buildTwoRealityInbounds(string $privateKey, string $shortId, string $xhttpShortId): array
@@ -2059,7 +2087,7 @@ class MarzbanService
     {
         $panel = self::updateMarzbanToken($panel_id);
 
-        Log::info('Updating configuration to mixed (SS + Trojan + VLESS + 2 REALITY)', [
+        Log::info('Updating configuration to mixed (SS + Trojan + 2 VLESS REALITY, без VLESS-WS)', [
             'panel_id' => $panel_id,
             'source' => 'panel',
         ]);
@@ -2068,7 +2096,7 @@ class MarzbanService
 
         $json_config = $this->buildBaseConfig($panel);
         $json_config['inbounds'] = array_merge(
-            $this->buildStableBasicInbounds($panel),
+            $this->buildStableBasicInboundsForMixed($panel),
             $this->buildTwoRealityInbounds(
                 $realityKeys['private_key'],
                 $realityKeys['short_id'],
