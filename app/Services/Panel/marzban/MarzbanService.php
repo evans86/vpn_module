@@ -2100,8 +2100,12 @@ class MarzbanService
             $realityKeys['grpc_short_id'],
             $realityKeys['xhttp_short_id']
         );
-        // Смешанный пресет: SS + Trojan + 3 VLESS REALITY (TCP 8443, GRPC 9443, XHTTP 8444)
-        $threeReality = array_slice($allRealityInbounds, 0, 3);
+        // Смешанный пресет: SS + Trojan + 3 VLESS REALITY (8443, 9443, 2083 — без 8444)
+        $threeReality = [
+            $allRealityInbounds[0], // VLESS TCP REALITY 8443
+            $allRealityInbounds[1], // VLESS GRPC REALITY 9443
+            $allRealityInbounds[3], // VLESS TCP REALITY ALT 2083
+        ];
 
         $json_config = $this->buildBaseConfig($panel);
         $json_config['inbounds'] = array_merge(
