@@ -10,6 +10,19 @@ use App\Models\KeyActivate\KeyActivate;
 class BroadcastService
 {
     /**
+     * Количество получателей (уникальных user_tg_id) без загрузки всех записей.
+     * Используется на странице создания рассылки для быстрого отображения.
+     */
+    public function getEligibleRecipientsCount(): int
+    {
+        return (int) KeyActivate::query()
+            ->where('status', KeyActivate::ACTIVE)
+            ->whereNotNull('user_tg_id')
+            ->selectRaw('COUNT(DISTINCT user_tg_id) as cnt')
+            ->value('cnt');
+    }
+
+    /**
      * Возвращает ключи для рассылки: по одному ключу на каждого уникального user_tg_id
      * (активные ключи с активированным пользователем).
      */

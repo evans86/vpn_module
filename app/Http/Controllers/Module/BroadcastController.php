@@ -39,7 +39,7 @@ class BroadcastController extends Controller
      */
     public function create(): View
     {
-        $eligibleCount = count($this->broadcastService->getEligibleKeyActivateIds());
+        $eligibleCount = $this->broadcastService->getEligibleRecipientsCount();
 
         return view('module.broadcast.create', [
             'eligibleCount' => $eligibleCount,
