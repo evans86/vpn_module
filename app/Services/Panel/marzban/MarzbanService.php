@@ -1459,6 +1459,96 @@ class MarzbanService
      * @param string $xhttpShortId
      * @return array
      */
+    /**
+     * SS + Trojan + VLESS-WS (без VMess). Для комбинированного пресета с двумя REALITY.
+     */
+    private function buildStableBasicInbounds(?Panel $panel = null): array
+    {
+        return [
+            [
+                'tag' => 'VLESS-WS',
+                'listen' => '0.0.0.0',
+                'port' => 2087,
+                'protocol' => 'vless',
+                'settings' => ['clients' => [], 'decryption' => 'none', 'level' => 0],
+                'streamSettings' => array_merge([
+                    'network' => 'ws',
+                    'wsSettings' => ['path' => '/vless'],
+                ], $this->getSecuritySettings($panel)),
+                'sniffing' => ['enabled' => true, 'destOverride' => ['http', 'tls']],
+            ],
+            [
+                'tag' => 'TROJAN-WS',
+                'listen' => '0.0.0.0',
+                'port' => 2097,
+                'protocol' => 'trojan',
+                'settings' => ['clients' => [], 'level' => 0],
+                'streamSettings' => array_merge([
+                    'network' => 'ws',
+                    'wsSettings' => ['path' => '/trojan'],
+                ], $this->getSecuritySettings($panel, true)),
+                'sniffing' => ['enabled' => true, 'destOverride' => ['http', 'tls']],
+            ],
+            [
+                'tag' => 'Shadowsocks-TCP',
+                'listen' => '0.0.0.0',
+                'port' => 8388,
+                'protocol' => 'shadowsocks',
+                'settings' => ['clients' => [], 'network' => 'tcp,udp', 'level' => 0],
+            ],
+        ];
+    }
+
+    /**
+     * Два стабильных VLESS REALITY: TCP (Microsoft) и TCP ALT (Google).
+     */
+    private function buildTwoRealityInbounds(string $privateKey, string $shortId, string $xhttpShortId): array
+    {
+        return [
+            [
+                'tag' => 'VLESS TCP REALITY',
+                'listen' => '0.0.0.0',
+                'port' => 8443,
+                'protocol' => 'vless',
+                'settings' => ['clients' => [], 'decryption' => 'none', 'level' => 0],
+                'streamSettings' => [
+                    'network' => 'tcp',
+                    'tcpSettings' => ['acceptProxyProtocol' => false, 'header' => ['type' => 'none']],
+                    'security' => 'reality',
+                    'realitySettings' => [
+                        'show' => false,
+                        'dest' => 'www.microsoft.com:443',
+                        'xver' => 0,
+                        'serverNames' => ['www.microsoft.com', 'microsoft.com', 'www.cloudflare.com', 'cloudflare.com'],
+                        'privateKey' => $privateKey,
+                        'shortIds' => ['', $shortId],
+                    ],
+                ],
+                'sniffing' => ['enabled' => true, 'destOverride' => ['http', 'tls', 'quic']],
+            ],
+            [
+                'tag' => 'VLESS TCP REALITY ALT',
+                'listen' => '0.0.0.0',
+                'port' => 2083,
+                'protocol' => 'vless',
+                'settings' => ['clients' => [], 'decryption' => 'none', 'level' => 0],
+                'streamSettings' => [
+                    'network' => 'tcp',
+                    'security' => 'reality',
+                    'realitySettings' => [
+                        'show' => false,
+                        'dest' => 'www.google.com:443',
+                        'xver' => 0,
+                        'serverNames' => ['www.google.com', 'google.com', 'www.amazon.com', 'amazon.com'],
+                        'privateKey' => $privateKey,
+                        'shortIds' => ['', $xhttpShortId],
+                    ],
+                ],
+                'sniffing' => ['enabled' => true, 'destOverride' => ['http', 'tls', 'quic']],
+            ],
+        ];
+    }
+
     private function buildRealityInbounds(string $privateKey, string $shortId, string $grpcShortId, string $xhttpShortId): array
     {
         return [
@@ -1670,6 +1760,61 @@ class MarzbanService
     }
 
     /**
+     * Синхронизация Host Settings: выставить address = домен панели для всех inbounds,
+     * чтобы в ссылках подписки (vless:// и т.д.) отображался домен, а не IP.
+     */
+    private function syncHostsAddressToPanelDomain(Panel $panel, MarzbanAPI $marzbanApi): void
+    {
+        $domain = $panel->formatted_address;
+        if (empty($domain) || str_starts_with($domain, 'http')) {
+            $domain = parse_url($panel->panel_adress ?? '', PHP_URL_HOST);
+        }
+        if (empty($domain)) {
+            Log::debug('Panel has no domain for hosts sync', ['panel_id' => $panel->id, 'source' => 'panel']);
+            return;
+        }
+
+        $hosts = $marzbanApi->getHosts($panel->auth_token);
+        if (empty($hosts)) {
+            Log::debug('No hosts returned from Marzban, skip address sync', ['panel_id' => $panel->id, 'source' => 'panel']);
+            return;
+        }
+
+        $updated = [];
+        foreach ($hosts as $inboundTag => $configs) {
+            if (!is_array($configs)) {
+                continue;
+            }
+            foreach ($configs as $i => $item) {
+                if (is_array($item) && isset($item['address'])) {
+                    $hosts[$inboundTag][$i]['address'] = $domain;
+                    $updated[$inboundTag] = true;
+                }
+            }
+        }
+        if (empty($updated)) {
+            return;
+        }
+
+        try {
+            $marzbanApi->updateHosts($panel->auth_token, $hosts);
+            Log::info('Hosts address synced to panel domain', [
+                'panel_id' => $panel->id,
+                'domain' => $domain,
+                'inbounds' => array_keys($updated),
+                'source' => 'panel',
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to sync hosts address to domain', [
+                'panel_id' => $panel->id,
+                'domain' => $domain,
+                'error' => $e->getMessage(),
+                'source' => 'panel',
+            ]);
+        }
+    }
+
+    /**
      * Применение конфигурации к панели
      *
      * @param Panel $panel
@@ -1751,6 +1896,9 @@ class MarzbanService
                     sleep($retryDelay);
                 }
             }
+
+            // Выставляем в Host Settings address = домен панели, чтобы в ссылках подписки был домен, а не IP
+            $this->syncHostsAddressToPanelDomain($panel, $marzbanApi);
 
             // Обновление статуса панели
             $panel->panel_status = Panel::PANEL_CONFIGURED;
@@ -1870,6 +2018,68 @@ class MarzbanService
     }
 
     /**
+     * Обновление конфигурации панели — стабильная REALITY: только REALITY inbounds (те же порты 8443, 9443, 8880, 2083 и т.д.),
+     * без VMess, Trojan, Shadowsocks.
+     *
+     * @param int $panel_id
+     * @return void
+     * @throws GuzzleException
+     */
+    public function updateConfigurationRealityStable(int $panel_id): void
+    {
+        $panel = self::updateMarzbanToken($panel_id);
+
+        Log::info('Updating configuration to stable REALITY (REALITY only, same ports)', [
+            'panel_id' => $panel_id,
+            'source' => 'panel',
+        ]);
+
+        $realityKeys = $this->getOrGenerateRealityKeys($panel);
+
+        $json_config = $this->buildBaseConfig($panel);
+        $json_config['inbounds'] = $this->buildRealityInbounds(
+            $realityKeys['private_key'],
+            $realityKeys['short_id'],
+            $realityKeys['grpc_short_id'],
+            $realityKeys['xhttp_short_id']
+        );
+
+        $this->applyConfiguration($panel, $json_config, Panel::CONFIG_TYPE_REALITY_STABLE);
+    }
+
+    /**
+     * Обновление конфигурации панели — смешанный пресет: SS + Trojan + VLESS (VLESS-WS) + 2 стабильных VLESS REALITY.
+     * Без VMess. Для теста на проде.
+     *
+     * @param int $panel_id
+     * @return void
+     * @throws GuzzleException
+     */
+    public function updateConfigurationMixed(int $panel_id): void
+    {
+        $panel = self::updateMarzbanToken($panel_id);
+
+        Log::info('Updating configuration to mixed (SS + Trojan + VLESS + 2 REALITY)', [
+            'panel_id' => $panel_id,
+            'source' => 'panel',
+        ]);
+
+        $realityKeys = $this->getOrGenerateRealityKeys($panel);
+
+        $json_config = $this->buildBaseConfig($panel);
+        $json_config['inbounds'] = array_merge(
+            $this->buildStableBasicInbounds($panel),
+            $this->buildTwoRealityInbounds(
+                $realityKeys['private_key'],
+                $realityKeys['short_id'],
+                $realityKeys['xhttp_short_id']
+            )
+        );
+
+        $this->applyConfiguration($panel, $json_config, Panel::CONFIG_TYPE_MIXED);
+    }
+
+    /**
      * Обновление конфигурации панели (legacy метод для обратной совместимости)
      *
      * По умолчанию использует REALITY конфигурацию
@@ -1944,13 +2154,99 @@ class MarzbanService
     }
 
     /**
-     * Добавление пользователи и протоколов подключения
+     * Inbounds и proxies для создания пользователя в зависимости от типа конфигурации панели.
+     * Возвращает [ inbounds, proxies ] для MarzbanAPI::createUser.
+     *
+     * @return array{0: array<string, array<string>>, 1: array<string, array>}
+     */
+    private function getInboundsAndProxiesForPanel(Panel $panel): array
+    {
+        $vlessId = Str::uuid()->toString();
+        $vmessId = Str::uuid()->toString();
+        $trojanPassword = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 16);
+        $ssPassword = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 16);
+
+        $configType = $panel->config_type ?? Panel::CONFIG_TYPE_STABLE;
+
+        if ($configType === Panel::CONFIG_TYPE_REALITY_STABLE) {
+            // Только REALITY inbounds (4 протокола)
+            $inbounds = [
+                'vless' => [
+                    'VLESS TCP REALITY',
+                    'VLESS GRPC REALITY',
+                    'VLESS XHTTP REALITY',
+                    'VLESS TCP REALITY ALT',
+                ],
+            ];
+            $proxies = [
+                'vless' => ['id' => $vlessId],
+            ];
+            return [$inbounds, $proxies];
+        }
+
+        if ($configType === Panel::CONFIG_TYPE_MIXED) {
+            // SS + Trojan + VLESS (VLESS-WS + 2 REALITY)
+            $inbounds = [
+                'vless' => ['VLESS-WS', 'VLESS TCP REALITY', 'VLESS TCP REALITY ALT'],
+                'trojan' => ['TROJAN-WS'],
+                'shadowsocks' => ['Shadowsocks-TCP'],
+            ];
+            $proxies = [
+                'vless' => ['id' => $vlessId],
+                'trojan' => ['password' => $trojanPassword],
+                'shadowsocks' => ['password' => $ssPassword],
+            ];
+            return [$inbounds, $proxies];
+        }
+
+        if ($configType === Panel::CONFIG_TYPE_REALITY) {
+            // REALITY + стабильные (VMess, Trojan, SS, VLESS-WS)
+            $inbounds = [
+                'vless' => [
+                    'VLESS-WS',
+                    'VLESS TCP REALITY',
+                    'VLESS GRPC REALITY',
+                    'VLESS XHTTP REALITY',
+                    'VLESS TCP REALITY ALT',
+                ],
+                'vmess' => ['VMESS-WS'],
+                'trojan' => ['TROJAN-WS'],
+                'shadowsocks' => ['Shadowsocks-TCP'],
+            ];
+            $proxies = [
+                'vless' => ['id' => $vlessId],
+                'vmess' => ['id' => $vmessId],
+                'trojan' => ['password' => $trojanPassword],
+                'shadowsocks' => ['password' => $ssPassword],
+            ];
+            return [$inbounds, $proxies];
+        }
+
+        // CONFIG_TYPE_STABLE или неизвестный — только стабильные протоколы (4)
+        $inbounds = [
+            'vmess' => ['VMESS-WS'],
+            'vless' => ['VLESS-WS'],
+            'trojan' => ['TROJAN-WS'],
+            'shadowsocks' => ['Shadowsocks-TCP'],
+        ];
+        $proxies = [
+            'vmess' => ['id' => $vmessId],
+            'vless' => ['id' => $vlessId],
+            'trojan' => ['password' => $trojanPassword],
+            'shadowsocks' => ['password' => $ssPassword],
+        ];
+        return [$inbounds, $proxies];
+    }
+
+    /**
+     * Добавление пользователя и протоколов подключения на панель.
      *
      * @param int $panel_id
      * @param int $userTgId
      * @param int $data_limit
      * @param int $expire
      * @param string $key_activate_id
+     * @param array $options
      * @return ServerUser
      * @throws GuzzleException
      */
@@ -1979,12 +2275,16 @@ class MarzbanService
             $userId = Str::uuid();
             $maxConnections = $options['max_connections'] ?? config('panel.max_connections', 4);
 
+            [$inbounds, $proxies] = $this->getInboundsAndProxiesForPanel($panel);
+
             $userData = $marzbanApi->createUser(
                 $panel->auth_token,
                 $userId,
                 $data_limit,
                 $expire,
-                $maxConnections // ← ПЕРЕДАЕМ ЛИМИТ ПОДКЛЮЧЕНИЙ
+                $maxConnections,
+                $inbounds,
+                $proxies
             );
 
             if (empty($userData['links'])) {
@@ -2092,11 +2392,15 @@ class MarzbanService
 //                'status' => $userData['status'] ?? 'active'
 //            ];
             $targetPanel = self::updateMarzbanToken($targetPanel->id);
+            [$targetInbounds, $targetProxies] = $this->getInboundsAndProxiesForPanel($targetPanel);
             $newUser = $targetMarzbanApi->createUser(
                 $targetPanel->auth_token,
                 $serverUser->id,
                 $userData['data_limit'] - $userData['used_traffic'] ?? 0,
-                $userData['expire'] ?? 0
+                $userData['expire'] ?? 0,
+                null,
+                $targetInbounds,
+                $targetProxies
             );
 
             // 3. Обновляем данные в БД
@@ -2242,11 +2546,15 @@ class MarzbanService
             $expire = time() + 86400; // минимум 1 день, если дата уже прошла
         }
 
+        [$targetInbounds, $targetProxies] = $this->getInboundsAndProxiesForPanel($targetPanel);
         $newUser = $marzbanApi->createUser(
             $targetPanel->auth_token,
             $serverUser->id,
             $dataLimit,
-            $expire
+            $expire,
+            null,
+            $targetInbounds,
+            $targetProxies
         );
 
         if (empty($newUser['links'])) {

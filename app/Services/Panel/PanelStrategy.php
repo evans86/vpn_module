@@ -95,6 +95,26 @@ class PanelStrategy
     }
 
     /**
+     * Обновление конфига панели — стабильная REALITY (только VLESS TCP на 443)
+     *
+     * @param int $panel_id
+     * @return void
+     * @throws GuzzleException
+     */
+    public function updateConfigurationRealityStable(int $panel_id): void
+    {
+        $this->strategy->updateConfigurationRealityStable($panel_id);
+    }
+
+    /**
+     * Обновление конфига панели — смешанный: SS + Trojan + VLESS + 2 REALITY
+     */
+    public function updateConfigurationMixed(int $panel_id): void
+    {
+        $this->strategy->updateConfigurationMixed($panel_id);
+    }
+
+    /**
      * Добавление пользователя панели
      *
      * @param int $panel_id

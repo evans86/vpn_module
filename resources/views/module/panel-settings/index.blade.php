@@ -400,10 +400,15 @@
                                         @endif
                                         @if($panel->config_type)
                                             <div><strong>Тип конфига:</strong> 
-                                                <span class="px-2 py-0.5 rounded text-xs font-medium 
-                                                    {{ $panel->config_type === 'reality' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800' }}">
-                                                    {{ $panel->config_type === 'reality' ? 'REALITY' : 'Стабильный' }}
-                                                </span>
+                                                @if($panel->config_type === 'reality_stable')
+                                                    <span class="px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">REALITY (только)</span>
+                                                @elseif($panel->config_type === 'reality')
+                                                    <span class="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">REALITY</span>
+                                                @elseif($panel->config_type === 'mixed')
+                                                    <span class="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Смешанный</span>
+                                                @else
+                                                    <span class="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Стабильный</span>
+                                                @endif
                                             </div>
                                         @endif
                                         @if($panel->use_tls)

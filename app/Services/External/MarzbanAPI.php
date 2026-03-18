@@ -201,22 +201,39 @@ class MarzbanAPI
      * @param string $userId
      * @param int $data_limit
      * @param int $expire
+     * @param int|null $maxConnections
+     * @param array|null $inbounds Формат: ['vless' => ['VLESS TCP REALITY', ...], 'vmess' => [...], ...]. Если null — используются дефолтные (VLESS-WS, VMESS-WS, TROJAN-WS, Shadowsocks-TCP).
+     * @param array|null $proxies Формат как у Marzban: vless.id, vmess.id, trojan.password, shadowsocks.password. Если null — генерируются под дефолтные inbounds.
      * @return mixed
      * @throws GuzzleException
      * @throws Exception
      */
-    public function createUser(string $token, string $userId, int $data_limit, int $expire, ?int $maxConnections = null)
+    public function createUser(string $token, string $userId, int $data_limit, int $expire, ?int $maxConnections = null, ?array $inbounds = null, ?array $proxies = null)
     {
         try {
             $action = 'user';
 
-            // Используем значение из конфига, если не передано
             if ($maxConnections === null) {
                 $maxConnections = config('panel.max_connections', 4);
             }
-
-            // Определяем level: если max_connections <= 3, то level = 0, иначе level = 1
             $level = $maxConnections <= 3 ? 0 : 1;
+
+            if ($inbounds === null) {
+                $inbounds = [
+                    'vmess' => ['VMESS-WS'],
+                    'vless' => ['VLESS-WS'],
+                    'trojan' => ['TROJAN-WS'],
+                    'shadowsocks' => ['Shadowsocks-TCP'],
+                ];
+            }
+            if ($proxies === null) {
+                $proxies = [
+                    'vmess' => ['id' => Str::uuid()->toString()],
+                    'vless' => ['id' => Str::uuid()->toString()],
+                    'trojan' => ['password' => substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 16)],
+                    'shadowsocks' => ['password' => substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 16)],
+                ];
+            }
 
             $requestParam = [
                 'headers' => [
@@ -228,27 +245,9 @@ class MarzbanAPI
                     'username' => $userId,
                     'data_limit' => $data_limit,
                     'expire' => $expire,
-                    'proxies' => [
-                        "vmess" => [
-                            "id" => Str::uuid()->toString()
-                        ],
-                        'vless' => [
-                            "id" => Str::uuid()->toString()
-                        ],
-                        'trojan' => [
-                            'password' => substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 16)
-                        ],
-                        'shadowsocks' => [
-                            'password' => substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 16)
-                        ]
-                    ],
-                    'inbounds' => [
-                        'vmess' => ["VMESS-WS"],
-                        'vless' => ["VLESS-WS"],
-                        'trojan' => ["TROJAN-WS"],
-                        'shadowsocks' => ["Shadowsocks-TCP"],
-                    ],
-                    'level' => $level // ← ДОБАВЛЯЕМ УРОВЕНЬ ПОЛИТИКИ
+                    'proxies' => $proxies,
+                    'inbounds' => $inbounds,
+                    'level' => $level
                 ],
                 'verify' => false,
                 'timeout' => 20,
@@ -537,6 +536,64 @@ class MarzbanAPI
                 'source' => 'api'
             ]);
             throw $e;
+        }
+    }
+
+    /**
+     * Получить Host Settings (Address и др. для каждого inbound).
+     * Ответ: [ "inbound_tag" => [ [ "remark" => "...", "address" => "...", "port" => ..., ... ], ... ], ... ]
+     *
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    public function getHosts(string $token): array
+    {
+        try {
+            $client = new Client([
+                'base_uri' => $this->host . '/api/',
+                'verify' => false,
+                'timeout' => 20,
+                'connect_timeout' => 10,
+            ]);
+            $response = $client->get('hosts', [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'Accept' => 'application/json',
+                ],
+                'curl' => self::curlSslDisable(),
+            ]);
+            $result = json_decode($response->getBody()->getContents(), true);
+            return is_array($result) ? $result : [];
+        } catch (\Exception $e) {
+            Log::warning('Marzban getHosts failed', ['error' => $e->getMessage(), 'source' => 'api']);
+            return [];
+        }
+    }
+
+    /**
+     * Обновить Host Settings. В ссылках подписки будет использоваться переданный address (домен).
+     *
+     * @param string $token
+     * @param array<string, array<int, array<string, mixed>>> $hosts Структура как у getHosts: tag => [ [ remark, address, port, ... ], ... ]
+     */
+    public function updateHosts(string $token, array $hosts): void
+    {
+        $client = new Client([
+            'base_uri' => $this->host . '/api/',
+            'verify' => false,
+            'timeout' => 20,
+            'connect_timeout' => 10,
+        ]);
+        $response = $client->put('hosts', [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $token,
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
+            ],
+            'json' => $hosts,
+            'curl' => self::curlSslDisable(),
+        ]);
+        if ($response->getStatusCode() !== 200) {
+            throw new \RuntimeException('Marzban updateHosts returned ' . $response->getStatusCode());
         }
     }
 }

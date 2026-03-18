@@ -39,6 +39,22 @@ interface PanelInterface
     public function updateConfigurationReality(int $panel_id): void;
 
     /**
+     * Обновление конфигурации панели — стабильная REALITY (только VLESS TCP на 443)
+     *
+     * @param int $panel_id
+     * @return void
+     */
+    public function updateConfigurationRealityStable(int $panel_id): void;
+
+    /**
+     * Обновление конфигурации панели — смешанный пресет: SS + Trojan + VLESS + 2 REALITY
+     *
+     * @param int $panel_id
+     * @return void
+     */
+    public function updateConfigurationMixed(int $panel_id): void;
+
+    /**
      * Добавление пользователя панели
      *
      * @param int $panel_id

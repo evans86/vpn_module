@@ -83,6 +83,26 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
     }
 
     /**
+     * Обновление конфигурации панели — стабильная REALITY (только VLESS TCP на 443).
+     *
+     * @param int $panel_id
+     * @return void
+     * @throws GuzzleException
+     */
+    public function updateConfigurationRealityStable(int $panel_id): void
+    {
+        $this->marzbanService->updateConfigurationRealityStable($panel_id);
+    }
+
+    /**
+     * Обновление конфигурации панели — смешанный: SS + Trojan + VLESS + 2 REALITY
+     */
+    public function updateConfigurationMixed(int $panel_id): void
+    {
+        $this->marzbanService->updateConfigurationMixed($panel_id);
+    }
+
+    /**
      * Добавление пользователя
      *
      * @param int $panel_id

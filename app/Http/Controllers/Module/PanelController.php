@@ -286,6 +286,74 @@ class PanelController extends Controller
     }
 
     /**
+     * Update panel configuration — stable REALITY (REALITY only, same ports, no VMess/Trojan/SS).
+     *
+     * @param Panel $panel
+     * @return RedirectResponse
+     * @throws GuzzleException
+     */
+    public function updateConfigRealityStable(Panel $panel): RedirectResponse
+    {
+        try {
+            $this->logger->info('Обновление конфигурации панели (только REALITY)', [
+                'source' => 'panel',
+                'action' => 'update-config-reality-stable',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+            ]);
+
+            $strategy = new PanelStrategy($panel->panel);
+            $strategy->updateConfigurationRealityStable($panel->id);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'Конфигурация «только REALITY» успешно применена');
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при обновлении конфигурации панели (только REALITY)', [
+                'source' => 'panel',
+                'action' => 'update-config-reality-stable',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Ошибка при обновлении конфигурации: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Update panel configuration — mixed: SS + Trojan + VLESS + 2 REALITY (no VMess).
+     */
+    public function updateConfigMixed(Panel $panel): RedirectResponse
+    {
+        try {
+            $this->logger->info('Обновление конфигурации панели (смешанный)', [
+                'source' => 'panel',
+                'action' => 'update-config-mixed',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+            ]);
+
+            $strategy = new PanelStrategy($panel->panel);
+            $strategy->updateConfigurationMixed($panel->id);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'Конфигурация «SS + Trojan + VLESS + 2 REALITY» применена');
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при обновлении конфигурации панели (смешанный)', [
+                'source' => 'panel',
+                'action' => 'update-config-mixed',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Ошибка при обновлении конфигурации: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Update panel configuration (legacy method).
      *
      * @param Panel $panel

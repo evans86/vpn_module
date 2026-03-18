@@ -312,6 +312,16 @@ class Panel extends Model
     const CONFIG_TYPE_REALITY = 'reality';
 
     /**
+     * @var string Тип конфига: стабильная REALITY (только REALITY inbounds, без VMess/Trojan/SS)
+     */
+    const CONFIG_TYPE_REALITY_STABLE = 'reality_stable';
+
+    /**
+     * @var string Тип конфига: SS + Trojan + VLESS + 2 VLESS REALITY (без VMess)
+     */
+    const CONFIG_TYPE_MIXED = 'mixed';
+
+    /**
      * Get the server associated with the panel.
      *
      * @return BelongsTo
@@ -508,6 +518,10 @@ class Panel extends Model
                 return 'Стабильный (без REALITY)';
             case self::CONFIG_TYPE_REALITY:
                 return 'С REALITY (лучший обход)';
+            case self::CONFIG_TYPE_REALITY_STABLE:
+                return 'REALITY стабильный (только REALITY)';
+            case self::CONFIG_TYPE_MIXED:
+                return 'SS + Trojan + VLESS + 2 REALITY';
             default:
                 return 'Неизвестно';
         }
@@ -525,6 +539,10 @@ class Panel extends Model
                 return 'info';
             case self::CONFIG_TYPE_REALITY:
                 return 'success';
+            case self::CONFIG_TYPE_REALITY_STABLE:
+                return 'primary';
+            case self::CONFIG_TYPE_MIXED:
+                return 'warning';
             default:
                 return 'secondary';
         }
@@ -538,6 +556,16 @@ class Panel extends Model
     public function isUsingRealityConfig(): bool
     {
         return $this->config_type === self::CONFIG_TYPE_REALITY;
+    }
+
+    /**
+     * Check if using stable REALITY config (port 443 only).
+     *
+     * @return bool
+     */
+    public function isUsingRealityStableConfig(): bool
+    {
+        return $this->config_type === self::CONFIG_TYPE_REALITY_STABLE;
     }
 
     /**
