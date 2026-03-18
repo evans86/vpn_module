@@ -290,6 +290,23 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::get('/', [\App\Http\Controllers\Module\OrderSettingsController::class, 'index'])->name('index');
                 Route::post('/', [\App\Http\Controllers\Module\OrderSettingsController::class, 'update'])->name('update');
             });
+
+            // Рассылки
+            Route::prefix('broadcast')->name('broadcast.')->group(function () {
+                Route::get('/', [\App\Http\Controllers\Module\BroadcastController::class, 'index'])->name('index');
+                Route::get('/create', [\App\Http\Controllers\Module\BroadcastController::class, 'create'])->name('create');
+                Route::post('/', [\App\Http\Controllers\Module\BroadcastController::class, 'store'])->name('store');
+                Route::get('/{broadcast}', [\App\Http\Controllers\Module\BroadcastController::class, 'show'])->name('show');
+                Route::post('/{broadcast}/start', [\App\Http\Controllers\Module\BroadcastController::class, 'start'])->name('start');
+            });
+
+            // Очередь заданий (перевыпуск ключей, рассылки, миграции)
+            Route::prefix('queue')->name('queue.')->group(function () {
+                Route::get('/', [\App\Http\Controllers\Module\QueueMonitorController::class, 'index'])->name('index');
+                Route::post('/retry', [\App\Http\Controllers\Module\QueueMonitorController::class, 'retry'])->name('retry');
+                Route::post('/retry-all', [\App\Http\Controllers\Module\QueueMonitorController::class, 'retryAll'])->name('retry-all');
+                Route::post('/flush', [\App\Http\Controllers\Module\QueueMonitorController::class, 'flush'])->name('flush');
+            });
         });
 
         // Dashboard
