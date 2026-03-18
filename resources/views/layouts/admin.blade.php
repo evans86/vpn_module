@@ -181,6 +181,18 @@
                     'routes' => ['admin.module.telegram-users.*']
                 ])
                 @include('layouts.admin.nav-item', [
+                    'route' => 'admin.module.broadcast.index',
+                    'icon' => 'fa-paper-plane',
+                    'label' => 'Рассылки',
+                    'routes' => ['admin.module.broadcast.*']
+                ])
+                @include('layouts.admin.nav-item', [
+                    'route' => 'admin.module.queue.index',
+                    'icon' => 'fa-tasks',
+                    'label' => 'Очередь заданий',
+                    'routes' => ['admin.module.queue.*']
+                ])
+                @include('layouts.admin.nav-item', [
                     'route' => 'admin.module.server-monitoring.index',
                     'icon' => 'fa-chart-line',
                     'label' => 'Статистика',

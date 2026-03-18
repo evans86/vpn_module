@@ -66,9 +66,11 @@ class QueueWorkSafeCommand extends Command
     {
         $this->laravel['events']->listen(\Illuminate\Queue\Events\JobProcessing::class, function ($event) {
             $this->writeStatus($event->job, 'Processing', 'comment');
+            $this->laravel['cache']->put('queue_worker_last_activity_at', now()->timestamp, now()->addMinutes(15));
         });
         $this->laravel['events']->listen(\Illuminate\Queue\Events\JobProcessed::class, function ($event) {
             $this->writeStatus($event->job, 'Processed', 'info');
+            $this->laravel['cache']->put('queue_worker_last_activity_at', now()->timestamp, now()->addMinutes(15));
         });
         $this->laravel['events']->listen(\Illuminate\Queue\Events\JobFailed::class, function ($event) {
             $this->writeStatus($event->job, 'Failed', 'error');
