@@ -24,19 +24,16 @@ class BroadcastService
 
     /**
      * Возвращает ключи для рассылки: по одному ключу на каждого уникального user_tg_id
-     * (активные ключи с активированным пользователем).
+     * (активные ключи с активированным пользователем). Один запрос без загрузки всех строк.
      */
     public function getEligibleKeyActivateIds(): array
     {
         return KeyActivate::query()
             ->where('status', KeyActivate::ACTIVE)
             ->whereNotNull('user_tg_id')
-            ->orderBy('user_tg_id')
-            ->orderBy('id')
-            ->get()
-            ->unique('user_tg_id')
+            ->selectRaw('MIN(id) as id')
+            ->groupBy('user_tg_id')
             ->pluck('id')
-            ->values()
             ->all();
     }
 
@@ -46,18 +43,32 @@ class BroadcastService
     public function createCampaignWithRecipients(string $name, string $message): BroadcastCampaign
     {
         $keyIds = $this->getEligibleKeyActivateIds();
+        $total = count($keyIds);
+
         $campaign = BroadcastCampaign::create([
             'name' => $name,
             'message' => $message,
             'status' => BroadcastCampaign::STATUS_DRAFT,
-            'total_recipients' => count($keyIds),
+            'total_recipients' => $total,
         ]);
 
-        foreach ($keyIds as $keyId) {
-            $campaign->recipients()->create([
-                'key_activate_id' => $keyId,
-                'status' => BroadcastRecipient::STATUS_PENDING,
-            ]);
+        if ($total > 0) {
+            $now = now()->toDateTimeString();
+            $campaignId = $campaign->id;
+            $chunks = array_chunk($keyIds, 1000);
+            foreach ($chunks as $chunk) {
+                $rows = [];
+                foreach ($chunk as $keyId) {
+                    $rows[] = [
+                        'broadcast_campaign_id' => $campaignId,
+                        'key_activate_id' => $keyId,
+                        'status' => BroadcastRecipient::STATUS_PENDING,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+                BroadcastRecipient::insert($rows);
+            }
         }
 
         return $campaign->fresh();
