@@ -225,45 +225,45 @@
                                         </div>
 
                                         <!-- Config Type Buttons -->
-                                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                            <form action="{{ route('admin.module.panel.update-config-stable', $panel) }}" method="POST" class="w-full">
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <form action="{{ route('admin.module.panel.update-config-stable', $panel) }}" method="POST" class="min-w-0">
                                                 @csrf
                                                 <button type="submit" 
-                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors w-full
+                                                        class="w-full min-h-[3.25rem] flex flex-col items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors
                                                         {{ $panel->config_type === 'stable' ? 'ring-2 ring-blue-500 shadow-sm' : '' }}"
                                                         title="Стабильный конфиг (без REALITY)">
-                                                    <i class="fas fa-shield-alt mr-2"></i>
-                                                    <span>Стабильный</span>
+                                                    <i class="fas fa-shield-alt text-sm shrink-0"></i>
+                                                    <span class="leading-tight text-center break-words">Стабильный</span>
                                                 </button>
                                             </form>
-                                            <form action="{{ route('admin.module.panel.update-config-reality', $panel) }}" method="POST" class="w-full">
+                                            <form action="{{ route('admin.module.panel.update-config-reality', $panel) }}" method="POST" class="min-w-0">
                                                 @csrf
                                                 <button type="submit" 
-                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 transition-colors w-full
+                                                        class="w-full min-h-[3.25rem] flex flex-col items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 transition-colors
                                                         {{ $panel->config_type === 'reality' ? 'ring-2 ring-green-500 shadow-sm' : '' }}"
                                                         title="Конфиг с REALITY - все протоколы">
-                                                    <i class="fas fa-rocket mr-2"></i>
-                                                    <span>REALITY</span>
+                                                    <i class="fas fa-rocket text-sm shrink-0"></i>
+                                                    <span class="leading-tight text-center break-words">REALITY</span>
                                                 </button>
                                             </form>
-                                            <form action="{{ route('admin.module.panel.update-config-reality-stable', $panel) }}" method="POST" class="w-full">
+                                            <form action="{{ route('admin.module.panel.update-config-reality-stable', $panel) }}" method="POST" class="min-w-0">
                                                 @csrf
                                                 <button type="submit" 
-                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors w-full
+                                                        class="w-full min-h-[3.25rem] flex flex-col items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors
                                                         {{ $panel->config_type === 'reality_stable' ? 'ring-2 ring-indigo-500 shadow-sm' : '' }}"
                                                         title="Только REALITY, без VMess/Trojan/SS">
-                                                    <i class="fas fa-lock mr-2"></i>
-                                                    <span>REALITY (только)</span>
+                                                    <i class="fas fa-lock text-sm shrink-0"></i>
+                                                    <span class="leading-tight text-center break-words">REALITY<br>(только)</span>
                                                 </button>
                                             </form>
-                                            <form action="{{ route('admin.module.panel.update-config-mixed', $panel) }}" method="POST" class="w-full">
+                                            <form action="{{ route('admin.module.panel.update-config-mixed', $panel) }}" method="POST" class="min-w-0">
                                                 @csrf
                                                 <button type="submit" 
-                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors w-full
+                                                        class="w-full min-h-[3.25rem] flex flex-col items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-md text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors
                                                         {{ $panel->config_type === 'mixed' ? 'ring-2 ring-amber-500 shadow-sm' : '' }}"
                                                         title="SS + Trojan + VLESS + 2 стабильных VLESS REALITY (без VMess)">
-                                                    <i class="fas fa-layer-group mr-2"></i>
-                                                    <span>Смешанный</span>
+                                                    <i class="fas fa-layer-group text-sm shrink-0"></i>
+                                                    <span class="leading-tight text-center break-words">Смешанный</span>
                                                 </button>
                                             </form>
                                         </div>
