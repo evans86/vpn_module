@@ -6,7 +6,11 @@ use App\Queue\WorkerNoPcntl;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
+use Illuminate\Queue\Events\JobProcessed;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -82,5 +86,29 @@ class AppServiceProvider extends ServiceProvider
         }
         
         Paginator::useBootstrap();
+
+        // Лог успешно обработанных заданий очереди (для страницы «Очередь заданий»).
+        $this->app['events']->listen(JobProcessed::class, function (JobProcessed $event): void {
+            if (!Schema::hasTable('processed_jobs')) {
+                return;
+            }
+            $job = $event->job;
+            $payload = json_decode($job->getRawBody(), true);
+            $jobName = $payload['displayName'] ?? class_basename($payload['job'] ?? 'Unknown');
+            $uuid = method_exists($job, 'uuid') ? $job->uuid() : null;
+            DB::table('processed_jobs')->insert([
+                'uuid' => $uuid,
+                'queue' => $job->getQueue(),
+                'job_name' => Str::limit($jobName, 255),
+                'processed_at' => now(),
+            ]);
+            // Оставляем только последние 500 записей.
+            $ids = DB::table('processed_jobs')->orderByDesc('id')->limit(self::PROCESSED_JOBS_KEEP)->pluck('id');
+            if ($ids->isNotEmpty()) {
+                DB::table('processed_jobs')->whereNotIn('id', $ids)->delete();
+            }
+        });
     }
+
+    private const PROCESSED_JOBS_KEEP = 500;
 }

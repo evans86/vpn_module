@@ -27,6 +27,7 @@ class QueueMonitorController extends Controller
         $workerLastActivityAt = null;
         $workerStatus = null; // 'active' | 'idle' | 'possibly_down' | 'unknown'
 
+        $processedJobs = [];
         if ($connection === 'database') {
             if (Schema::hasTable('jobs')) {
                 $pending = (int) DB::table('jobs')->count();
@@ -37,6 +38,12 @@ class QueueMonitorController extends Controller
                     ->orderByDesc('failed_at')
                     ->limit(50)
                     ->get(['id', 'uuid', 'queue', 'failed_at', 'exception']);
+            }
+            if (Schema::hasTable('processed_jobs')) {
+                $processedJobs = DB::table('processed_jobs')
+                    ->orderByDesc('processed_at')
+                    ->limit(50)
+                    ->get(['id', 'uuid', 'queue', 'job_name', 'processed_at']);
             }
             $ts = Cache::get('queue_worker_last_activity_at');
             if ($ts) {
@@ -61,6 +68,7 @@ class QueueMonitorController extends Controller
             'queuePending' => $pending,
             'queueFailed' => $failed,
             'failedJobs' => $failedJobs,
+            'processedJobs' => $processedJobs,
             'workerLastActivityAt' => $workerLastActivityAt,
             'workerStatus' => $workerStatus,
         ]);
