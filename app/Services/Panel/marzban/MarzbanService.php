@@ -2222,9 +2222,9 @@ class MarzbanService
         }
 
         if ($configType === Panel::CONFIG_TYPE_MIXED) {
-            // SS + Trojan + VLESS (VLESS-WS + 2 REALITY)
+            // SS + Trojan + 3 VLESS REALITY (без VLESS-WS)
             $inbounds = [
-                'vless' => ['VLESS-WS', 'VLESS TCP REALITY', 'VLESS TCP REALITY ALT'],
+                'vless' => ['VLESS TCP REALITY', 'VLESS GRPC REALITY', 'VLESS TCP REALITY ALT'],
                 'trojan' => ['TROJAN-WS'],
                 'shadowsocks' => ['Shadowsocks-TCP'],
             ];
