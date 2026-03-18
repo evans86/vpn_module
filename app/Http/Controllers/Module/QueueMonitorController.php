@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
@@ -23,6 +24,9 @@ class QueueMonitorController extends Controller
         $failed = 0;
         $failedJobs = [];
 
+        $workerLastActivityAt = null;
+        $workerStatus = null; // 'active' | 'idle' | 'possibly_down' | 'unknown'
+
         if ($connection === 'database') {
             if (Schema::hasTable('jobs')) {
                 $pending = (int) DB::table('jobs')->count();
@@ -34,6 +38,22 @@ class QueueMonitorController extends Controller
                     ->limit(50)
                     ->get(['id', 'uuid', 'queue', 'failed_at', 'exception']);
             }
+            $ts = Cache::get('queue_worker_last_activity_at');
+            if ($ts) {
+                $workerLastActivityAt = \Carbon\Carbon::createFromTimestamp($ts);
+                $minutesAgo = (int) $workerLastActivityAt->diffInMinutes(now());
+                if ($minutesAgo <= 5) {
+                    $workerStatus = 'active';
+                } elseif ($minutesAgo <= 60) {
+                    $workerStatus = 'idle';
+                } elseif ($pending > 0) {
+                    $workerStatus = 'possibly_down';
+                } else {
+                    $workerStatus = 'idle';
+                }
+            } else {
+                $workerStatus = $pending > 0 ? 'possibly_down' : 'unknown';
+            }
         }
 
         return view('module.queue.index', [
@@ -41,6 +61,8 @@ class QueueMonitorController extends Controller
             'queuePending' => $pending,
             'queueFailed' => $failed,
             'failedJobs' => $failedJobs,
+            'workerLastActivityAt' => $workerLastActivityAt,
+            'workerStatus' => $workerStatus,
         ]);
     }
 

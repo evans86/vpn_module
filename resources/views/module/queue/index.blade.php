@@ -5,57 +5,48 @@
 
 @section('content')
     <div class="space-y-6">
-        {{-- Сводка --}}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <div class="text-sm font-medium text-gray-500">Подключение</div>
                 <div class="mt-1 text-lg font-semibold {{ $queueConnection === 'sync' ? 'text-amber-600' : 'text-gray-900' }}">
                     {{ $queueConnection }}
                 </div>
-                @if($queueConnection === 'sync')
-                    <p class="mt-2 text-xs text-amber-700">Воркер не используется. В .env укажите <code>QUEUE_CONNECTION=database</code> для фоновых заданий.</p>
-                @endif
             </div>
             <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <div class="text-sm font-medium text-gray-500">В ожидании</div>
                 <div class="mt-1 text-lg font-semibold {{ $queuePending > 0 ? 'text-blue-600' : 'text-gray-900' }}">{{ $queuePending }}</div>
-                <p class="mt-2 text-xs text-gray-500">Перевыпуск ключей, рассылки, миграции и др.</p>
             </div>
             <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <div class="text-sm font-medium text-gray-500">Провалилось</div>
                 <div class="mt-1 text-lg font-semibold {{ $queueFailed > 0 ? 'text-red-600' : 'text-gray-900' }}">{{ $queueFailed }}</div>
-                @if($queueFailed > 0)
-                    <p class="mt-2 text-xs text-gray-500">Ниже можно повторить или очистить.</p>
+            </div>
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <div class="text-sm font-medium text-gray-500">Воркер</div>
+                @if($queueConnection === 'sync')
+                    <div class="mt-1 text-lg font-semibold text-gray-400">—</div>
+                @elseif($workerStatus === 'active')
+                    <div class="mt-1 text-lg font-semibold text-green-600">Запущен</div>
+                    @if($workerLastActivityAt)
+                        <div class="mt-1 text-xs text-gray-500">Активность: {{ $workerLastActivityAt->diffForHumans() }}</div>
+                    @endif
+                @elseif($workerStatus === 'idle')
+                    <div class="mt-1 text-lg font-semibold text-gray-600">Запущен</div>
+                    @if($workerLastActivityAt)
+                        <div class="mt-1 text-xs text-gray-500">Последняя активность: {{ $workerLastActivityAt->diffForHumans() }}</div>
+                    @endif
+                @elseif($workerStatus === 'possibly_down')
+                    <div class="mt-1 text-lg font-semibold text-red-600">Возможно вылетел</div>
+                    @if($workerLastActivityAt)
+                        <div class="mt-1 text-xs text-gray-500">Последняя активность: {{ $workerLastActivityAt->diffForHumans() }}</div>
+                    @else
+                        <div class="mt-1 text-xs text-gray-500">Нет данных об активности. Задания в очереди не обрабатываются.</div>
+                    @endif
+                @else
+                    <div class="mt-1 text-lg font-semibold text-gray-400">Нет данных</div>
+                    <div class="mt-1 text-xs text-gray-500">Запустите воркер — после обработки задания статус появится.</div>
                 @endif
             </div>
         </div>
-
-        {{-- Как запустить воркер, чтобы не отключался --}}
-        <x-admin.card title="Как держать воркер запущенным (чтобы не отключался)">
-            <div class="space-y-4 text-sm">
-                @if($queueConnection === 'sync')
-                    <p class="text-amber-700">Сначала в <code>.env</code> установите <code>QUEUE_CONNECTION=database</code> и перезапустите приложение.</p>
-                @endif
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <h4 class="font-semibold text-gray-800 mb-2">Windows (OpenServer)</h4>
-                        <ul class="list-disc list-inside space-y-1 text-gray-700">
-                            <li>Запуск в цикле (рекомендуется): <code class="bg-gray-100 px-1">scripts\start-queue-worker.bat</code> — окно не закрывать.</li>
-                            <li>Или одна сессия: <code class="bg-gray-100 px-1">php artisan queue:work-safe database</code> в отдельном CMD.</li>
-                            <li><strong>Чтобы не отключался после перезагрузки:</strong> создайте задачу в <strong>Планировщике заданий Windows</strong>: триггер «При запуске» или «При входе в систему», действие — запуск <code>php.exe</code> с аргументами <code>artisan queue:work-safe database</code>, рабочая папка — корень проекта.</li>
-                        </ul>
-                    </div>
-                    <div>
-                        <h4 class="font-semibold text-gray-800 mb-2">Linux / сервер</h4>
-                        <ul class="list-disc list-inside space-y-1 text-gray-700">
-                            <li>Фон: <code class="bg-gray-100 px-1">nohup php artisan queue:work-safe database >> storage/logs/queue-worker.log 2>&1 &</code></li>
-                            <li><strong>Чтобы не отключался:</strong> используйте <strong>Supervisor</strong> — конфиг в <code>docs/supervisor-queue.conf.example</code>. Supervisor перезапустит воркер при падении и после перезагрузки сервера.</li>
-                        </ul>
-                    </div>
-                </div>
-                <p class="text-gray-500">Остановка воркера: в другом терминале <code>php artisan queue:restart</code>. Проверка: <code>php artisan queue:status</code>.</p>
-            </div>
-        </x-admin.card>
 
         {{-- Провалившиеся задания --}}
         @if($queueFailed > 0)
