@@ -2087,21 +2087,26 @@ class MarzbanService
     {
         $panel = self::updateMarzbanToken($panel_id);
 
-        Log::info('Updating configuration to mixed (SS + Trojan + 2 VLESS REALITY, без VLESS-WS)', [
+        Log::info('Updating configuration to mixed (SS + Trojan + 3 VLESS REALITY)', [
             'panel_id' => $panel_id,
             'source' => 'panel',
         ]);
 
         $realityKeys = $this->getOrGenerateRealityKeys($panel);
 
+        $allRealityInbounds = $this->buildRealityInbounds(
+            $realityKeys['private_key'],
+            $realityKeys['short_id'],
+            $realityKeys['grpc_short_id'],
+            $realityKeys['xhttp_short_id']
+        );
+        // Смешанный пресет: SS + Trojan + 3 VLESS REALITY (TCP 8443, GRPC 9443, XHTTP 8444)
+        $threeReality = array_slice($allRealityInbounds, 0, 3);
+
         $json_config = $this->buildBaseConfig($panel);
         $json_config['inbounds'] = array_merge(
             $this->buildStableBasicInboundsForMixed($panel),
-            $this->buildTwoRealityInbounds(
-                $realityKeys['private_key'],
-                $realityKeys['short_id'],
-                $realityKeys['xhttp_short_id']
-            )
+            $threeReality
         );
 
         $this->applyConfiguration($panel, $json_config, Panel::CONFIG_TYPE_MIXED);
