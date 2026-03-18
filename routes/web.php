@@ -296,6 +296,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::get('/', [\App\Http\Controllers\Module\BroadcastController::class, 'index'])->name('index');
                 Route::get('/create', [\App\Http\Controllers\Module\BroadcastController::class, 'create'])->name('create');
                 Route::post('/', [\App\Http\Controllers\Module\BroadcastController::class, 'store'])->name('store');
+                Route::get('/search-users', [\App\Http\Controllers\Module\BroadcastController::class, 'searchUsers'])->name('search-users');
                 Route::get('/{broadcast}', [\App\Http\Controllers\Module\BroadcastController::class, 'show'])->name('show');
                 Route::post('/{broadcast}/start', [\App\Http\Controllers\Module\BroadcastController::class, 'start'])->name('start');
                 Route::post('/{broadcast}/cancel', [\App\Http\Controllers\Module\BroadcastController::class, 'cancel'])->name('cancel');

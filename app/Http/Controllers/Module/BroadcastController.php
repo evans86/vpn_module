@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
 use App\Models\Broadcast\BroadcastCampaign;
+use App\Models\KeyActivate\KeyActivate;
+use App\Models\TelegramUser\TelegramUser;
 use App\Services\Broadcast\BroadcastService;
 use App\Services\Notification\TelegramNotificationService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -74,18 +77,69 @@ class BroadcastController extends Controller
      */
     public function show(BroadcastCampaign $broadcast): View
     {
-        $recipientsForTest = [];
-        if ($broadcast->isDraft()) {
-            $recipientsForTest = $broadcast->recipients()
-                ->with('keyActivate')
-                ->limit(200)
+        return view('module.broadcast.show', [
+            'campaign' => $broadcast,
+        ]);
+    }
+
+    /**
+     * Поиск пользователей для тестовой рассылки (по Telegram ID или username). Без перезагрузки.
+     */
+    public function searchUsers(Request $request): JsonResponse
+    {
+        $q = trim((string) $request->input('q', ''));
+        if ($q === '') {
+            return response()->json([]);
+        }
+
+        $like = '%' . $q . '%';
+
+        $byTg = KeyActivate::query()
+            ->where('status', KeyActivate::ACTIVE)
+            ->whereNotNull('user_tg_id')
+            ->where('user_tg_id', 'like', $like)
+            ->selectRaw('MIN(id) as id, user_tg_id')
+            ->groupBy('user_tg_id')
+            ->limit(25)
+            ->get();
+
+        $tgIdsFromUsername = TelegramUser::query()
+            ->where('username', 'like', $like)
+            ->pluck('telegram_id')
+            ->unique()
+            ->filter()
+            ->values()
+            ->all();
+
+        $byUsername = collect();
+        if (count($tgIdsFromUsername) > 0) {
+            $byUsername = KeyActivate::query()
+                ->where('status', KeyActivate::ACTIVE)
+                ->whereNotNull('user_tg_id')
+                ->whereIn('user_tg_id', $tgIdsFromUsername)
+                ->selectRaw('MIN(id) as id, user_tg_id')
+                ->groupBy('user_tg_id')
+                ->limit(25)
                 ->get();
         }
 
-        return view('module.broadcast.show', [
-            'campaign' => $broadcast,
-            'recipientsForTest' => $recipientsForTest,
-        ]);
+        $merged = $byTg->concat($byUsername)->unique('id')->take(50)->values();
+        $userTgIds = $merged->pluck('user_tg_id')->unique()->values()->all();
+
+        $usernames = TelegramUser::query()
+            ->whereIn('telegram_id', $userTgIds)
+            ->pluck('username', 'telegram_id')
+            ->all();
+
+        $result = $merged->map(function ($row) use ($usernames) {
+            return [
+                'key_activate_id' => $row->id,
+                'user_tg_id' => $row->user_tg_id,
+                'username' => $usernames[$row->user_tg_id] ?? null,
+            ];
+        })->all();
+
+        return response()->json($result);
     }
 
     /**
@@ -138,36 +192,31 @@ class BroadcastController extends Controller
                 ->with('error', 'Тестовая отправка доступна только для рассылки в статусе «Черновик».');
         }
 
-        $recipientIds = $request->input('recipient_ids', []);
-        if (is_array($recipientIds) && count($recipientIds) > 0) {
-            $recipientIds = array_slice(array_filter(array_map('intval', $recipientIds)), 0, 20);
-            $recipients = $broadcast->recipients()
-                ->with('keyActivate')
-                ->whereIn('id', $recipientIds)
-                ->get();
-        } else {
-            $request->validate([
-                'count' => ['required', 'integer', 'min' => 1, 'max' => 20],
-            ], [
-                'count.required' => 'Укажите количество получателей или выберите их в списке.',
-                'count.min' => 'Минимум 1 получатель.',
-                'count.max' => 'Не более 20 получателей для теста.',
-            ]);
-            $recipients = $broadcast->recipients()
-                ->with('keyActivate')
-                ->limit((int) $request->input('count'))
-                ->get();
+        $keyIds = $request->input('key_activate_ids', []);
+        if (is_string($keyIds)) {
+            $keyIds = json_decode($keyIds, true) ?: [];
         }
+        if (!is_array($keyIds)) {
+            $keyIds = [];
+        }
+        $keyIds = array_slice(array_filter(array_map('strval', $keyIds)), 0, 20);
+
+        if (count($keyIds) === 0) {
+            return redirect()
+                ->route('admin.module.broadcast.show', $broadcast)
+                ->with('error', 'Выберите хотя бы одного получателя для теста.');
+        }
+
+        $keys = KeyActivate::query()
+            ->whereIn('id', $keyIds)
+            ->where('status', KeyActivate::ACTIVE)
+            ->whereNotNull('user_tg_id')
+            ->get();
 
         $delivered = 0;
         $failed = 0;
 
-        foreach ($recipients as $recipient) {
-            $key = $recipient->keyActivate;
-            if (!$key) {
-                $failed++;
-                continue;
-            }
+        foreach ($keys as $key) {
             $result = $notification->sendToUserWithResult($key, $broadcast->message, null);
             if ($result->shouldCountAsSent) {
                 $delivered++;
