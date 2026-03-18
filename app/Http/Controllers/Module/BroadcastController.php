@@ -7,6 +7,7 @@ use App\Models\Broadcast\BroadcastCampaign;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\TelegramUser\TelegramUser;
 use App\Services\Broadcast\BroadcastService;
+use App\Jobs\SendBroadcastChunkJob;
 use App\Services\Notification\TelegramNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -182,9 +183,9 @@ class BroadcastController extends Controller
     }
 
     /**
-     * Отправить тестовую рассылку нескольким получателям (без изменения кампании).
+     * Поставить тестовую рассылку в очередь (отправка через воркер).
      */
-    public function testSend(BroadcastCampaign $broadcast, Request $request, TelegramNotificationService $notification): RedirectResponse
+    public function testSend(BroadcastCampaign $broadcast, Request $request): RedirectResponse
     {
         if (!$broadcast->isDraft()) {
             return redirect()
@@ -207,31 +208,10 @@ class BroadcastController extends Controller
                 ->with('error', 'Выберите хотя бы одного получателя для теста.');
         }
 
-        $keys = KeyActivate::query()
-            ->whereIn('id', $keyIds)
-            ->where('status', KeyActivate::ACTIVE)
-            ->whereNotNull('user_tg_id')
-            ->get();
-
-        $delivered = 0;
-        $failed = 0;
-
-        foreach ($keys as $key) {
-            $result = $notification->sendToUserWithResult($key, $broadcast->message, null);
-            if ($result->shouldCountAsSent) {
-                $delivered++;
-            } else {
-                $failed++;
-            }
-        }
-
-        $total = $delivered + $failed;
-        $message = $total === 0
-            ? 'Нет получателей для теста.'
-            : "Тестовая рассылка отправлена: доставлено {$delivered}, не доставлено {$failed} (всего {$total}).";
+        SendBroadcastChunkJob::dispatch($broadcast->id, $keyIds);
 
         return redirect()
             ->route('admin.module.broadcast.show', $broadcast)
-            ->with('success', $message);
+            ->with('success', 'Тестовая рассылка поставлена в очередь. Сообщения будут отправлены воркером в фоне.');
     }
 }
