@@ -403,7 +403,7 @@ class VpnConfigController extends Controller
                 }
                 $name = $this->normalizeLocationLabelName($name);
                 $sectionNumber = count($slotsWithLinks) + 1;
-                $locationLabel = $name . ' #' . $sectionNumber;
+                $locationLabel = $this->locationLabelWithEmoji($location, $name . ' #' . $sectionNumber);
                 $slotsWithLinks[] = [
                     'location_label'  => $locationLabel,
                     'location_code'   => $locationCode,
@@ -563,7 +563,7 @@ class VpnConfigController extends Controller
                 }
                 $name = $this->normalizeLocationLabelName($name);
                 $sectionNumber = count($slotsWithLinks) + 1;
-                $locationLabel = $name . ' #' . $sectionNumber;
+                $locationLabel = $this->locationLabelWithEmoji($location, $name . ' #' . $sectionNumber);
                 $slotsWithLinks[] = [
                     'location_label'  => $locationLabel,
                     'location_code'   => $locationCode,
@@ -776,6 +776,7 @@ class VpnConfigController extends Controller
                     if ($locationLabel === '') {
                         $locationLabel = $code ?: 'VPN';
                     }
+                    $locationLabel = $this->locationLabelWithEmoji($server->location, $locationLabel);
                 } elseif (!empty($server->name)) {
                     $locationLabel = $server->name;
                 }
@@ -1140,6 +1141,7 @@ class VpnConfigController extends Controller
                                         if ($newLocationLabel === '') {
                                             $newLocationLabel = $code ?: 'VPN';
                                         }
+                                        $newLocationLabel = $this->locationLabelWithEmoji($newServer->location, $newLocationLabel);
                                     } elseif (!empty($newServer->name)) {
                                         $newLocationLabel = $newServer->name;
                                     }
@@ -1438,6 +1440,37 @@ class VpnConfigController extends Controller
             'Финлядния' => 'Финляндия',
         ];
         return $typos[$name] ?? $name;
+    }
+
+    /**
+     * Добавить флаг (emoji) к подписи локации, если он задан в БД.
+     * Поддерживает формат :xx: (код страны) → Unicode-флаг и уже готовые emoji.
+     */
+    private function locationLabelWithEmoji(?\App\Models\Location\Location $location, string $label): string
+    {
+        if (!$location || empty(trim((string) $location->emoji))) {
+            return $label;
+        }
+        $emoji = $this->locationEmojiToUnicode(trim($location->emoji));
+        return $emoji !== '' ? $emoji . ' ' . $label : $label;
+    }
+
+    /**
+     * Преобразовать emoji локации в Unicode-флаг для отображения.
+     * :nl: → 🇳🇱, :fi: → 🇫🇮; если уже флаг или другой emoji — вернуть как есть.
+     */
+    private function locationEmojiToUnicode(string $emoji): string
+    {
+        if (preg_match('/^:([a-z]{2}):$/i', $emoji, $m)) {
+            $code = strtoupper($m[1]);
+            // Regional indicator symbols: A = U+1F1E6, B = U+1F1E7, ... Z = U+1F1FF
+            $a = ord('A');
+            $base = 0x1F1E6;
+            $c1 = mb_chr($base + (ord($code[0]) - $a));
+            $c2 = mb_chr($base + (ord($code[1]) - $a));
+            return $c1 . $c2;
+        }
+        return $emoji;
     }
 
     /**
