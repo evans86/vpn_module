@@ -66,24 +66,10 @@ class AppServiceProvider extends ServiceProvider
             }
         }
 
-        // Генерация ссылок на тот же хост, с которого пришёл запрос (основной домен или зеркало).
-        // Учитываем X-Forwarded-Host на случай, когда прокси ещё не обработан TrustProxies или хост приходит только в заголовке.
-        $allowedHosts = config('app.allowed_url_hosts', []);
-        if (!empty($allowedHosts)) {
-            $host = request()->header('X-Forwarded-Host');
-            if (is_string($host)) {
-                $host = trim(explode(',', $host)[0]);
-            }
-            if (empty($host) || !in_array($host, $allowedHosts, true)) {
-                $host = request()->getHost();
-            }
-            if (in_array($host, $allowedHosts, true)) {
-                $scheme = request()->header('X-Forwarded-Proto', request()->getScheme());
-                if (is_string($scheme)) {
-                    $scheme = trim(explode(',', $scheme)[0]);
-                }
-                URL::forceRootUrl($scheme . '://' . $host);
-            }
+        // Все ссылки/роуты/URL всегда генерируем на основной публичный домен.
+        $publicUrl = config('app.public_url');
+        if (!empty($publicUrl)) {
+            URL::forceRootUrl($publicUrl);
         }
         
         Paginator::useBootstrap();

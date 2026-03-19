@@ -144,7 +144,7 @@
     </div>
 </footer>
 
-@if(config('app.failover_mirror_url'))
+@if(!empty(config('app.mirror_urls', [])) && request()->getHost() === parse_url(config('app.public_url'), PHP_URL_HOST))
 <script>
 (function(){
   if ('serviceWorker' in navigator) {

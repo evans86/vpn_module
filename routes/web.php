@@ -75,13 +75,13 @@ Route::prefix('personal')->name('personal.')->group(function () {
 // Telegram Bot Webhook
 Route::post('/telegram/webhook/{token}', [FatherBotController::class, 'handle'])->name('telegram.webhook');
 
-// Service Worker для failover на зеркало (отдаётся только если задан APP_FAILOVER_MIRROR_URL)
+// Service Worker для failover на зеркала (берёт список из APP_MIRROR_URLS)
 Route::get('/service-worker.js', function () {
-    $mirror = config('app.failover_mirror_url');
-    if (empty($mirror)) {
+    $mirrors = config('app.mirror_urls', []);
+    if (empty($mirrors)) {
         return response('', 404);
     }
-    return response()->view('service-worker', ['mirrorOrigin' => $mirror], 200, [
+    return response()->view('service-worker', ['mirrorOrigins' => $mirrors], 200, [
         'Content-Type' => 'application/javascript; charset=UTF-8',
         'Cache-Control' => 'max-age=0, must-revalidate',
     ]);

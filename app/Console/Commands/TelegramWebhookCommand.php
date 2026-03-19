@@ -72,7 +72,7 @@ class TelegramWebhookCommand extends Command
             return;
         }
 
-        $baseUrl = config('telegram.webhook_url', 'https://vpn-telegram.com');
+        $baseUrl = rtrim(config('telegram.webhook_url', config('app.public_url', 'https://vpn-telegram.com')), '/');
         $url = "{$baseUrl}/{$botType}-bot/{$token}/init";
 
         try {

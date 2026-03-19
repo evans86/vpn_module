@@ -1,5 +1,5 @@
 'use strict';
-const MIRROR_ORIGIN = @json($mirrorOrigin);
+const MIRROR_ORIGINS = @json($mirrorOrigins ?? []);
 
 function redirectHtml(mirrorFullUrl) {
   var safe = mirrorFullUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -7,14 +7,20 @@ function redirectHtml(mirrorFullUrl) {
 }
 
 self.addEventListener('fetch', function (event) {
-  if (!MIRROR_ORIGIN || event.request.mode !== 'navigate') {
+  if (!Array.isArray(MIRROR_ORIGINS) || MIRROR_ORIGINS.length === 0 || event.request.mode !== 'navigate') {
     return;
   }
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) {
     return;
   }
-  const mirrorUrl = MIRROR_ORIGIN + url.pathname + url.search;
+  const candidates = MIRROR_ORIGINS.filter(function (origin) {
+    return origin && origin !== url.origin;
+  });
+  if (candidates.length === 0) {
+    return;
+  }
+  const mirrorUrl = candidates[0] + url.pathname + url.search;
 
   event.respondWith(
     fetch(event.request).then(

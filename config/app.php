@@ -57,25 +57,30 @@ return [
     'asset_url' => env('ASSET_URL', null),
 
     /*
-    | Список разрешённых хостов для генерации URL (основной домен + зеркала).
-    | Если запрос пришёл с одного из этих хостов, route()/url() будут строить
-    | ссылки на тот же хост (чтобы зеркало отдавало ссылки на зеркало).
-    */
-    'allowed_url_hosts' => array_filter(array_map('trim', explode(',', env('APP_ALLOWED_URL_HOSTS', 'vpn-telegram.com,link.telegram-planet.ru')))),
-
-    /*
-    | URL для ссылок в боте, уведомлениях, API (нет «текущего запроса»).
-    | По умолчанию = APP_URL. Можно задать зеркало (APP_PUBLIC_URL=https://link.telegram-planet.ru).
-    | Пустое значение не допускается — иначе в боте будут относительные ссылки /config/...
+    | Публичный основной URL (все ссылки/ключи/конфиги генерируются только на него).
+    | Должен быть основным доменом, например https://vpn-telegram.com
     */
     'public_url' => rtrim(env('APP_PUBLIC_URL') ?: env('APP_URL', 'http://localhost'), '/'),
 
     /*
-    | Failover mirror для Service Worker: при недоступности основного сайта браузер
-    | перенаправляется на этот URL (например https://link.telegram-planet.ru).
-    | Задаётся только на основном домене (vpn-telegram.com). На зеркале оставить пустым.
+    | Зеркала по приоритету для failover (1-е основное зеркало, затем резервное).
+    | Пример: APP_MIRROR_URLS=https://vpnhighbot.su,https://link.telegram-planet.ru
     */
-    'failover_mirror_url' => rtrim(env('APP_FAILOVER_MIRROR_URL', ''), '/'),
+    'mirror_urls' => array_values(array_filter(array_map(
+        fn($u) => rtrim(trim($u), '/'),
+        explode(',', env('APP_MIRROR_URLS', 'https://vpnhighbot.su,https://link.telegram-planet.ru'))
+    ))),
+
+    /*
+    | Backward compatibility: первое зеркало из mirror_urls.
+    */
+    'failover_mirror_url' => (function () {
+        $mirrors = array_values(array_filter(array_map(
+            fn($u) => rtrim(trim($u), '/'),
+            explode(',', env('APP_MIRROR_URLS', 'https://vpnhighbot.su,https://link.telegram-planet.ru'))
+        )));
+        return $mirrors[0] ?? '';
+    })(),
 
     /*
     |--------------------------------------------------------------------------
