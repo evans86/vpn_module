@@ -6,12 +6,25 @@ function redirectHtml(mirrorFullUrl) {
   return '<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=' + safe + '"><script>location.replace(' + JSON.stringify(mirrorFullUrl) + ');</script></head><body><p>Перенаправление на зеркало…</p></body></html>';
 }
 
+/** Не уводим на зеркало админку, API и ЛК — только публичные страницы (конфиги, netcheck и т.д.). */
+function skipMirrorFailoverForPath(pathname) {
+  var p = pathname || '/';
+  if (p.indexOf('/admin') === 0) return true;
+  if (p.indexOf('/api') === 0) return true;
+  if (p.indexOf('/personal') === 0) return true;
+  if (p.indexOf('/livewire') === 0) return true;
+  return false;
+}
+
 self.addEventListener('fetch', function (event) {
   if (!Array.isArray(MIRROR_ORIGINS) || MIRROR_ORIGINS.length === 0 || event.request.mode !== 'navigate') {
     return;
   }
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) {
+    return;
+  }
+  if (skipMirrorFailoverForPath(url.pathname)) {
     return;
   }
   const candidates = MIRROR_ORIGINS.filter(function (origin) {
