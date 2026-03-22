@@ -67,15 +67,19 @@ class UrlHelper
     }
 
     /**
-     * Блок ссылок для Telegram (HTML): основная + зеркала.
+     * Блок ссылок для Telegram (HTML): основная и опционально зеркала.
+     *
+     * @param bool $includeMirrors false — одна ссылка «Конфигурация» (для списков подписок в боте)
      */
-    public static function telegramConfigLinksHtml(string $keyActivateId): string
+    public static function telegramConfigLinksHtml(string $keyActivateId, bool $includeMirrors = true): string
     {
         $primary = self::configUrl($keyActivateId);
         $esc = static fn (string $u): string => htmlspecialchars($u, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (!$includeMirrors) {
+            return '🔗 <a href="' . $esc($primary) . '">Конфигурация</a>';
+        }
         $lines = ['🔗 <a href="' . $esc($primary) . '">Конфигурация (основной сайт)</a>'];
-        $mirrors = self::configMirrorUrls($keyActivateId);
-        foreach ($mirrors as $i => $url) {
+        foreach (self::configMirrorUrls($keyActivateId) as $i => $url) {
             $n = $i + 1;
             $lines[] = '🔗 <a href="' . $esc($url) . '">Зеркало ' . $n . '</a>';
         }

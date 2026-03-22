@@ -321,7 +321,7 @@ class SalesmanBotController extends AbstractTelegramBot
                     $message .= "📊 Использовано: {$trafficUsedGB} GB\n";
                 }
 
-                $message .= \App\Helpers\UrlHelper::telegramConfigLinksHtml($key->id) . "\n\n";
+                $message .= \App\Helpers\UrlHelper::telegramConfigLinksHtml($key->id, false) . "\n\n";
             }
 
             $message .= "Страница " . ($page + 1) . " из $totalPages";
@@ -411,7 +411,7 @@ class SalesmanBotController extends AbstractTelegramBot
 //                    $message .= "📊 Лимит трафика: {$trafficGB} GB\n";
                 }
 
-                $message .= \App\Helpers\UrlHelper::telegramConfigLinksHtml($key->id) . "\n\n";
+                $message .= \App\Helpers\UrlHelper::telegramConfigLinksHtml($key->id, false) . "\n\n";
             }
 
             $message .= "Страница " . ($page + 1) . " из $totalPages";
@@ -484,7 +484,7 @@ class SalesmanBotController extends AbstractTelegramBot
                 $message .= "📊 Использовано: {$trafficUsedGB} GB\n";
             }
 
-            $message .= \App\Helpers\UrlHelper::telegramConfigLinksHtml($key->id) . "\n\n";
+            $message .= \App\Helpers\UrlHelper::telegramConfigLinksHtml($key->id, false) . "\n\n";
 
             // Кнопка "Назад к списку подписок"
             $keyboard = [
