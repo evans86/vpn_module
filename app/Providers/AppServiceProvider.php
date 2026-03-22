@@ -66,10 +66,10 @@ class AppServiceProvider extends ServiceProvider
             }
         }
 
-        // Все ссылки/роуты/URL всегда генерируем на основной публичный домен.
-        $publicUrl = config('app.public_url');
-        if (!empty($publicUrl)) {
-            URL::forceRootUrl($publicUrl);
+        // Абсолютные URL приложения (админка и т.д.) — основной домен APP_URL.
+        $rootUrl = rtrim((string) config('app.url'), '/');
+        if ($rootUrl !== '') {
+            URL::forceRootUrl($rootUrl);
         }
         
         Paginator::useBootstrap();

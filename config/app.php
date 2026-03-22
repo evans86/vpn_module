@@ -57,19 +57,58 @@ return [
     'asset_url' => env('ASSET_URL', null),
 
     /*
-    | Публичный основной URL (все ссылки/ключи/конфиги генерируются только на него).
-    | Должен быть основным доменом, например https://vpn-telegram.com
+    | Канонический URL приложения (админка, route(), webhooks — основной домен).
+    | Совпадает с APP_URL. Для обратной совместимости в коде остаётся ключ public_url.
     */
-    'public_url' => rtrim(env('APP_PUBLIC_URL') ?: env('APP_URL', 'http://localhost'), '/'),
+    'public_url' => rtrim(env('APP_URL', 'http://localhost'), '/'),
 
     /*
-    | Зеркала по приоритету для failover (1-е основное зеркало, затем резервное).
-    | Пример: APP_MIRROR_URLS=https://vpnhighbot.su,https://link.telegram-planet.ru
+    | База для публичных ссылок на страницы конфигов ключей (бот, API, уведомления).
+    | Обычно зеркало/«фронт» для пользователей, если админка на другом домене.
+    | Пример: APP_URL=https://vpn-telegram.com, APP_CONFIG_PUBLIC_URL=https://vpnhigh.su
+    | Если не задано — используется APP_PUBLIC_URL (legacy), затем APP_URL.
+    */
+    'config_public_url' => rtrim(
+        env('APP_CONFIG_PUBLIC_URL')
+            ?: env('APP_PUBLIC_URL')
+            ?: env('APP_URL', 'http://localhost'),
+        '/'
+    ),
+
+    /*
+    | Дополнительные зеркала (через запятую). Не дублируйте хост из APP_CONFIG_PUBLIC_URL.
+    | Пример: APP_MIRROR_URLS=https://link.telegram-planet.ru,https://другое-зеркало.ru
     */
     'mirror_urls' => array_values(array_filter(array_map(
         fn($u) => rtrim(trim($u), '/'),
-        explode(',', env('APP_MIRROR_URLS', 'https://vpnhighbot.su,https://link.telegram-planet.ru'))
+        explode(',', env('APP_MIRROR_URLS', ''))
     ))),
+
+    /*
+    | Хосты, на которых регистрируется service worker (основной + конфиг-публичный + зеркала).
+    | Используется только при непустом APP_MIRROR_URLS (режим нескольких доменов).
+    */
+    'pwa_service_worker_hosts' => (function () {
+        $urls = array_filter(array_merge(
+            [env('APP_URL'), env('APP_CONFIG_PUBLIC_URL'), env('APP_PUBLIC_URL')],
+            explode(',', env('APP_MIRROR_URLS', ''))
+        ));
+        $seen = [];
+        $hosts = [];
+        foreach ($urls as $url) {
+            $url = rtrim(trim((string) $url), '/');
+            if ($url === '') {
+                continue;
+            }
+            $host = parse_url(str_contains($url, '://') ? $url : 'https://' . $url, PHP_URL_HOST);
+            if (!$host || isset($seen[$host])) {
+                continue;
+            }
+            $seen[$host] = true;
+            $hosts[] = $host;
+        }
+        return $hosts;
+    })(),
 
     /*
     | Backward compatibility: первое зеркало из mirror_urls.
@@ -77,9 +116,34 @@ return [
     'failover_mirror_url' => (function () {
         $mirrors = array_values(array_filter(array_map(
             fn($u) => rtrim(trim($u), '/'),
-            explode(',', env('APP_MIRROR_URLS', 'https://vpnhighbot.su,https://link.telegram-planet.ru'))
+            explode(',', env('APP_MIRROR_URLS', ''))
         )));
         return $mirrors[0] ?? '';
+    })(),
+
+    /*
+    | Regex-паттерны доверенных Host для запросов (основной + зеркала). Используется TrustHosts.
+    */
+    'trusted_host_patterns' => (function () {
+        $urls = array_filter(array_merge(
+            [env('APP_URL'), env('APP_CONFIG_PUBLIC_URL'), env('APP_PUBLIC_URL')],
+            explode(',', env('APP_MIRROR_URLS', ''))
+        ));
+        $seen = [];
+        $patterns = [];
+        foreach ($urls as $url) {
+            $url = rtrim(trim((string) $url), '/');
+            if ($url === '') {
+                continue;
+            }
+            $host = parse_url(str_contains($url, '://') ? $url : 'https://' . $url, PHP_URL_HOST);
+            if (!$host || isset($seen[$host])) {
+                continue;
+            }
+            $seen[$host] = true;
+            $patterns[] = '^(.+\.)?' . preg_quote($host, '$') . '$';
+        }
+        return array_values($patterns);
     })(),
 
     /*

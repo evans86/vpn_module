@@ -70,14 +70,7 @@ class NotificationService
             $message .= "После окончания срока работы ключ будет деактивирован.";
 
             $keyboard = [
-                'inline_keyboard' => [
-                    [
-                        [
-                            'text' => 'Открыть конфигурацию',
-                            'url' => \App\Helpers\UrlHelper::configUrl($keyId)
-                        ]
-                    ]
-                ]
+                'inline_keyboard' => \App\Helpers\UrlHelper::telegramInlineKeyboardConfigRows($keyId),
             ];
 
             $this->telegramService->sendToUser($keyActivate, $message, $keyboard);
@@ -105,14 +98,7 @@ class NotificationService
             $message = "✅ Ключ <code>{$keyId}</code> был успешно активирован\n";
 
             $keyboard = [
-                'inline_keyboard' => [
-                    [
-                        [
-                            'text' => 'Открыть конфигурацию',
-                            'url' => \App\Helpers\UrlHelper::configUrl($keyId)
-                        ]
-                    ]
-                ]
+                'inline_keyboard' => \App\Helpers\UrlHelper::telegramInlineKeyboardConfigRows($keyId),
             ];
 
             $this->telegramService->sendToSalesman($salesman, $message, $keyboard);

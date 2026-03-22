@@ -71,16 +71,15 @@ class KeyActivateController extends Controller
             // Активация ключа в системе
             $activatedKey = $this->keyActivateService->activateModuleKey($key, $request->user_tg_id);
 
-            return ApiHelpers::success([
+            return ApiHelpers::success(array_merge([
                 'key' => $activatedKey->id,
-                'config_url' => \App\Helpers\UrlHelper::configUrl($activatedKey->id),
                 'traffic_limit' => $activatedKey->traffic_limit,
                 'traffic_limit_gb' => round($activatedKey->traffic_limit / 1024 / 1024 / 1024, 1),
                 'finish_at' => $activatedKey->finish_at,
                 // 'activated_at' => $activatedKey->activated_at, // поле не существует в БД
                 'status' => $activatedKey->status,
                 'status_text' => $activatedKey->getStatusText(),
-            ]);
+            ], \App\Helpers\UrlHelper::configUrlsPayload($activatedKey->id)));
         } catch (RuntimeException $r) {
             return ApiHelpers::error($r->getMessage());
         } catch (Exception $e) {
@@ -124,9 +123,8 @@ class KeyActivateController extends Controller
                 ->whereNull('pack_salesman_id')->first();
 
             if ($hasExistingKey) {
-                return ApiHelpers::success([
+                return ApiHelpers::success(array_merge([
                     'key' => $hasExistingKey->id,
-                    'config_url' => \App\Helpers\UrlHelper::configUrl($hasExistingKey->id),
                     'traffic_limit' => $hasExistingKey->traffic_limit,
                     'traffic_limit_gb' => \App\Constants\ProductConstants::FREE_KEY_SIZE_GB,
                     'finish_at' => $hasExistingKey->finish_at,
@@ -134,7 +132,7 @@ class KeyActivateController extends Controller
                     'status' => $hasExistingKey->status,
                     'status_text' => $hasExistingKey->getStatusText(),
                     'is_free' => true,
-                ]);
+                ], \App\Helpers\UrlHelper::configUrlsPayload($hasExistingKey->id)));
             }
 
             // Создание и активация ключа (5GB бесплатный ключ)
@@ -142,9 +140,8 @@ class KeyActivateController extends Controller
             $key = $this->keyActivateService->create($freeKeySize, null, null, null);
             $activatedKey = $this->keyActivateService->activate($key, $request->user_tg_id);
 
-            return ApiHelpers::success([
+            return ApiHelpers::success(array_merge([
                 'key' => $activatedKey->id,
-                'config_url' => \App\Helpers\UrlHelper::configUrl($activatedKey->id),
                 'traffic_limit' => $activatedKey->traffic_limit,
                 'traffic_limit_gb' => 5,
                 'finish_at' => $activatedKey->finish_at,
@@ -152,7 +149,7 @@ class KeyActivateController extends Controller
                 'status' => $activatedKey->status,
                 'status_text' => $activatedKey->getStatusText(),
                 'is_free' => true,
-            ]);
+            ], \App\Helpers\UrlHelper::configUrlsPayload($activatedKey->id)));
         } catch (RuntimeException $e) {
             return ApiHelpers::error($e->getMessage());
         } catch (Exception $e) {
@@ -298,15 +295,14 @@ class KeyActivateController extends Controller
                 return ApiHelpers::error('Доступ запрещен');
             }
 
-            $resultKey = [
+            $resultKey = array_merge([
                 'key' => $key->id,
-                'config_url' => \App\Helpers\UrlHelper::configUrl($key->id),
                 'traffic_limit' => $key->traffic_limit,
                 'traffic_limit_gb' => round($key->traffic_limit / \App\Constants\DataConstants::BYTES_IN_GB, 1),
                 'finish_at' => $key->finish_at,
                 'status' => $key->status,
                 'status_text' => $key->getStatusText(),
-            ];
+            ], \App\Helpers\UrlHelper::configUrlsPayload($key->id));
 
             return ApiHelpers::success([
                 'key' => $resultKey,
@@ -447,16 +443,15 @@ class KeyActivateController extends Controller
 
             $keys = $query->get()
                 ->map(function ($key) {
-                    return [
+                    return array_merge([
                         'key' => $key->id,
-                        'config_url' => \App\Helpers\UrlHelper::configUrl($key->id),
                         'traffic_limit' => $key->traffic_limit,
                         'traffic_limit_gb' => round($key->traffic_limit / \App\Constants\DataConstants::BYTES_IN_GB, 1),
                         'finish_at' => $key->finish_at,
                         'status' => $key->status,
                         'status_text' => $key->getStatusText(),
 //                        'pack_type' => $key->packSalesman->pack->module_key ? 'module' : 'bot'
-                    ];
+                    ], \App\Helpers\UrlHelper::configUrlsPayload($key->id));
                 });
 
             // Если ключей нет, возвращаем пустой массив с пояснением

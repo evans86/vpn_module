@@ -694,24 +694,16 @@ class ViolationManualService
             $message .= "Превышен лимит нарушений правил использования.\n";
             $message .= "Ваш ключ доступа был автоматически заменен.\n\n";
             $message .= "Новый ключ: <code>{$newKey->id}</code>\n";
-            $message .= "🔗 Конфигурация: " . \App\Helpers\UrlHelper::configUrl($newKey->id);
+            $message .= "\n" . \App\Helpers\UrlHelper::telegramConfigLinksHtml($newKey->id);
 
-            $keyboard = [
-                'inline_keyboard' => [
-                    [
-                        [
-                            'text' => '🔗 Открыть конфигурацию',
-                            'url' => \App\Helpers\UrlHelper::configUrl($newKey->id)
-                        ]
-                    ],
-                    [
-                        [
-                            'text' => '🆕 Новый ключ',
-                            'url' => \App\Helpers\UrlHelper::configUrl($newKey->id)
-                        ]
-                    ]
-                ]
+            $rows = \App\Helpers\UrlHelper::telegramInlineKeyboardConfigRows($newKey->id);
+            $rows[] = [
+                [
+                    'text' => '🆕 Новый ключ',
+                    'url' => \App\Helpers\UrlHelper::configUrl($newKey->id),
+                ],
             ];
+            $keyboard = ['inline_keyboard' => $rows];
 
             // Отправляем уведомление напрямую через notificationService
             $notificationService = app(\App\Services\Notification\TelegramNotificationService::class);

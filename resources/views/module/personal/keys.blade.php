@@ -200,16 +200,23 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                 @if($key->status == \App\Models\KeyActivate\KeyActivate::ACTIVE)
+                                    <div class="flex flex-col gap-1">
                                     <a href="{{ \App\Helpers\UrlHelper::configUrl($key->id) }}"
                                        target="_blank"
                                        class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                                       title="Открыть конфигурацию">
+                                       title="Открыть конфигурацию (основной сайт)">
                                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                                         </svg>
                                         Конфигурация
                                     </a>
+                                    @foreach(\App\Helpers\UrlHelper::configMirrorUrls($key->id) as $idx => $mirrorUrl)
+                                        <a href="{{ $mirrorUrl }}" target="_blank" rel="noopener"
+                                           class="text-xs text-amber-700 hover:text-amber-900 underline"
+                                           title="Зеркало {{ $idx + 1 }}">Зеркало {{ $idx + 1 }}</a>
+                                    @endforeach
+                                    </div>
                                 @else
                                     <span class="text-xs text-gray-500"
                                           title="Конфигурация доступна только для активированных ключей">

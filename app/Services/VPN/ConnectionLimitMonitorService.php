@@ -681,28 +681,20 @@ class ConnectionLimitMonitorService
      */
     private function getViolationKeyboard(ConnectionLimitViolation $violation): array
     {
-        $keyboard = [
-            'inline_keyboard' => [
-                [
-                    [
-                        'text' => '🔗 Открыть конфигурацию',
-                        'url' => \App\Helpers\UrlHelper::configUrl($violation->keyActivate->id)
-                    ]
-                ]
-            ]
-        ];
+        $keyId = $violation->keyActivate->id;
+        $rows = \App\Helpers\UrlHelper::telegramInlineKeyboardConfigRows($keyId);
 
         // Для 3-го нарушения добавляем кнопку с новым ключом
         if ($violation->violation_count >= 3) {
-            $keyboard['inline_keyboard'][] = [
+            $rows[] = [
                 [
                     'text' => '🆕 Новый ключ',
-                    'url' => \App\Helpers\UrlHelper::configUrl($violation->keyActivate->id)
-                ]
+                    'url' => \App\Helpers\UrlHelper::configUrl($keyId),
+                ],
             ];
         }
 
-        return $keyboard;
+        return ['inline_keyboard' => $rows];
     }
 
 

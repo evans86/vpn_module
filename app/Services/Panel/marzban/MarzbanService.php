@@ -1793,9 +1793,13 @@ class MarzbanService
      */
     private function syncHostsAddressToPanelDomain(Panel $panel, MarzbanAPI $marzbanApi): void
     {
+        // Домен для Marzban Host Settings: из адреса панели в БД (часто совпадает с зеркалом конфигов).
         $domain = $panel->formatted_address;
         if (empty($domain) || str_starts_with($domain, 'http')) {
             $domain = parse_url($panel->panel_adress ?? '', PHP_URL_HOST);
+        }
+        if (empty($domain)) {
+            $domain = parse_url(rtrim((string) config('app.config_public_url'), '/'), PHP_URL_HOST);
         }
         if (empty($domain)) {
             Log::debug('Panel has no domain for hosts sync', ['panel_id' => $panel->id, 'source' => 'panel']);
@@ -2473,7 +2477,7 @@ class MarzbanService
                     $message .= "🔗 Для продолжения работы:\n";
                     $message .= "• Заново вставьте ссылку-подключение в клиент VPN, или\n";
                     $message .= "• При выключенном VPN нажмите кнопку обновления конфигурации\n\n";
-                    $message .= "🔗 Ссылка: " . \App\Helpers\UrlHelper::configUrl($key_activate->id);
+                    $message .= "\n" . \App\Helpers\UrlHelper::telegramConfigLinksHtml($key_activate->id);
 
                     try {
                         if (!is_null($key_activate->module_salesman_id)) {

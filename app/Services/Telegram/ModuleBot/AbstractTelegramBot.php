@@ -28,10 +28,10 @@ abstract class AbstractTelegramBot
     protected PackSalesmanRepository $packSalesmanRepository;
     protected SalesmanRepository $salesmanRepository;
     protected KeyActivateService $keyActivateService;
-    /** URL приложения для webhook (используется APP_PUBLIC_URL). */
+    /** URL приложения для webhook (основной домен APP_URL). */
     protected static function webhookBaseUrl(): string
     {
-        return rtrim(config('app.public_url', config('app.url', 'https://vpn-telegram.com')), '/') . '/';
+        return rtrim(config('app.url', 'http://localhost'), '/') . '/';
     }
     protected const BOT_TYPE_FATHER = 'father';
     protected const BOT_TYPE_SALESMAN = 'salesman';

@@ -132,7 +132,7 @@
             </p>
         </div>
     </div>
-    @if(!empty(config('app.mirror_urls', [])) && request()->getHost() === parse_url(config('app.public_url'), PHP_URL_HOST))
+    @if(!empty(config('app.mirror_urls', [])) && in_array(request()->getHost(), config('app.pwa_service_worker_hosts', []), true))
     <script>(function(){if('serviceWorker'in navigator)navigator.serviceWorker.register('{{ url("/service-worker.js") }}',{scope:'/'}).catch(function(){});})();</script>
     @endif
 </body>
