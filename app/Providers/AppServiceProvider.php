@@ -57,19 +57,39 @@ class AppServiceProvider extends ServiceProvider
         $timezone = config('app.timezone', 'Europe/Moscow');
         date_default_timezone_set($timezone);
         
-        if(config('app.env') === 'production') {
+        if (config('app.env') === 'production') {
             URL::forceScheme('https');
-            
-            // Force HTTPS for all asset URLs
-            if (!request()->secure()) {
-                $this->app['request']->server->set('HTTPS', true);
+
+            // За прокси: считаем запрос HTTPS (только HTTP-запросы, не консоль).
+            if (!$this->app->runningInConsole() && $this->app->has('request')) {
+                $req = $this->app->make('request');
+                if (!$req->secure()) {
+                    $req->server->set('HTTPS', 'on');
+                }
             }
         }
 
-        // Абсолютные URL приложения (админка и т.д.) — основной домен APP_URL.
-        $rootUrl = rtrim((string) config('app.url'), '/');
-        if ($rootUrl !== '') {
-            URL::forceRootUrl($rootUrl);
+        // Корень для URL::route() и redirect()->route():
+        // — на зеркалах (те же хосты, что для PWA/TrustHosts) остаёмся на текущем Host;
+        // — в консоли, очередях и прочих случаях — канонический APP_URL.
+        $defaultRoot = rtrim((string) config('app.url'), '/');
+        $multiHosts = config('app.pwa_service_worker_hosts', []);
+        if (!$this->app->runningInConsole() && $this->app->has('request')) {
+            try {
+                $request = $this->app->make('request');
+                $host = $request->getHost();
+                if ($host !== '' && is_array($multiHosts) && in_array($host, $multiHosts, true)) {
+                    URL::forceRootUrl(rtrim($request->getSchemeAndHttpHost(), '/'));
+                } elseif ($defaultRoot !== '') {
+                    URL::forceRootUrl($defaultRoot);
+                }
+            } catch (\Throwable $e) {
+                if ($defaultRoot !== '') {
+                    URL::forceRootUrl($defaultRoot);
+                }
+            }
+        } elseif ($defaultRoot !== '') {
+            URL::forceRootUrl($defaultRoot);
         }
         
         Paginator::useBootstrap();
