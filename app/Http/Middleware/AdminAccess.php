@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Helpers\UrlHelper;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -31,7 +32,8 @@ class AdminAccess
             if ($request->expectsJson()) {
                 return response()->json(['message' => 'Access denied. Admin access required.'], 403);
             }
-            return redirect()->route('personal.auth')->with('error', 'Доступ запрещен. Требуются права администратора.');
+            return redirect()->to(UrlHelper::personalRoute('personal.auth'))
+                ->with('error', 'Доступ запрещен. Требуются права администратора.');
         }
 
         return $next($request);

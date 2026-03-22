@@ -14,6 +14,21 @@ class UrlHelper
     }
 
     /**
+     * Абсолютный URL маршрута личного кабинета продавца (/personal/...).
+     * Всегда на APP_CONFIG_PUBLIC_URL (как страницы конфигов), а не на APP_URL.
+     *
+     * @param  string  $name  Имя маршрута, например personal.dashboard
+     */
+    public static function personalRoute(string $name, array $parameters = []): string
+    {
+        $path = route($name, $parameters, false);
+        $path = '/' . ltrim((string) $path, '/');
+        $base = rtrim((string) config('app.config_public_url'), '/');
+
+        return $base . $path;
+    }
+
+    /**
      * Полные URL конфигурации на каждом зеркале (без основного public_url).
      *
      * @return list<string>

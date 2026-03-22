@@ -305,7 +305,7 @@
             }
 
             async function testLatency(samples = 15) {
-                const url = @json(route('personal.network.ping'));
+                const url = @json(\App\Helpers\UrlHelper::personalRoute('personal.network.ping'));
                 const rtts = [];
                 for (let i = 0; i < samples; i++) {
                     const t0 = ms();
@@ -323,7 +323,7 @@
             }
 
             async function testPacketLoss(total = 40, timeout = 1500, gap = 150) {
-                const url = @json(route('personal.network.ping'));
+                const url = @json(\App\Helpers\UrlHelper::personalRoute('personal.network.ping'));
                 let ok = 0;
                 const times = [];
                 for (let i = 0; i < total; i++) {
@@ -341,7 +341,7 @@
             }
 
             async function testDownload() {
-                const url = @json(route('personal.network.payload', ['size' => '5mb']));
+                const url = @json(\App\Helpers\UrlHelper::personalRoute('personal.network.payload', ['size' => '5mb']));
                 const t0 = ms();
                 let ok = true, received = 0;
 
@@ -595,7 +595,7 @@
 
             async function downloadPDF() {
                 if (!window.__lastReport) return;
-                const url = @json(route('personal.network.report'));
+                const url = @json(\App\Helpers\UrlHelper::personalRoute('personal.network.report'));
                 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
                 const resp = await fetch(url, {
                     method: 'POST',

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Helpers\UrlHelper;
 use Illuminate\Auth\Middleware\Authenticate as Middleware;
 use Illuminate\Http\Request;
 
@@ -17,7 +18,7 @@ class Authenticate extends Middleware
     {
         if (!$request->expectsJson()) {
             if ($request->is('personal/*')) {
-                return route('personal.auth.telegram');
+                return UrlHelper::personalRoute('personal.auth.telegram');
             }
             return route('login');
         }

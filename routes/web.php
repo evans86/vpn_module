@@ -16,9 +16,11 @@ use App\Http\Controllers\VpnConfigController;
 use App\Http\Controllers\LogController;
 use App\Http\Controllers\Module\ServerUserController;
 use App\Http\Controllers\Module\ServerUserTransferController;
+use App\Helpers\UrlHelper;
 use App\Http\Middleware\VerifyCsrfToken;
 use App\Services\Telegram\ModuleBot\FatherBotController;
 use App\Http\Controllers\Auth\Personal\SalesmanAuthController;
+use App\Http\Middleware\RedirectPersonalToConfigPublicHost;
 use App\Http\Controllers\PublicNetworkCheckController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -31,8 +33,11 @@ use Illuminate\Support\Facades\Route;
 
 Auth::routes(['register' => false]);
 
-// Личный кабинет продавца
-Route::prefix('personal')->name('personal.')->group(function () {
+// Личный кабинет продавца (канонический хост — APP_CONFIG_PUBLIC_URL)
+Route::prefix('personal')
+    ->middleware([RedirectPersonalToConfigPublicHost::class])
+    ->name('personal.')
+    ->group(function () {
     // Авторизация через Telegram
     Route::get('/auth', [SalesmanAuthController::class, 'showLoginForm'])->name('auth');
     Route::get('/auth/telegram', [SalesmanAuthController::class, 'redirect'])->name('auth.telegram');
@@ -68,7 +73,7 @@ Route::prefix('personal')->name('personal.')->group(function () {
 
     Route::post('/logout', function () {
         Auth::guard('salesman')->logout();
-        return redirect()->route('personal.auth');
+        return redirect()->to(UrlHelper::personalRoute('personal.auth'));
     })->name('logout');
 });
 

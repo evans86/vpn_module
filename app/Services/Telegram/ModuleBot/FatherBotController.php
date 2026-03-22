@@ -6,6 +6,7 @@ use App\Models\KeyActivate\KeyActivate;
 use App\Models\Order\Order;
 use App\Models\OrderSetting\OrderSetting;
 use App\Models\PackSalesman\PackSalesman;
+use App\Helpers\UrlHelper;
 use App\Models\Salesman\Salesman;
 use App\Services\Order\OrderService;
 use App\Services\Panel\PanelStrategy;
@@ -371,7 +372,7 @@ class FatherBotController extends AbstractTelegramBot
             // Сохраняем в кэше информацию о том, что запрос идет из бота
             Cache::put("telegram_auth:{$hash}", [
                 'user_id' => $this->chatId,
-                'callback_url' => config('app.url') . '/personal/auth/telegram/callback',
+                'callback_url' => UrlHelper::personalRoute('personal.auth.telegram.callback'),
                 'source' => 'bot' // Добавляем метку источника
             ], now()->addMinutes(5));
 
@@ -434,7 +435,7 @@ class FatherBotController extends AbstractTelegramBot
             $hash = bin2hex(random_bytes(16));
             Cache::put("telegram_auth:{$hash}", [
                 'user_id' => $this->chatId,
-                'callback_url' => config('app.url') . '/personal/auth/telegram/callback'
+                'callback_url' => UrlHelper::personalRoute('personal.auth.telegram.callback'),
             ], now()->addMinutes(5));
 
             return "https://t.me/{$botUsername}?start=auth_{$hash}";

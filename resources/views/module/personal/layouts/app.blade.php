@@ -213,7 +213,7 @@
         <div class="p-4">
             <ul class="space-y-2">
                 <li>
-                    <a href="{{ route('personal.dashboard') }}"
+                    <a href="{{ \App\Helpers\UrlHelper::personalRoute('personal.dashboard') }}"
                        class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.dashboard') ? 'active' : '' }} tooltip">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none"
                              viewBox="0 0 24 24" stroke="currentColor">
@@ -225,7 +225,7 @@
                     </a>
                 </li>
                 <li>
-                    <a href="{{ route('personal.keys') }}"
+                    <a href="{{ \App\Helpers\UrlHelper::personalRoute('personal.keys') }}"
                        class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.keys') ? 'active' : '' }} tooltip">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none"
                              viewBox="0 0 24 24" stroke="currentColor">
@@ -260,7 +260,7 @@
 {{--                    </a>--}}
 {{--                </li>--}}
                 <li>
-                    <a href="{{ route('personal.faq') }}"
+                    <a href="{{ \App\Helpers\UrlHelper::personalRoute('personal.faq') }}"
                        class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.faq') ? 'active' : '' }} tooltip">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none"
                              viewBox="0 0 24 24" stroke="currentColor">
@@ -277,7 +277,7 @@
         </div>
 
         <div class="absolute bottom-0 w-full p-4 border-t border-gray-200">
-            <form action="{{ route('personal.logout') }}" method="POST">
+            <form action="{{ \App\Helpers\UrlHelper::personalRoute('personal.logout') }}" method="POST">
                 @csrf
                 <button type="submit"
                         class="w-full flex items-center justify-center p-2 rounded-lg text-gray-600 hover:bg-gray-100 tooltip">

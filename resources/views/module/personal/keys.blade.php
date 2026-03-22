@@ -8,7 +8,7 @@
         <div class="bg-white shadow rounded-lg mb-6">
             <div class="px-4 py-5 sm:p-6">
                 <h4 class="text-lg font-medium text-gray-900 mb-4">Фильтры поиска</h4>
-                <form method="GET" action="{{ route('personal.keys') }}">
+                <form method="GET" action="{{ \App\Helpers\UrlHelper::personalRoute('personal.keys') }}">
                     <div class="flex flex-wrap items-end gap-4">
                         <!-- Поиск по ключу -->
                         <div class="flex-1 min-w-[200px]">
@@ -85,7 +85,7 @@
                                     class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 whitespace-nowrap">
                                 Применить
                             </button>
-                            <a href="{{ route('personal.keys') }}"
+                            <a href="{{ \App\Helpers\UrlHelper::personalRoute('personal.keys') }}"
                                class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 whitespace-nowrap">
                                 Сбросить
                             </a>

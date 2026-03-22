@@ -48,7 +48,8 @@ return [
     'telegram' => [
         'client_id' => env('TELEGRAM_BOT_TOKEN'),  // Это будет ваш bot token (например: '123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11')
         'client_secret' => env('TELEGRAM_BOT_NAME'), // Это username вашего бота (например: 'MyBot')
-        'redirect' => env('TELEGRAM_REDIRECT_URI'), // URL callback (например: 'https://yourdomain.com/personal/auth/telegram/callback')
+        // Должен совпадать с APP_CONFIG_PUBLIC_URL + /personal/auth/telegram/callback (см. UrlHelper::personalRoute)
+        'redirect' => env('TELEGRAM_REDIRECT_URI'),
     ],
 
     's3_logs' => [

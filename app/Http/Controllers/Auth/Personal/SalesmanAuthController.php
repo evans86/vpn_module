@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth\Personal;
 
+use App\Helpers\UrlHelper;
 use App\Models\Salesman\Salesman;
 use App\Services\Telegram\ModuleBot\FatherBotController;
 use Exception;
@@ -42,7 +43,7 @@ class SalesmanAuthController extends Controller
     public function logout()
     {
         Auth::guard('salesman')->logout();
-        return redirect()->route('personal.auth')
+        return redirect()->to(UrlHelper::personalRoute('personal.auth'))
             ->with('success', 'Вы успешно вышли из системы');
     }
 
@@ -52,7 +53,7 @@ class SalesmanAuthController extends Controller
     public function showLoginForm()
     {
         if (Auth::guard('salesman')->check()) {
-            return redirect()->route('personal.dashboard');
+            return redirect()->to(UrlHelper::personalRoute('personal.dashboard'));
         }
 
         return view('module.personal.auth.login');
@@ -85,12 +86,12 @@ class SalesmanAuthController extends Controller
             Cache::forget("telegram_auth:{$hash}");
 
             // Всегда редиректим в личный кабинет, независимо от источника
-            return redirect()->route('personal.dashboard')
+            return redirect()->to(UrlHelper::personalRoute('personal.dashboard'))
                 ->with('success', 'Вы успешно авторизованы');
 
         } catch (Exception $e) {
             Log::error('Auth error: ' . $e->getMessage());
-            return redirect()->route('personal.auth')
+            return redirect()->to(UrlHelper::personalRoute('personal.auth'))
                 ->with('error', 'Ошибка авторизации: ' . $e->getMessage());
         }
     }

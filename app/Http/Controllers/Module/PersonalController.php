@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Module;
 
+use App\Helpers\UrlHelper;
 use App\Http\Controllers\Controller;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\PackSalesman\PackSalesman;
@@ -412,7 +413,7 @@ class PersonalController extends Controller
             'custom_help_text' => $request->help_text
         ]);
 
-        return redirect()->route('personal.faq')->with('success', 'Текст FAQ успешно обновлен!');
+        return redirect()->to(UrlHelper::personalRoute('personal.faq'))->with('success', 'Текст FAQ успешно обновлен!');
     }
 
     /**
@@ -427,6 +428,6 @@ class PersonalController extends Controller
             'custom_help_text' => null
         ]);
 
-        return redirect()->route('personal.faq')->with('success', 'Текст FAQ сброшен к стандартному!');
+        return redirect()->to(UrlHelper::personalRoute('personal.faq'))->with('success', 'Текст FAQ сброшен к стандартному!');
     }
 }
