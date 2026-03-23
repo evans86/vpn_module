@@ -52,6 +52,8 @@
     function renderVpnConfigPage(container, page) {
         if (!container || !page) return;
 
+        global.__vpnConfigPage = page;
+
         var KS = (page.meta && page.meta.keyStatus) ? page.meta.keyStatus : { EXPIRED: 0, ACTIVE: 1, PAID: 2 };
         var keyActivate = page.keyActivate || {};
         var userInfo = page.userInfo || {};
@@ -119,20 +121,36 @@
 
         parts.push('<div class="bg-white rounded-2xl shadow-lg p-6 md:p-8" id="config-content-wrapper" data-all-config-links="' + escapeAttr(allConfigAttr) + '">');
 
+        var hasProto = allLinks.length > 0;
+        var btnBase = 'inline-flex items-center justify-center px-4 py-3 border-2 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all shadow-sm';
+        var disClass = hasProto ? '' : ' opacity-50 cursor-not-allowed';
+
         parts.push(
             '<div class="mb-8 flex flex-col sm:flex-row gap-3 flex-wrap">' +
-            '<button type="button" onclick="copyCurrentUrl()" class="inline-flex items-center justify-center px-4 py-3 border-2 border-indigo-200 text-indigo-700 rounded-xl font-medium bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all shadow-sm hover:shadow">' +
-            '<svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>Скопировать ссылку</button>'
-        );
-        if (allLinks.length) {
-            parts.push(
-                '<button type="button" onclick="copyAllConfigurations()" class="inline-flex items-center justify-center px-4 py-3 border-2 border-green-200 text-green-700 rounded-xl font-medium bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all shadow-sm hover:shadow" title="Скопировать все протоколы в текстовом виде (по одному на строку)">' +
-                '<svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Скопировать конфигурации</button>'
-            );
-        }
-        parts.push(
-            '<button type="button" onclick="showUrlQR()" class="inline-flex items-center justify-center px-4 py-3 border-2 border-gray-200 text-gray-700 rounded-xl font-medium bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all shadow-sm hover:shadow">' +
-            '<svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9h14a2 2 0 012 2v2m0 0H3a2 2 0 01-2-2V9a2 2 0 012-2h14a2 2 0 012 2v2zm0 0h2a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2h2z"/></svg>QR-код конфигурации</button>' +
+            /* 1 — ссылка на страницу */
+            '<button type="button" onclick="copyCurrentUrl()" class="' + btnBase + ' border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:ring-indigo-500 hover:shadow">' +
+            '<svg class="h-5 w-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>Скопировать ссылку</button>' +
+            /* 2 — QR той же ссылки */
+            '<button type="button" onclick="showVpnPageLinkQr()" class="' + btnBase + ' border-violet-200 text-violet-800 bg-violet-50 hover:bg-violet-100 focus:ring-violet-500 hover:shadow">' +
+            '<svg class="h-5 w-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9h14a2 2 0 012 2v2m0 0H3a2 2 0 01-2-2V9a2 2 0 012-2h14a2 2 0 012 2v2zm0 0h2a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2h2z"/></svg>QR ссылки</button>' +
+            /* 3 — текст конфигов */
+            (hasProto
+                ? '<button type="button" onclick="copyAllConfigurations()" class="' + btnBase + ' border-green-200 text-green-700 bg-green-50 hover:bg-green-100 focus:ring-green-500 hover:shadow" title="Все строки конфигурации, по одной на строку">' +
+                '<svg class="h-5 w-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Скопировать конфигурацию</button>'
+                : '<button type="button" disabled class="' + btnBase + disClass + ' border-green-200 text-green-700 bg-green-50 focus:ring-green-500" title="Нет протоколов подключения">' +
+                '<svg class="h-5 w-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Скопировать конфигурацию</button>') +
+            /* 4 — QR текста конфигов */
+            (hasProto
+                ? '<button type="button" onclick="showQrPlainAllConfigs()" class="' + btnBase + ' border-emerald-200 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 focus:ring-emerald-500 hover:shadow" title="QR со всеми строками конфигурации">' +
+                '<svg class="h-5 w-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>QR-код конфигурации</button>'
+                : '<button type="button" disabled class="' + btnBase + disClass + ' border-emerald-200 text-emerald-800 bg-emerald-50 focus:ring-emerald-500" title="Нет протоколов подключения">' +
+                '<svg class="h-5 w-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>QR-код конфигурации</button>') +
+            /* 5 — JSON */
+            '<button type="button" onclick="copyVpnConfigJson()" class="' + btnBase + ' border-amber-200 text-amber-900 bg-amber-50 hover:bg-amber-100 focus:ring-amber-500 hover:shadow" title="JSON с данными страницы (для разработчиков)">' +
+            '<svg class="h-5 w-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>Скопировать конфигурацию (JSON)</button>' +
+            /* 6 — QR JSON */
+            '<button type="button" onclick="showQrVpnConfigJson()" class="' + btnBase + ' border-orange-200 text-orange-900 bg-orange-50 hover:bg-orange-100 focus:ring-orange-500 hover:shadow" title="QR с JSON-данными страницы">' +
+            '<svg class="h-5 w-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>QR-код конфигурации (JSON)</button>' +
             '</div>'
         );
 

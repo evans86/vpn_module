@@ -75,14 +75,59 @@
         window.copyCurrentUrl = function() {
             navigator.clipboard.writeText(window.location.href).then(function() { showCopyNotification('✓ Ссылка скопирована в буфер обмена!'); }).catch(function() { alert('Не удалось скопировать ссылку.'); });
         };
-        window.copyAllConfigurations = function() {
+        window.__vpnConfigPage = null;
+        window.getVpnConfigAllLinks = function() {
             var wrapper = document.getElementById('config-content-wrapper');
-            if (!wrapper) return;
+            if (!wrapper) return [];
             var raw = wrapper.getAttribute('data-all-config-links');
             var links = [];
-            try { if (raw) links = JSON.parse(atob(raw)); } catch (e) { console.warn('copyAllConfigurations: invalid data', e); }
+            try { if (raw) links = JSON.parse(atob(raw)); } catch (e) { console.warn('getVpnConfigAllLinks: invalid data', e); }
+            return links;
+        };
+        window.copyAllConfigurations = function() {
+            var links = window.getVpnConfigAllLinks();
             if (links.length === 0) { showCopyNotification('Нет протоколов для копирования.'); return; }
-            navigator.clipboard.writeText(links.join('\n')).then(function() { showCopyNotification('✓ Все конфигурации скопированы (' + links.length + ' протокол(ов))!'); }).catch(function() { alert('Не удалось скопировать конфигурации.'); });
+            navigator.clipboard.writeText(links.join('\n')).then(function() {
+                showCopyNotification('✓ Конфигурация скопирована (' + links.length + ' протокол(ов))!');
+            }).catch(function() { alert('Не удалось скопировать конфигурацию.'); });
+        };
+        window.showVpnPageLinkQr = function() {
+            window.showQR(window.location.href, 'ссылки');
+        };
+        window.showQrPlainAllConfigs = function() {
+            var links = window.getVpnConfigAllLinks();
+            if (!links.length) { showCopyNotification('Нет протоколов для QR-кода.'); return; }
+            window.showQR(links.join('\n'), 'конфигурации');
+        };
+        function buildVpnConfigExportObject() {
+            if (!window.__vpnConfigPage) return null;
+            return {
+                pageUrl: window.location.href,
+                exportedAt: new Date().toISOString(),
+                page: window.__vpnConfigPage
+            };
+        }
+        window.copyVpnConfigJson = function() {
+            var o = buildVpnConfigExportObject();
+            if (!o) { showCopyNotification('Данные страницы ещё не загружены.'); return; }
+            try {
+                var text = JSON.stringify(o, null, 2);
+                navigator.clipboard.writeText(text).then(function() {
+                    showCopyNotification('✓ JSON скопирован в буфер обмена!');
+                }).catch(function() { alert('Не удалось скопировать JSON.'); });
+            } catch (e) {
+                alert('Не удалось сформировать JSON.');
+            }
+        };
+        window.showQrVpnConfigJson = function() {
+            var o = buildVpnConfigExportObject();
+            if (!o) { showCopyNotification('Данные страницы ещё не загружены.'); return; }
+            try {
+                var text = JSON.stringify(o);
+                window.showQR(text, 'JSON');
+            } catch (e) {
+                alert('Не удалось сформировать QR.');
+            }
         };
         window.copyToClipboard = function(text, protocol) {
             navigator.clipboard.writeText(text).then(function() { showCopyNotification('✓ Конфигурация ' + (protocol || '') + ' скопирована!'); }).catch(function() { alert('Не удалось скопировать конфигурацию.'); });
@@ -98,7 +143,7 @@
             navigator.clipboard.writeText(links.join('\n')).then(function() { showCopyNotification('✓ Конфигурации «' + label + '» скопированы (' + links.length + ')!'); }).catch(function() { alert('Не удалось скопировать конфигурации.'); });
         };
         window.showUrlQR = function(url) {
-            window.showQR(url || window.location.href, 'конфигурации');
+            window.showQR(url || window.location.href, 'ссылки');
         };
         window.showQR = function(link, protocol) {
             if (!link) { alert('Ссылка для QR-кода отсутствует или некорректна.'); return; }
@@ -107,11 +152,35 @@
             var qrDescription = document.getElementById('qrDescription');
             if (!qrcodeElement || typeof QRCodeStyling === 'undefined') { alert('QR-библиотека не загружена.'); return; }
             qrcodeElement.innerHTML = '';
-            if (qrTitle) qrTitle.textContent = protocol ? 'QR-код для ' + protocol : 'QR-код';
-            if (qrDescription) qrDescription.textContent = protocol ? 'Отсканируйте этот код в вашем VPN-клиенте' : 'Отсканируйте этот код для быстрого доступа';
-            var qrCode = new QRCodeStyling({ width: 300, height: 300, type: 'svg', data: link, dotsOptions: { color: '#4f46e5', type: 'rounded' }, backgroundOptions: { color: '#ffffff' }, image: '', imageOptions: { crossOrigin: 'anonymous', margin: 10 } });
-            qrCode.append(qrcodeElement);
-            currentQR = qrCode;
+            if (qrTitle) qrTitle.textContent = protocol ? 'QR-код: ' + protocol : 'QR-код';
+            if (qrDescription) {
+                qrDescription.textContent = (protocol === 'JSON' || protocol === 'конфигурации')
+                    ? 'Отсканируйте или скопируйте данные при необходимости'
+                    : 'Отсканируйте этот код в вашем VPN-клиенте';
+            }
+            var dataStr = String(link);
+            var opts = {
+                width: 300,
+                height: 300,
+                type: 'svg',
+                data: dataStr,
+                dotsOptions: { color: '#4f46e5', type: 'rounded' },
+                backgroundOptions: { color: '#ffffff' },
+                image: '',
+                imageOptions: { crossOrigin: 'anonymous', margin: 10 }
+            };
+            if (dataStr.length > 600) {
+                opts.qrOptions = { errorCorrectionLevel: 'L' };
+            }
+            try {
+                var qrCode = new QRCodeStyling(opts);
+                qrCode.append(qrcodeElement);
+                currentQR = qrCode;
+            } catch (err) {
+                console.error(err);
+                alert('Не удалось построить QR-код (возможно, слишком много данных). Скопируйте текст кнопкой «Скопировать».');
+                return;
+            }
             var qrModal = document.getElementById('qrModal');
             if (qrModal) { qrModal.classList.remove('hidden'); qrModal.classList.add('flex'); }
         };
