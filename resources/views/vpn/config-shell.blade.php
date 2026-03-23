@@ -27,10 +27,8 @@
                 <div class="vpn-config-progress-track" aria-hidden="true">
                     <div id="config-progress-fill" class="vpn-config-progress-fill"></div>
                 </div>
-                <div class="text-center min-h-[4rem] flex flex-col items-center justify-start px-1">
-                    <p id="config-progress-phase" class="hidden text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">Подготовка…</p>
+                <div class="text-center min-h-[3.25rem] flex flex-col items-center justify-start px-1">
                     <p id="config-progress-status" class="vpn-refresh-status-text text-sm sm:text-[0.9375rem] font-medium text-indigo-900/85 leading-relaxed max-w-md"></p>
-                    <p id="config-progress-poll-hint" class="hidden text-xs text-indigo-500/90 mt-2 font-medium" aria-live="polite"></p>
                 </div>
             </div>
             <div id="config-progress-error" class="hidden w-full max-w-xl mx-auto pt-4 border-t border-red-100 mt-2">
@@ -243,8 +241,6 @@
         var lastUpdatedEl = document.getElementById('config-last-updated');
         var btnRefresh = document.getElementById('config-btn-refresh');
         var statusTextEl = document.getElementById('config-progress-status');
-        var phaseEl = document.getElementById('config-progress-phase');
-        var pollHintEl = document.getElementById('config-progress-poll-hint');
         var spinnerBlock = document.getElementById('config-progress-spinner');
         var errBlock = document.getElementById('config-progress-error');
         var retryBtn = document.getElementById('config-progress-retry');
@@ -421,14 +417,6 @@
                 }
                 statusRotation = null;
                 if (btnRefresh) btnRefresh.disabled = false;
-                if (phaseEl) {
-                    phaseEl.textContent = '';
-                    phaseEl.classList.add('hidden');
-                }
-                if (pollHintEl) {
-                    pollHintEl.textContent = '';
-                    pollHintEl.classList.add('hidden');
-                }
                 if (spinnerBlock) spinnerBlock.setAttribute('aria-busy', 'false');
                 progressBar.classList.add('hidden');
                 refreshBar.classList.remove('hidden');
@@ -442,14 +430,6 @@
                 refreshBar.classList.add('hidden');
                 showSpinnerState();
                 if (spinnerBlock) spinnerBlock.setAttribute('aria-busy', 'true');
-                if (phaseEl) {
-                    phaseEl.classList.remove('hidden');
-                    phaseEl.textContent = 'Отправляем запрос…';
-                }
-                if (pollHintEl) {
-                    pollHintEl.textContent = '';
-                    pollHintEl.classList.add('hidden');
-                }
                 if (btnRefresh) btnRefresh.disabled = true;
             }
 
@@ -472,14 +452,6 @@
                 clearVpnSyncPolling();
                 refreshSessionClosed = true;
                 if (btnRefresh) btnRefresh.disabled = false;
-                if (phaseEl) {
-                    phaseEl.textContent = '';
-                    phaseEl.classList.add('hidden');
-                }
-                if (pollHintEl) {
-                    pollHintEl.textContent = '';
-                    pollHintEl.classList.add('hidden');
-                }
                 if (spinnerBlock) spinnerBlock.setAttribute('aria-busy', 'false');
                 showErrorState(errMsg, httpStatus);
             }
@@ -508,11 +480,6 @@
                         var baselineEpoch = (typeof res.data.lastUpdatedEpoch === 'number') ? res.data.lastUpdatedEpoch : undefined;
                         var baselineLabel = res.data.lastUpdated ? String(res.data.lastUpdated) : '';
 
-                        if (phaseEl) phaseEl.textContent = 'Синхронизация с панелью…';
-                        if (pollHintEl) {
-                            pollHintEl.classList.remove('hidden');
-                            pollHintEl.textContent = 'Проверка 0 / ' + MAX_SYNC_POLLS;
-                        }
                         if (typeof window.vpnConfigRefreshStartSyncPollingRotation === 'function' && statusTextEl) {
                             statusRotation = window.vpnConfigRefreshStartSyncPollingRotation(statusTextEl);
                         }
@@ -541,11 +508,8 @@
                             if (refreshSessionClosed) return;
                             syncPollAttempts++;
                             if (syncPollAttempts > MAX_SYNC_POLLS) {
-                                closeRefreshUi('Не удалось дождаться ответа панели. Данные на экране — последние сохранённые. При необходимости обновите страницу.');
+                                closeRefreshUi('Пока не удалось подтвердить обновление. Попробуйте позже или обновите страницу.');
                                 return;
-                            }
-                            if (pollHintEl) {
-                                pollHintEl.textContent = 'Проверка ' + syncPollAttempts + ' / ' + MAX_SYNC_POLLS;
                             }
                             fetch(contentUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
                                 .then(parseJsonResponse)
@@ -554,7 +518,7 @@
                                     if (!pollRes.data || !pollRes.data.success || !pollRes.data.page) return;
                                     if (isDataNewerThanBaseline(pollRes.data)) {
                                         applyContentPayload(pollRes.data);
-                                        closeRefreshUi('✓ Конфигурация обновлена с сервера панели');
+                                        closeRefreshUi('✓ Готово, конфигурация обновлена');
                                     }
                                 })
                                 .catch(function() { /* сеть: следующий интервал попробует снова */ });
