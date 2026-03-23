@@ -159,32 +159,6 @@ class KeyActivateRepository extends BaseRepository
     }
 
     /**
-     * Загрузка ключа для ответа /content: только слоты и продавец (без нарушений — они не нужны для первого фрагмента из БД).
-     *
-     * @param string $id key_activate_id
-     * @return KeyActivate|null
-     */
-    public function findWithConfigRelationsForContent(string $id): ?KeyActivate
-    {
-        /** @var KeyActivate|null $result */
-        $result = $this->query()
-            ->with([
-                'keyActivateUsers' => function ($q) {
-                    $q->orderBy('id');
-                },
-                'keyActivateUsers.serverUser:id,keys,updated_at,panel_id',
-                'keyActivateUsers.serverUser.panel:id,server_id',
-                'keyActivateUsers.serverUser.panel.server:id,name,location_id',
-                'keyActivateUsers.serverUser.panel.server.location:id,code,emoji',
-                'packSalesman:id,salesman_id,pack_id',
-                'packSalesman.salesman:id,telegram_id,bot_link,panel_id,module_bot_id',
-            ])
-            ->find($id);
-
-        return $result;
-    }
-
-    /**
      * Find key by ID with relations
      * @param int $id
      * @return KeyActivate|null

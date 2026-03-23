@@ -238,19 +238,25 @@ class VpnConfigController extends Controller
         }
 
         try {
-            $keyActivate = $this->keyActivateRepository->findWithConfigRelationsForContent($key_activate_id);
+            // Как у подписки: findById + двухшаговая загрузка слотов (findAllByKeyActivateIdForSubscription)
+            // вместо одного nested eager findWithConfigRelationsForContent — меньше нагрузка на БД и быстрее при сети до MySQL.
+            $keyActivate = $this->keyActivateRepository->findById($key_activate_id);
             if (!$keyActivate) {
                 return response()->json(['success' => false, 'message' => 'Ключ не найден'], 404);
             }
-            $keyActivateUsers = $keyActivate->keyActivateUsers;
+            $keyActivate->load([
+                'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
+                'packSalesman.salesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
+            ]);
+            $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateIdForSubscription($key_activate_id);
+            $keyActivate->setRelation('keyActivateUsers', $keyActivateUsers);
+
             if ($keyActivateUsers->isEmpty()) {
-                $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
-                if ($keyActivateUsers->isNotEmpty()) {
-                    $keyActivate->setRelation('keyActivateUsers', $keyActivateUsers);
-                }
-            }
-            if ($keyActivateUsers->isEmpty()) {
-                $replacedViolation = $keyActivate->replacedViolation;
+                $replacedViolation = ConnectionLimitViolation::where('key_activate_id', $key_activate_id)
+                    ->whereNotNull('key_replaced_at')
+                    ->whereNotNull('replaced_key_id')
+                    ->orderBy('key_replaced_at', 'desc')
+                    ->first();
                 if ($replacedViolation && $replacedViolation->replaced_key_id) {
                     return response()->json([
                         'success' => false,
