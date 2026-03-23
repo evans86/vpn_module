@@ -388,8 +388,30 @@
             }
         }
 
+        /** Тихая подгрузка /content после фоновой синхронизации Marzban (обновлённые ключи в БД). */
+        function refetchVpnConfigContentSilent() {
+            fetch(contentUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(parseJsonResponse)
+                .then(function(res) {
+                    if (res.data && res.data.success && res.data.page && contentEl && typeof window.renderVpnConfigPage === 'function') {
+                        window.__vpnConfigPage = res.data.page;
+                        window.renderVpnConfigPage(contentEl, res.data.page);
+                        if (typeof window.syncVpnToolbarProtoButtons === 'function') window.syncVpnToolbarProtoButtons();
+                        if (res.data.lastUpdated && lastUpdatedEl) lastUpdatedEl.textContent = res.data.lastUpdated;
+                    }
+                })
+                .catch(function() { /* игнорируем: пользователь уже видит данные с первого ответа */ });
+        }
+
+        var _vpnRefreshFollowupTimers = [];
+        function clearVpnRefreshFollowups() {
+            _vpnRefreshFollowupTimers.forEach(function(id) { clearTimeout(id); });
+            _vpnRefreshFollowupTimers = [];
+        }
+
         function runRefresh() {
             if (!progressBar || !refreshBar) return;
+            clearVpnRefreshFollowups();
             progressBar.classList.remove('hidden');
             refreshBar.classList.add('hidden');
             showSpinnerState();
@@ -421,6 +443,11 @@
                         if (res.data.lastUpdated && lastUpdatedEl) lastUpdatedEl.textContent = res.data.lastUpdated;
                         progressBar.classList.add('hidden');
                         refreshBar.classList.remove('hidden');
+                        if (res.data.syncPending) {
+                            _vpnRefreshFollowupTimers.push(setTimeout(refetchVpnConfigContentSilent, 4500));
+                            _vpnRefreshFollowupTimers.push(setTimeout(refetchVpnConfigContentSilent, 11000));
+                            _vpnRefreshFollowupTimers.push(setTimeout(refetchVpnConfigContentSilent, 25000));
+                        }
                     } else {
                         var errMsg = (res.data && res.data.message) ? String(res.data.message) : '';
                         if (!errMsg && !res.ok) errMsg = '';

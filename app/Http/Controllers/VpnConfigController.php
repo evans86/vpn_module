@@ -299,28 +299,23 @@ class VpnConfigController extends Controller
     }
 
     /**
-     * Кнопка «Обновить»: актуальные ссылки и трафик с Marzban (buildConnectionData + getSubscribeInfo).
-     * Токен панели обновляется один раз на панель, не на каждый слот — меньше задержка и риск 504.
-     * Таймаут: config panel.vpn_config_refresh_time_limit (сек), при необходимости поднимите proxy_read_timeout в nginx.
+     * Кнопка «Обновить»: сразу отдаём рабочую конфигурацию из БД (как /content), без долгого HTTP к Marzban в этом запросе.
+     * Синхронизация ссылок с панелями запускается после отправки ответа (Kernel::terminate) — иначе nginx даёт 504 и в логах пусто.
+     * Клиент через несколько секунд тихо перезапрашивает /content, чтобы подтянуть уже обновлённые ключи из БД.
      */
     public function showConfigRefresh(string $token): Response
     {
         $key_activate_id = trim($token);
         $t0 = microtime(true);
-        $timeLimit = (int) config('panel.vpn_config_refresh_time_limit', 300);
-        if ($timeLimit < 60) {
-            $timeLimit = 60;
-        }
-        if ((int) ini_get('memory_limit') < 1024) {
-            @ini_set('memory_limit', '1024M');
+        if ((int) ini_get('memory_limit') < 512) {
+            @ini_set('memory_limit', '512M');
         }
         if (function_exists('set_time_limit')) {
-            @set_time_limit($timeLimit);
+            @set_time_limit(120);
         }
 
-        Log::info('VpnConfig refresh: запрос', [
+        Log::info('VpnConfig refresh: быстрый ответ (БД), фоновая синхронизация Marzban после send)', [
             'key_activate_id' => $key_activate_id,
-            'php_time_limit' => $timeLimit,
             'source' => 'vpn',
         ]);
 
@@ -351,14 +346,15 @@ class VpnConfigController extends Controller
                 }
                 return response()->json(['success' => false, 'message' => 'Конфигурация не найдена.'], 404);
             }
-            $data = $this->buildConnectionData($keyActivate, $key_activate_id, true);
+
+            $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id, $keyActivateUsers);
             $viewData = $this->buildBrowserPageViewData(
                 $keyActivate,
                 $data['firstKeyActivateUser'],
                 $data['firstServerUser'],
                 $data['connectionKeys'],
                 $data['slotsWithLinks'],
-                false,
+                true,
                 true,
                 null,
                 null,
@@ -369,18 +365,38 @@ class VpnConfigController extends Controller
                 ? $data['lastUpdated']->format('d.m.Y H:i')
                 : null;
 
-            Log::info('VpnConfig refresh: успех', [
+            $durationMs = (int) round((microtime(true) - $t0) * 1000);
+            Log::info('VpnConfig refresh: ответ отправлен (из БД)', [
                 'key_activate_id' => $key_activate_id,
-                'duration_ms' => (int) round((microtime(true) - $t0) * 1000),
+                'duration_ms' => $durationMs,
                 'slots' => count($data['slotsWithLinks'] ?? []),
                 'links_total' => count($data['connectionKeys'] ?? []),
                 'last_updated_label' => $lastUpdated,
                 'source' => 'vpn',
             ]);
 
-            return response()->json(['success' => true, 'page' => $page, 'lastUpdated' => $lastUpdated]);
+            app()->terminating(function () use ($key_activate_id) {
+                try {
+                    /** @var self $ctrl */
+                    $ctrl = app(self::class);
+                    $ctrl->syncMarzbanForKeyActivateAfterResponse($key_activate_id);
+                } catch (\Throwable $e) {
+                    Log::error('VpnConfig refresh: сбой планировщика фоновой синхронизации', [
+                        'key_activate_id' => $key_activate_id,
+                        'error' => $e->getMessage(),
+                        'source' => 'vpn',
+                    ]);
+                }
+            });
+
+            return response()->json([
+                'success' => true,
+                'page' => $page,
+                'lastUpdated' => $lastUpdated,
+                'syncPending' => true,
+            ]);
         } catch (\Throwable $e) {
-            Log::warning('VpnConfig refresh: ошибка', [
+            Log::warning('VpnConfig refresh: ошибка до ответа', [
                 'key_activate_id' => $key_activate_id,
                 'duration_ms' => (int) round((microtime(true) - $t0) * 1000),
                 'error' => $e->getMessage(),
@@ -393,6 +409,62 @@ class VpnConfigController extends Controller
                 'success' => false,
                 'message' => 'Не удалось обновить конфигурацию. Попробуйте позже.',
             ], 500);
+        }
+    }
+
+    /**
+     * Выполняется после отправки HTTP-ответа (terminate): тянем актуальные ссылки с Marzban в БД.
+     * Не блокирует браузер и не упирается в таймаут nginx.
+     */
+    public function syncMarzbanForKeyActivateAfterResponse(string $key_activate_id): void
+    {
+        $t0 = microtime(true);
+        $bgLimit = (int) config('panel.vpn_config_refresh_time_limit', 300);
+        if ($bgLimit < 60) {
+            $bgLimit = 60;
+        }
+        if ((int) ini_get('memory_limit') < 1024) {
+            @ini_set('memory_limit', '1024M');
+        }
+        if (function_exists('set_time_limit')) {
+            @set_time_limit($bgLimit);
+        }
+
+        Log::info('VpnConfig refresh: фон — синхронизация Marzban старт', [
+            'key_activate_id' => $key_activate_id,
+            'source' => 'vpn',
+        ]);
+
+        try {
+            $keyActivate = $this->keyActivateRepository->findById($key_activate_id);
+            if (!$keyActivate) {
+                Log::warning('VpnConfig refresh: фон — ключ не найден', [
+                    'key_activate_id' => $key_activate_id,
+                    'source' => 'vpn',
+                ]);
+
+                return;
+            }
+            $keyActivate->load([
+                'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
+                'packSalesman.salesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
+            ]);
+            $this->buildConnectionData($keyActivate, $key_activate_id, true);
+
+            Log::info('VpnConfig refresh: фон — синхронизация Marzban успех', [
+                'key_activate_id' => $key_activate_id,
+                'duration_ms' => (int) round((microtime(true) - $t0) * 1000),
+                'source' => 'vpn',
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('VpnConfig refresh: фон — синхронизация Marzban ошибка', [
+                'key_activate_id' => $key_activate_id,
+                'duration_ms' => (int) round((microtime(true) - $t0) * 1000),
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'source' => 'vpn',
+            ]);
         }
     }
 
