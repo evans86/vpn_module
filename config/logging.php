@@ -35,9 +35,19 @@ return [
     */
 
     'channels' => [
+        /*
+         * По умолчанию stack = single + database: КАЖДЫЙ лог дублируется INSERT в БД (application_logs).
+         * При нагрузке это часто даёт lock wait / медленные ответы / таймауты.
+         * На проде задайте: LOG_STACK_CHANNELS=single
+         */
         'stack' => [
             'driver' => 'stack',
-            'channels' => ['single', 'database'],
+            'channels' => (static function (): array {
+                $raw = (string) env('LOG_STACK_CHANNELS', 'single,database');
+                $ch = array_values(array_filter(array_map('trim', explode(',', $raw))));
+
+                return $ch !== [] ? $ch : ['single'];
+            })(),
             'ignore_exceptions' => true,
         ],
 
