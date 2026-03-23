@@ -84,6 +84,7 @@ class KeyActivateController extends Controller
                 KeyActivate::EXPIRED => 'Просрочен',
                 KeyActivate::ACTIVE => 'Активирован',
                 KeyActivate::PAID => 'Оплачен',
+                KeyActivate::ACTIVATING => 'Активация…',
                 KeyActivate::DELETED => 'Удален'
             ];
 
@@ -120,6 +121,7 @@ class KeyActivateController extends Controller
                     KeyActivate::EXPIRED => 'Просрочен',
                     KeyActivate::ACTIVE => 'Активирован',
                     KeyActivate::PAID => 'Оплачен',
+                    KeyActivate::ACTIVATING => 'Активация…',
                     KeyActivate::DELETED => 'Удален'
                 ],
                 'filters' => $filters ?? [],

@@ -561,9 +561,17 @@ class SalesmanBotController extends AbstractTelegramBot
                 return;
             }
 
-            // Проверяем статус ключа
-            if ($key->status != KeyActivate::PAID) {
+            // Проверяем статус ключа (ACTIVATING — повтор при «зависшей» активации, без блокировки по user_tg_id)
+            if ($key->status === KeyActivate::ACTIVE) {
                 $this->sendMessage("❌ Невозможно активировать ключ.\n\nКлюч уже был активирован ");
+                return;
+            }
+            if ($key->status !== KeyActivate::PAID && $key->status !== KeyActivate::ACTIVATING) {
+                $this->sendMessage("❌ Невозможно активировать ключ.\n\nКлюч уже был активирован ");
+                return;
+            }
+            if ($key->status === KeyActivate::ACTIVATING && (int) $key->user_tg_id !== (int) $this->chatId) {
+                $this->sendMessage("❌ Ключ активируется другим пользователем.");
                 return;
             }
 
@@ -573,8 +581,8 @@ class SalesmanBotController extends AbstractTelegramBot
                 return;
             }
 
-            // Проверяем, не активирован ли уже ключ
-            if ($key->user_tg_id) {
+            // Занят другим пользователем (не сценарий ACTIVATING тем же пользователем)
+            if ($key->user_tg_id && (int) $key->user_tg_id !== (int) $this->chatId) {
                 $this->sendMessage("❌ Ключ уже был активирован.\n\nКаждый ключ можно использовать только один раз.");
                 return;
             }

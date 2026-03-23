@@ -397,81 +397,19 @@ class KeyActivateService
     public function activateModuleKey(KeyActivate $key, int $userTgId): KeyActivate
     {
         try {
-            // Проверяем текущий статус
-            if (!$this->keyActivateRepository->hasCorrectStatusForActivation($key)) {
-                throw new RuntimeException('Ключ не может быть активирован (неверный статус)');
-            }
-
-            // Проверяем, не истек ли срок для активации
-//            if ($this->keyActivateRepository->isActivationPeriodExpired($key)) {
-//                throw new RuntimeException('Срок активации ключа истек');
-//            }
-
-            // Проверяем, не занят ли уже ключ другим пользователем
-            if ($this->keyActivateRepository->isUsedByAnotherUser($key, $userTgId)) {
-                throw new RuntimeException('Ключ уже используется другим пользователем');
-            }
-
             if (!$key->packSalesman || !$key->packSalesman->salesman) {
                 throw new RuntimeException('Не найдена связь ключа с продавцом');
             }
 
-            $finishAt = time() + ($key->packSalesman->pack->period * \App\Constants\TimeConstants::SECONDS_IN_DAY);
-            $panels = $this->getPanelsForActivation($key, true);
-            if (empty($panels)) {
-                throw new RuntimeException('Активная панель Marzban не найдена');
+            $keyId = (string) $key->id;
+            if (!$this->keyActivateRepository->tryClaimActivation($keyId, $userTgId)) {
+                return $this->resolveActivationWithoutClaim($keyId, $userTgId);
             }
 
-            $serverUsers = [];
-            foreach ($panels as $panel) {
-                try {
-                    $panelStrategy = new PanelStrategy($panel->panel ?? Panel::MARZBAN);
-                    $serverUser = $panelStrategy->addServerUser(
-                        $panel->id,
-                        $userTgId,
-                        $key->traffic_limit,
-                        $finishAt,
-                        $key->id,
-                        ['max_connections' => config('panel.max_connections', 4)]
-                    );
-                    $serverUsers[] = $serverUser;
-                } catch (Exception $e) {
-                    $this->logger->error('Ошибка активации ключа (слот)', [
-                        'key_id' => $key->id,
-                        'panel_id' => $panel->id,
-                        'error' => $e->getMessage(),
-                        'source' => 'key_activate',
-                    ]);
-                    $this->panelRepository->markPanelWithError($panel->id, 'Ошибка при создании пользователя: ' . $e->getMessage());
-                }
-            }
-            if (empty($serverUsers)) {
-                throw new RuntimeException('Не удалось создать пользователя ни на одной панели');
-            }
+            /** @var KeyActivate $keyLocked */
+            $keyLocked = KeyActivate::with(['packSalesman.pack'])->findOrFail($keyId);
 
-            $activatedKey = $this->keyActivateRepository->updateActivationData(
-                $key,
-                $userTgId,
-                KeyActivate::ACTIVE
-            );
-
-            $this->logger->info('Ключ успешно активирован', [
-                'key_id' => $activatedKey->id,
-                'user_id' => $userTgId,
-                'server_user_ids' => array_map(fn ($su) => $su->id, $serverUsers),
-                'panel_ids' => array_map(fn ($su) => $su->panel_id, $serverUsers),
-                'traffic_limit' => $key->traffic_limit,
-                'finish_at' => $key->finish_at
-            ]);
-
-            $this->notificationService->sendKeyActivatedNotification(
-                $key->packSalesman->salesman->telegram_id,
-                $key->id
-            );
-
-            $this->warmConfigSync((string) $activatedKey->id);
-
-            return $activatedKey;
+            return $this->runActivationAfterClaim($keyLocked, $userTgId, null, 'activate_module_key');
         } catch (Exception $e) {
             $this->logger->error('Ошибка активации ключа', [
                 'key_id' => $key->id,
@@ -485,7 +423,7 @@ class KeyActivateService
 
 
     /**
-     * Активация ключа
+     * Активация ключа (HTTP к Marzban вне долгой транзакции с FOR UPDATE — без lock wait timeout).
      *
      * @param KeyActivate $key
      * @param int $userTgId
@@ -495,105 +433,15 @@ class KeyActivateService
     public function activate(KeyActivate $key, int $userTgId): KeyActivate
     {
         try {
-            return DB::transaction(function () use ($key, $userTgId) {
-                // Блокируем строку ключа, чтобы исключить двойную активацию (например при повторной доставке webhook)
-                /** @var KeyActivate $keyLocked */
-                $keyLocked = KeyActivate::with(['packSalesman.pack'])
-                    ->where('id', $key->id)
-                    ->lockForUpdate()
-                    ->firstOrFail();
+            $keyId = (string) $key->id;
+            if (!$this->keyActivateRepository->tryClaimActivation($keyId, $userTgId)) {
+                return $this->resolveActivationWithoutClaim($keyId, $userTgId);
+            }
 
-                if (!$this->keyActivateRepository->hasCorrectStatusForActivation($keyLocked)) {
-                    throw new RuntimeException('Ключ не может быть активирован (неверный статус)');
-                }
+            /** @var KeyActivate $keyLocked */
+            $keyLocked = KeyActivate::with(['packSalesman.pack'])->findOrFail($keyId);
 
-                if ($this->keyActivateRepository->isUsedByAnotherUser($keyLocked, $userTgId)) {
-                    throw new RuntimeException('Ключ уже используется другим пользователем');
-                }
-
-                if (!is_null($keyLocked->pack_salesman_id)) {
-                    $finishAt = time() + ($keyLocked->packSalesman->pack->period * \App\Constants\TimeConstants::SECONDS_IN_DAY);
-                } else {
-                    $finishAt = Carbon::now()->addMonth()->startOfMonth()->timestamp;
-                }
-
-                $panels = $this->getPanelsForActivation($keyLocked, true);
-                if (empty($panels)) {
-                    throw new RuntimeException('Активная панель Marzban не найдена');
-                }
-
-                $serverUsers = [];
-                $lastError = null;
-                foreach ($panels as $panel) {
-                    try {
-                        $panelStrategy = new PanelStrategy($panel->panel ?? Panel::MARZBAN);
-                        $serverUser = $panelStrategy->addServerUser(
-                            $panel->id,
-                            $userTgId,
-                            $keyLocked->traffic_limit,
-                            $finishAt,
-                            $keyLocked->id,
-                            ['max_connections' => config('panel.max_connections', 4)]
-                        );
-                        $serverUsers[] = $serverUser;
-                    } catch (Exception $e) {
-                        $lastError = $e;
-                        $this->panelRepository->markPanelWithError(
-                            $panel->id,
-                            'Ошибка при создании пользователя: ' . $e->getMessage()
-                        );
-                        $provider = $panel->server ? $panel->server->provider : '';
-                        Log::warning('Panel marked with error (multi-provider slot)', [
-                            'panel_id' => $panel->id,
-                            'provider' => $provider,
-                            'error' => $e->getMessage(),
-                            'source' => 'key',
-                        ]);
-                        Cache::forget('optimized_marzban_panel_balanced');
-                        Cache::forget('optimized_marzban_panel_traffic_based');
-                        Cache::forget('optimized_marzban_panel_intelligent');
-                        if ($provider) {
-                            foreach (['balanced', 'traffic_based', 'intelligent'] as $strategy) {
-                                Cache::forget("optimized_marzban_panel_{$strategy}_provider_{$provider}");
-                            }
-                        }
-                    }
-                }
-
-                if (empty($serverUsers)) {
-                    $errorMessage = 'Не удалось создать пользователя ни на одной панели';
-                    if ($lastError) {
-                        $errorMessage .= ': ' . $lastError->getMessage();
-                    }
-                    throw new RuntimeException($errorMessage);
-                }
-
-                $activatedKey = $this->keyActivateRepository->updateActivationData(
-                    $keyLocked,
-                    $userTgId,
-                    KeyActivate::ACTIVE
-                );
-
-                $this->logger->info('Ключ успешно активирован', [
-                    'source' => 'key_activate',
-                    'action' => 'activate',
-                    'key_id' => $activatedKey->id,
-                    'user_tg_id' => $userTgId,
-                    'server_user_ids' => array_map(fn ($su) => $su->id, $serverUsers),
-                    'panel_ids' => array_map(fn ($su) => $su->panel_id, $serverUsers),
-                    'traffic_limit' => $keyLocked->traffic_limit,
-                    'finish_at' => $keyLocked->finish_at
-                ]);
-
-                if (!is_null($keyLocked->pack_salesman_id)) {
-                    $packSalesman = $this->packSalesmanRepository->findByIdOrFail($keyLocked->pack_salesman_id);
-                    $this->notificationService->sendKeyActivatedNotification($packSalesman->salesman->telegram_id, $keyLocked->id);
-                }
-
-                $this->warmConfigSync((string) $activatedKey->id);
-
-                return $activatedKey;
-            });
+            return $this->runActivationAfterClaim($keyLocked, $userTgId, null, 'activate');
         } catch (Exception $e) {
             $this->logger->error('Ошибка при активации ключа', [
                 'source' => 'key_activate',
@@ -620,22 +468,140 @@ class KeyActivateService
     public function activateWithFinishAt(KeyActivate $key, int $userTgId, int $finishAt): KeyActivate
     {
         try {
-            // Проверяем текущий статус
-            if (!$this->keyActivateRepository->hasCorrectStatusForActivation($key)) {
+            $keyId = (string) $key->id;
+            if (!$this->keyActivateRepository->tryClaimActivation($keyId, $userTgId)) {
+                return $this->resolveActivationWithoutClaim($keyId, $userTgId);
+            }
+
+            /** @var KeyActivate $keyLocked */
+            $keyLocked = KeyActivate::with(['packSalesman.pack'])->findOrFail($keyId);
+
+            return $this->runActivationAfterClaim($keyLocked, $userTgId, $finishAt, 'activate_with_finish_at');
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при активации ключа с finish_at', [
+                'source' => 'key_activate',
+                'action' => 'activate_with_finish_at',
+                'key_id' => $key->id,
+                'user_tg_id' => $userTgId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            throw new RuntimeException($e->getMessage());
+        }
+    }
+
+    /**
+     * Повтор запроса: уже ACTIVE, «зависшая» активация с созданными слотами, или конфликт.
+     */
+    private function resolveActivationWithoutClaim(string $keyId, int $userTgId): KeyActivate
+    {
+        /** @var KeyActivate|null $existing */
+        $existing = KeyActivate::with(['packSalesman.pack', 'keyActivateUsers'])->find($keyId);
+        if (!$existing instanceof KeyActivate) {
+            throw new RuntimeException('Ключ не найден');
+        }
+
+        if ($existing->status === KeyActivate::ACTIVE && (int) $existing->user_tg_id === $userTgId) {
+            return $existing;
+        }
+
+        if ($existing->status === KeyActivate::ACTIVATING
+            && (int) $existing->user_tg_id === $userTgId
+            && $existing->keyActivateUsers()->exists()) {
+            return $this->finalizeStuckActivation($existing, $userTgId);
+        }
+
+        if ($existing->status === KeyActivate::ACTIVATING && (int) $existing->user_tg_id === $userTgId) {
+            throw new RuntimeException('Ключ уже активируется, подождите несколько секунд');
+        }
+
+        if ($this->keyActivateRepository->isUsedByAnotherUser($existing, $userTgId)) {
+            throw new RuntimeException('Ключ уже используется другим пользователем');
+        }
+
+        if (!$this->keyActivateRepository->hasCorrectStatusForActivation($existing) && $existing->status !== KeyActivate::ACTIVATING) {
+            throw new RuntimeException('Ключ не может быть активирован (неверный статус)');
+        }
+
+        throw new RuntimeException('Ключ не может быть активирован (неверный статус)');
+    }
+
+    /**
+     * Marzban успел создать пользователей, но статус в БД остался ACTIVATING — доводим до ACTIVE.
+     */
+    private function finalizeStuckActivation(KeyActivate $key, int $userTgId): KeyActivate
+    {
+        /** @var KeyActivate $activated */
+        $activated = DB::transaction(function () use ($key, $userTgId) {
+            /** @var KeyActivate $locked */
+            $locked = KeyActivate::with(['packSalesman.pack'])->where('id', $key->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->status === KeyActivate::ACTIVE && (int) $locked->user_tg_id === $userTgId) {
+                return $locked;
+            }
+
+            if ($locked->status !== KeyActivate::ACTIVATING || (int) $locked->user_tg_id !== $userTgId) {
                 throw new RuntimeException('Ключ не может быть активирован (неверный статус)');
             }
 
-            // Проверяем, не занят ли уже ключ другим пользователем
-            if ($this->keyActivateRepository->isUsedByAnotherUser($key, $userTgId)) {
-                throw new RuntimeException('Ключ уже используется другим пользователем');
+            if (!$locked->keyActivateUsers()->exists()) {
+                throw new RuntimeException('Ключ уже активируется, подождите несколько секунд');
             }
 
-            $panels = $this->getPanelsForActivation($key, true);
+            return $this->keyActivateRepository->updateActivationData($locked, $userTgId, KeyActivate::ACTIVE);
+        });
+
+        $this->logger->info('Ключ завершён после прерванной активации', [
+            'source' => 'key_activate',
+            'action' => 'finalize_stuck_activation',
+            'key_id' => $activated->id,
+            'user_tg_id' => $userTgId,
+        ]);
+
+        if (!is_null($activated->pack_salesman_id)) {
+            $packSalesman = $this->packSalesmanRepository->findByIdOrFail($activated->pack_salesman_id);
+            $this->notificationService->sendKeyActivatedNotification($packSalesman->salesman->telegram_id, $activated->id);
+        }
+
+        $this->warmConfigSync((string) $activated->id);
+
+        return $activated;
+    }
+
+    /**
+     * @param KeyActivate $keyLocked уже ACTIVATING с корректным user_tg_id
+     * @param int|null $finishAtOverride если задан — используется вместо расчёта по пакету (activateWithFinishAt)
+     * @param string $logAction метка для логов
+     */
+    private function runActivationAfterClaim(
+        KeyActivate $keyLocked,
+        int $userTgId,
+        ?int $finishAtOverride,
+        string $logAction
+    ): KeyActivate {
+        $keyId = (string) $keyLocked->id;
+        $serverUsers = [];
+
+        try {
+            if ($keyLocked->status !== KeyActivate::ACTIVATING || (int) $keyLocked->user_tg_id !== $userTgId) {
+                $this->keyActivateRepository->releaseActivationClaim($keyId);
+                throw new RuntimeException('Не удалось зарезервировать ключ для активации');
+            }
+
+            if ($finishAtOverride !== null) {
+                $finishAt = $finishAtOverride;
+            } elseif (!is_null($keyLocked->pack_salesman_id)) {
+                $finishAt = time() + ($keyLocked->packSalesman->pack->period * \App\Constants\TimeConstants::SECONDS_IN_DAY);
+            } else {
+                $finishAt = Carbon::now()->addMonth()->startOfMonth()->timestamp;
+            }
+
+            $panels = $this->getPanelsForActivation($keyLocked, true);
             if (empty($panels)) {
                 throw new RuntimeException('Активная панель Marzban не найдена');
             }
 
-            $serverUsers = [];
             $lastError = null;
             foreach ($panels as $panel) {
                 try {
@@ -643,9 +609,9 @@ class KeyActivateService
                     $serverUser = $panelStrategy->addServerUser(
                         $panel->id,
                         $userTgId,
-                        $key->traffic_limit,
+                        $keyLocked->traffic_limit,
                         $finishAt,
-                        $key->id,
+                        $keyLocked->id,
                         ['max_connections' => config('panel.max_connections', 4)]
                     );
                     $serverUsers[] = $serverUser;
@@ -656,12 +622,15 @@ class KeyActivateService
                         'Ошибка при создании пользователя: ' . $e->getMessage()
                     );
                     $provider = $panel->server ? $panel->server->provider : '';
-                    Log::warning('Panel marked with error (activateWithFinishAt)', [
+                    Log::warning('Panel marked with error (multi-provider slot)', [
                         'panel_id' => $panel->id,
                         'provider' => $provider,
                         'error' => $e->getMessage(),
                         'source' => 'key',
                     ]);
+                    Cache::forget('optimized_marzban_panel_balanced');
+                    Cache::forget('optimized_marzban_panel_traffic_based');
+                    Cache::forget('optimized_marzban_panel_intelligent');
                     if ($provider) {
                         foreach (['balanced', 'traffic_based', 'intelligent'] as $strategy) {
                             Cache::forget("optimized_marzban_panel_{$strategy}_provider_{$provider}");
@@ -679,42 +648,56 @@ class KeyActivateService
             }
 
             $activatedKey = $this->keyActivateRepository->updateActivationData(
-                $key,
+                $keyLocked,
                 $userTgId,
                 KeyActivate::ACTIVE
             );
-            $activatedKey->finish_at = $finishAt;
-            $activatedKey->save();
 
-            $this->logger->info('Ключ успешно активирован с указанным finish_at', [
+            if ($finishAtOverride !== null) {
+                $activatedKey->finish_at = $finishAtOverride;
+                $activatedKey->save();
+            }
+
+            $this->logger->info('Ключ успешно активирован', [
                 'source' => 'key_activate',
-                'action' => 'activate_with_finish_at',
+                'action' => $logAction,
                 'key_id' => $activatedKey->id,
                 'user_tg_id' => $userTgId,
                 'server_user_ids' => array_map(fn ($su) => $su->id, $serverUsers),
-                'traffic_limit' => $key->traffic_limit,
-                'finish_at' => $finishAt
+                'panel_ids' => array_map(fn ($su) => $su->panel_id, $serverUsers),
+                'traffic_limit' => $keyLocked->traffic_limit,
+                'finish_at' => $activatedKey->finish_at,
             ]);
 
-            if (!is_null($key->pack_salesman_id)) {
-                $packSalesman = $this->packSalesmanRepository->findByIdOrFail($key->pack_salesman_id);
-                $this->notificationService->sendKeyActivatedNotification($packSalesman->salesman->telegram_id, $key->id);
+            if ($logAction === 'activate_module_key') {
+                $refreshed = KeyActivate::with('packSalesman.salesman')->find($activatedKey->id);
+                if ($refreshed && $refreshed->packSalesman && $refreshed->packSalesman->salesman) {
+                    $this->notificationService->sendKeyActivatedNotification(
+                        $refreshed->packSalesman->salesman->telegram_id,
+                        $refreshed->id
+                    );
+                }
+            } elseif (!is_null($keyLocked->pack_salesman_id)) {
+                $packSalesman = $this->packSalesmanRepository->findByIdOrFail($keyLocked->pack_salesman_id);
+                $this->notificationService->sendKeyActivatedNotification($packSalesman->salesman->telegram_id, $keyLocked->id);
             }
 
             $this->warmConfigSync((string) $activatedKey->id);
 
             return $activatedKey;
-        } catch (Exception $e) {
-            $this->logger->error('Ошибка при активации ключа с finish_at', [
-                'source' => 'key_activate',
-                'action' => 'activate_with_finish_at',
-                'key_id' => $key->id,
-                'user_tg_id' => $userTgId,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            throw new RuntimeException($e->getMessage());
+        } catch (\Throwable $e) {
+            // Не снимаем бронь, если пользователи уже созданы на панелях — иначе дубли в Marzban при повторе.
+            if (count($serverUsers) === 0) {
+                $this->keyActivateRepository->releaseActivationClaim($keyId);
+            } else {
+                Log::error('Активация: ошибка после создания пользователей на панелях (ключ остаётся ACTIVATING для доведения)', [
+                    'source' => 'key_activate',
+                    'key_id' => $keyId,
+                    'user_tg_id' => $userTgId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+            throw $e;
         }
     }
 
@@ -1113,6 +1096,8 @@ class KeyActivateService
                 return 'ACTIVE (Активирован)';
             case KeyActivate::PAID:
                 return 'PAID (Оплачен)';
+            case KeyActivate::ACTIVATING:
+                return 'ACTIVATING (Активация)';
             case KeyActivate::DELETED:
                 return 'DELETED (Удален)';
             default:

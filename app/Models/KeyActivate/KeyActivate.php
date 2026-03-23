@@ -37,6 +37,8 @@ class KeyActivate extends Model
     const ACTIVE = 1;         // Активирован и используется
     const PAID = 2;          // Оплачен, ожидает активации
     const DELETED = 3;       // Удален
+    /** Активация в процессе (Marzban), без долгой блокировки строки FOR UPDATE */
+    const ACTIVATING = 4;
 
     use HasFactory;
 
@@ -113,6 +115,8 @@ class KeyActivate extends Model
                 return '✅ Активирован';
             case self::PAID:
                 return '⚪️ Не активирован';
+            case self::ACTIVATING:
+                return '⏳ Активация…';
             case self::DELETED:
                 return 'Ключ удален';
             default:
@@ -134,6 +138,8 @@ class KeyActivate extends Model
                 return 'Активирован';
             case self::PAID:
                 return 'Оплачен';
+            case self::ACTIVATING:
+                return 'Активация';
             case self::DELETED:
                 return 'Удален';
             default:
@@ -155,6 +161,8 @@ class KeyActivate extends Model
                 return 'badge-success';
             case self::PAID:
                 return 'badge-info';
+            case self::ACTIVATING:
+                return 'badge-warning';
             case self::DELETED:
                 return 'badge-secondary';
             default:
@@ -171,6 +179,8 @@ class KeyActivate extends Model
                 return 'bg-green-100 text-green-800';
             case self::PAID:
                 return 'bg-yellow-100 text-yellow-800';
+            case self::ACTIVATING:
+                return 'bg-amber-100 text-amber-800';
             case self::DELETED:
                 return 'bg-gray-100 text-gray-800';
             default:

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class KeyActivateRepository extends BaseRepository
@@ -137,7 +138,8 @@ class KeyActivateRepository extends BaseRepository
      */
     public function findWithConfigRelationsForBrowser(string $id): ?KeyActivate
     {
-        return $this->query()
+        /** @var KeyActivate|null $result */
+        $result = $this->query()
             ->with([
                 'keyActivateUsers' => function ($q) {
                     $q->orderBy('id');
@@ -152,6 +154,8 @@ class KeyActivateRepository extends BaseRepository
                 'replacedViolation',
             ])
             ->find($id);
+
+        return $result;
     }
 
     /**
@@ -163,7 +167,8 @@ class KeyActivateRepository extends BaseRepository
      */
     public function findWithConfigRelationsForContent(string $id): ?KeyActivate
     {
-        return $this->query()
+        /** @var KeyActivate|null $result */
+        $result = $this->query()
             ->with([
                 'keyActivateUsers' => function ($q) {
                     $q->orderBy('id');
@@ -176,6 +181,8 @@ class KeyActivateRepository extends BaseRepository
                 'packSalesman.salesman:id,telegram_id,bot_link,panel_id,module_bot_id',
             ])
             ->find($id);
+
+        return $result;
     }
 
     /**
@@ -225,6 +232,45 @@ class KeyActivateRepository extends BaseRepository
     public function hasCorrectStatusForActivation(KeyActivate $key): bool
     {
         return $key->status == KeyActivate::PAID;
+    }
+
+    /**
+     * Атомарно перевести ключ в ACTIVATING и привязать user_tg_id (короткая транзакция без HTTP к панелям).
+     *
+     * @return bool true, если строка обновлена (мы первые)
+     */
+    public function tryClaimActivation(string $keyId, int $userTgId): bool
+    {
+        return DB::transaction(function () use ($keyId, $userTgId) {
+            $affected = DB::table('key_activate')
+                ->where('id', $keyId)
+                ->where('status', KeyActivate::PAID)
+                ->where(function ($q) {
+                    $q->whereNull('user_tg_id')->orWhere('user_tg_id', 0);
+                })
+                ->update([
+                    'status' => KeyActivate::ACTIVATING,
+                    'user_tg_id' => $userTgId,
+                    'updated_at' => now(),
+                ]);
+
+            return $affected === 1;
+        });
+    }
+
+    /**
+     * Откат брони при ошибке Marzban (ключ снова PAID, user_tg_id сброшен).
+     */
+    public function releaseActivationClaim(string $keyId): void
+    {
+        DB::table('key_activate')
+            ->where('id', $keyId)
+            ->where('status', KeyActivate::ACTIVATING)
+            ->update([
+                'status' => KeyActivate::PAID,
+                'user_tg_id' => null,
+                'updated_at' => now(),
+            ]);
     }
 
     /**

@@ -2700,6 +2700,8 @@ class MarzbanService
                 return 'ACTIVE (Активирован)';
             case KeyActivate::PAID:
                 return 'PAID (Оплачен)';
+            case KeyActivate::ACTIVATING:
+                return 'ACTIVATING (Активация)';
             case KeyActivate::DELETED:
                 return 'DELETED (Удален)';
             default:
