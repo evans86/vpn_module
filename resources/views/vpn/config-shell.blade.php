@@ -69,6 +69,9 @@
     <script src="{{ asset('js/vpn-singbox-export.js') }}?v={{ $_vpnSbVer }}"></script>
     <script src="{{ asset('js/vpn-config-content.js') }}?v={{ $_vpnCfgJsVer }}"></script>
     <script>
+    window.__vpnSingboxProfileTitle = @json(config('app.name', 'VPN'));
+    </script>
+    <script>
     (function(){
         var copyNotificationTimeout, currentQR = null;
         function showCopyNotification(message) {
@@ -148,7 +151,10 @@
                 return;
             }
             try {
-                var text = window.buildSingBoxProfileJson(links);
+                var title = (typeof window.__vpnSingboxProfileTitle === 'string' && window.__vpnSingboxProfileTitle.trim())
+                    ? window.__vpnSingboxProfileTitle.trim()
+                    : (document.title || 'VPN');
+                var text = window.buildSingBoxProfileJson(links, { remarks: title, name: title });
                 if (!text) {
                     showCopyNotification('Не удалось разобрать ссылки в формат sing-box.');
                     return;

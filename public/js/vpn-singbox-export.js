@@ -241,9 +241,16 @@
 
     /**
      * @param {string[]} links
+     * @param {{ remarks?: string, name?: string }|undefined} [options]
      * @returns {object|null}
      */
-    function buildSingBoxProfile(links) {
+    function buildSingBoxProfile(links, options) {
+        options = options || {};
+        var title = String(options.remarks || options.name || '').trim();
+        if (!title) {
+            title = 'VPN';
+        }
+
         var proxies = [];
         for (var i = 0; i < links.length; i++) {
             var o = parseLinkToOutbound(links[i], i);
@@ -258,6 +265,9 @@
         var selectorList = tags.concat(['direct']);
 
         return {
+            /** Hiddify и др. показывают название профиля из буфера по этому полю (иначе «Unknown»). */
+            remarks: title,
+            name: title,
             log: { level: 'warn' },
             dns: {
                 servers: [
@@ -312,10 +322,11 @@
 
     /**
      * @param {string[]} links
+     * @param {{ remarks?: string, name?: string }|undefined} [options]
      * @returns {string}
      */
-    function buildSingBoxProfileJson(links) {
-        var profile = buildSingBoxProfile(links);
+    function buildSingBoxProfileJson(links, options) {
+        var profile = buildSingBoxProfile(links, options);
         if (!profile) {
             return '';
         }
