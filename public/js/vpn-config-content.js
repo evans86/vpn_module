@@ -45,6 +45,29 @@
         return (n / (1024 * 1024 * 1024)).toFixed(2);
     }
 
+    /** Панель действий: симметричная сетка 2×3 (на md+), сразу под блоком «Проверить качество сети». */
+    function buildVpnActionToolbarHtml() {
+        var c = 'inline-flex w-full h-full min-h-[4.25rem] items-center justify-center text-center px-2 py-2.5 sm:px-3 border-2 rounded-xl font-medium text-xs sm:text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all shadow-sm hover:shadow';
+        return (
+            '<div id="config-action-buttons" class="mb-8">' +
+            '<div class="bg-white rounded-2xl shadow-lg p-4 sm:p-6 md:p-8 border border-gray-100">' +
+            '<div class="grid grid-cols-2 md:grid-cols-3 gap-3 auto-rows-fr">' +
+            '<button type="button" onclick="copyCurrentUrl()" class="' + c + ' border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:ring-indigo-500">' +
+            '<span class="inline-flex flex-col sm:flex-row items-center justify-center gap-1.5"><svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg><span>Скопировать ссылку</span></span></button>' +
+            '<button type="button" onclick="showVpnPageLinkQr()" class="' + c + ' border-violet-200 text-violet-800 bg-violet-50 hover:bg-violet-100 focus:ring-violet-500">' +
+            '<span class="inline-flex flex-col sm:flex-row items-center justify-center gap-1.5"><svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9h14a2 2 0 012 2v2m0 0H3a2 2 0 01-2-2V9a2 2 0 012-2h14a2 2 0 012 2v2zm0 0h2a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2h2z"/></svg><span>QR ссылки</span></span></button>' +
+            '<button type="button" id="vpn-btn-copy-plain" disabled onclick="copyAllConfigurations()" class="' + c + ' border-green-200 text-green-700 bg-green-50 hover:bg-green-100 focus:ring-green-500 opacity-50 cursor-not-allowed" title="Нет протоколов подключения">' +
+            '<span class="inline-flex flex-col sm:flex-row items-center justify-center gap-1.5"><svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg><span>Скопировать конфигурацию</span></span></button>' +
+            '<button type="button" id="vpn-btn-qr-plain" disabled onclick="showQrPlainAllConfigs()" class="' + c + ' border-emerald-200 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 focus:ring-emerald-500 opacity-50 cursor-not-allowed" title="Нет протоколов подключения">' +
+            '<span class="inline-flex flex-col sm:flex-row items-center justify-center gap-1.5"><svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg><span>QR-код конфигурации</span></span></button>' +
+            '<button type="button" onclick="copyVpnConfigJson()" class="' + c + ' border-amber-200 text-amber-900 bg-amber-50 hover:bg-amber-100 focus:ring-amber-500" title="JSON с данными страницы">' +
+            '<span class="inline-flex flex-col sm:flex-row items-center justify-center gap-1.5"><svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg><span>Скопировать конфигурацию (JSON)</span></span></button>' +
+            '<button type="button" onclick="showQrVpnConfigJson()" class="' + c + ' border-orange-200 text-orange-900 bg-orange-50 hover:bg-orange-100 focus:ring-orange-500" title="QR с JSON-данными страницы">' +
+            '<span class="inline-flex flex-col sm:flex-row items-center justify-center gap-1.5"><svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg><span>QR-код конфигурации (JSON)</span></span></button>' +
+            '</div></div></div>'
+        );
+    }
+
     /**
      * @param {HTMLElement} container
      * @param {object} page — ответ API (поле page)
@@ -118,6 +141,8 @@
             '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Проверить качество сети</a>' +
             '</div></div>'
         );
+
+        parts.push(buildVpnActionToolbarHtml());
 
         parts.push('<div class="bg-white rounded-2xl shadow-lg p-6 md:p-8" id="config-content-wrapper" data-all-config-links="' + escapeAttr(allConfigAttr) + '">');
 
