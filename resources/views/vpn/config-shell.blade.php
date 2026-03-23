@@ -63,14 +63,8 @@
     @php
         $_vpnCfgJsPath = public_path('js/vpn-config-content.js');
         $_vpnCfgJsVer = is_file($_vpnCfgJsPath) ? filemtime($_vpnCfgJsPath) : 1;
-        $_vpnSbPath = public_path('js/vpn-singbox-export.js');
-        $_vpnSbVer = is_file($_vpnSbPath) ? filemtime($_vpnSbPath) : 1;
     @endphp
-    <script src="{{ asset('js/vpn-singbox-export.js') }}?v={{ $_vpnSbVer }}"></script>
     <script src="{{ asset('js/vpn-config-content.js') }}?v={{ $_vpnCfgJsVer }}"></script>
-    <script>
-    window.__vpnSingboxProfileTitle = @json(config('app.name', 'VPN'));
-    </script>
     <script>
     (function(){
         var copyNotificationTimeout, currentQR = null;
@@ -127,44 +121,11 @@
             var links = window.getVpnConfigAllLinks();
             var has = links.length > 0;
             var copyBtn = document.getElementById('vpn-btn-copy-plain');
-            var jsonBtn = document.getElementById('vpn-btn-copy-sub-json');
-            [copyBtn, jsonBtn].forEach(function(el) {
-                if (!el) return;
-                el.disabled = !has;
-                el.classList.toggle('opacity-50', !has);
-                el.classList.toggle('cursor-not-allowed', !has);
-                if (el.id === 'vpn-btn-copy-plain') {
-                    el.setAttribute('title', has ? 'Все строки конфигурации, по одной на строку' : 'Нет протоколов подключения');
-                } else {
-                    el.setAttribute('title', has ? 'Профиль sing-box (JSON) для Hiddify и др.' : 'Нет протоколов для JSON');
-                }
-            });
-        };
-        window.copyVpnSubscriptionJson = function() {
-            var links = window.getVpnConfigAllLinks();
-            if (!links.length) {
-                showCopyNotification('Нет данных для JSON.');
-                return;
-            }
-            if (typeof window.buildSingBoxProfileJson !== 'function') {
-                alert('Не загружен модуль sing-box. Обновите страницу.');
-                return;
-            }
-            try {
-                var title = (typeof window.__vpnSingboxProfileTitle === 'string' && window.__vpnSingboxProfileTitle.trim())
-                    ? window.__vpnSingboxProfileTitle.trim()
-                    : (document.title || 'VPN');
-                var text = window.buildSingBoxProfileJson(links, { remarks: title, name: title });
-                if (!text) {
-                    showCopyNotification('Не удалось разобрать ссылки в формат sing-box.');
-                    return;
-                }
-                navigator.clipboard.writeText(text).then(function() {
-                    showCopyNotification('✓ JSON sing-box скопирован (импорт в Hiddify)');
-                }).catch(function() { alert('Не удалось скопировать.'); });
-            } catch (e) {
-                alert('Не удалось сформировать JSON.');
-            }
+            if (!copyBtn) return;
+            copyBtn.disabled = !has;
+            copyBtn.classList.toggle('opacity-50', !has);
+            copyBtn.classList.toggle('cursor-not-allowed', !has);
+            copyBtn.setAttribute('title', has ? 'Все строки конфигурации, по одной на строку' : 'Нет протоколов подключения');
         };
         window.copyAllConfigurations = function() {
             var links = window.getVpnConfigAllLinks();
