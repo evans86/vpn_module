@@ -38,8 +38,8 @@
                 </div>
             </div>
             <div id="config-progress-error" class="hidden mt-2 flex-1">
-                <p class="text-sm text-red-600">Обновление не удалось.</p>
-                <p id="config-progress-error-detail" class="text-xs text-red-500 mt-1 hidden"></p>
+                <p class="text-sm text-red-600">Не удалось обновить данные.</p>
+                <p id="config-progress-error-detail" class="text-xs text-gray-600 mt-1 hidden"></p>
                 <button type="button" id="config-progress-retry" class="mt-2 px-3 py-1.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Повторить</button>
             </div>
         </div>
@@ -206,6 +206,7 @@
     </script>
     <script>
     (function(){
+        window.__vpnConfigDebug = @json((bool) config('app.debug'));
         var contentUrl = @json($contentUrl);
         var refreshUrl = @json($refreshUrl);
         var contentEl = document.getElementById('config-content');
@@ -218,13 +219,31 @@
         var errBlock = document.getElementById('config-progress-error');
         var retryBtn = document.getElementById('config-progress-retry');
 
+        /** Короткий текст для пользователя. Подробности — storage/logs и консоль браузера при APP_DEBUG=true. */
         function humanizeRefreshError(raw, httpStatus) {
-            var s = String(raw || '');
-            if (httpStatus === 504 || /504|Gateway Time-out|Gateway Timeout/i.test(s)) {
-                return 'Превышено время ожидания (504): nginx оборвал долгий запрос к PHP. Кнопка «Обновить» теперь не ходит в панели — обновите страницу (Ctrl+F5). Если снова 504, увеличьте proxy_read_timeout / fastcgi_read_timeout в nginx.';
+            if (window.__vpnConfigDebug) {
+                try { console.warn('[VPN конфиг: обновить]', { httpStatus: httpStatus, raw: raw != null ? String(raw).slice(0, 1200) : '' }); } catch (e) {}
+            }
+            var s = String(raw || '').trim();
+            if (httpStatus === 504 || httpStatus === 502 || httpStatus === 503) {
+                return 'Сервер долго не отвечал. Попробуйте через минуту или обновите страницу.';
+            }
+            if (httpStatus === 0) {
+                return 'Проверьте подключение к интернету и попробуйте снова.';
+            }
+            if (!s) {
+                if (httpStatus >= 500) return 'Сервис временно недоступен. Попробуйте позже.';
+                if (httpStatus === 404) return 'Данные не найдены. Обновите страницу.';
+                return 'Попробуйте позже или обновите страницу.';
+            }
+            if (/504|502|503|Gateway|Time-out|timeout/i.test(s)) {
+                return 'Сервер долго не отвечал. Попробуйте через минуту или обновите страницу.';
             }
             if (/^\s*</.test(s) || /<html/i.test(s)) {
-                return 'Вместо JSON пришла HTML-страница ошибки прокси (часто 502/504). Обновите страницу целиком или попробуйте позже.';
+                return 'Сервис временно недоступен. Попробуйте позже.';
+            }
+            if (/nginx|php-fpm|proxy_|fastcgi|socket/i.test(s)) {
+                return 'Попробуйте позже или обновите страницу.';
             }
             if (s.length > 220) return s.slice(0, 220) + '…';
             return s;
@@ -375,14 +394,14 @@
                         refreshBar.classList.remove('hidden');
                     } else {
                         var errMsg = (res.data && res.data.message) ? String(res.data.message) : '';
-                        if (!errMsg && !res.ok) errMsg = 'Сервер вернул ошибку (HTTP ' + (res.status != null ? res.status : '?') + ').';
+                        if (!errMsg && !res.ok) errMsg = '';
                         showErrorState(errMsg, res.status);
                     }
                 })
                 .catch(function() {
                     clearInterval(t);
                     if (fill) fill.style.width = '0%';
-                    showErrorState('Нет ответа от сервера или сбой сети.', 0);
+                    showErrorState('', 0);
                 });
         }
 

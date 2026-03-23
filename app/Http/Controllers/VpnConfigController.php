@@ -306,6 +306,7 @@ class VpnConfigController extends Controller
     public function showConfigRefresh(string $token): Response
     {
         $key_activate_id = trim($token);
+        $t0 = microtime(true);
         $timeLimit = (int) config('panel.vpn_config_refresh_time_limit', 300);
         if ($timeLimit < 60) {
             $timeLimit = 60;
@@ -316,6 +317,12 @@ class VpnConfigController extends Controller
         if (function_exists('set_time_limit')) {
             @set_time_limit($timeLimit);
         }
+
+        Log::info('VpnConfig refresh: запрос', [
+            'key_activate_id' => $key_activate_id,
+            'php_time_limit' => $timeLimit,
+            'source' => 'vpn',
+        ]);
 
         try {
             $keyActivate = $this->keyActivateRepository->findById($key_activate_id);
@@ -362,11 +369,23 @@ class VpnConfigController extends Controller
                 ? $data['lastUpdated']->format('d.m.Y H:i')
                 : null;
 
+            Log::info('VpnConfig refresh: успех', [
+                'key_activate_id' => $key_activate_id,
+                'duration_ms' => (int) round((microtime(true) - $t0) * 1000),
+                'slots' => count($data['slotsWithLinks'] ?? []),
+                'links_total' => count($data['connectionKeys'] ?? []),
+                'last_updated_label' => $lastUpdated,
+                'source' => 'vpn',
+            ]);
+
             return response()->json(['success' => true, 'page' => $page, 'lastUpdated' => $lastUpdated]);
         } catch (\Throwable $e) {
-            Log::warning('VpnConfig refresh failed', [
+            Log::warning('VpnConfig refresh: ошибка', [
                 'key_activate_id' => $key_activate_id,
+                'duration_ms' => (int) round((microtime(true) - $t0) * 1000),
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString(),
                 'source' => 'vpn',
             ]);
