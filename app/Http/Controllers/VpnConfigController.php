@@ -90,8 +90,12 @@ class VpnConfigController extends Controller
             // Явный параметр (обратная совместимость): ?format=subscription или ?sub=1
             $forceSubscription = in_array(request()->query('format'), ['subscription', 'sub', 'txt'], true)
                 || request()->query('sub') === '1';
-            // Plain text подписки по тому же URL /config/{token} без query — для всех запросов, кроме явной загрузки страницы в браузере.
-            $isSubscriptionRequest = $forceSubscription || !$this->shouldServeHtmlConfigShellPage($userAgent);
+            // Подписка plain text по тому же URL без query — для VPN/HTTP-клиентов; в обычном браузере — HTML-страница.
+            $isSubscriptionRequest = $forceSubscription
+                || $this->isVpnClient($userAgent)
+                || $this->isLikelyHttpClientLibrary($userAgent)
+                || !$this->requestAcceptsHtml()
+                || !$this->hasVersionedBrowserInUserAgent($userAgent);
 
             if ($isSubscriptionRequest) {
                 $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateIdForSubscription($key_activate_id);
@@ -859,38 +863,6 @@ class VpnConfigController extends Controller
         }
 
         return false;
-    }
-
-    /**
-     * Отдать HTML-оболочку только при явной навигации документом в браузере (Sec-Fetch-*).
-     * Иначе — plain text подписки по тому же URL без ?format=.
-     */
-    private function shouldServeHtmlConfigShellPage(string $userAgent): bool
-    {
-        if ($this->isVpnClient($userAgent)) {
-            return false;
-        }
-        if ($this->isLikelyHttpClientLibrary($userAgent)) {
-            return false;
-        }
-        if (!$this->hasVersionedBrowserInUserAgent($userAgent)) {
-            return false;
-        }
-        if (!$this->requestAcceptsHtml()) {
-            return false;
-        }
-        if (strtolower(request()->header('X-Requested-With', '')) === 'xmlhttprequest') {
-            return false;
-        }
-        $dest = strtolower(request()->header('Sec-Fetch-Dest', ''));
-        $mode = strtolower(request()->header('Sec-Fetch-Mode', ''));
-        if ($dest === '' && $mode === '') {
-            // HTTP без Sec-Fetch (локальная разработка) — HTML как раньше.
-            // HTTPS без Sec-Fetch — считаем запросом подписки (клиенты без навигационных заголовков).
-            return !request()->secure();
-        }
-
-        return $dest === 'document' && $mode === 'navigate';
     }
 
     /**
