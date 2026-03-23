@@ -218,10 +218,22 @@
         var errBlock = document.getElementById('config-progress-error');
         var retryBtn = document.getElementById('config-progress-retry');
 
-        function showErrorState(msg) {
+        function humanizeRefreshError(raw, httpStatus) {
+            var s = String(raw || '');
+            if (httpStatus === 504 || /504|Gateway Time-out|Gateway Timeout/i.test(s)) {
+                return 'Превышено время ожидания (504): nginx оборвал долгий запрос к PHP. Кнопка «Обновить» теперь не ходит в панели — обновите страницу (Ctrl+F5). Если снова 504, увеличьте proxy_read_timeout / fastcgi_read_timeout в nginx.';
+            }
+            if (/^\s*</.test(s) || /<html/i.test(s)) {
+                return 'Вместо JSON пришла HTML-страница ошибки прокси (часто 502/504). Обновите страницу целиком или попробуйте позже.';
+            }
+            if (s.length > 220) return s.slice(0, 220) + '…';
+            return s;
+        }
+
+        function showErrorState(msg, httpStatus) {
             if (spinnerBlock) spinnerBlock.classList.add('hidden');
             if (errBlock) errBlock.classList.remove('hidden');
-            setRefreshErrorMessage(msg || '');
+            setRefreshErrorMessage(msg ? humanizeRefreshError(msg, httpStatus) : '');
         }
         function showSpinnerState() {
             if (spinnerBlock) spinnerBlock.classList.remove('hidden');
@@ -364,13 +376,13 @@
                     } else {
                         var errMsg = (res.data && res.data.message) ? String(res.data.message) : '';
                         if (!errMsg && !res.ok) errMsg = 'Сервер вернул ошибку (HTTP ' + (res.status != null ? res.status : '?') + ').';
-                        showErrorState(errMsg);
+                        showErrorState(errMsg, res.status);
                     }
                 })
                 .catch(function() {
                     clearInterval(t);
                     if (fill) fill.style.width = '0%';
-                    showErrorState('Нет ответа от сервера или сбой сети.');
+                    showErrorState('Нет ответа от сервера или сбой сети.', 0);
                 });
         }
 

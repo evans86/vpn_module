@@ -142,6 +142,15 @@ return [
     'skip_warm_config_after_activation' => env('KEY_ACTIVATE_SKIP_WARM_CONFIG', false),
 
     'warm_config_http_timeout' => (int) env('KEY_WARM_CONFIG_HTTP_TIMEOUT', 45),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Кнопка «Обновить» на странице конфига (/config/{token}/refresh)
+    |--------------------------------------------------------------------------
+    | Синхронный запрос к Marzban: при нескольких панелях время растёт. Увеличьте
+    | vpn_config_refresh_time_limit и proxy_read_timeout / fastcgi_read_timeout в nginx.
+    */
+    'vpn_config_refresh_time_limit' => (int) env('VPN_CONFIG_REFRESH_TIME_LIMIT', 300),
 ];
 
 

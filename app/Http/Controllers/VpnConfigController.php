@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\KeyActivateUser\KeyActivateUser;
+use App\Models\Panel\Panel;
 use App\Models\ServerUser\ServerUser;
 use App\Models\VPN\ConnectionLimitViolation;
 use App\Jobs\AddMissingSlotsForKeyJob;
@@ -298,18 +299,22 @@ class VpnConfigController extends Controller
     }
 
     /**
-     * Фоновое обновление конфига для браузера: полная сборка данных и HTML страницы.
-     * Вызывается JS со страницы config-loading.
+     * Кнопка «Обновить»: актуальные ссылки и трафик с Marzban (buildConnectionData + getSubscribeInfo).
+     * Токен панели обновляется один раз на панель, не на каждый слот — меньше задержка и риск 504.
+     * Таймаут: config panel.vpn_config_refresh_time_limit (сек), при необходимости поднимите proxy_read_timeout в nginx.
      */
     public function showConfigRefresh(string $token): Response
     {
         $key_activate_id = trim($token);
-
+        $timeLimit = (int) config('panel.vpn_config_refresh_time_limit', 300);
+        if ($timeLimit < 60) {
+            $timeLimit = 60;
+        }
         if ((int) ini_get('memory_limit') < 1024) {
             @ini_set('memory_limit', '1024M');
         }
         if (function_exists('set_time_limit')) {
-            @set_time_limit(180);
+            @set_time_limit($timeLimit);
         }
 
         try {
@@ -321,9 +326,23 @@ class VpnConfigController extends Controller
                 'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
                 'packSalesman.salesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
             ]);
-            $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
+            $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateIdForSubscription($key_activate_id);
+            $keyActivate->setRelation('keyActivateUsers', $keyActivateUsers);
+
             if ($keyActivateUsers->isEmpty()) {
-                return response()->json(['success' => false, 'message' => 'Нет слотов для ключа'], 404);
+                $replacedViolation = ConnectionLimitViolation::where('key_activate_id', $key_activate_id)
+                    ->whereNotNull('key_replaced_at')
+                    ->whereNotNull('replaced_key_id')
+                    ->orderBy('key_replaced_at', 'desc')
+                    ->first();
+                if ($replacedViolation && $replacedViolation->replaced_key_id) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Ваш ключ доступа был заменен из-за нарушения лимита подключений. Пожалуйста, используйте новый ключ.',
+                        'replacedKeyId' => $replacedViolation->replaced_key_id,
+                    ], 404);
+                }
+                return response()->json(['success' => false, 'message' => 'Конфигурация не найдена.'], 404);
             }
             $data = $this->buildConnectionData($keyActivate, $key_activate_id, true);
             $viewData = $this->buildBrowserPageViewData(
@@ -336,7 +355,7 @@ class VpnConfigController extends Controller
                 true,
                 null,
                 null,
-                null
+                $data['lastUpdated'] ?? null
             );
             $page = $this->serializeConfigPageForClient($viewData);
             $lastUpdated = isset($data['lastUpdated']) && $data['lastUpdated']
@@ -508,6 +527,7 @@ class VpnConfigController extends Controller
         $firstServerUser = null;
         $lastUpdated = null;
 
+        $orderedSlots = [];
         foreach ($keyActivateUsers as $kau) {
             $serverUser = $kau->serverUser;
             if (!$serverUser && $kau->server_user_id) {
@@ -540,12 +560,56 @@ class VpnConfigController extends Controller
             if ($serverUser->panel && !$serverUser->panel->relationLoaded('server')) {
                 $serverUser->panel->load('server.location');
             }
+            $orderedSlots[] = ['kau' => $kau, 'serverUser' => $serverUser];
+        }
+
+        /** @var array<int, Panel|null> $panelTokenCache panel_id => свежий токен (один updateToken на панель) */
+        $panelTokenCache = [];
+        foreach ($orderedSlots as $slot) {
+            $su = $slot['serverUser'];
+            $pid = $su->panel_id;
+            if (!$pid || isset($panelTokenCache[$pid])) {
+                continue;
+            }
+            $panel = $su->panel;
+            if (!$panel) {
+                $panelTokenCache[$pid] = null;
+                continue;
+            }
+            try {
+                $panelType = $panel->panel ?? \App\Models\Panel\Panel::MARZBAN;
+                if ($panelType === '') {
+                    $panelType = \App\Models\Panel\Panel::MARZBAN;
+                }
+                $panelStrategyFactory = new \App\Services\Panel\PanelStrategyFactory();
+                $panelStrategy = $panelStrategyFactory->create($panelType);
+                $panelTokenCache[$pid] = $panelStrategy->updateToken((int) $pid);
+            } catch (\Throwable $e) {
+                Log::warning('VpnConfig: updateToken failed for panel', [
+                    'panel_id' => $pid,
+                    'error' => $e->getMessage(),
+                    'source' => 'vpn',
+                ]);
+                $panelTokenCache[$pid] = null;
+            }
+        }
+
+        foreach ($orderedSlots as $slot) {
+            $kau = $slot['kau'];
+            $serverUser = $slot['serverUser'];
+            $pid = $serverUser->panel_id;
+            $panelFresh = $pid ? ($panelTokenCache[$pid] ?? null) : null;
+            if ($panelFresh) {
+                $serverUser->setRelation('panel', $panelFresh);
+            }
+
             $slotLinks = [];
             try {
-                $links = $this->getFreshUserLinks($serverUser);
+                $links = $this->getFreshUserLinks($serverUser, $panelFresh);
                 if (!empty($links)) {
                     $slotLinks = $links;
                     $connectionKeys = array_merge($connectionKeys, $links);
+                    $serverUser->refresh();
                     if ($serverUser->updated_at && (!$lastUpdated || $serverUser->updated_at > $lastUpdated)) {
                         $lastUpdated = $serverUser->updated_at;
                     }
@@ -616,29 +680,29 @@ class VpnConfigController extends Controller
     }
 
     /**
-     * Получить актуальные ссылки пользователя из панели
+     * Получить актуальные ссылки пользователя из панели Marzban.
      *
      * @param ServerUser $serverUser Пользователь сервера
+     * @param Panel|null $panelFresh Уже обновлённая панель (один updateToken на несколько слотов) — иначе токен обновится здесь
      * @return array Массив ссылок
      */
-    private function getFreshUserLinks(ServerUser $serverUser): array
+    private function getFreshUserLinks(ServerUser $serverUser, ?Panel $panelFresh = null): array
     {
         try {
-            // Используем стратегию для работы с панелью
-            $panel = $serverUser->panel;
+            $panel = $panelFresh ?? $serverUser->panel;
             if (!$panel) {
                 throw new \RuntimeException('Panel not found for server user');
             }
 
-            $panelType = $panel->panel ?? \App\Models\Panel\Panel::MARZBAN;
-            if ($panelType === '') {
-                $panelType = \App\Models\Panel\Panel::MARZBAN;
+            if ($panelFresh === null) {
+                $panelType = $panel->panel ?? \App\Models\Panel\Panel::MARZBAN;
+                if ($panelType === '') {
+                    $panelType = \App\Models\Panel\Panel::MARZBAN;
+                }
+                $panelStrategyFactory = new \App\Services\Panel\PanelStrategyFactory();
+                $panelStrategy = $panelStrategyFactory->create($panelType);
+                $panel = $panelStrategy->updateToken($panel->id);
             }
-            $panelStrategyFactory = new \App\Services\Panel\PanelStrategyFactory();
-            $panelStrategy = $panelStrategyFactory->create($panelType);
-
-            // Обновляем токен через стратегию
-            $panel = $panelStrategy->updateToken($panel->id);
 
             $marzbanApi = new MarzbanAPI($panel->api_address);
 
@@ -1083,8 +1147,7 @@ class VpnConfigController extends Controller
                 ]);
             }
 
-            // Первая подгрузка /content (useStoredOnly=true): только БД — без HTTP к Marzban, иначе ответ 5–60+ с.
-            // Реальный used_traffic/data_limit — после кнопки «Обновить» (refresh) или при полной странице без useStoredOnly.
+            // /content (useStoredOnly=true): только БД. /refresh (useStoredOnly=false): трафик и ссылки с панели Marzban.
             $info = [];
             $panelType = $serverUser && $serverUser->panel ? $serverUser->panel->panel : null;
             if ($panelType !== null && $panelType !== '' && !$useStoredOnly) {
