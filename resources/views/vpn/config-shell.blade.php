@@ -23,33 +23,32 @@
     </div>
     <div id="config-progress-bar" class="container mx-auto px-4 pt-4 max-w-6xl hidden">
         <div class="vpn-config-progress-card relative overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-violet-50 border-2 border-indigo-200/90 rounded-2xl p-5 sm:p-6 shadow-md">
-            <div class="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl" aria-hidden="true">
-                <div class="vpn-config-blob vpn-config-blob--1"></div>
-                <div class="vpn-config-blob vpn-config-blob--2"></div>
-            </div>
-            <div id="config-progress-spinner" class="relative z-10 flex flex-col gap-4 w-full max-w-xl mx-auto" role="status" aria-live="polite" aria-busy="true" aria-label="Идёт обновление конфигурации">
-                <div class="vpn-config-orb-visual flex justify-center pt-1 pb-0" aria-hidden="true">
-                    <div class="vpn-config-orb-ring">
-                        <span class="vpn-config-orb-wave"></span>
-                        <span class="vpn-config-orb-wave vpn-config-orb-wave--b"></span>
-                        <div class="vpn-config-orb-core">
-                            <svg class="w-7 h-7 text-white drop-shadow-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                            </svg>
-                        </div>
-                    </div>
+            <div class="vpn-config-sheen pointer-events-none absolute inset-0 overflow-hidden rounded-2xl" aria-hidden="true"></div>
+            <div class="vpn-config-grid-bg pointer-events-none absolute inset-0 rounded-2xl opacity-[0.07]" aria-hidden="true"></div>
+            <div id="config-progress-spinner" class="relative z-10 flex flex-col gap-5 w-full max-w-xl mx-auto" role="status" aria-live="polite" aria-busy="true" aria-label="Идёт обновление конфигурации">
+                <div class="vpn-config-wave" aria-hidden="true">
+                    <span class="vpn-config-wave-bar"></span>
+                    <span class="vpn-config-wave-bar"></span>
+                    <span class="vpn-config-wave-bar"></span>
+                    <span class="vpn-config-wave-bar"></span>
+                    <span class="vpn-config-wave-bar"></span>
+                    <span class="vpn-config-wave-bar"></span>
+                    <span class="vpn-config-wave-bar"></span>
+                    <span class="vpn-config-wave-bar"></span>
+                    <span class="vpn-config-wave-bar"></span>
+                    <span class="vpn-config-wave-bar"></span>
+                    <span class="vpn-config-wave-bar"></span>
+                    <span class="vpn-config-wave-bar"></span>
+                    <span class="vpn-config-wave-bar"></span>
                 </div>
                 <div class="vpn-config-progress-track" aria-hidden="true">
                     <div id="config-progress-fill" class="vpn-config-progress-fill"></div>
                 </div>
-                <div class="text-center min-h-[3.25rem] flex flex-col items-center justify-start gap-3 px-1">
+                <div class="text-center min-h-[3.25rem] flex flex-col items-center justify-start px-1">
                     <p id="config-progress-status" class="vpn-refresh-status-text text-sm sm:text-[0.9375rem] font-medium text-indigo-900/85 leading-relaxed max-w-md"></p>
-                    <div class="vpn-config-dots" aria-hidden="true">
-                        <span></span><span></span><span></span>
-                    </div>
                 </div>
             </div>
-            <div id="config-progress-error" class="hidden w-full max-w-xl mx-auto pt-4 border-t border-red-100 mt-2">
+            <div id="config-progress-error" class="hidden relative z-10 w-full max-w-xl mx-auto pt-4 border-t border-red-100 mt-2">
                 <p class="text-sm font-medium text-red-600">Не удалось обновить данные.</p>
                 <p id="config-progress-error-detail" class="text-xs text-gray-600 mt-1 hidden"></p>
                 <button type="button" id="config-progress-retry" class="mt-3 px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm">Повторить</button>
@@ -100,109 +99,75 @@
             opacity: 0;
             transform: translateY(4px);
         }
-        /* Декоративные «облака» на фоне карточки */
-        .vpn-config-blob {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(40px);
-            opacity: 0.55;
+        /* Лёгкое «бликование» на фоне карточки */
+        .vpn-config-sheen {
+            background: linear-gradient(
+                115deg,
+                transparent 0%,
+                transparent 38%,
+                rgba(99, 102, 241, 0.09) 48%,
+                rgba(45, 212, 191, 0.07) 52%,
+                transparent 62%,
+                transparent 100%
+            );
+            background-size: 220% 100%;
+            animation: vpnSheen 5.5s ease-in-out infinite;
         }
-        .vpn-config-blob--1 {
-            width: 200px;
-            height: 200px;
-            top: -60px;
-            right: -40px;
-            background: radial-gradient(circle, rgba(99, 102, 241, 0.45) 0%, transparent 72%);
-            animation: vpnBlobDrift 12s ease-in-out infinite;
+        @keyframes vpnSheen {
+            0%, 100% { background-position: 100% 50%; }
+            50% { background-position: 0% 50%; }
         }
-        .vpn-config-blob--2 {
-            width: 180px;
-            height: 180px;
-            bottom: -70px;
-            left: -50px;
-            background: radial-gradient(circle, rgba(20, 184, 166, 0.35) 0%, transparent 72%);
-            animation: vpnBlobDrift 14s ease-in-out infinite reverse;
+        /* Едва заметная сетка — «структура» без шума */
+        .vpn-config-grid-bg {
+            background-image:
+                linear-gradient(rgba(99, 102, 241, 0.35) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(99, 102, 241, 0.35) 1px, transparent 1px);
+            background-size: 22px 22px;
+            mask-image: radial-gradient(ellipse 85% 75% at 50% 45%, black 20%, transparent 75%);
         }
-        @keyframes vpnBlobDrift {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            33% { transform: translate(-12px, 8px) scale(1.05); }
-            66% { transform: translate(10px, -6px) scale(0.96); }
-        }
-        /* Центральный «орб» с пульсирующими кольцами */
-        .vpn-config-orb-ring {
-            position: relative;
-            width: 76px;
-            height: 76px;
+        /* «Волна» — полоски разной высоты (как мягкий спектр) */
+        .vpn-config-wave {
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             justify-content: center;
-        }
-        .vpn-config-orb-wave {
-            position: absolute;
-            inset: 0;
-            border-radius: 50%;
-            border: 2px solid rgba(99, 102, 241, 0.45);
-            animation: vpnOrbWave 2.4s ease-out infinite;
-        }
-        .vpn-config-orb-wave--b {
-            animation-delay: 1.1s;
-            border-color: rgba(20, 184, 166, 0.4);
-        }
-        @keyframes vpnOrbWave {
-            0% { transform: scale(0.65); opacity: 0.85; }
-            100% { transform: scale(1.35); opacity: 0; }
-        }
-        .vpn-config-orb-core {
-            position: relative;
-            width: 52px;
+            gap: 5px;
             height: 52px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #6366f1 0%, #7c3aed 50%, #14b8a6 100%);
-            background-size: 200% 200%;
-            box-shadow:
-                0 6px 24px rgba(99, 102, 241, 0.45),
-                inset 0 1px 0 rgba(255, 255, 255, 0.25);
-            animation: vpnOrbGlow 3.5s ease-in-out infinite;
+            padding: 0 8px;
         }
-        @keyframes vpnOrbGlow {
-            0%, 100% { background-position: 0% 50%; transform: scale(1) rotate(0deg); }
-            50% { background-position: 100% 50%; transform: scale(1.06) rotate(4deg); }
-        }
-        /* Три прыгающие точки под текстом */
-        .vpn-config-dots {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            height: 10px;
-        }
-        .vpn-config-dots span {
+        .vpn-config-wave-bar {
             display: block;
-            width: 7px;
-            height: 7px;
+            width: 6px;
+            height: 44px;
             border-radius: 9999px;
-            background: linear-gradient(180deg, #6366f1, #8b5cf6);
-            animation: vpnDotBounce 1.15s ease-in-out infinite;
+            transform-origin: bottom center;
+            background: linear-gradient(to top, #4f46e5, #8b5cf6 45%, #2dd4bf);
+            box-shadow: 0 0 12px rgba(99, 102, 241, 0.2);
+            animation: vpnWaveBar 1.05s ease-in-out infinite alternate;
         }
-        .vpn-config-dots span:nth-child(2) { animation-delay: 0.14s; }
-        .vpn-config-dots span:nth-child(3) { animation-delay: 0.28s; }
-        @keyframes vpnDotBounce {
-            0%, 80%, 100% { transform: translateY(0); opacity: 0.55; }
-            40% { transform: translateY(-6px); opacity: 1; }
+        .vpn-config-wave-bar:nth-child(1) { animation-duration: 0.72s; animation-delay: 0s; }
+        .vpn-config-wave-bar:nth-child(2) { animation-duration: 0.95s; animation-delay: 0.06s; }
+        .vpn-config-wave-bar:nth-child(3) { animation-duration: 0.68s; animation-delay: 0.12s; }
+        .vpn-config-wave-bar:nth-child(4) { animation-duration: 1.1s; animation-delay: 0.03s; }
+        .vpn-config-wave-bar:nth-child(5) { animation-duration: 0.8s; animation-delay: 0.18s; }
+        .vpn-config-wave-bar:nth-child(6) { animation-duration: 0.88s; animation-delay: 0.09s; }
+        .vpn-config-wave-bar:nth-child(7) { animation-duration: 1.18s; animation-delay: 0s; }
+        .vpn-config-wave-bar:nth-child(8) { animation-duration: 0.72s; animation-delay: 0.15s; }
+        .vpn-config-wave-bar:nth-child(9) { animation-duration: 0.98s; animation-delay: 0.21s; }
+        .vpn-config-wave-bar:nth-child(10) { animation-duration: 0.84s; animation-delay: 0.07s; }
+        .vpn-config-wave-bar:nth-child(11) { animation-duration: 1.05s; animation-delay: 0.11s; }
+        .vpn-config-wave-bar:nth-child(12) { animation-duration: 0.76s; animation-delay: 0.24s; }
+        .vpn-config-wave-bar:nth-child(13) { animation-duration: 0.92s; animation-delay: 0.04s; }
+        @keyframes vpnWaveBar {
+            from { transform: scaleY(0.28); opacity: 0.65; }
+            to { transform: scaleY(1); opacity: 1; }
         }
         @media (prefers-reduced-motion: reduce) {
-            .vpn-config-blob--1,
-            .vpn-config-blob--2,
-            .vpn-config-orb-wave,
-            .vpn-config-orb-wave--b,
-            .vpn-config-orb-core,
-            .vpn-config-dots span,
+            .vpn-config-sheen,
+            .vpn-config-wave-bar,
             .vpn-config-progress-fill {
                 animation: none !important;
             }
-            .vpn-config-orb-core { transform: none; }
+            .vpn-config-wave-bar { transform: scaleY(0.65); opacity: 0.85; }
         }
     </style>
     <script src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
