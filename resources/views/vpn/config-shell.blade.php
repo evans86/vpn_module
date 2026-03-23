@@ -22,25 +22,19 @@
         </div>
     </div>
     <div id="config-progress-bar" class="container mx-auto px-4 pt-4 max-w-6xl hidden">
-        <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-center gap-4">
-            <div id="config-progress-spinner" class="flex items-center gap-4 flex-1 min-w-0">
-                <div class="flex-shrink-0">
-                    <svg class="animate-spin h-6 w-6 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
+        <div class="bg-gradient-to-br from-indigo-50 via-white to-violet-50 border-2 border-indigo-200/90 rounded-2xl p-5 sm:p-6 shadow-md">
+            <div id="config-progress-spinner" class="flex flex-col gap-3 w-full max-w-xl mx-auto" role="status" aria-live="polite" aria-label="Идёт обновление конфигурации">
+                <div class="vpn-config-progress-track" aria-hidden="true">
+                    <div id="config-progress-fill" class="vpn-config-progress-fill"></div>
                 </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-indigo-800">Обновление конфигурации с серверов…</p>
-                    <div class="mt-2 w-full bg-indigo-200 rounded-full h-2 overflow-hidden">
-                        <div id="config-progress-fill" class="h-full bg-indigo-600 rounded-full transition-all duration-300 ease-out" style="width: 0%;"></div>
-                    </div>
+                <div class="text-center min-h-[3.25rem] flex items-start justify-center px-1">
+                    <p id="config-progress-status" class="vpn-refresh-status-text text-sm sm:text-[0.9375rem] font-medium text-indigo-900/85 leading-relaxed max-w-md"></p>
                 </div>
             </div>
-            <div id="config-progress-error" class="hidden mt-2 flex-1">
-                <p class="text-sm text-red-600">Не удалось обновить данные.</p>
+            <div id="config-progress-error" class="hidden w-full max-w-xl mx-auto pt-4 border-t border-red-100 mt-2">
+                <p class="text-sm font-medium text-red-600">Не удалось обновить данные.</p>
                 <p id="config-progress-error-detail" class="text-xs text-gray-600 mt-1 hidden"></p>
-                <button type="button" id="config-progress-retry" class="mt-2 px-3 py-1.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Повторить</button>
+                <button type="button" id="config-progress-retry" class="mt-3 px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm">Повторить</button>
             </div>
         </div>
     </div>
@@ -59,12 +53,44 @@
         .notification { position: fixed; bottom: 24px; right: 24px; padding: 16px 24px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15); font-size: 15px; font-weight: 500; z-index: 1000; opacity: 0; transform: translateY(20px) scale(0.95); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .notification.hidden { opacity: 0; transform: translateY(20px) scale(0.95); }
         .notification:not(.hidden) { opacity: 1; transform: translateY(0) scale(1); }
+        /* Прогресс «Обновить»: indigo/violet/teal в стиле страницы */
+        .vpn-config-progress-track {
+            height: 8px;
+            border-radius: 9999px;
+            background: rgba(79, 70, 229, 0.12);
+            overflow: hidden;
+            box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+        }
+        .vpn-config-progress-fill {
+            height: 100%;
+            width: 42%;
+            border-radius: 9999px;
+            background: linear-gradient(90deg, #4f46e5, #7c3aed 42%, #14b8a6);
+            background-size: 200% 100%;
+            animation: vpnConfigProgressSlide 1.35s ease-in-out infinite;
+        }
+        @keyframes vpnConfigProgressSlide {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(320%); }
+        }
+        .vpn-refresh-status-text {
+            transition: opacity 0.35s ease, transform 0.35s ease;
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .vpn-refresh-status-text.vpn-refresh-status--hidden {
+            opacity: 0;
+            transform: translateY(4px);
+        }
     </style>
     <script src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
     @php
         $_vpnCfgJsPath = public_path('js/vpn-config-content.js');
         $_vpnCfgJsVer = is_file($_vpnCfgJsPath) ? filemtime($_vpnCfgJsPath) : 1;
+        $_vpnRefreshUiPath = public_path('js/vpn-config-refresh-ui.js');
+        $_vpnRefreshUiVer = is_file($_vpnRefreshUiPath) ? filemtime($_vpnRefreshUiPath) : 1;
     @endphp
+    <script src="{{ asset('js/vpn-config-refresh-ui.js') }}?v={{ $_vpnRefreshUiVer }}"></script>
     <script src="{{ asset('js/vpn-config-content.js') }}?v={{ $_vpnCfgJsVer }}"></script>
     <script>
     (function(){
@@ -214,7 +240,7 @@
         var progressBar = document.getElementById('config-progress-bar');
         var lastUpdatedEl = document.getElementById('config-last-updated');
         var btnRefresh = document.getElementById('config-btn-refresh');
-        var fill = document.getElementById('config-progress-fill');
+        var statusTextEl = document.getElementById('config-progress-status');
         var spinnerBlock = document.getElementById('config-progress-spinner');
         var errBlock = document.getElementById('config-progress-error');
         var retryBtn = document.getElementById('config-progress-retry');
@@ -367,20 +393,23 @@
             progressBar.classList.remove('hidden');
             refreshBar.classList.add('hidden');
             showSpinnerState();
-            if (fill) fill.style.width = '0%';
 
-            var start = Date.now();
-            var t = setInterval(function() {
-                if (!fill) return;
-                var p = Math.min(85, ((Date.now() - start) / 20000) * 85);
-                fill.style.width = p + '%';
-            }, 200);
+            var statusRotation = null;
+            if (typeof window.vpnConfigRefreshStartStatusRotation === 'function' && statusTextEl) {
+                statusRotation = window.vpnConfigRefreshStartStatusRotation(statusTextEl);
+            }
+
+            function stopStatusRotation() {
+                if (statusRotation && typeof statusRotation.stop === 'function') {
+                    statusRotation.stop();
+                }
+                statusRotation = null;
+            }
 
             fetch(refreshUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
                 .then(parseJsonResponse)
                 .then(function(res) {
-                    clearInterval(t);
-                    if (fill) fill.style.width = '100%';
+                    stopStatusRotation();
                     if (res.data && res.data.success) {
                         window.__vpnConfigPage = res.data.page || null;
                         if (contentEl && res.data.page && typeof window.renderVpnConfigPage === 'function') {
@@ -399,8 +428,7 @@
                     }
                 })
                 .catch(function() {
-                    clearInterval(t);
-                    if (fill) fill.style.width = '0%';
+                    stopStatusRotation();
                     showErrorState('', 0);
                 });
         }
