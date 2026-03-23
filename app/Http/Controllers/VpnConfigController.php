@@ -1038,15 +1038,15 @@ class VpnConfigController extends Controller
                 ]);
             }
 
-            // Всегда запрашиваем used_traffic/data_limit с панели при наличии serverUser,
-            // иначе при первой загрузке (useStoredOnly) показывается 0 GB и пользователь видит «сброс» трафика.
+            // Первая подгрузка /content (useStoredOnly=true): только БД — без HTTP к Marzban, иначе ответ 5–60+ с.
+            // Реальный used_traffic/data_limit — после кнопки «Обновить» (refresh) или при полной странице без useStoredOnly.
             $info = [];
             $panelType = $serverUser && $serverUser->panel ? $serverUser->panel->panel : null;
-            if ($panelType !== null && $panelType !== '') {
+            if ($panelType !== null && $panelType !== '' && !$useStoredOnly) {
                 try {
                     $panel_strategy = new PanelStrategy($panelType);
                     $info = $panel_strategy->getSubscribeInfo($serverUser->panel->id, $serverUser->id);
-                    if (!$useStoredOnly && isset($info['key_status_updated']) && $info['key_status_updated'] === true) {
+                    if (isset($info['key_status_updated']) && $info['key_status_updated'] === true) {
                         $keyActivate->refresh();
                     }
                 } catch (Exception $e) {
