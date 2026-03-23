@@ -63,7 +63,10 @@
     @php
         $_vpnCfgJsPath = public_path('js/vpn-config-content.js');
         $_vpnCfgJsVer = is_file($_vpnCfgJsPath) ? filemtime($_vpnCfgJsPath) : 1;
+        $_vpnSingboxPath = public_path('js/vpn-singbox-export.js');
+        $_vpnSingboxVer = is_file($_vpnSingboxPath) ? filemtime($_vpnSingboxPath) : 1;
     @endphp
+    <script src="{{ asset('js/vpn-singbox-export.js') }}?v={{ $_vpnSingboxVer }}"></script>
     <script src="{{ asset('js/vpn-config-content.js') }}?v={{ $_vpnCfgJsVer }}"></script>
     <script>
     (function(){
@@ -132,34 +135,58 @@
         window.showQrPlainAllConfigs = function() {
             var links = window.getVpnConfigAllLinks();
             if (!links.length) { showCopyNotification('Нет протоколов для QR-кода.'); return; }
-            window.showQR(links.join('\n'), 'конфигурации');
+            var blob = links.join('\n');
+            var subUrl = typeof window.getVpnSubscriptionUrl === 'function' ? window.getVpnSubscriptionUrl() : null;
+            if (blob.length > 2200 && subUrl) {
+                window.showQR(subUrl, 'конфигурации', { forceSubscriptionUrl: true, reason: 'plain-too-long' });
+                return;
+            }
+            window.showQR(blob, 'конфигурации');
         };
-        function buildVpnConfigExportObject() {
-            if (!window.__vpnConfigPage) return null;
-            return {
-                pageUrl: window.location.href,
-                exportedAt: new Date().toISOString(),
-                page: window.__vpnConfigPage
-            };
-        }
         window.copyVpnConfigJson = function() {
-            var o = buildVpnConfigExportObject();
-            if (!o) { showCopyNotification('Данные страницы ещё не загружены.'); return; }
+            if (!window.__vpnConfigPage) { showCopyNotification('Данные страницы ещё не загружены.'); return; }
+            if (typeof window.exportVpnImportPayload !== 'function') {
+                alert('Модуль экспорта sing-box не загружен.');
+                return;
+            }
             try {
-                var text = JSON.stringify(o, null, 2);
-                navigator.clipboard.writeText(text).then(function() {
-                    showCopyNotification('✓ JSON скопирован в буфер обмена!');
-                }).catch(function() { alert('Не удалось скопировать JSON.'); });
+                var payload = window.exportVpnImportPayload();
+                if (!payload) {
+                    showCopyNotification('Нет данных для экспорта.');
+                    return;
+                }
+                if (payload.kind === 'singbox') {
+                    navigator.clipboard.writeText(JSON.stringify(payload.profile, null, 2)).then(function() {
+                        showCopyNotification('✓ Профиль sing-box для Hiddify скопирован!');
+                    }).catch(function() { alert('Не удалось скопировать JSON.'); });
+                    return;
+                }
+                if (payload.kind === 'subscription') {
+                    navigator.clipboard.writeText(payload.url).then(function() {
+                        showCopyNotification(payload.note || '✓ Ссылка подписки скопирована.');
+                    }).catch(function() { alert('Не удалось скопировать.'); });
+                }
             } catch (e) {
                 alert('Не удалось сформировать JSON.');
             }
         };
         window.showQrVpnConfigJson = function() {
-            var o = buildVpnConfigExportObject();
-            if (!o) { showCopyNotification('Данные страницы ещё не загружены.'); return; }
+            if (!window.__vpnConfigPage) { showCopyNotification('Данные страницы ещё не загружены.'); return; }
+            if (typeof window.exportVpnImportPayload !== 'function') {
+                alert('Модуль экспорта sing-box не загружен.');
+                return;
+            }
             try {
-                var text = JSON.stringify(o);
-                window.showQR(text, 'JSON');
+                var payload = window.exportVpnImportPayload();
+                if (!payload) {
+                    showCopyNotification('Нет данных для QR.');
+                    return;
+                }
+                if (payload.kind === 'singbox') {
+                    window.showQR(JSON.stringify(payload.profile), 'JSON', { preferCompactSingBox: true });
+                    return;
+                }
+                window.showQR(payload.url, 'JSON', { forceSubscriptionUrl: true, reason: 'json-fallback-sub' });
             } catch (e) {
                 alert('Не удалось сформировать QR.');
             }
@@ -180,7 +207,10 @@
         window.showUrlQR = function(url) {
             window.showQR(url || window.location.href, 'ссылки');
         };
-        window.showQR = function(link, protocol) {
+        /** ~2.9 KB — безопасный запас для QR (версия 40, байтовый режим, EC L). */
+        var QR_SAFE_MAX = 2300;
+        window.showQR = function(link, protocol, extra) {
+            extra = extra || {};
             if (!link) { alert('Ссылка для QR-кода отсутствует или некорректна.'); return; }
             var qrcodeElement = document.getElementById('qrcode');
             var qrTitle = document.getElementById('qrTitle');
@@ -188,33 +218,66 @@
             if (!qrcodeElement || typeof QRCodeStyling === 'undefined') { alert('QR-библиотека не загружена.'); return; }
             qrcodeElement.innerHTML = '';
             if (qrTitle) qrTitle.textContent = protocol ? 'QR-код: ' + protocol : 'QR-код';
-            if (qrDescription) {
-                qrDescription.textContent = (protocol === 'JSON' || protocol === 'конфигурации')
-                    ? 'Отсканируйте или скопируйте данные при необходимости'
-                    : 'Отсканируйте этот код в вашем VPN-клиенте';
-            }
             var dataStr = String(link);
+            var subUrl = typeof window.getVpnSubscriptionUrl === 'function' ? window.getVpnSubscriptionUrl() : null;
+            if (!extra.forceSubscriptionUrl && subUrl && dataStr.length > QR_SAFE_MAX && (protocol === 'JSON' || protocol === 'конфигурации')) {
+                dataStr = subUrl;
+                if (qrDescription) {
+                    qrDescription.textContent = 'В QR помещена ссылка подписки (данных слишком много для одного кода). В Hiddify: «Добавить профиль» → вставьте ссылку или отсканируйте QR.';
+                }
+            } else if (qrDescription) {
+                if (extra.forceSubscriptionUrl && extra.reason === 'plain-too-long') {
+                    qrDescription.textContent = 'В QR — ссылка подписки (все серверы). Добавьте в клиент как subscription URL.';
+                } else if (extra.forceSubscriptionUrl && extra.reason === 'json-fallback-sub') {
+                    qrDescription.textContent = 'Не удалось собрать sing-box из ссылок. В QR — ссылка подписки (?format=subscription) для Hiddify.';
+                } else {
+                    qrDescription.textContent = (protocol === 'JSON' || protocol === 'конфигурации')
+                        ? 'Профиль sing-box или ссылки на подключение — импорт в Hiddify / sing-box'
+                        : 'Отсканируйте этот код в вашем VPN-клиенте';
+                }
+            }
+            var len = dataStr.length;
+            var side = len > 1500 ? 480 : (len > 800 ? 400 : 300);
             var opts = {
-                width: 300,
-                height: 300,
-                type: 'svg',
+                width: side,
+                height: side,
+                type: len > 1200 ? 'canvas' : 'svg',
                 data: dataStr,
                 dotsOptions: { color: '#4f46e5', type: 'rounded' },
                 backgroundOptions: { color: '#ffffff' },
                 image: '',
-                imageOptions: { crossOrigin: 'anonymous', margin: 10 }
+                imageOptions: { crossOrigin: 'anonymous', margin: 10 },
+                qrOptions: { errorCorrectionLevel: len > 400 ? 'L' : 'M' }
             };
-            if (dataStr.length > 600) {
-                opts.qrOptions = { errorCorrectionLevel: 'L' };
-            }
             try {
                 var qrCode = new QRCodeStyling(opts);
                 qrCode.append(qrcodeElement);
                 currentQR = qrCode;
             } catch (err) {
                 console.error(err);
-                alert('Не удалось построить QR-код (возможно, слишком много данных). Скопируйте текст кнопкой «Скопировать».');
-                return;
+                if (subUrl && dataStr !== subUrl && (protocol === 'JSON' || protocol === 'конфигурации')) {
+                    try {
+                        dataStr = subUrl;
+                        opts.data = dataStr;
+                        opts.width = 360;
+                        opts.height = 360;
+                        opts.type = 'svg';
+                        opts.qrOptions = { errorCorrectionLevel: 'M' };
+                        if (qrDescription) {
+                            qrDescription.textContent = 'Показана ссылка подписки — так надёжнее для QR.';
+                        }
+                        var qr2 = new QRCodeStyling(opts);
+                        qr2.append(qrcodeElement);
+                        currentQR = qr2;
+                    } catch (e2) {
+                        console.error(e2);
+                        alert('Не удалось построить QR-код. Скопируйте конфигурацию кнопкой «Скопировать».');
+                        return;
+                    }
+                } else {
+                    alert('Не удалось построить QR-код (возможно, слишком много данных). Скопируйте текст кнопкой «Скопировать».');
+                    return;
+                }
             }
             var qrModal = document.getElementById('qrModal');
             if (qrModal) { qrModal.classList.remove('hidden'); qrModal.classList.add('flex'); }
