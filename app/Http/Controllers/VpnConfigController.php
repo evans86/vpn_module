@@ -594,7 +594,12 @@ class VpnConfigController extends Controller
         }
 
         if (empty($connectionKeys)) {
-            throw new RuntimeException('Invalid connection keys format');
+            Log::warning('VpnConfig: после синхронизации с панелями нет ссылок — откат к данным из БД (как при первой загрузке)', [
+                'key_activate_id' => $key_activate_id,
+                'source' => 'vpn',
+            ]);
+
+            return $this->buildConnectionDataFromStored($keyActivate, $key_activate_id, null);
         }
         if ($firstKeyActivateUser === null) {
             $firstKeyActivateUser = $keyActivateUsers->first();

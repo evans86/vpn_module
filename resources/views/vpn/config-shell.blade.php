@@ -39,6 +39,7 @@
             </div>
             <div id="config-progress-error" class="hidden mt-2 flex-1">
                 <p class="text-sm text-red-600">Обновление не удалось.</p>
+                <p id="config-progress-error-detail" class="text-xs text-red-500 mt-1 hidden"></p>
                 <button type="button" id="config-progress-retry" class="mt-2 px-3 py-1.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Повторить</button>
             </div>
         </div>
@@ -217,13 +218,15 @@
         var errBlock = document.getElementById('config-progress-error');
         var retryBtn = document.getElementById('config-progress-retry');
 
-        function showErrorState() {
+        function showErrorState(msg) {
             if (spinnerBlock) spinnerBlock.classList.add('hidden');
             if (errBlock) errBlock.classList.remove('hidden');
+            setRefreshErrorMessage(msg || '');
         }
         function showSpinnerState() {
             if (spinnerBlock) spinnerBlock.classList.remove('hidden');
             if (errBlock) errBlock.classList.add('hidden');
+            setRefreshErrorMessage('');
         }
 
         function setContentError(msg) {
@@ -232,11 +235,24 @@
         }
 
         function parseJsonResponse(r) {
+            var st = r.status;
             var ct = (r.headers.get('Content-Type') || '').toLowerCase();
-            if (ct.indexOf('application/json') !== -1) {
-                return r.json().then(function(d) { return { ok: r.ok, data: d }; }).catch(function() { return { ok: false, data: {} }; });
+            if (ct.indexOf('application/json') !== -1 || ct.indexOf('+json') !== -1) {
+                return r.json().then(function(d) { return { ok: r.ok, status: st, data: d }; }).catch(function() { return { ok: false, status: st, data: {} }; });
             }
-            return r.text().then(function() { return { ok: false, data: {} }; });
+            return r.text().then(function(t) { return { ok: false, status: st, data: { message: t ? String(t).slice(0, 200) : '' } }; });
+        }
+
+        function setRefreshErrorMessage(msg) {
+            var el = document.getElementById('config-progress-error-detail');
+            if (!el) return;
+            if (msg) {
+                el.textContent = msg;
+                el.classList.remove('hidden');
+            } else {
+                el.textContent = '';
+                el.classList.add('hidden');
+            }
         }
 
         function vpnB64ToUtf8(b64) {
@@ -334,7 +350,7 @@
                 .then(function(res) {
                     clearInterval(t);
                     if (fill) fill.style.width = '100%';
-                    if (res.ok && res.data && res.data.success) {
+                    if (res.data && res.data.success) {
                         window.__vpnConfigPage = res.data.page || null;
                         if (contentEl && res.data.page && typeof window.renderVpnConfigPage === 'function') {
                             window.renderVpnConfigPage(contentEl, res.data.page);
@@ -346,13 +362,15 @@
                         progressBar.classList.add('hidden');
                         refreshBar.classList.remove('hidden');
                     } else {
-                        showErrorState();
+                        var errMsg = (res.data && res.data.message) ? String(res.data.message) : '';
+                        if (!errMsg && !res.ok) errMsg = 'Сервер вернул ошибку (HTTP ' + (res.status != null ? res.status : '?') + ').';
+                        showErrorState(errMsg);
                     }
                 })
                 .catch(function() {
                     clearInterval(t);
                     if (fill) fill.style.width = '0%';
-                    showErrorState();
+                    showErrorState('Нет ответа от сервера или сбой сети.');
                 });
         }
 
