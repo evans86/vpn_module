@@ -6,7 +6,36 @@
 
     global.VPN_CONFIG_REFRESH_UI = {
         STEP_MS: 3200,
+        SYNC_STEP_MS: 2600,
         FADE_MS: 350,
+        /** Короткие подписи, пока ждём ответ от панели (опрос /content). */
+        syncMessages: [
+            'Сверяем данные с панелью управления…',
+            'Запрашиваем актуальные ключи…',
+            'Панель отвечает не всегда мгновенно — это нормально.',
+            'Проверяем, что в базе уже лежит свежая конфигурация…',
+            'Ещё немного — подтягиваем то, что на сервере.',
+            'Соединение с панелью установлено, ждём запись в базу…',
+            'Почти: сравниваем версию данных…',
+            'Идёт синхронизация. Можно пока потянуться.',
+            'Сервер обрабатывает запрос — смотрим результат…',
+            'Проверяем ещё раз, появились ли обновления…',
+            'Держим курс на актуальные ссылки…',
+            'Если долго — панель просто думает. Мы не сдаёмся.',
+            'Запрашиваем копию с панели в вашу конфигурацию…',
+            'Секунда терпения — данные подъезжают.',
+            'Смотрим, обновилась ли метка времени конфигурации…',
+            'Как только панель отдаст свежие данные — сразу покажем.',
+            'Параллельно проверяем, не изменились ли ключи…',
+            'Осталось дождаться подтверждения от сервера…',
+            'Идёт фоновая синхронизация — вы как раз в теме.',
+            'Мы опрашиваем сервер, пока процесс не завершится.',
+            'Ещё один круг проверки — так надёжнее.',
+            'Свежие данные уже в пути.',
+            'Не закрывайте вкладку — процесс под контролем.',
+            'Панель синхронизируется — почти готово.',
+            'Скоро обновим экран, как только база подтвердит изменения.'
+        ],
         messages: [
             'Проверяем, не смотрит ли Роскомнадзор слишком внимательно.',
             'Роскомнадзор снова хмурится. Работаем аккуратно.',
@@ -184,4 +213,67 @@
     }
 
     global.vpnConfigRefreshStartStatusRotation = startStatusRotation;
+
+    /**
+     * Фразы на этапе «ждём синхронизацию с панелью» (короче, про процесс).
+     * @param {HTMLElement|null} el
+     * @returns {{ stop: function(): void }}
+     */
+    function startSyncPollingRotation(el) {
+        var cfg = global.VPN_CONFIG_REFRESH_UI;
+        var messages = cfg.syncMessages || [];
+        if (!messages.length) {
+            return { stop: function () {} };
+        }
+        var STEP_MS = cfg.SYNC_STEP_MS || 2600;
+        var FADE_MS = cfg.FADE_MS || 350;
+        var lastIndex = -1;
+
+        function pickRandomIndex() {
+            var n = messages.length;
+            if (n <= 1) return 0;
+            var i;
+            var guard = 0;
+            do {
+                i = Math.floor(Math.random() * n);
+                guard++;
+            } while (i === lastIndex && guard < 50);
+            return i;
+        }
+
+        var intervalId = null;
+        var stopped = false;
+
+        function showNext() {
+            if (!el || stopped) return;
+            el.classList.add('vpn-refresh-status--hidden');
+            global.setTimeout(function () {
+                if (!el || stopped) return;
+                lastIndex = pickRandomIndex();
+                el.textContent = messages[lastIndex] || '';
+                el.classList.remove('vpn-refresh-status--hidden');
+            }, FADE_MS);
+        }
+
+        if (el && messages.length) {
+            lastIndex = pickRandomIndex();
+            el.textContent = messages[lastIndex] || '';
+            intervalId = global.setInterval(showNext, STEP_MS);
+        }
+
+        return {
+            stop: function () {
+                stopped = true;
+                if (intervalId !== null) {
+                    global.clearInterval(intervalId);
+                    intervalId = null;
+                }
+                if (el) {
+                    el.classList.remove('vpn-refresh-status--hidden');
+                }
+            }
+        };
+    }
+
+    global.vpnConfigRefreshStartSyncPollingRotation = startSyncPollingRotation;
 })(window);

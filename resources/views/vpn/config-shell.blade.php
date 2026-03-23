@@ -23,12 +23,14 @@
     </div>
     <div id="config-progress-bar" class="container mx-auto px-4 pt-4 max-w-6xl hidden">
         <div class="bg-gradient-to-br from-indigo-50 via-white to-violet-50 border-2 border-indigo-200/90 rounded-2xl p-5 sm:p-6 shadow-md">
-            <div id="config-progress-spinner" class="flex flex-col gap-3 w-full max-w-xl mx-auto" role="status" aria-live="polite" aria-label="Идёт обновление конфигурации">
+            <div id="config-progress-spinner" class="flex flex-col gap-3 w-full max-w-xl mx-auto" role="status" aria-live="polite" aria-busy="true" aria-label="Идёт обновление конфигурации">
                 <div class="vpn-config-progress-track" aria-hidden="true">
                     <div id="config-progress-fill" class="vpn-config-progress-fill"></div>
                 </div>
-                <div class="text-center min-h-[3.25rem] flex items-start justify-center px-1">
+                <div class="text-center min-h-[4rem] flex flex-col items-center justify-start px-1">
+                    <p id="config-progress-phase" class="hidden text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">Подготовка…</p>
                     <p id="config-progress-status" class="vpn-refresh-status-text text-sm sm:text-[0.9375rem] font-medium text-indigo-900/85 leading-relaxed max-w-md"></p>
+                    <p id="config-progress-poll-hint" class="hidden text-xs text-indigo-500/90 mt-2 font-medium" aria-live="polite"></p>
                 </div>
             </div>
             <div id="config-progress-error" class="hidden w-full max-w-xl mx-auto pt-4 border-t border-red-100 mt-2">
@@ -241,6 +243,8 @@
         var lastUpdatedEl = document.getElementById('config-last-updated');
         var btnRefresh = document.getElementById('config-btn-refresh');
         var statusTextEl = document.getElementById('config-progress-status');
+        var phaseEl = document.getElementById('config-progress-phase');
+        var pollHintEl = document.getElementById('config-progress-poll-hint');
         var spinnerBlock = document.getElementById('config-progress-spinner');
         var errBlock = document.getElementById('config-progress-error');
         var retryBtn = document.getElementById('config-progress-retry');
@@ -390,58 +394,66 @@
             }
         }
 
-        /**
-         * Тихая подгрузка /content после фоновой синхронизации Marzban.
-         * Если lastUpdated изменился относительно ответа «Обновить» — БД уже перезаписана с панели.
-         */
-        function refetchVpnConfigContentSilent() {
-            fetch(contentUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
-                .then(parseJsonResponse)
-                .then(function(res) {
-                    if (res.data && res.data.success && res.data.page && contentEl && typeof window.renderVpnConfigPage === 'function') {
-                        var newLabel = res.data.lastUpdated ? String(res.data.lastUpdated) : '';
-                        var newEpoch = res.data.lastUpdatedEpoch;
-                        var awaiting = window.__vpnAwaitingSyncRefresh === true;
-                        var dataChanged = false;
-                        if (awaiting) {
-                            var bEp = window.__vpnLastUpdatedEpochBeforeSync;
-                            if (typeof newEpoch === 'number' && typeof bEp === 'number') {
-                                dataChanged = newEpoch !== bEp;
-                            } else {
-                                var baseline = window.__vpnLastUpdatedBeforeSync;
-                                dataChanged = baseline !== undefined && newLabel && newLabel !== String(baseline);
-                            }
-                        }
-                        if (dataChanged) {
-                            showCopyNotification('✓ Конфигурация обновлена с сервера панели');
-                            window.__vpnAwaitingSyncRefresh = false;
-                        }
-                        window.__vpnConfigPage = res.data.page;
-                        window.renderVpnConfigPage(contentEl, res.data.page);
-                        if (typeof window.syncVpnToolbarProtoButtons === 'function') window.syncVpnToolbarProtoButtons();
-                        if (res.data.lastUpdated && lastUpdatedEl) lastUpdatedEl.textContent = res.data.lastUpdated;
-                        if (newLabel) window.__vpnLastConfigUpdatedLabel = newLabel;
-                        if (typeof newEpoch === 'number') window.__vpnLastConfigEpoch = newEpoch;
-                    }
-                })
-                .catch(function() { /* игнорируем: пользователь уже видит данные с первого ответа */ });
-        }
-
-        var _vpnRefreshFollowupTimers = [];
-        function clearVpnRefreshFollowups() {
-            _vpnRefreshFollowupTimers.forEach(function(id) { clearTimeout(id); });
-            _vpnRefreshFollowupTimers = [];
+        var _vpnSyncPollTimer = null;
+        function clearVpnSyncPolling() {
+            if (_vpnSyncPollTimer) {
+                clearInterval(_vpnSyncPollTimer);
+                _vpnSyncPollTimer = null;
+            }
         }
 
         function runRefresh() {
             if (!progressBar || !refreshBar) return;
-            clearVpnRefreshFollowups();
-            window.__vpnAwaitingSyncRefresh = false;
-            window.__vpnLastUpdatedBeforeSync = undefined;
-            window.__vpnLastUpdatedEpochBeforeSync = undefined;
-            progressBar.classList.remove('hidden');
-            refreshBar.classList.add('hidden');
-            showSpinnerState();
+            if (btnRefresh && btnRefresh.disabled) return;
+
+            clearVpnSyncPolling();
+            var refreshSessionClosed = false;
+            var syncPollAttempts = 0;
+            var MAX_SYNC_POLLS = 45;
+            var POLL_INTERVAL_MS = 2000;
+
+            function closeRefreshUi(notifyMsg) {
+                if (refreshSessionClosed) return;
+                refreshSessionClosed = true;
+                clearVpnSyncPolling();
+                if (statusRotation && typeof statusRotation.stop === 'function') {
+                    statusRotation.stop();
+                }
+                statusRotation = null;
+                if (btnRefresh) btnRefresh.disabled = false;
+                if (phaseEl) {
+                    phaseEl.textContent = '';
+                    phaseEl.classList.add('hidden');
+                }
+                if (pollHintEl) {
+                    pollHintEl.textContent = '';
+                    pollHintEl.classList.add('hidden');
+                }
+                if (spinnerBlock) spinnerBlock.setAttribute('aria-busy', 'false');
+                progressBar.classList.add('hidden');
+                refreshBar.classList.remove('hidden');
+                if (notifyMsg) showCopyNotification(notifyMsg);
+            }
+
+            function resetUiBeforeRequest() {
+                window.__vpnLastUpdatedBeforeSync = undefined;
+                window.__vpnLastUpdatedEpochBeforeSync = undefined;
+                progressBar.classList.remove('hidden');
+                refreshBar.classList.add('hidden');
+                showSpinnerState();
+                if (spinnerBlock) spinnerBlock.setAttribute('aria-busy', 'true');
+                if (phaseEl) {
+                    phaseEl.classList.remove('hidden');
+                    phaseEl.textContent = 'Отправляем запрос…';
+                }
+                if (pollHintEl) {
+                    pollHintEl.textContent = '';
+                    pollHintEl.classList.add('hidden');
+                }
+                if (btnRefresh) btnRefresh.disabled = true;
+            }
+
+            resetUiBeforeRequest();
 
             var statusRotation = null;
             if (typeof window.vpnConfigRefreshStartStatusRotation === 'function' && statusTextEl) {
@@ -453,6 +465,23 @@
                     statusRotation.stop();
                 }
                 statusRotation = null;
+            }
+
+            function onRefreshHttpError(errMsg, httpStatus) {
+                stopStatusRotation();
+                clearVpnSyncPolling();
+                refreshSessionClosed = true;
+                if (btnRefresh) btnRefresh.disabled = false;
+                if (phaseEl) {
+                    phaseEl.textContent = '';
+                    phaseEl.classList.add('hidden');
+                }
+                if (pollHintEl) {
+                    pollHintEl.textContent = '';
+                    pollHintEl.classList.add('hidden');
+                }
+                if (spinnerBlock) spinnerBlock.setAttribute('aria-busy', 'false');
+                showErrorState(errMsg, httpStatus);
             }
 
             fetch(refreshUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
@@ -470,27 +499,77 @@
                         if (res.data.lastUpdated && lastUpdatedEl) lastUpdatedEl.textContent = res.data.lastUpdated;
                         if (res.data.lastUpdated) window.__vpnLastConfigUpdatedLabel = res.data.lastUpdated;
                         if (typeof res.data.lastUpdatedEpoch === 'number') window.__vpnLastConfigEpoch = res.data.lastUpdatedEpoch;
-                        progressBar.classList.add('hidden');
-                        refreshBar.classList.remove('hidden');
-                        if (res.data.syncPending) {
-                            window.__vpnAwaitingSyncRefresh = true;
-                            window.__vpnLastUpdatedBeforeSync = res.data.lastUpdated ? String(res.data.lastUpdated) : '';
-                            window.__vpnLastUpdatedEpochBeforeSync = (typeof res.data.lastUpdatedEpoch === 'number')
-                                ? res.data.lastUpdatedEpoch
-                                : undefined;
-                            _vpnRefreshFollowupTimers.push(setTimeout(refetchVpnConfigContentSilent, 4500));
-                            _vpnRefreshFollowupTimers.push(setTimeout(refetchVpnConfigContentSilent, 11000));
-                            _vpnRefreshFollowupTimers.push(setTimeout(refetchVpnConfigContentSilent, 25000));
+
+                        if (!res.data.syncPending) {
+                            closeRefreshUi(null);
+                            return;
                         }
+
+                        var baselineEpoch = (typeof res.data.lastUpdatedEpoch === 'number') ? res.data.lastUpdatedEpoch : undefined;
+                        var baselineLabel = res.data.lastUpdated ? String(res.data.lastUpdated) : '';
+
+                        if (phaseEl) phaseEl.textContent = 'Синхронизация с панелью…';
+                        if (pollHintEl) {
+                            pollHintEl.classList.remove('hidden');
+                            pollHintEl.textContent = 'Проверка 0 / ' + MAX_SYNC_POLLS;
+                        }
+                        if (typeof window.vpnConfigRefreshStartSyncPollingRotation === 'function' && statusTextEl) {
+                            statusRotation = window.vpnConfigRefreshStartSyncPollingRotation(statusTextEl);
+                        }
+
+                        function applyContentPayload(payload) {
+                            if (!payload || !payload.page || !contentEl || typeof window.renderVpnConfigPage !== 'function') return;
+                            window.__vpnConfigPage = payload.page;
+                            window.renderVpnConfigPage(contentEl, payload.page);
+                            if (typeof window.syncVpnToolbarProtoButtons === 'function') window.syncVpnToolbarProtoButtons();
+                            if (payload.lastUpdated && lastUpdatedEl) lastUpdatedEl.textContent = payload.lastUpdated;
+                            if (payload.lastUpdated) window.__vpnLastConfigUpdatedLabel = payload.lastUpdated;
+                            if (typeof payload.lastUpdatedEpoch === 'number') window.__vpnLastConfigEpoch = payload.lastUpdatedEpoch;
+                        }
+
+                        function isDataNewerThanBaseline(payload) {
+                            if (!payload) return false;
+                            var newEpoch = payload.lastUpdatedEpoch;
+                            var newLabel = payload.lastUpdated ? String(payload.lastUpdated) : '';
+                            if (typeof newEpoch === 'number' && typeof baselineEpoch === 'number') {
+                                return newEpoch !== baselineEpoch;
+                            }
+                            return baselineLabel !== undefined && newLabel && newLabel !== String(baselineLabel);
+                        }
+
+                        function pollOnce() {
+                            if (refreshSessionClosed) return;
+                            syncPollAttempts++;
+                            if (syncPollAttempts > MAX_SYNC_POLLS) {
+                                closeRefreshUi('Не удалось дождаться ответа панели. Данные на экране — последние сохранённые. При необходимости обновите страницу.');
+                                return;
+                            }
+                            if (pollHintEl) {
+                                pollHintEl.textContent = 'Проверка ' + syncPollAttempts + ' / ' + MAX_SYNC_POLLS;
+                            }
+                            fetch(contentUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+                                .then(parseJsonResponse)
+                                .then(function(pollRes) {
+                                    if (refreshSessionClosed) return;
+                                    if (!pollRes.data || !pollRes.data.success || !pollRes.data.page) return;
+                                    if (isDataNewerThanBaseline(pollRes.data)) {
+                                        applyContentPayload(pollRes.data);
+                                        closeRefreshUi('✓ Конфигурация обновлена с сервера панели');
+                                    }
+                                })
+                                .catch(function() { /* сеть: следующий интервал попробует снова */ });
+                        }
+
+                        pollOnce();
+                        _vpnSyncPollTimer = setInterval(pollOnce, POLL_INTERVAL_MS);
                     } else {
                         var errMsg = (res.data && res.data.message) ? String(res.data.message) : '';
                         if (!errMsg && !res.ok) errMsg = '';
-                        showErrorState(errMsg, res.status);
+                        onRefreshHttpError(errMsg, res.status);
                     }
                 })
                 .catch(function() {
-                    stopStatusRotation();
-                    showErrorState('', 0);
+                    onRefreshHttpError('', 0);
                 });
         }
 
