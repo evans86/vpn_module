@@ -23,7 +23,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class VpnConfigController extends Controller
 {
-    /** Время кэширования HTML контента страницы конфига (секунды). */
+    /** Кэш только фрагмента HTML для /content (сек). Обновление с панели — только «Обновить» (refresh). */
     private const CONFIG_CONTENT_CACHE_TTL_SECONDS = 180;
 
     /**
@@ -469,6 +469,7 @@ class VpnConfigController extends Controller
         }
 
         Cache::forget('vpn_config_html_' . $key_activate_id);
+        Cache::forget('vpn_config_content_' . $key_activate_id);
         try {
             $keyActivate = $this->keyActivateRepository->findById($key_activate_id);
             if ($traceRefresh) {
@@ -1319,8 +1320,11 @@ class VpnConfigController extends Controller
             $netcheckUrl = route('netcheck.index');
             $isDemoMode = false; // Это реальная страница, не демо
 
-            // Нарушения: уже загруженные связи или два точечных запроса (не тянем все строки по ключу в память).
-            if ($keyActivate->relationLoaded('activeViolations') && $keyActivate->relationLoaded('replacedViolation')) {
+            // Первый фрагмент из БД (/content): без нарушений — меньше SQL; блок нарушений после «Обновить» (refresh).
+            if ($useStoredOnly && $partialOnly) {
+                $violations = collect();
+                $replacedViolation = null;
+            } elseif ($keyActivate->relationLoaded('activeViolations') && $keyActivate->relationLoaded('replacedViolation')) {
                 $violations = $keyActivate->activeViolations;
                 $replacedViolation = $keyActivate->replacedViolation;
             } else {

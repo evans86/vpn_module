@@ -159,8 +159,7 @@ class KeyActivateRepository extends BaseRepository
     }
 
     /**
-     * Загрузка ключа для ответа /content: слоты + нарушения одним набором eager load,
-     * чтобы в showBrowserPage не делать отдельные запросы к connection_limit_violations.
+     * Загрузка ключа для ответа /content: только слоты и продавец (без нарушений — они не нужны для первого фрагмента из БД).
      *
      * @param string $id key_activate_id
      * @return KeyActivate|null
@@ -179,8 +178,6 @@ class KeyActivateRepository extends BaseRepository
                 'keyActivateUsers.serverUser.panel.server.location:id,code,emoji',
                 'packSalesman:id,salesman_id,pack_id',
                 'packSalesman.salesman:id,telegram_id,bot_link,panel_id,module_bot_id',
-                'activeViolations',
-                'replacedViolation',
             ])
             ->find($id);
 
