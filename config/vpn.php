@@ -7,7 +7,7 @@ return [
     |--------------------------------------------------------------------------
     | Трассировка времени загрузки страницы конфига (/config/{token}, /content, /refresh)
     |--------------------------------------------------------------------------
-    | VPN_CONFIG_TRACE=true — включить запись в storage/logs/config-trace.log
+    | VPN_CONFIG_TRACE=true — запись в storage/logs/config-trace.log (подписка: stage subscription_*)
     | VPN_CONFIG_TRACE_TOKENS — через запятую UUID ключей; пусто = все ключи (шумно на проде)
     */
     'config_trace' => [

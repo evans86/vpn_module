@@ -124,30 +124,101 @@ class VpnConfigController extends Controller
 
             if ($isSubscriptionRequest) {
                 if ($traceShow) {
-                    VpnConfigPageTrace::checkpoint('show_subscription_path');
+                    VpnConfigPageTrace::subscription($key_activate_id, 'SUB_A0_entry', [
+                        'force_subscription_query' => $forceSubscription,
+                        'is_vpn_client_ua' => $this->isVpnClient($userAgent),
+                        'accepts_html' => $this->requestAcceptsHtml(),
+                        'has_versioned_browser_ua' => $this->hasVersionedBrowserInUserAgent($userAgent),
+                        'accept_header' => mb_substr((string) request()->header('Accept', ''), 0, 200),
+                        'ua_short' => mb_substr($userAgent, 0, 160),
+                        'note' => 'Дальше: findAllByKeyActivateIdForSubscription → collectConnectionKeysFromKeyActivateUsers',
+                    ]);
+                }
+
+                $tFind = microtime(true);
+                if ($traceShow) {
+                    VpnConfigPageTrace::subscription($key_activate_id, 'SUB_A1_before_findAllByKeyActivateIdForSubscription');
                 }
                 $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateIdForSubscription($key_activate_id);
+                $findMs = round((microtime(true) - $tFind) * 1000, 2);
+                if ($traceShow) {
+                    $firstKau = $keyActivateUsers->first();
+                    VpnConfigPageTrace::subscription($key_activate_id, 'SUB_A2_after_findAllByKeyActivateIdForSubscription', [
+                        'segment_ms' => $findMs,
+                        'find_ms' => $findMs,
+                        'repo' => 'KeyActivateUserRepository::findAllByKeyActivateIdForSubscription (with serverUser.panel.server.location)',
+                        'key_activate_users_count' => $keyActivateUsers->count(),
+                        'kau_ids_sample' => $keyActivateUsers->take(10)->pluck('id')->values()->all(),
+                        'first_kau_has_server_user' => $firstKau ? $firstKau->relationLoaded('serverUser') : null,
+                        'first_kau_server_user_id' => $firstKau ? $firstKau->server_user_id : null,
+                    ]);
+                }
+
                 if ($keyActivateUsers->isEmpty()) {
                     Log::warning('KeyActivateUser not found for KeyActivate', ['key_activate_id' => $key_activate_id, 'source' => 'vpn']);
+                    if ($traceShow) {
+                        VpnConfigPageTrace::subscription($key_activate_id, 'SUB_B1_empty_users_before_replacedViolation_query');
+                    }
+                    $tRv = microtime(true);
                     $replacedViolation = ConnectionLimitViolation::where('key_activate_id', $key_activate_id)
                         ->whereNotNull('key_replaced_at')->whereNotNull('replaced_key_id')->orderBy('key_replaced_at', 'desc')->first();
+                    $rvMs = round((microtime(true) - $tRv) * 1000, 2);
+                    if ($traceShow) {
+                        VpnConfigPageTrace::subscription($key_activate_id, 'SUB_B2_after_replacedViolation_query', [
+                            'segment_ms' => $rvMs,
+                            'replaced_violation_query_ms' => $rvMs,
+                            'found_replaced_key' => (bool) ($replacedViolation && $replacedViolation->replaced_key_id),
+                            'replaced_key_id' => $replacedViolation && $replacedViolation->replaced_key_id ? $replacedViolation->replaced_key_id : null,
+                        ]);
+                    }
                     if ($replacedViolation && $replacedViolation->replaced_key_id) {
+                        if ($traceShow) {
+                            VpnConfigPageTrace::subscription($key_activate_id, 'SUB_B3_return_error_view_replaced');
+                        }
+
                         return response()->view('vpn.error', [
                             'message' => 'Ваш ключ доступа был заменен из-за нарушения лимита подключений. Пожалуйста, используйте новый ключ.',
                             'replacedKeyId' => $replacedViolation->replaced_key_id
                         ]);
                     }
                     if (app()->environment('local') && config('app.debug', false)) {
+                        if ($traceShow) {
+                            VpnConfigPageTrace::subscription($key_activate_id, 'SUB_B3_return_showDemoPage');
+                        }
+
                         return $this->showDemoPage($key_activate_id);
                     }
+                    if ($traceShow) {
+                        VpnConfigPageTrace::subscription($key_activate_id, 'SUB_B3_return_error_not_found');
+                    }
+
                     return response()->view('vpn.error', ['message' => 'Конфигурация VPN не найдена.']);
                 }
-                $connectionKeys = $this->collectConnectionKeysFromKeyActivateUsers($keyActivateUsers);
+
+                $tCollect = microtime(true);
                 if ($traceShow) {
-                    VpnConfigPageTrace::checkpoint('show_subscription_plain_text');
+                    VpnConfigPageTrace::subscription($key_activate_id, 'SUB_C1_before_collectConnectionKeysFromKeyActivateUsers', [
+                        'hint' => 'Внутри: foreach слотов, load panel.server.location при необходимости, formatConnectionKeys / json_decode keys',
+                    ]);
+                }
+                $connectionKeys = $this->collectConnectionKeysFromKeyActivateUsers($keyActivateUsers);
+                $collectMs = round((microtime(true) - $tCollect) * 1000, 2);
+                $bodyPreview = implode("\n", $connectionKeys);
+                if ($traceShow) {
+                    VpnConfigPageTrace::subscription($key_activate_id, 'SUB_C2_after_collectConnectionKeysFromKeyActivateUsers', [
+                        'segment_ms' => $collectMs,
+                        'collect_ms' => $collectMs,
+                        'connection_keys_count' => count($connectionKeys),
+                        'response_body_bytes' => strlen($bodyPreview),
+                        'first_link_preview' => mb_substr($connectionKeys[0] ?? '', 0, 120),
+                    ]);
                 }
 
-                return response(implode("\n", $connectionKeys))
+                if ($traceShow) {
+                    VpnConfigPageTrace::subscription($key_activate_id, 'SUB_C3_return_plain_text_200');
+                }
+
+                return response($bodyPreview)
                     ->header('Content-Type', 'text/plain; charset=utf-8');
             }
 

@@ -66,6 +66,15 @@ class Kernel extends HttpKernel
             SubstituteBindings::class,
         ],
 
+        /**
+         * Публичные GET /config/.../content|refresh — без сессии (нет блокировки session file между shell и fetch).
+         */
+        'config_public' => [
+            EncryptCookies::class,
+            AddQueuedCookiesToResponse::class,
+            SubstituteBindings::class,
+        ],
+
         'api' => [
             'throttle:api',
             SubstituteBindings::class,

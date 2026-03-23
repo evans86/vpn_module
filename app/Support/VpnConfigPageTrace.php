@@ -63,6 +63,21 @@ final class VpnConfigPageTrace
     }
 
     /**
+     * Ветка plain text подписки — те же записи в config-trace.log, stage с префиксом subscription_ (grep: subscription_SUB_).
+     *
+     * @param array<string, mixed> $extra segment_ms — длительность шага (мс)
+     */
+    public static function subscription(string $keyActivateId, string $label, array $extra = []): void
+    {
+        if (!self::shouldTrace($keyActivateId) || self::$ctx === null) {
+            return;
+        }
+        self::write('subscription_' . $label, array_merge([
+            'subscription_label' => $label,
+        ], $extra));
+    }
+
+    /**
      * @param array<string, mixed> $extra
      */
     public static function end(array $extra = []): void

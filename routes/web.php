@@ -95,10 +95,8 @@ Route::get('/service-worker.js', function () {
 // VPN Error Page (только для локальной разработки) - должен быть ПЕРЕД /config/{token}
 Route::get('/config/error', [VpnConfigController::class, 'showError'])->name('vpn.config.error');
 
-// VPN Config Download
+// VPN Config Download (shell и подписка — с сессией web). /content и /refresh — routes/config-public.php (без сессии).
 Route::get('/config/{token}', [VpnConfigController::class, 'show'])->name('vpn.config.show');
-Route::get('/config/{token}/content', [VpnConfigController::class, 'showConfigContent'])->name('vpn.config.content');
-Route::get('/config/{token}/refresh', [VpnConfigController::class, 'showConfigRefresh'])->name('vpn.config.refresh');
 
 // Public Network Check
 Route::prefix('netcheck')->name('netcheck.')->group(function () {
