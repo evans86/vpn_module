@@ -63,7 +63,10 @@
     @php
         $_vpnCfgJsPath = public_path('js/vpn-config-content.js');
         $_vpnCfgJsVer = is_file($_vpnCfgJsPath) ? filemtime($_vpnCfgJsPath) : 1;
+        $_vpnSbPath = public_path('js/vpn-singbox-export.js');
+        $_vpnSbVer = is_file($_vpnSbPath) ? filemtime($_vpnSbPath) : 1;
     @endphp
+    <script src="{{ asset('js/vpn-singbox-export.js') }}?v={{ $_vpnSbVer }}"></script>
     <script src="{{ asset('js/vpn-config-content.js') }}?v={{ $_vpnCfgJsVer }}"></script>
     <script>
     (function(){
@@ -130,7 +133,7 @@
                 if (el.id === 'vpn-btn-copy-plain') {
                     el.setAttribute('title', has ? 'Все строки конфигурации, по одной на строку' : 'Нет протоколов подключения');
                 } else {
-                    el.setAttribute('title', has ? 'JSON-массив URI (vless/trojan/ss…) для импорта в клиент' : 'Нет протоколов для JSON');
+                    el.setAttribute('title', has ? 'Профиль sing-box (JSON) для Hiddify и др.' : 'Нет протоколов для JSON');
                 }
             });
         };
@@ -140,11 +143,18 @@
                 showCopyNotification('Нет данных для JSON.');
                 return;
             }
+            if (typeof window.buildSingBoxProfileJson !== 'function') {
+                alert('Не загружен модуль sing-box. Обновите страницу.');
+                return;
+            }
             try {
-                // Один корректный JSON: массив строк URI — такой формат принимают многие клиенты при «импорт из буфера».
-                var text = JSON.stringify(links);
+                var text = window.buildSingBoxProfileJson(links);
+                if (!text) {
+                    showCopyNotification('Не удалось разобрать ссылки в формат sing-box.');
+                    return;
+                }
                 navigator.clipboard.writeText(text).then(function() {
-                    showCopyNotification('✓ JSON скопирован (массив ссылок)');
+                    showCopyNotification('✓ JSON sing-box скопирован (импорт в Hiddify)');
                 }).catch(function() { alert('Не удалось скопировать.'); });
             } catch (e) {
                 alert('Не удалось сформировать JSON.');
