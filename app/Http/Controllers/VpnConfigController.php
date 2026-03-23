@@ -218,6 +218,13 @@ class VpnConfigController extends Controller
     public function showConfigContent(string $token): Response
     {
         $key_activate_id = trim($token);
+        if ((int) ini_get('memory_limit') < 512) {
+            @ini_set('memory_limit', '512M');
+        }
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(120);
+        }
+
         $cacheKey = 'vpn_config_content_' . $key_activate_id;
         $cached = Cache::get($cacheKey);
         if ($cached !== null && is_array($cached)) {
@@ -1096,18 +1103,27 @@ class VpnConfigController extends Controller
             $netcheckUrl = route('netcheck.index');
             $isDemoMode = false; // Это реальная страница, не демо
 
-            // Нарушения: используем уже загруженные связи или один общий запрос (меньше round-trip к БД)
+            // Нарушения: уже загруженные связи или два точечных запроса (не тянем все строки по ключу в память).
             if ($keyActivate->relationLoaded('activeViolations') && $keyActivate->relationLoaded('replacedViolation')) {
                 $violations = $keyActivate->activeViolations;
                 $replacedViolation = $keyActivate->replacedViolation;
             } else {
-                $allViolations = ConnectionLimitViolation::where('key_activate_id', $keyActivate->id)->get();
                 $violations = $keyActivate->relationLoaded('activeViolations')
                     ? $keyActivate->activeViolations
-                    : $allViolations->where('status', ConnectionLimitViolation::STATUS_ACTIVE)->whereNull('key_replaced_at')->sortByDesc('created_at')->values();
+                    : ConnectionLimitViolation::query()
+                        ->where('key_activate_id', $keyActivate->id)
+                        ->where('status', ConnectionLimitViolation::STATUS_ACTIVE)
+                        ->whereNull('key_replaced_at')
+                        ->orderByDesc('created_at')
+                        ->get();
                 $replacedViolation = $keyActivate->relationLoaded('replacedViolation')
                     ? $keyActivate->replacedViolation
-                    : $allViolations->whereNotNull('key_replaced_at')->whereNotNull('replaced_key_id')->sortByDesc('key_replaced_at')->first();
+                    : ConnectionLimitViolation::query()
+                        ->where('key_activate_id', $keyActivate->id)
+                        ->whereNotNull('key_replaced_at')
+                        ->whereNotNull('replaced_key_id')
+                        ->orderByDesc('key_replaced_at')
+                        ->first();
             }
 
             $newKeyActivate = null;
