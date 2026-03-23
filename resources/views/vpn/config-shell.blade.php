@@ -77,17 +77,9 @@
         .notification { position: fixed; bottom: 24px; right: 24px; padding: 16px 24px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15); font-size: 15px; font-weight: 500; z-index: 1000; opacity: 0; transform: translateY(20px) scale(0.95); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .notification.hidden { opacity: 0; transform: translateY(20px) scale(0.95); }
         .notification:not(.hidden) { opacity: 1; transform: translateY(0) scale(1); }
-        /* Полоска «съедается» персонажем: --vpn-eat-progress 0…1 */
-        @property --vpn-eat-progress {
-            syntax: '<number>';
-            inherits: false;
-            initial-value: 0;
-        }
+        /* Полоска «съедается» персонажем: --vpn-eat-progress 0…1 (без @property inherits:false — иначе дети не видят переменную) */
         .vpn-eat-wrap {
             --vpn-eat-progress: 0;
-        }
-        .vpn-eat-wrap.vpn-eat-wrap--smooth {
-            transition: --vpn-eat-progress 0.5s cubic-bezier(0.34, 1.2, 0.64, 1);
         }
         .vpn-eat-stage {
             width: 100%;
@@ -101,7 +93,7 @@
             left: 0;
             top: 0;
             bottom: 0;
-            width: calc(var(--vpn-eat-progress) * 100%);
+            width: calc(var(--vpn-eat-progress, 0) * 100%);
             transition: width 0.5s cubic-bezier(0.34, 1.2, 0.64, 1);
             background: repeating-linear-gradient(
                 -45deg,
@@ -128,7 +120,7 @@
         }
         .vpn-eat-critter {
             position: absolute;
-            left: calc(28px + var(--vpn-eat-progress) * (100% - 56px));
+            left: calc(28px + var(--vpn-eat-progress, 0) * (100% - 56px));
             bottom: 0;
             transform: translateX(-50%);
             width: 56px;
@@ -190,10 +182,8 @@
         }
         @media (prefers-reduced-motion: reduce) {
             .vpn-config-sheen,
-            .vpn-eat-mouth,
-            .vpn-eat-wrap.vpn-eat-wrap--smooth {
+            .vpn-eat-mouth {
                 animation: none !important;
-                transition: none !important;
             }
             .vpn-eat-critter,
             .vpn-eat-crumbs,
