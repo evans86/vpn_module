@@ -60,6 +60,7 @@
         .notification:not(.hidden) { opacity: 1; transform: translateY(0) scale(1); }
     </style>
     <script src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
+    <script src="{{ asset('js/vpn-config-content.js') }}"></script>
     <script>
     (function(){
         var copyNotificationTimeout, currentQR = null;
@@ -161,21 +162,61 @@
             return r.text().then(function() { return { ok: false, data: {} }; });
         }
 
-        // Один раз вешаем делегирование кликов (работает и для подгруженного контента)
-        if (contentEl) contentEl.addEventListener('click', delegateLocationToggle);
+        function vpnB64ToUtf8(b64) {
+            if (!b64) return '';
+            try {
+                return decodeURIComponent(Array.prototype.map.call(atob(b64), function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+            } catch (err) { return ''; }
+        }
 
-        // Первая загрузка контента
+        // Один раз вешаем делегирование кликов (работает и для подгруженного контента)
+        if (contentEl) contentEl.addEventListener('click', delegateConfigContent);
+
+        // Первая загрузка контента (данные page — JSON, разметка на клиенте)
         fetch(contentUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
             .then(parseJsonResponse)
             .then(function(res) {
                 if (res.ok && res.data && res.data.success) {
-                    if (contentEl && res.data.html) contentEl.innerHTML = res.data.html;
+                    if (contentEl && res.data.page && typeof window.renderVpnConfigPage === 'function') {
+                        window.renderVpnConfigPage(contentEl, res.data.page);
+                    } else if (contentEl && res.data.html) {
+                        contentEl.innerHTML = res.data.html;
+                    }
                     if (res.data.lastUpdated && lastUpdatedEl) lastUpdatedEl.textContent = res.data.lastUpdated;
                 } else {
                     setContentError(res.data && res.data.message ? res.data.message : null);
                 }
             })
             .catch(function() { setContentError(); });
+
+        function delegateConfigContent(e) {
+            var groupCopy = e.target.closest('.config-group-copy-btn');
+            if (groupCopy) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (typeof copyGroupConfigurations === 'function') copyGroupConfigurations(groupCopy);
+                return;
+            }
+            var copyBtn = e.target.closest('[data-copy-link-b64]');
+            if (copyBtn) {
+                e.preventDefault();
+                var link = vpnB64ToUtf8(copyBtn.getAttribute('data-copy-link-b64'));
+                var protocol = copyBtn.getAttribute('data-protocol') || '';
+                if (link && typeof copyToClipboard === 'function') copyToClipboard(link, protocol);
+                return;
+            }
+            var qrBtn = e.target.closest('[data-qr-link-b64]');
+            if (qrBtn) {
+                e.preventDefault();
+                var linkQr = vpnB64ToUtf8(qrBtn.getAttribute('data-qr-link-b64'));
+                var prot = qrBtn.getAttribute('data-protocol') || '';
+                if (linkQr && typeof showQR === 'function') showQR(linkQr, prot);
+                return;
+            }
+            delegateLocationToggle(e);
+        }
 
         function delegateLocationToggle(e) {
             var btn = e.target.closest('.config-location-toggle');
@@ -215,7 +256,11 @@
                     clearInterval(t);
                     if (fill) fill.style.width = '100%';
                     if (res.ok && res.data && res.data.success) {
-                        if (contentEl && res.data.html) contentEl.innerHTML = res.data.html;
+                        if (contentEl && res.data.page && typeof window.renderVpnConfigPage === 'function') {
+                            window.renderVpnConfigPage(contentEl, res.data.page);
+                        } else if (contentEl && res.data.html) {
+                            contentEl.innerHTML = res.data.html;
+                        }
                         if (res.data.lastUpdated && lastUpdatedEl) lastUpdatedEl.textContent = res.data.lastUpdated;
                         progressBar.classList.add('hidden');
                         refreshBar.classList.remove('hidden');

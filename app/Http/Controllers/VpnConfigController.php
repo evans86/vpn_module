@@ -118,6 +118,7 @@ class VpnConfigController extends Controller
                     return response()->view('vpn.error', ['message' => 'Конфигурация VPN не найдена.']);
                 }
 
+
                 $connectionKeys = $this->collectConnectionKeysFromKeyActivateUsers($keyActivateUsers);
                 $bodyPreview = implode("\n", $connectionKeys);
 
@@ -219,7 +220,7 @@ class VpnConfigController extends Controller
 
     /**
      * Контент страницы конфига (только из БД, без панелей). Для быстрой отрисовки: сначала отдаётся shell, потом fetch этого URL.
-     * Возвращает JSON { success, html?, lastUpdated?, message? }.
+     * Возвращает JSON { success, page, lastUpdated?, message? } — данные для отрисовки на клиенте (без HTML с бэкенда).
      */
     public function showConfigContent(string $token): Response
     {
@@ -233,8 +234,12 @@ class VpnConfigController extends Controller
 
         $cacheKey = 'vpn_config_content_' . $key_activate_id;
         $cached = Cache::get($cacheKey);
-        if ($cached !== null && is_array($cached)) {
-            return response()->json(['success' => true, 'html' => $cached['html'] ?? '', 'lastUpdated' => $cached['lastUpdated'] ?? null]);
+        if ($cached !== null && is_array($cached) && isset($cached['page']) && is_array($cached['page'])) {
+            return response()->json([
+                'success' => true,
+                'page' => $cached['page'],
+                'lastUpdated' => $cached['lastUpdated'] ?? null,
+            ]);
         }
 
         try {
@@ -267,7 +272,7 @@ class VpnConfigController extends Controller
                 return response()->json(['success' => false, 'message' => 'Конфигурация не найдена.'], 404);
             }
             $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id, $keyActivateUsers);
-            $response = $this->showBrowserPage(
+            $viewData = $this->buildBrowserPageViewData(
                 $keyActivate,
                 $data['firstKeyActivateUser'],
                 $data['firstServerUser'],
@@ -279,13 +284,13 @@ class VpnConfigController extends Controller
                 null,
                 $data['lastUpdated'] ?? null
             );
-            $html = $response->getContent();
+            $page = $this->serializeConfigPageForClient($viewData);
             $lastUpdated = isset($data['lastUpdated']) && $data['lastUpdated']
                 ? $data['lastUpdated']->format('d.m.Y H:i')
                 : null;
-            Cache::put($cacheKey, ['html' => $html, 'lastUpdated' => $lastUpdated], now()->addSeconds(self::CONFIG_CONTENT_CACHE_TTL_SECONDS));
+            Cache::put($cacheKey, ['page' => $page, 'lastUpdated' => $lastUpdated], now()->addSeconds(self::CONFIG_CONTENT_CACHE_TTL_SECONDS));
 
-            return response()->json(['success' => true, 'html' => $html, 'lastUpdated' => $lastUpdated]);
+            return response()->json(['success' => true, 'page' => $page, 'lastUpdated' => $lastUpdated]);
         } catch (\Throwable $e) {
             Log::warning('VpnConfig content failed', [
                 'key_activate_id' => $key_activate_id,
@@ -327,7 +332,7 @@ class VpnConfigController extends Controller
                 return response()->json(['success' => false, 'message' => 'Нет слотов для ключа'], 404);
             }
             $data = $this->buildConnectionData($keyActivate, $key_activate_id, true);
-            $response = $this->showBrowserPage(
+            $viewData = $this->buildBrowserPageViewData(
                 $keyActivate,
                 $data['firstKeyActivateUser'],
                 $data['firstServerUser'],
@@ -339,13 +344,13 @@ class VpnConfigController extends Controller
                 null,
                 null
             );
+            $page = $this->serializeConfigPageForClient($viewData);
             $lastUpdated = isset($data['lastUpdated']) && $data['lastUpdated']
                 ? $data['lastUpdated']->format('d.m.Y H:i')
                 : null;
-            $html = $response->getContent();
-            Cache::put('vpn_config_content_' . $key_activate_id, ['html' => $html ?: '', 'lastUpdated' => $lastUpdated], now()->addSeconds(self::CONFIG_CONTENT_CACHE_TTL_SECONDS));
+            Cache::put('vpn_config_content_' . $key_activate_id, ['page' => $page, 'lastUpdated' => $lastUpdated], now()->addSeconds(self::CONFIG_CONTENT_CACHE_TTL_SECONDS));
 
-            return response()->json(['success' => true, 'html' => $html ?: '', 'lastUpdated' => $lastUpdated]);
+            return response()->json(['success' => true, 'page' => $page, 'lastUpdated' => $lastUpdated]);
         } catch (\Throwable $e) {
             Log::warning('VpnConfig refresh failed', [
                 'key_activate_id' => $key_activate_id,
@@ -648,7 +653,7 @@ class VpnConfigController extends Controller
                     // Получаем конфигурацию панели, чтобы узнать доступные inbounds
                     $panelConfig = $marzbanApi->getConfig($panel->auth_token);
                     $availableInboundTags = [];
-                    
+
                     if (!empty($panelConfig['inbounds']) && is_array($panelConfig['inbounds'])) {
                         foreach ($panelConfig['inbounds'] as $inbound) {
                             if (isset($inbound['tag'])) {
@@ -656,7 +661,7 @@ class VpnConfigController extends Controller
                             }
                         }
                     }
-                    
+
                     // Определяем все возможные inbounds для REALITY конфигурации
                     $allPossibleInbounds = [
                         'vmess' => ["VMESS-WS"],
@@ -672,7 +677,7 @@ class VpnConfigController extends Controller
                         'trojan' => ["TROJAN-WS"],
                         'shadowsocks' => ["Shadowsocks-TCP"],
                     ];
-                    
+
                     // Фильтруем inbounds, оставляя только те, которые существуют на панели
                     $realityInbounds = [];
                     foreach ($allPossibleInbounds as $protocol => $inboundTags) {
@@ -686,7 +691,7 @@ class VpnConfigController extends Controller
                             $realityInbounds[$protocol] = $filteredTags;
                         }
                     }
-                    
+
                     // Обновляем пользователя только если есть доступные inbounds
                     if (!empty($realityInbounds)) {
                         $updatedUserData = $marzbanApi->updateUser(
@@ -1032,17 +1037,18 @@ class VpnConfigController extends Controller
     }
 
     /**
-     * Показывает страницу для браузера
+     * Собирает данные для страницы конфига в браузере (те же поля, что раньше передавались в Blade partial).
+     *
      * @param array $slotsWithLinks Массив [ ['location_label' => string, 'connection_keys' => array], ... ]
      * @param bool $useStoredOnly не дергать панель (userInfo из ключа), для быстрого первого отображения
-     * @param bool $partialOnly вернуть только HTML блока контента (для ответа refresh)
+     * @param bool $partialOnly первый фрагмент /content: без лишних SQL по нарушениям
      * @param string|null $configRefreshUrl не используется (оставлен для совместимости)
      * @param string|null $configRefreshUrlForButton URL для кнопки «Обновить»
      * @param \DateTimeInterface|null $lastUpdated время последнего обновления конфига в БД
+     * @return array<string, mixed>
      */
-    private function showBrowserPage(KeyActivate $keyActivate, $keyActivateUser, $serverUser, $connectionKeys, array $slotsWithLinks = [], bool $useStoredOnly = false, bool $partialOnly = false, ?string $configRefreshUrl = null, ?string $configRefreshUrlForButton = null, $lastUpdated = null): Response
+    private function buildBrowserPageViewData(KeyActivate $keyActivate, $keyActivateUser, $serverUser, $connectionKeys, array $slotsWithLinks = [], bool $useStoredOnly = false, bool $partialOnly = false, ?string $configRefreshUrl = null, ?string $configRefreshUrlForButton = null, $lastUpdated = null): array
     {
-        try {
             // При первом открытии (useStoredOnly) не дергаем БД и не обновляем статус — страница отдаётся быстрее; статус обновится по кнопке «Обновить».
             if (!$useStoredOnly) {
                 $keyActivate->refresh();
@@ -1236,24 +1242,148 @@ class VpnConfigController extends Controller
                 $viewData['configRefreshUrlForButton'] = $configRefreshUrlForButton;
                 $viewData['configLastUpdated'] = $lastUpdated ? $lastUpdated->format('d.m.Y H:i') : null;
             }
-            if ($partialOnly) {
-                return response(view('vpn.partials.config-content', $viewData)->render())
-                    ->header('Content-Type', 'text/html; charset=UTF-8');
-            }
-            return response()->view('vpn.config', $viewData);
 
-        } catch (Exception $e) {
-            Log::error('Error showing browser page:', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'source' => 'vpn'
-            ]);
+            return $viewData;
+    }
 
-            // В случае ошибки при подготовке страницы показываем страницу ошибки
-            return response()->view('vpn.error', [
-                'message' => 'Конфигурация VPN не найдена. Пожалуйста, проверьте правильность ссылки или обратитесь в поддержку.'
-            ]);
+    /**
+     * Данные для клиентской отрисовки (без Eloquent и без HTML).
+     *
+     * @param array<string, mixed> $viewData
+     * @return array<string, mixed>
+     */
+    private function serializeConfigPageForClient(array $viewData): array
+    {
+        $keyActivate = $viewData['keyActivate'] ?? null;
+        $newKeyActivate = $viewData['newKeyActivate'] ?? null;
+
+        $formattedKeysGrouped = [];
+        foreach ($viewData['formattedKeysGrouped'] ?? [] as $g) {
+            $formattedKeysGrouped[] = [
+                'label' => $g['label'] ?? '',
+                'flag_code' => $g['flag_code'] ?? '',
+                'keys' => $this->normalizeFormattedKeysForClient($g['keys'] ?? []),
+            ];
         }
+
+        $violationsOut = [];
+        $violations = $viewData['violations'] ?? null;
+        if ($violations instanceof \Illuminate\Support\Collection) {
+            foreach ($violations as $v) {
+                $violationsOut[] = [
+                    'violation_count' => (int) ($v->violation_count ?? 0),
+                ];
+            }
+        }
+
+        $replacedViolation = $viewData['replacedViolation'] ?? null;
+        $replacedOut = null;
+        if ($replacedViolation) {
+            $kr = $replacedViolation->key_replaced_at ?? null;
+            $replacedOut = [
+                'key_replaced_at' => $kr ? $kr->getTimestamp() : null,
+                'replaced_key_id' => $replacedViolation->replaced_key_id ?? null,
+            ];
+        }
+
+        return [
+            'meta' => [
+                'keyStatus' => [
+                    'EXPIRED' => KeyActivate::EXPIRED,
+                    'ACTIVE' => KeyActivate::ACTIVE,
+                    'PAID' => KeyActivate::PAID,
+                ],
+            ],
+            'keyActivate' => $this->serializeKeyActivateForClient($keyActivate),
+            'userInfo' => $this->normalizeUserInfoForClient($viewData['userInfo'] ?? []),
+            'formattedKeys' => $this->normalizeFormattedKeysForClient($viewData['formattedKeys'] ?? []),
+            'formattedKeysGrouped' => $formattedKeysGrouped,
+            'botLink' => (string) ($viewData['botLink'] ?? '#'),
+            'netcheckUrl' => (string) ($viewData['netcheckUrl'] ?? ''),
+            'isDemoMode' => (bool) ($viewData['isDemoMode'] ?? false),
+            'violations' => $violationsOut,
+            'replacedViolation' => $replacedOut,
+            'newKeyActivate' => $this->serializeKeyActivateForClient($newKeyActivate),
+            'newKeyFormattedKeys' => $viewData['newKeyFormattedKeys'] !== null
+                ? $this->normalizeFormattedKeysForClient($viewData['newKeyFormattedKeys'])
+                : null,
+            'newKeyUserInfo' => $viewData['newKeyUserInfo'] !== null
+                ? $this->normalizeUserInfoForClient($viewData['newKeyUserInfo'])
+                : null,
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $keys
+     * @return array<int, array<string, string>>
+     */
+    private function normalizeFormattedKeysForClient(array $keys): array
+    {
+        $out = [];
+        foreach ($keys as $k) {
+            $link = isset($k['link']) ? stripslashes((string) $k['link']) : '';
+            $out[] = [
+                'protocol' => (string) ($k['protocol'] ?? ''),
+                'icon' => (string) ($k['icon'] ?? ''),
+                'connection_type' => (string) ($k['connection_type'] ?? ''),
+                'link' => $link,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $userInfo
+     * @return array<string, mixed>
+     */
+    private function normalizeUserInfoForClient(array $userInfo): array
+    {
+        $exp = $userInfo['expiration_date'] ?? null;
+        if ($exp instanceof \DateTimeInterface) {
+            $exp = $exp->getTimestamp();
+        }
+
+        return [
+            'username' => (string) ($userInfo['username'] ?? ''),
+            'status' => (string) ($userInfo['status'] ?? 'active'),
+            'data_limit' => (float) ($userInfo['data_limit'] ?? 0),
+            'data_limit_tariff' => (float) ($userInfo['data_limit_tariff'] ?? 0),
+            'data_used' => (float) ($userInfo['data_used'] ?? 0),
+            'expiration_date' => $exp !== null ? (int) $exp : null,
+            'days_remaining' => isset($userInfo['days_remaining']) && $userInfo['days_remaining'] !== null
+                ? (int) $userInfo['days_remaining']
+                : null,
+        ];
+    }
+
+    /**
+     * @param KeyActivate|\stdClass|object|null $key
+     * @return array<string, mixed>|null
+     */
+    private function serializeKeyActivateForClient($key): ?array
+    {
+        if ($key === null) {
+            return null;
+        }
+        if ($key instanceof KeyActivate) {
+            return [
+                'id' => (string) $key->id,
+                'status' => (int) $key->status,
+                'finish_at' => $key->finish_at !== null ? (int) $key->finish_at : null,
+                'traffic_limit' => $key->traffic_limit !== null ? (float) $key->traffic_limit : 0.0,
+            ];
+        }
+        if (is_object($key)) {
+            return [
+                'id' => (string) ($key->id ?? ''),
+                'status' => isset($key->status) ? (int) $key->status : 0,
+                'finish_at' => isset($key->finish_at) ? (int) $key->finish_at : null,
+                'traffic_limit' => isset($key->traffic_limit) ? (float) $key->traffic_limit : 0.0,
+            ];
+        }
+
+        return null;
     }
 
 
