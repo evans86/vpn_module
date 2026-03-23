@@ -10,6 +10,7 @@ use App\Jobs\AddMissingSlotsForKeyJob;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Repositories\KeyActivateUser\KeyActivateUserRepository;
 use App\Repositories\ServerUser\ServerUserRepository;
+use App\Support\VpnConfigPageTrace;
 use App\Services\External\MarzbanAPI;
 use App\Services\Panel\marzban\MarzbanService;
 use App\Services\Panel\PanelStrategy;
@@ -66,23 +67,47 @@ class VpnConfigController extends Controller
             @set_time_limit(180);
         }
 
+        $traceShow = VpnConfigPageTrace::shouldTrace($key_activate_id);
+        if ($traceShow) {
+            VpnConfigPageTrace::begin($key_activate_id, 'show');
+        }
+
         try {
             // Если запрошен роут /config/error, перенаправляем на метод showError
             if ($key_activate_id === 'error') {
+                if ($traceShow) {
+                    VpnConfigPageTrace::checkpoint('show_error_route');
+                }
+
                 return $this->showError();
             }
 
             // Быстрая проверка существования ключа (один лёгкий запрос) — для браузера не тянем слоты и связи.
             $keyActivate = $this->keyActivateRepository->findById($key_activate_id);
+            if ($traceShow) {
+                VpnConfigPageTrace::checkpoint('show_after_findById', ['found' => (bool) $keyActivate]);
+            }
 
             if (!$keyActivate) {
                 $showDemo = app()->environment('local') && config('app.debug', false);
                 if ($showDemo) {
+                    if ($traceShow) {
+                        VpnConfigPageTrace::checkpoint('show_not_found_demo');
+                    }
+
                     return $this->showDemoPage($key_activate_id);
                 }
                 if (request()->wantsJson()) {
+                    if ($traceShow) {
+                        VpnConfigPageTrace::checkpoint('show_not_found_json');
+                    }
+
                     return response()->json(['status' => 'error', 'message' => 'Configuration not found'], 404);
                 }
+                if ($traceShow) {
+                    VpnConfigPageTrace::checkpoint('show_not_found_view');
+                }
+
                 return response()->view('vpn.error', [
                     'message' => 'Конфигурация VPN не найдена. Пожалуйста, проверьте правильность ссылки или обратитесь в поддержку.'
                 ]);
@@ -98,6 +123,9 @@ class VpnConfigController extends Controller
                 || !$this->hasVersionedBrowserInUserAgent($userAgent);
 
             if ($isSubscriptionRequest) {
+                if ($traceShow) {
+                    VpnConfigPageTrace::checkpoint('show_subscription_path');
+                }
                 $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateIdForSubscription($key_activate_id);
                 if ($keyActivateUsers->isEmpty()) {
                     Log::warning('KeyActivateUser not found for KeyActivate', ['key_activate_id' => $key_activate_id, 'source' => 'vpn']);
@@ -115,6 +143,10 @@ class VpnConfigController extends Controller
                     return response()->view('vpn.error', ['message' => 'Конфигурация VPN не найдена.']);
                 }
                 $connectionKeys = $this->collectConnectionKeysFromKeyActivateUsers($keyActivateUsers);
+                if ($traceShow) {
+                    VpnConfigPageTrace::checkpoint('show_subscription_plain_text');
+                }
+
                 return response(implode("\n", $connectionKeys))
                     ->header('Content-Type', 'text/plain; charset=utf-8');
             }
@@ -123,10 +155,18 @@ class VpnConfigController extends Controller
             $configPageCacheKey = 'vpn_config_html_' . $key_activate_id;
             $cachedHtml = Cache::get($configPageCacheKey);
             if ($cachedHtml !== null) {
+                if ($traceShow) {
+                    VpnConfigPageTrace::checkpoint('show_shell_full_html_cache_hit');
+                }
+
                 return response($cachedHtml)->header('Content-Type', 'text/html; charset=utf-8');
             }
 
             // Быстрый ответ: отдаём лёгкую оболочку (shell), контент подгрузится по /config/{token}/content — DOMContentLoaded будет ~0.5 с вместо 15+ с.
+            if ($traceShow) {
+                VpnConfigPageTrace::checkpoint('show_return_config_shell_view');
+            }
+
             return response()->view('vpn.config-shell', [
                 'token' => $key_activate_id,
                 'contentUrl' => route('vpn.config.content', ['token' => $key_activate_id], false),
@@ -134,6 +174,9 @@ class VpnConfigController extends Controller
             ]);
 
         } catch (\App\Exceptions\KeyReplacedException $e) {
+            if ($traceShow) {
+                VpnConfigPageTrace::checkpoint('show_KeyReplacedException', ['new_key_id' => $e->getNewKeyId()]);
+            }
             // Ключ был перевыпущен - показываем страницу ошибки с информацией о новом ключе
             $newKeyId = $e->getNewKeyId();
 
@@ -156,6 +199,12 @@ class VpnConfigController extends Controller
                 'replacedKeyId' => $newKeyId
             ]);
         } catch (Exception $e) {
+            if ($traceShow) {
+                VpnConfigPageTrace::checkpoint('show_Exception', [
+                    'error' => $e->getMessage(),
+                    'class' => get_class($e),
+                ]);
+            }
             Log::error('Error showing VPN config', [
                 'key_activate_id' => $key_activate_id,
                 'error' => $e->getMessage(),
@@ -208,6 +257,10 @@ class VpnConfigController extends Controller
             return response()->view('vpn.error', [
                 'message' => 'Конфигурация VPN не найдена. Пожалуйста, проверьте правильность ссылки или обратитесь в поддержку.'
             ]);
+        } finally {
+            if ($traceShow) {
+                VpnConfigPageTrace::end();
+            }
         }
     }
 
@@ -225,14 +278,27 @@ class VpnConfigController extends Controller
             @set_time_limit(120);
         }
 
+        $traceContent = VpnConfigPageTrace::shouldTrace($key_activate_id);
+        if ($traceContent) {
+            VpnConfigPageTrace::begin($key_activate_id, 'content');
+        }
+
         $cacheKey = 'vpn_config_content_' . $key_activate_id;
         $cached = Cache::get($cacheKey);
         if ($cached !== null && is_array($cached)) {
+            if ($traceContent) {
+                VpnConfigPageTrace::checkpoint('content_json_cache_hit');
+                VpnConfigPageTrace::end(['cached' => true]);
+            }
+
             return response()->json(['success' => true, 'html' => $cached['html'] ?? '', 'lastUpdated' => $cached['lastUpdated'] ?? null]);
         }
 
         try {
             $keyActivate = $this->keyActivateRepository->findWithConfigRelationsForContent($key_activate_id);
+            if ($traceContent) {
+                VpnConfigPageTrace::checkpoint('content_after_findWithConfigRelationsForContent', ['found' => (bool) $keyActivate]);
+            }
             if (!$keyActivate) {
                 return response()->json(['success' => false, 'message' => 'Ключ не найден'], 404);
             }
@@ -242,6 +308,9 @@ class VpnConfigController extends Controller
                 if ($keyActivateUsers->isNotEmpty()) {
                     $keyActivate->setRelation('keyActivateUsers', $keyActivateUsers);
                 }
+            }
+            if ($traceContent) {
+                VpnConfigPageTrace::checkpoint('content_key_activate_users', ['count' => $keyActivateUsers->count()]);
             }
             if ($keyActivateUsers->isEmpty()) {
                 $replacedViolation = $keyActivate->replacedViolation;
@@ -255,7 +324,11 @@ class VpnConfigController extends Controller
                 return response()->json(['success' => false, 'message' => 'Конфигурация не найдена.'], 404);
             }
             $data = $this->buildConnectionDataFromStored($keyActivate, $key_activate_id, $keyActivateUsers);
-            $refreshUrl = route('vpn.config.refresh', ['token' => $key_activate_id], false);
+            if ($traceContent) {
+                VpnConfigPageTrace::checkpoint('content_after_buildConnectionDataFromStored', [
+                    'slots' => count($data['slotsWithLinks'] ?? []),
+                ]);
+            }
             $response = $this->showBrowserPage(
                 $keyActivate,
                 $data['firstKeyActivateUser'],
@@ -268,19 +341,39 @@ class VpnConfigController extends Controller
                 null,
                 $data['lastUpdated'] ?? null
             );
+            if ($traceContent) {
+                VpnConfigPageTrace::checkpoint('content_after_showBrowserPage_before_getContent');
+            }
             $html = $response->getContent();
+            if ($traceContent) {
+                VpnConfigPageTrace::checkpoint('content_after_getContent', ['html_bytes' => strlen($html ?? '')]);
+            }
             $lastUpdated = isset($data['lastUpdated']) && $data['lastUpdated']
                 ? $data['lastUpdated']->format('d.m.Y H:i')
                 : null;
             Cache::put($cacheKey, ['html' => $html, 'lastUpdated' => $lastUpdated], now()->addSeconds(self::CONFIG_CONTENT_CACHE_TTL_SECONDS));
+            if ($traceContent) {
+                VpnConfigPageTrace::checkpoint('content_cache_put_done');
+            }
+
             return response()->json(['success' => true, 'html' => $html, 'lastUpdated' => $lastUpdated]);
         } catch (\Throwable $e) {
+            if ($traceContent) {
+                VpnConfigPageTrace::checkpoint('content_throw', [
+                    'error' => $e->getMessage(),
+                    'class' => get_class($e),
+                ]);
+            }
             Log::warning('VpnConfig content failed', [
                 'key_activate_id' => $key_activate_id,
                 'error' => $e->getMessage(),
                 'source' => 'vpn',
             ]);
             return response()->json(['success' => false, 'message' => 'Не удалось загрузить конфигурацию.'], 500);
+        } finally {
+            if ($traceContent) {
+                VpnConfigPageTrace::end();
+            }
         }
     }
 
@@ -298,9 +391,18 @@ class VpnConfigController extends Controller
         if (function_exists('set_time_limit')) {
             @set_time_limit(180);
         }
+
+        $traceRefresh = VpnConfigPageTrace::shouldTrace($key_activate_id);
+        if ($traceRefresh) {
+            VpnConfigPageTrace::begin($key_activate_id, 'refresh');
+        }
+
         Cache::forget('vpn_config_html_' . $key_activate_id);
         try {
             $keyActivate = $this->keyActivateRepository->findById($key_activate_id);
+            if ($traceRefresh) {
+                VpnConfigPageTrace::checkpoint('refresh_after_findById', ['found' => (bool) $keyActivate]);
+            }
             if (!$keyActivate) {
                 return response()->json(['success' => false, 'message' => 'Ключ не найден'], 404);
             }
@@ -308,11 +410,22 @@ class VpnConfigController extends Controller
                 'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
                 'packSalesman.salesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
             ]);
+            if ($traceRefresh) {
+                VpnConfigPageTrace::checkpoint('refresh_after_packSalesman_load');
+            }
             $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
             if ($keyActivateUsers->isEmpty()) {
                 return response()->json(['success' => false, 'message' => 'Нет слотов для ключа'], 404);
             }
+            if ($traceRefresh) {
+                VpnConfigPageTrace::checkpoint('refresh_before_buildConnectionData', ['slots' => $keyActivateUsers->count()]);
+            }
             $data = $this->buildConnectionData($keyActivate, $key_activate_id, true);
+            if ($traceRefresh) {
+                VpnConfigPageTrace::checkpoint('refresh_after_buildConnectionData', [
+                    'slots_with_links' => count($data['slotsWithLinks'] ?? []),
+                ]);
+            }
             $response = $this->showBrowserPage(
                 $keyActivate,
                 $data['firstKeyActivateUser'],
@@ -325,13 +438,29 @@ class VpnConfigController extends Controller
                 null,
                 null
             );
+            if ($traceRefresh) {
+                VpnConfigPageTrace::checkpoint('refresh_after_showBrowserPage_before_getContent');
+            }
             $lastUpdated = isset($data['lastUpdated']) && $data['lastUpdated']
                 ? $data['lastUpdated']->format('d.m.Y H:i')
                 : null;
             $html = $response->getContent();
+            if ($traceRefresh) {
+                VpnConfigPageTrace::checkpoint('refresh_after_getContent', ['html_bytes' => strlen($html ?: '')]);
+            }
             Cache::put('vpn_config_content_' . $key_activate_id, ['html' => $html ?: '', 'lastUpdated' => $lastUpdated], now()->addSeconds(self::CONFIG_CONTENT_CACHE_TTL_SECONDS));
+            if ($traceRefresh) {
+                VpnConfigPageTrace::checkpoint('refresh_cache_put_done');
+            }
+
             return response()->json(['success' => true, 'html' => $html ?: '', 'lastUpdated' => $lastUpdated]);
         } catch (\Throwable $e) {
+            if ($traceRefresh) {
+                VpnConfigPageTrace::checkpoint('refresh_throw', [
+                    'error' => $e->getMessage(),
+                    'class' => get_class($e),
+                ]);
+            }
             Log::warning('VpnConfig refresh failed', [
                 'key_activate_id' => $key_activate_id,
                 'error' => $e->getMessage(),
@@ -342,6 +471,10 @@ class VpnConfigController extends Controller
                 'success' => false,
                 'message' => 'Не удалось обновить конфигурацию. Попробуйте позже.',
             ], 500);
+        } finally {
+            if ($traceRefresh) {
+                VpnConfigPageTrace::end();
+            }
         }
     }
 
@@ -1028,6 +1161,13 @@ class VpnConfigController extends Controller
     private function showBrowserPage(KeyActivate $keyActivate, $keyActivateUser, $serverUser, $connectionKeys, array $slotsWithLinks = [], bool $useStoredOnly = false, bool $partialOnly = false, ?string $configRefreshUrl = null, ?string $configRefreshUrlForButton = null, $lastUpdated = null): Response
     {
         try {
+            if (VpnConfigPageTrace::isActive()) {
+                VpnConfigPageTrace::checkpoint('browser_page_enter', [
+                    'useStoredOnly' => $useStoredOnly,
+                    'partialOnly' => $partialOnly,
+                    'key_activate_id' => $keyActivate->id,
+                ]);
+            }
             // При первом открытии (useStoredOnly) не дергаем БД и не обновляем статус — страница отдаётся быстрее; статус обновится по кнопке «Обновить».
             if (!$useStoredOnly) {
                 $keyActivate->refresh();
@@ -1063,6 +1203,11 @@ class VpnConfigController extends Controller
                         'source' => 'vpn'
                     ]);
                 }
+            }
+            if (VpnConfigPageTrace::isActive()) {
+                VpnConfigPageTrace::checkpoint('browser_page_after_subscribe_block', [
+                    'subscribe_info_keys' => array_keys($info ?? []),
+                ]);
             }
 
             $packSalesman = $keyActivate->packSalesman ?? null;
@@ -1124,6 +1269,12 @@ class VpnConfigController extends Controller
                         ->whereNotNull('replaced_key_id')
                         ->orderByDesc('key_replaced_at')
                         ->first();
+            }
+            if (VpnConfigPageTrace::isActive()) {
+                VpnConfigPageTrace::checkpoint('browser_page_after_violations', [
+                    'violations_count' => isset($violations) ? $violations->count() : 0,
+                    'has_replaced' => (bool) ($replacedViolation ?? null),
+                ]);
             }
 
             $newKeyActivate = null;
@@ -1218,6 +1369,9 @@ class VpnConfigController extends Controller
                 $viewData['configRefreshUrlForButton'] = $configRefreshUrlForButton;
                 $viewData['configLastUpdated'] = $lastUpdated ? $lastUpdated->format('d.m.Y H:i') : null;
             }
+            if (VpnConfigPageTrace::isActive()) {
+                VpnConfigPageTrace::checkpoint('browser_page_before_render', ['partialOnly' => $partialOnly]);
+            }
             if ($partialOnly) {
                 return response(view('vpn.partials.config-content', $viewData)->render())
                     ->header('Content-Type', 'text/html; charset=UTF-8');
@@ -1225,6 +1379,12 @@ class VpnConfigController extends Controller
             return response()->view('vpn.config', $viewData);
 
         } catch (Exception $e) {
+            if (VpnConfigPageTrace::isActive()) {
+                VpnConfigPageTrace::checkpoint('browser_page_Exception', [
+                    'error' => $e->getMessage(),
+                    'class' => get_class($e),
+                ]);
+            }
             Log::error('Error showing browser page:', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
