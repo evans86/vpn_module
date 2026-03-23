@@ -63,13 +63,6 @@ return [
             'level' => env('LOG_LEVEL', 'debug'),
         ],
 
-        /** Диагностика /config/{token}: storage/logs/config-trace.log */
-        'config_trace' => [
-            'driver' => 'single',
-            'path' => storage_path('logs/config-trace.log'),
-            'level' => 'debug',
-        ],
-
         'telegram' => [
             'driver' => 'single',
             'path' => storage_path('logs/telegram.log'),
