@@ -76,8 +76,19 @@
             if (copyNotificationTimeout) clearTimeout(copyNotificationTimeout);
             copyNotificationTimeout = setTimeout(function() { notification.classList.add('hidden'); }, 3000);
         }
+        window.getVpnCleanConfigCanonicalUrl = function() {
+            try {
+                var u = new URL(window.location.href);
+                u.searchParams.delete('format');
+                u.searchParams.delete('sub');
+                return u.toString();
+            } catch (e) {
+                return window.location.href;
+            }
+        };
         window.copyCurrentUrl = function() {
-            navigator.clipboard.writeText(window.location.href).then(function() { showCopyNotification('✓ Ссылка скопирована в буфер обмена!'); }).catch(function() { alert('Не удалось скопировать ссылку.'); });
+            var url = window.getVpnCleanConfigCanonicalUrl();
+            navigator.clipboard.writeText(url).then(function() { showCopyNotification('✓ Ссылка скопирована в буфер обмена!'); }).catch(function() { alert('Не удалось скопировать ссылку.'); });
         };
         window.__vpnConfigPage = null;
         window.getVpnConfigAllLinks = function() {
@@ -110,31 +121,39 @@
             var links = window.getVpnConfigAllLinks();
             var has = links.length > 0;
             var copyBtn = document.getElementById('vpn-btn-copy-plain');
-            if (copyBtn) {
-                copyBtn.disabled = !has;
-                copyBtn.classList.toggle('opacity-50', !has);
-                copyBtn.classList.toggle('cursor-not-allowed', !has);
-                copyBtn.setAttribute('title', has ? 'Все строки конфигурации, по одной на строку' : 'Нет протоколов подключения');
-            }
+            var jsonBtn = document.getElementById('vpn-btn-copy-sub-json');
+            [copyBtn, jsonBtn].forEach(function(el) {
+                if (!el) return;
+                el.disabled = !has;
+                el.classList.toggle('opacity-50', !has);
+                el.classList.toggle('cursor-not-allowed', !has);
+                if (el.id === 'vpn-btn-copy-plain') {
+                    el.setAttribute('title', has ? 'Все строки конфигурации, по одной на строку' : 'Нет протоколов подключения');
+                } else {
+                    el.setAttribute('title', has ? 'JSON: ссылка подписки и массив прокси (URI)' : 'Нет протоколов для JSON');
+                }
+            });
         };
-        window.getVpnSubscriptionUrl = function() {
-            try {
-                var u = new URL(window.location.href);
-                u.searchParams.set('format', 'subscription');
-                return u.toString();
-            } catch (e) {
-                return null;
-            }
-        };
-        window.copyVpnSubscriptionUrl = function() {
-            var u = window.getVpnSubscriptionUrl();
-            if (!u) {
-                showCopyNotification('Не удалось сформировать ссылку подписки.');
+        window.copyVpnSubscriptionJson = function() {
+            var links = window.getVpnConfigAllLinks();
+            if (!links.length) {
+                showCopyNotification('Нет данных для JSON подписки.');
                 return;
             }
-            navigator.clipboard.writeText(u).then(function() {
-                showCopyNotification('✓ Ссылка подписки для клиентов скопирована!');
-            }).catch(function() { alert('Не удалось скопировать.'); });
+            var subUrl = typeof window.getVpnCleanConfigCanonicalUrl === 'function' ? window.getVpnCleanConfigCanonicalUrl() : '';
+            var payload = {
+                version: 1,
+                subscription_url: subUrl,
+                proxies: links
+            };
+            try {
+                var text = JSON.stringify(payload, null, 2);
+                navigator.clipboard.writeText(text).then(function() {
+                    showCopyNotification('✓ JSON подписки скопирован!');
+                }).catch(function() { alert('Не удалось скопировать.'); });
+            } catch (e) {
+                alert('Не удалось сформировать JSON.');
+            }
         };
         window.copyAllConfigurations = function() {
             var links = window.getVpnConfigAllLinks();
@@ -144,7 +163,8 @@
             }).catch(function() { alert('Не удалось скопировать конфигурацию.'); });
         };
         window.showVpnPageLinkQr = function() {
-            window.showQR(window.location.href, 'ссылки');
+            var u = typeof window.getVpnCleanConfigCanonicalUrl === 'function' ? window.getVpnCleanConfigCanonicalUrl() : window.location.href;
+            window.showQR(u, 'ссылки');
         };
         window.copyToClipboard = function(text, protocol) {
             navigator.clipboard.writeText(text).then(function() { showCopyNotification('✓ Конфигурация ' + (protocol || '') + ' скопирована!'); }).catch(function() { alert('Не удалось скопировать конфигурацию.'); });
@@ -160,7 +180,8 @@
             navigator.clipboard.writeText(links.join('\n')).then(function() { showCopyNotification('✓ Конфигурации «' + label + '» скопированы (' + links.length + ')!'); }).catch(function() { alert('Не удалось скопировать конфигурации.'); });
         };
         window.showUrlQR = function(url) {
-            window.showQR(url || window.location.href, 'ссылки');
+            var u = url || (typeof window.getVpnCleanConfigCanonicalUrl === 'function' ? window.getVpnCleanConfigCanonicalUrl() : window.location.href);
+            window.showQR(u, 'ссылки');
         };
         window.showQR = function(link, protocol) {
             if (!link) { alert('Ссылка для QR-кода отсутствует или некорректна.'); return; }

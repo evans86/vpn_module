@@ -87,13 +87,11 @@ class VpnConfigController extends Controller
             }
 
             $userAgent = request()->header('User-Agent') ?? 'Unknown';
-            // Явный параметр для подписки (обход подмены заголовков прокси/зеркалом): ?format=subscription или ?sub=1
+            // Явный параметр (обратная совместимость): ?format=subscription или ?sub=1
             $forceSubscription = in_array(request()->query('format'), ['subscription', 'sub', 'txt'], true)
                 || request()->query('sub') === '1';
-            $isSubscriptionRequest = $forceSubscription
-                || $this->isVpnClient($userAgent)
-                || !$this->requestAcceptsHtml()
-                || !$this->hasVersionedBrowserInUserAgent($userAgent);
+            // Plain text подписки по тому же URL /config/{token} без query — для всех запросов, кроме явной загрузки страницы в браузере.
+            $isSubscriptionRequest = $forceSubscription || !$this->shouldServeHtmlConfigShellPage($userAgent);
 
             if ($isSubscriptionRequest) {
                 $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateIdForSubscription($key_activate_id);
@@ -842,6 +840,57 @@ class VpnConfigController extends Controller
         return str_contains($ua, 'chrome/') || str_contains($ua, 'firefox/')
             || str_contains($ua, 'safari/') || str_contains($ua, 'edg/')
             || str_contains($ua, 'opr/') || str_contains($ua, 'msie ');
+    }
+
+    /**
+     * HTTP-библиотеки и типичные клиенты подписки — не HTML-страница.
+     */
+    private function isLikelyHttpClientLibrary(string $userAgent): bool
+    {
+        $u = strtolower($userAgent);
+        $libs = [
+            'okhttp', 'curl/', 'python-requests', 'go-http', 'dart/', 'axios', 'winhttp',
+            'apache-httpclient', 'urllib', 'java/', 'httpclient', 'cfnetwork',
+        ];
+        foreach ($libs as $lib) {
+            if (strpos($u, $lib) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Отдать HTML-оболочку только при явной навигации документом в браузере (Sec-Fetch-*).
+     * Иначе — plain text подписки по тому же URL без ?format=.
+     */
+    private function shouldServeHtmlConfigShellPage(string $userAgent): bool
+    {
+        if ($this->isVpnClient($userAgent)) {
+            return false;
+        }
+        if ($this->isLikelyHttpClientLibrary($userAgent)) {
+            return false;
+        }
+        if (!$this->hasVersionedBrowserInUserAgent($userAgent)) {
+            return false;
+        }
+        if (!$this->requestAcceptsHtml()) {
+            return false;
+        }
+        if (strtolower(request()->header('X-Requested-With', '')) === 'xmlhttprequest') {
+            return false;
+        }
+        $dest = strtolower(request()->header('Sec-Fetch-Dest', ''));
+        $mode = strtolower(request()->header('Sec-Fetch-Mode', ''));
+        if ($dest === '' && $mode === '') {
+            // HTTP без Sec-Fetch (локальная разработка) — HTML как раньше.
+            // HTTPS без Sec-Fetch — считаем запросом подписки (клиенты без навигационных заголовков).
+            return !request()->secure();
+        }
+
+        return $dest === 'document' && $mode === 'navigate';
     }
 
     /**
