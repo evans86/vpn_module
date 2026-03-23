@@ -22,9 +22,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 class VpnConfigController extends Controller
 {
-    /** Кэш только фрагмента HTML для /content (сек). Обновление с панели — только «Обновить» (refresh). */
-    private const CONFIG_CONTENT_CACHE_TTL_SECONDS = 180;
-
     /**
      * @var KeyActivateRepository
      */
@@ -126,14 +123,7 @@ class VpnConfigController extends Controller
                     ->header('Content-Type', 'text/plain; charset=utf-8');
             }
 
-            // Браузер: отдаём из кэша при повторном открытии (90 сек) — страница открывается мгновенно.
-            $configPageCacheKey = 'vpn_config_html_' . $key_activate_id;
-            $cachedHtml = Cache::get($configPageCacheKey);
-            if ($cachedHtml !== null) {
-                return response($cachedHtml)->header('Content-Type', 'text/html; charset=utf-8');
-            }
-
-            // Быстрый ответ: отдаём лёгкую оболочку (shell), контент подгрузится по /config/{token}/content — DOMContentLoaded будет ~0.5 с вместо 15+ с.
+            // Браузер: лёгкая оболочка (shell), контент подгрузится по /config/{token}/content.
             return response()->view('vpn.config-shell', [
                 'token' => $key_activate_id,
                 'contentUrl' => route('vpn.config.content', ['token' => $key_activate_id], false),
@@ -232,16 +222,6 @@ class VpnConfigController extends Controller
             @set_time_limit(120);
         }
 
-        $cacheKey = 'vpn_config_content_' . $key_activate_id;
-        $cached = Cache::get($cacheKey);
-        if ($cached !== null && is_array($cached) && isset($cached['page']) && is_array($cached['page'])) {
-            return response()->json([
-                'success' => true,
-                'page' => $cached['page'],
-                'lastUpdated' => $cached['lastUpdated'] ?? null,
-            ]);
-        }
-
         try {
             // Как у подписки: findById + двухшаговая загрузка слотов (findAllByKeyActivateIdForSubscription)
             // вместо одного nested eager findWithConfigRelationsForContent — меньше нагрузка на БД и быстрее при сети до MySQL.
@@ -288,7 +268,6 @@ class VpnConfigController extends Controller
             $lastUpdated = isset($data['lastUpdated']) && $data['lastUpdated']
                 ? $data['lastUpdated']->format('d.m.Y H:i')
                 : null;
-            Cache::put($cacheKey, ['page' => $page, 'lastUpdated' => $lastUpdated], now()->addSeconds(self::CONFIG_CONTENT_CACHE_TTL_SECONDS));
 
             return response()->json(['success' => true, 'page' => $page, 'lastUpdated' => $lastUpdated]);
         } catch (\Throwable $e) {
@@ -316,8 +295,6 @@ class VpnConfigController extends Controller
             @set_time_limit(180);
         }
 
-        Cache::forget('vpn_config_html_' . $key_activate_id);
-        Cache::forget('vpn_config_content_' . $key_activate_id);
         try {
             $keyActivate = $this->keyActivateRepository->findById($key_activate_id);
             if (!$keyActivate) {
@@ -348,7 +325,6 @@ class VpnConfigController extends Controller
             $lastUpdated = isset($data['lastUpdated']) && $data['lastUpdated']
                 ? $data['lastUpdated']->format('d.m.Y H:i')
                 : null;
-            Cache::put('vpn_config_content_' . $key_activate_id, ['page' => $page, 'lastUpdated' => $lastUpdated], now()->addSeconds(self::CONFIG_CONTENT_CACHE_TTL_SECONDS));
 
             return response()->json(['success' => true, 'page' => $page, 'lastUpdated' => $lastUpdated]);
         } catch (\Throwable $e) {
