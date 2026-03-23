@@ -427,8 +427,14 @@ class VpnConfigController extends Controller
                     $lastUpdated = $serverUser->updated_at;
                 }
                 $connectionKeys = array_merge($connectionKeys, $slotLinks);
-                $server = $serverUser->panel && $serverUser->panel->server ? $serverUser->panel->server : null;
-                $location = $server && $server->relationLoaded('location') ? $server->location : null;
+                $server = null;
+                $location = null;
+                $serverUser->loadMissing(['panel.server.location']);
+                if ($serverUser->panel && $serverUser->panel->server) {
+                    $server = $serverUser->panel->server;
+                    $server->loadMissing('location');
+                    $location = $server->location;
+                }
                 $locationCode = '';
                 $name = 'Сервер';
                 if ($location) {
@@ -610,6 +616,7 @@ class VpnConfigController extends Controller
                     $slotLinks = $links;
                     $connectionKeys = array_merge($connectionKeys, $links);
                     $serverUser->refresh();
+                    $serverUser->loadMissing(['panel.server.location']);
                     if ($serverUser->updated_at && (!$lastUpdated || $serverUser->updated_at > $lastUpdated)) {
                         $lastUpdated = $serverUser->updated_at;
                     }
@@ -632,8 +639,14 @@ class VpnConfigController extends Controller
                 unset($stored);
             }
             if (!empty($slotLinks)) {
-                $server = $serverUser->panel && $serverUser->panel->server ? $serverUser->panel->server : null;
-                $location = $server && $server->relationLoaded('location') ? $server->location : null;
+                $server = null;
+                $location = null;
+                $serverUser->loadMissing(['panel.server.location']);
+                if ($serverUser->panel && $serverUser->panel->server) {
+                    $server = $serverUser->panel->server;
+                    $server->loadMissing('location');
+                    $location = $server->location;
+                }
                 $locationCode = '';
                 $name = 'Сервер';
                 if ($location) {
