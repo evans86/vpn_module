@@ -26,20 +26,62 @@
             <div class="vpn-config-sheen pointer-events-none absolute inset-0 overflow-hidden rounded-2xl" aria-hidden="true"></div>
             <div class="vpn-config-grid-bg pointer-events-none absolute inset-0 rounded-2xl opacity-[0.07]" aria-hidden="true"></div>
             <div id="config-progress-spinner" class="relative z-10 flex flex-col gap-5 w-full max-w-xl mx-auto" role="status" aria-live="polite" aria-busy="true" aria-label="Идёт обновление конфигурации">
-                <div class="vpn-config-wave" aria-hidden="true">
-                    <span class="vpn-config-wave-bar"></span>
-                    <span class="vpn-config-wave-bar"></span>
-                    <span class="vpn-config-wave-bar"></span>
-                    <span class="vpn-config-wave-bar"></span>
-                    <span class="vpn-config-wave-bar"></span>
-                    <span class="vpn-config-wave-bar"></span>
-                    <span class="vpn-config-wave-bar"></span>
-                    <span class="vpn-config-wave-bar"></span>
-                    <span class="vpn-config-wave-bar"></span>
-                    <span class="vpn-config-wave-bar"></span>
-                    <span class="vpn-config-wave-bar"></span>
-                    <span class="vpn-config-wave-bar"></span>
-                    <span class="vpn-config-wave-bar"></span>
+                <div class="vpn-config-mascots flex flex-wrap justify-center items-end gap-5 sm:gap-7 px-2" aria-hidden="true">
+                    <div class="vpn-config-mascot vpn-config-mascot--blob">
+                        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" class="vpn-config-mascot-svg" aria-hidden="true">
+                            <defs>
+                                <linearGradient id="vpnMascotG1" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#a855f7"/>
+                                </linearGradient>
+                            </defs>
+                            <ellipse cx="32" cy="38" rx="22" ry="20" fill="url(#vpnMascotG1)"/>
+                            <circle cx="22" cy="38" r="4" fill="#fda4af" opacity="0.55"/>
+                            <circle cx="42" cy="38" r="4" fill="#fda4af" opacity="0.55"/>
+                            <ellipse cx="25" cy="30" rx="3.5" ry="4.5" fill="#1e1b4b"/>
+                            <ellipse cx="39" cy="30" rx="3.5" ry="4.5" fill="#1e1b4b"/>
+                            <path d="M26 42 Q32 48 38 42" stroke="#1e1b4b" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <div class="vpn-config-mascot vpn-config-mascot--robot">
+                        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" class="vpn-config-mascot-svg" aria-hidden="true">
+                            <defs>
+                                <linearGradient id="vpnMascotG2" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stop-color="#c4b5fd"/><stop offset="100%" stop-color="#8b5cf6"/>
+                                </linearGradient>
+                            </defs>
+                            <line x1="32" y1="14" x2="32" y2="22" stroke="#6366f1" stroke-width="3" stroke-linecap="round"/>
+                            <circle cx="32" cy="11" r="4" fill="#4f46e5"/>
+                            <rect x="16" y="22" width="32" height="30" rx="8" fill="url(#vpnMascotG2)" stroke="#5b21b6" stroke-width="1.5"/>
+                            <rect x="22" y="30" width="20" height="10" rx="3" fill="#ede9fe"/>
+                            <circle cx="26" cy="35" r="2.2" fill="#312e81"/>
+                            <circle cx="38" cy="35" r="2.2" fill="#312e81"/>
+                            <rect x="26" y="46" width="12" height="3" rx="1.5" fill="#5b21b6"/>
+                        </svg>
+                    </div>
+                    <div class="vpn-config-mascot vpn-config-mascot--ghost">
+                        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" class="vpn-config-mascot-svg" aria-hidden="true">
+                            <defs>
+                                <linearGradient id="vpnMascotG3" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#ddd6fe"/><stop offset="100%" stop-color="#a78bfa"/>
+                                </linearGradient>
+                            </defs>
+                            <path d="M32 14 C20 14 12 24 12 38 L12 50 L20 46 L28 50 L32 46 L36 50 L44 46 L52 50 L52 38 C52 24 44 14 32 14Z" fill="url(#vpnMascotG3)" stroke="#7c3aed" stroke-width="1.2"/>
+                            <circle cx="25" cy="32" r="3" fill="#1e1b4b"/>
+                            <circle cx="39" cy="32" r="3" fill="#1e1b4b"/>
+                            <path d="M28 40 Q32 43 36 40" stroke="#1e1b4b" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <div class="vpn-config-mascot vpn-config-mascot--duck">
+                        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" class="vpn-config-mascot-svg" aria-hidden="true">
+                            <ellipse cx="32" cy="36" rx="20" ry="18" fill="#fde047"/>
+                            <ellipse cx="32" cy="36" rx="20" ry="18" fill="none" stroke="#eab308" stroke-width="1.5"/>
+                            <circle cx="25" cy="32" r="3" fill="#1e293b"/>
+                            <circle cx="39" cy="32" r="3" fill="#1e293b"/>
+                            <path d="M32 36 L24 40 L32 44 L40 40 Z" fill="#fb923c"/>
+                            <path d="M18 48 Q22 52 26 50" stroke="#f59e0b" stroke-width="3" fill="none" stroke-linecap="round"/>
+                            <path d="M46 48 Q42 52 38 50" stroke="#f59e0b" stroke-width="3" fill="none" stroke-linecap="round"/>
+                        </svg>
+                    </div>
                 </div>
                 <div class="vpn-config-progress-track" aria-hidden="true">
                     <div id="config-progress-fill" class="vpn-config-progress-fill"></div>
@@ -125,49 +167,62 @@
             background-size: 22px 22px;
             mask-image: radial-gradient(ellipse 85% 75% at 50% 45%, black 20%, transparent 75%);
         }
-        /* «Волна» — полоски разной высоты (как мягкий спектр) */
-        .vpn-config-wave {
-            display: flex;
-            align-items: flex-end;
-            justify-content: center;
-            gap: 5px;
-            height: 52px;
-            padding: 0 8px;
+        /* Смешные фигурки: разные «характеры» анимации */
+        .vpn-config-mascot {
+            width: 3.75rem;
+            height: 3.75rem;
+            flex-shrink: 0;
+            filter: drop-shadow(0 6px 10px rgba(99, 102, 241, 0.22));
         }
-        .vpn-config-wave-bar {
+        .vpn-config-mascot-svg {
             display: block;
-            width: 6px;
-            height: 44px;
-            border-radius: 9999px;
-            transform-origin: bottom center;
-            background: linear-gradient(to top, #4f46e5, #8b5cf6 45%, #2dd4bf);
-            box-shadow: 0 0 12px rgba(99, 102, 241, 0.2);
-            animation: vpnWaveBar 1.05s ease-in-out infinite alternate;
+            width: 100%;
+            height: 100%;
         }
-        .vpn-config-wave-bar:nth-child(1) { animation-duration: 0.72s; animation-delay: 0s; }
-        .vpn-config-wave-bar:nth-child(2) { animation-duration: 0.95s; animation-delay: 0.06s; }
-        .vpn-config-wave-bar:nth-child(3) { animation-duration: 0.68s; animation-delay: 0.12s; }
-        .vpn-config-wave-bar:nth-child(4) { animation-duration: 1.1s; animation-delay: 0.03s; }
-        .vpn-config-wave-bar:nth-child(5) { animation-duration: 0.8s; animation-delay: 0.18s; }
-        .vpn-config-wave-bar:nth-child(6) { animation-duration: 0.88s; animation-delay: 0.09s; }
-        .vpn-config-wave-bar:nth-child(7) { animation-duration: 1.18s; animation-delay: 0s; }
-        .vpn-config-wave-bar:nth-child(8) { animation-duration: 0.72s; animation-delay: 0.15s; }
-        .vpn-config-wave-bar:nth-child(9) { animation-duration: 0.98s; animation-delay: 0.21s; }
-        .vpn-config-wave-bar:nth-child(10) { animation-duration: 0.84s; animation-delay: 0.07s; }
-        .vpn-config-wave-bar:nth-child(11) { animation-duration: 1.05s; animation-delay: 0.11s; }
-        .vpn-config-wave-bar:nth-child(12) { animation-duration: 0.76s; animation-delay: 0.24s; }
-        .vpn-config-wave-bar:nth-child(13) { animation-duration: 0.92s; animation-delay: 0.04s; }
-        @keyframes vpnWaveBar {
-            from { transform: scaleY(0.28); opacity: 0.65; }
-            to { transform: scaleY(1); opacity: 1; }
+        .vpn-config-mascot--blob {
+            animation: vpnMascotHop 1.05s ease-in-out infinite;
+        }
+        .vpn-config-mascot--robot {
+            animation: vpnMascotWobble 1.35s ease-in-out infinite;
+            animation-delay: 0.1s;
+        }
+        .vpn-config-mascot--ghost {
+            animation: vpnMascotFloat 1.2s ease-in-out infinite;
+            animation-delay: 0.2s;
+        }
+        .vpn-config-mascot--duck {
+            animation: vpnMascotPeck 0.95s ease-in-out infinite;
+            animation-delay: 0.32s;
+        }
+        @keyframes vpnMascotHop {
+            0%, 100% { transform: translateY(0) scale(1); }
+            40% { transform: translateY(-11px) scale(1.04, 0.96); }
+            55% { transform: translateY(0) scale(0.98, 1.03); }
+        }
+        @keyframes vpnMascotWobble {
+            0%, 100% { transform: translateY(0) rotate(-3deg); }
+            50% { transform: translateY(-7px) rotate(4deg); }
+        }
+        @keyframes vpnMascotFloat {
+            0%, 100% { transform: translateY(0) translateX(0); }
+            33% { transform: translateY(-9px) translateX(3px); }
+            66% { transform: translateY(-4px) translateX(-3px); }
+        }
+        @keyframes vpnMascotPeck {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            30% { transform: translateY(2px) rotate(-8deg); }
+            45% { transform: translateY(-6px) rotate(6deg); }
+            60% { transform: translateY(0) rotate(0deg); }
         }
         @media (prefers-reduced-motion: reduce) {
             .vpn-config-sheen,
-            .vpn-config-wave-bar,
+            .vpn-config-mascot--blob,
+            .vpn-config-mascot--robot,
+            .vpn-config-mascot--ghost,
+            .vpn-config-mascot--duck,
             .vpn-config-progress-fill {
                 animation: none !important;
             }
-            .vpn-config-wave-bar { transform: scaleY(0.65); opacity: 0.85; }
         }
     </style>
     <script src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
