@@ -1,16 +1,21 @@
 /**
- * Сборка минимального валидного JSON sing-box из URI (vless/vmess/trojan/ss)
- * для импорта в Hiddify и другие клиенты на sing-box.
+ * Сборка профиля sing-box из URI (vless/vmess/trojan/ss) для Hiddify и др.
+ * Формат: log.warn, dns (google/local), tun inbound, selector+direct, route.final=proxy.
  */
 (function (global) {
     'use strict';
 
+    /**
+     * Человекочитаемый тег (эмодзи, кириллица, как в подписке).
+     * Убираем только управляющие символы и обрезаем длину.
+     */
     function safeTag(name, index) {
         var t = String(name || '')
-            .replace(/[#\s]/g, '_')
-            .replace(/[^\x20-\x7E]/g, '')
-            .replace(/[^a-zA-Z0-9._-]/g, '')
-            .slice(0, 48);
+            .replace(/[\u0000-\u001F\u007F]/g, '')
+            .trim();
+        if (t.length > 128) {
+            t = t.slice(0, 128);
+        }
         return t || ('node-' + index);
     }
 
@@ -79,12 +84,15 @@
                 };
                 if (security === 'reality' && q.get('pbk')) {
                     outbound.tls.reality = {
+                        enabled: true,
                         public_key: q.get('pbk'),
                         short_id: q.get('sid') || ''
                     };
                 }
                 if (q.get('fp')) {
                     outbound.tls.utls = { enabled: true, fingerprint: q.get('fp') };
+                } else if (security === 'reality') {
+                    outbound.tls.utls = { enabled: true, fingerprint: 'chrome' };
                 }
             }
             return outbound;
@@ -247,30 +255,57 @@
         var tags = proxies.map(function (p) {
             return p.tag;
         });
+        var selectorList = tags.concat(['direct']);
 
         return {
             log: { level: 'warn' },
-            dns: {},
-            inbounds: [],
+            dns: {
+                servers: [
+                    {
+                        tag: 'google',
+                        address: '8.8.8.8',
+                        address_resolver: 'local'
+                    },
+                    {
+                        tag: 'local',
+                        address: 'local'
+                    }
+                ],
+                rules: [
+                    {
+                        outbound: 'any',
+                        server: 'google'
+                    }
+                ],
+                final: 'google'
+            },
+            inbounds: [
+                {
+                    type: 'tun',
+                    tag: 'tun-in',
+                    interface_name: 'singtun0',
+                    mtu: 9000,
+                    auto_route: true,
+                    strict_route: false,
+                    sniff: true
+                }
+            ],
             outbounds: [
                 {
                     type: 'selector',
                     tag: 'proxy',
-                    outbounds: tags.slice(),
+                    outbounds: selectorList,
                     default: tags[0]
-                },
-                {
-                    type: 'urltest',
-                    tag: 'auto',
-                    outbounds: tags.slice(),
-                    interval: '10m',
-                    tolerance: 50,
-                    url: 'https://www.gstatic.com/generate_204'
                 }
-            ].concat(proxies),
+            ].concat(proxies).concat([
+                {
+                    type: 'direct',
+                    tag: 'direct'
+                }
+            ]),
             route: {
-                rules: [],
-                final: 'auto'
+                auto_detect_interface: true,
+                final: 'proxy'
             }
         };
     }
