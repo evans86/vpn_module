@@ -26,65 +26,30 @@
             <div class="vpn-config-sheen pointer-events-none absolute inset-0 overflow-hidden rounded-2xl" aria-hidden="true"></div>
             <div class="vpn-config-grid-bg pointer-events-none absolute inset-0 rounded-2xl opacity-[0.07]" aria-hidden="true"></div>
             <div id="config-progress-spinner" class="relative z-10 flex flex-col gap-5 w-full max-w-xl mx-auto" role="status" aria-live="polite" aria-busy="true" aria-label="Идёт обновление конфигурации">
-                <div class="vpn-config-mascots flex flex-wrap justify-center items-end gap-5 sm:gap-7 px-2" aria-hidden="true">
-                    <div class="vpn-config-mascot vpn-config-mascot--blob">
-                        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" class="vpn-config-mascot-svg" aria-hidden="true">
-                            <defs>
-                                <linearGradient id="vpnMascotG1" x1="0%" y1="0%" x2="100%" y2="100%">
-                                    <stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#a855f7"/>
-                                </linearGradient>
-                            </defs>
-                            <ellipse cx="32" cy="38" rx="22" ry="20" fill="url(#vpnMascotG1)"/>
-                            <circle cx="22" cy="38" r="4" fill="#fda4af" opacity="0.55"/>
-                            <circle cx="42" cy="38" r="4" fill="#fda4af" opacity="0.55"/>
-                            <ellipse cx="25" cy="30" rx="3.5" ry="4.5" fill="#1e1b4b"/>
-                            <ellipse cx="39" cy="30" rx="3.5" ry="4.5" fill="#1e1b4b"/>
-                            <path d="M26 42 Q32 48 38 42" stroke="#1e1b4b" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-                        </svg>
+                <div id="config-eat-wrap" class="vpn-eat-wrap w-full max-w-xl mx-auto" style="--vpn-eat-progress: 0;" aria-hidden="true">
+                    <div class="vpn-eat-stage relative pt-12 pb-1">
+                        <div class="vpn-eat-track relative h-[14px] rounded-full overflow-hidden">
+                            <div class="vpn-eat-crumbs" aria-hidden="true"></div>
+                            <div class="vpn-eat-food" aria-hidden="true"></div>
+                        </div>
+                        <div class="vpn-eat-critter" aria-hidden="true">
+                            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" class="vpn-eat-critter-svg">
+                                <defs>
+                                    <linearGradient id="vpnEatBlobGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#a855f7"/>
+                                    </linearGradient>
+                                </defs>
+                                <ellipse cx="32" cy="36" rx="18" ry="16" fill="url(#vpnEatBlobGrad)"/>
+                                <circle cx="22" cy="38" r="3.5" fill="#fda4af" opacity="0.55"/>
+                                <circle cx="42" cy="38" r="3.5" fill="#fda4af" opacity="0.55"/>
+                                <circle cx="24" cy="28" r="3" fill="#1e1b4b"/>
+                                <circle cx="36" cy="28" r="3" fill="#1e1b4b"/>
+                                <g class="vpn-eat-mouth-g" transform="translate(32, 40)">
+                                    <ellipse class="vpn-eat-mouth" cx="0" cy="0" rx="10" ry="7" fill="#312e81"/>
+                                </g>
+                            </svg>
+                        </div>
                     </div>
-                    <div class="vpn-config-mascot vpn-config-mascot--robot">
-                        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" class="vpn-config-mascot-svg" aria-hidden="true">
-                            <defs>
-                                <linearGradient id="vpnMascotG2" x1="0%" y1="0%" x2="0%" y2="100%">
-                                    <stop offset="0%" stop-color="#c4b5fd"/><stop offset="100%" stop-color="#8b5cf6"/>
-                                </linearGradient>
-                            </defs>
-                            <line x1="32" y1="14" x2="32" y2="22" stroke="#6366f1" stroke-width="3" stroke-linecap="round"/>
-                            <circle cx="32" cy="11" r="4" fill="#4f46e5"/>
-                            <rect x="16" y="22" width="32" height="30" rx="8" fill="url(#vpnMascotG2)" stroke="#5b21b6" stroke-width="1.5"/>
-                            <rect x="22" y="30" width="20" height="10" rx="3" fill="#ede9fe"/>
-                            <circle cx="26" cy="35" r="2.2" fill="#312e81"/>
-                            <circle cx="38" cy="35" r="2.2" fill="#312e81"/>
-                            <rect x="26" y="46" width="12" height="3" rx="1.5" fill="#5b21b6"/>
-                        </svg>
-                    </div>
-                    <div class="vpn-config-mascot vpn-config-mascot--ghost">
-                        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" class="vpn-config-mascot-svg" aria-hidden="true">
-                            <defs>
-                                <linearGradient id="vpnMascotG3" x1="0%" y1="0%" x2="100%" y2="100%">
-                                    <stop offset="0%" stop-color="#ddd6fe"/><stop offset="100%" stop-color="#a78bfa"/>
-                                </linearGradient>
-                            </defs>
-                            <path d="M32 14 C20 14 12 24 12 38 L12 50 L20 46 L28 50 L32 46 L36 50 L44 46 L52 50 L52 38 C52 24 44 14 32 14Z" fill="url(#vpnMascotG3)" stroke="#7c3aed" stroke-width="1.2"/>
-                            <circle cx="25" cy="32" r="3" fill="#1e1b4b"/>
-                            <circle cx="39" cy="32" r="3" fill="#1e1b4b"/>
-                            <path d="M28 40 Q32 43 36 40" stroke="#1e1b4b" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-                        </svg>
-                    </div>
-                    <div class="vpn-config-mascot vpn-config-mascot--duck">
-                        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" class="vpn-config-mascot-svg" aria-hidden="true">
-                            <ellipse cx="32" cy="36" rx="20" ry="18" fill="#fde047"/>
-                            <ellipse cx="32" cy="36" rx="20" ry="18" fill="none" stroke="#eab308" stroke-width="1.5"/>
-                            <circle cx="25" cy="32" r="3" fill="#1e293b"/>
-                            <circle cx="39" cy="32" r="3" fill="#1e293b"/>
-                            <path d="M32 36 L24 40 L32 44 L40 40 Z" fill="#fb923c"/>
-                            <path d="M18 48 Q22 52 26 50" stroke="#f59e0b" stroke-width="3" fill="none" stroke-linecap="round"/>
-                            <path d="M46 48 Q42 52 38 50" stroke="#f59e0b" stroke-width="3" fill="none" stroke-linecap="round"/>
-                        </svg>
-                    </div>
-                </div>
-                <div class="vpn-config-progress-track" aria-hidden="true">
-                    <div id="config-progress-fill" class="vpn-config-progress-fill"></div>
                 </div>
                 <div class="text-center min-h-[3.25rem] flex flex-col items-center justify-start px-1">
                     <p id="config-progress-status" class="vpn-refresh-status-text text-sm sm:text-[0.9375rem] font-medium text-indigo-900/85 leading-relaxed max-w-md"></p>
@@ -112,25 +77,81 @@
         .notification { position: fixed; bottom: 24px; right: 24px; padding: 16px 24px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15); font-size: 15px; font-weight: 500; z-index: 1000; opacity: 0; transform: translateY(20px) scale(0.95); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .notification.hidden { opacity: 0; transform: translateY(20px) scale(0.95); }
         .notification:not(.hidden) { opacity: 1; transform: translateY(0) scale(1); }
-        /* Прогресс «Обновить»: indigo/violet/teal в стиле страницы */
-        .vpn-config-progress-track {
-            height: 8px;
-            border-radius: 9999px;
-            background: rgba(79, 70, 229, 0.12);
-            overflow: hidden;
+        /* Полоска «съедается» персонажем: --vpn-eat-progress 0…1 */
+        @property --vpn-eat-progress {
+            syntax: '<number>';
+            inherits: false;
+            initial-value: 0;
+        }
+        .vpn-eat-wrap {
+            --vpn-eat-progress: 0;
+        }
+        .vpn-eat-wrap.vpn-eat-wrap--smooth {
+            transition: --vpn-eat-progress 0.5s cubic-bezier(0.34, 1.2, 0.64, 1);
+        }
+        .vpn-eat-stage {
+            width: 100%;
+        }
+        .vpn-eat-track {
+            background: rgba(79, 70, 229, 0.1);
             box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
         }
-        .vpn-config-progress-fill {
-            height: 100%;
-            width: 42%;
-            border-radius: 9999px;
-            background: linear-gradient(90deg, #4f46e5, #7c3aed 42%, #14b8a6);
-            background-size: 200% 100%;
-            animation: vpnConfigProgressSlide 1.35s ease-in-out infinite;
+        .vpn-eat-crumbs {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: calc(var(--vpn-eat-progress) * 100%);
+            transition: width 0.5s cubic-bezier(0.34, 1.2, 0.64, 1);
+            background: repeating-linear-gradient(
+                -45deg,
+                rgba(251, 191, 36, 0.12) 0px,
+                rgba(251, 191, 36, 0.12) 4px,
+                rgba(254, 243, 199, 0.35) 4px,
+                rgba(254, 243, 199, 0.35) 8px
+            );
+            border-radius: 9999px 0 0 9999px;
+            pointer-events: none;
         }
-        @keyframes vpnConfigProgressSlide {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(320%); }
+        .vpn-eat-food {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: calc((1 - var(--vpn-eat-progress)) * 100%);
+            min-width: 0;
+            background: linear-gradient(90deg, #4f46e5, #7c3aed 48%, #14b8a6);
+            border-radius: 0 9999px 9999px 0;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            pointer-events: none;
+            transition: width 0.5s cubic-bezier(0.34, 1.2, 0.64, 1);
+        }
+        .vpn-eat-critter {
+            position: absolute;
+            left: calc(28px + var(--vpn-eat-progress) * (100% - 56px));
+            bottom: 0;
+            transform: translateX(-50%);
+            width: 56px;
+            height: 56px;
+            filter: drop-shadow(0 4px 10px rgba(99, 102, 241, 0.35));
+            transition: left 0.5s cubic-bezier(0.34, 1.2, 0.64, 1);
+        }
+        .vpn-eat-critter-svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .vpn-eat-mouth {
+            transform-origin: 0 0;
+            animation: vpnEatChomp 0.38s ease-in-out infinite;
+        }
+        @keyframes vpnEatChomp {
+            0%, 100% { transform: scale(0.45, 0.25); opacity: 0.9; }
+            50% { transform: scale(1, 1); opacity: 1; }
+        }
+        .vpn-eat-wrap--done .vpn-eat-mouth {
+            animation: none;
+            transform: scale(0.55, 0.45);
         }
         .vpn-refresh-status-text {
             transition: opacity 0.35s ease, transform 0.35s ease;
@@ -167,61 +188,17 @@
             background-size: 22px 22px;
             mask-image: radial-gradient(ellipse 85% 75% at 50% 45%, black 20%, transparent 75%);
         }
-        /* Смешные фигурки: разные «характеры» анимации */
-        .vpn-config-mascot {
-            width: 3.75rem;
-            height: 3.75rem;
-            flex-shrink: 0;
-            filter: drop-shadow(0 6px 10px rgba(99, 102, 241, 0.22));
-        }
-        .vpn-config-mascot-svg {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
-        .vpn-config-mascot--blob {
-            animation: vpnMascotHop 1.05s ease-in-out infinite;
-        }
-        .vpn-config-mascot--robot {
-            animation: vpnMascotWobble 1.35s ease-in-out infinite;
-            animation-delay: 0.1s;
-        }
-        .vpn-config-mascot--ghost {
-            animation: vpnMascotFloat 1.2s ease-in-out infinite;
-            animation-delay: 0.2s;
-        }
-        .vpn-config-mascot--duck {
-            animation: vpnMascotPeck 0.95s ease-in-out infinite;
-            animation-delay: 0.32s;
-        }
-        @keyframes vpnMascotHop {
-            0%, 100% { transform: translateY(0) scale(1); }
-            40% { transform: translateY(-11px) scale(1.04, 0.96); }
-            55% { transform: translateY(0) scale(0.98, 1.03); }
-        }
-        @keyframes vpnMascotWobble {
-            0%, 100% { transform: translateY(0) rotate(-3deg); }
-            50% { transform: translateY(-7px) rotate(4deg); }
-        }
-        @keyframes vpnMascotFloat {
-            0%, 100% { transform: translateY(0) translateX(0); }
-            33% { transform: translateY(-9px) translateX(3px); }
-            66% { transform: translateY(-4px) translateX(-3px); }
-        }
-        @keyframes vpnMascotPeck {
-            0%, 100% { transform: translateY(0) rotate(0deg); }
-            30% { transform: translateY(2px) rotate(-8deg); }
-            45% { transform: translateY(-6px) rotate(6deg); }
-            60% { transform: translateY(0) rotate(0deg); }
-        }
         @media (prefers-reduced-motion: reduce) {
             .vpn-config-sheen,
-            .vpn-config-mascot--blob,
-            .vpn-config-mascot--robot,
-            .vpn-config-mascot--ghost,
-            .vpn-config-mascot--duck,
-            .vpn-config-progress-fill {
+            .vpn-eat-mouth,
+            .vpn-eat-wrap.vpn-eat-wrap--smooth {
                 animation: none !important;
+                transition: none !important;
+            }
+            .vpn-eat-critter,
+            .vpn-eat-crumbs,
+            .vpn-eat-food {
+                transition: none !important;
             }
         }
     </style>
@@ -380,6 +357,7 @@
         var contentEl = document.getElementById('config-content');
         var refreshBar = document.getElementById('config-refresh-bar');
         var progressBar = document.getElementById('config-progress-bar');
+        var eatWrap = document.getElementById('config-eat-wrap');
         var lastUpdatedEl = document.getElementById('config-last-updated');
         var btnRefresh = document.getElementById('config-btn-refresh');
         var statusTextEl = document.getElementById('config-progress-status');
@@ -452,6 +430,22 @@
                 el.textContent = '';
                 el.classList.add('hidden');
             }
+        }
+
+        function resetEatUi() {
+            if (!eatWrap) return;
+            eatWrap.classList.remove('vpn-eat-wrap--done', 'vpn-eat-wrap--smooth');
+            eatWrap.style.setProperty('--vpn-eat-progress', '0');
+        }
+
+        function setEatProgress(p) {
+            if (!eatWrap) return;
+            var v = Math.max(0, Math.min(1, Number(p) || 0));
+            eatWrap.style.setProperty('--vpn-eat-progress', String(v));
+        }
+
+        function syncPollEatProgress(attempt, maxPolls) {
+            return Math.min(0.92, 0.1 + (attempt / maxPolls) * 0.82);
         }
 
         function vpnB64ToUtf8(b64) {
@@ -546,6 +540,7 @@
 
             clearVpnSyncPolling();
             var refreshSessionClosed = false;
+            var syncPollFinished = false;
             var syncPollAttempts = 0;
             var MAX_SYNC_POLLS = 45;
             var POLL_INTERVAL_MS = 2000;
@@ -560,6 +555,7 @@
                 statusRotation = null;
                 if (btnRefresh) btnRefresh.disabled = false;
                 if (spinnerBlock) spinnerBlock.setAttribute('aria-busy', 'false');
+                resetEatUi();
                 progressBar.classList.add('hidden');
                 refreshBar.classList.remove('hidden');
                 if (notifyMsg) showCopyNotification(notifyMsg);
@@ -568,6 +564,8 @@
             function resetUiBeforeRequest() {
                 window.__vpnLastUpdatedBeforeSync = undefined;
                 window.__vpnLastUpdatedEpochBeforeSync = undefined;
+                syncPollFinished = false;
+                resetEatUi();
                 progressBar.classList.remove('hidden');
                 refreshBar.classList.add('hidden');
                 showSpinnerState();
@@ -615,13 +613,16 @@
                         if (typeof res.data.lastUpdatedEpoch === 'number') window.__vpnLastConfigEpoch = res.data.lastUpdatedEpoch;
 
                         if (!res.data.syncPending) {
-                            closeRefreshUi(null);
+                            if (eatWrap) eatWrap.classList.add('vpn-eat-wrap--smooth');
+                            setEatProgress(1);
+                            setTimeout(function() { closeRefreshUi(null); }, 420);
                             return;
                         }
 
                         var baselineEpoch = (typeof res.data.lastUpdatedEpoch === 'number') ? res.data.lastUpdatedEpoch : undefined;
                         var baselineLabel = res.data.lastUpdated ? String(res.data.lastUpdated) : '';
 
+                        setEatProgress(0.1);
                         if (typeof window.vpnConfigRefreshStartSyncPollingRotation === 'function' && statusTextEl) {
                             statusRotation = window.vpnConfigRefreshStartSyncPollingRotation(statusTextEl);
                         }
@@ -650,17 +651,35 @@
                             if (refreshSessionClosed) return;
                             syncPollAttempts++;
                             if (syncPollAttempts > MAX_SYNC_POLLS) {
-                                closeRefreshUi('Пока не удалось подтвердить обновление. Попробуйте позже или обновите страницу.');
+                                if (syncPollFinished) return;
+                                syncPollFinished = true;
+                                clearVpnSyncPolling();
+                                if (eatWrap) eatWrap.classList.add('vpn-eat-wrap--smooth');
+                                setEatProgress(0.74);
+                                setTimeout(function() {
+                                    closeRefreshUi('Пока не удалось подтвердить обновление. Попробуйте позже или обновите страницу.');
+                                }, 450);
                                 return;
                             }
+                            if (eatWrap) eatWrap.classList.add('vpn-eat-wrap--smooth');
+                            setEatProgress(syncPollEatProgress(syncPollAttempts, MAX_SYNC_POLLS));
                             fetch(contentUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
                                 .then(parseJsonResponse)
                                 .then(function(pollRes) {
                                     if (refreshSessionClosed) return;
+                                    if (syncPollFinished) return;
                                     if (!pollRes.data || !pollRes.data.success || !pollRes.data.page) return;
                                     if (isDataNewerThanBaseline(pollRes.data)) {
+                                        syncPollFinished = true;
+                                        clearVpnSyncPolling();
                                         applyContentPayload(pollRes.data);
-                                        closeRefreshUi('✓ Готово, конфигурация обновлена');
+                                        if (eatWrap) {
+                                            eatWrap.classList.add('vpn-eat-wrap--smooth', 'vpn-eat-wrap--done');
+                                        }
+                                        setEatProgress(1);
+                                        setTimeout(function() {
+                                            closeRefreshUi('✓ Готово, конфигурация обновлена');
+                                        }, 480);
                                     }
                                 })
                                 .catch(function() { /* сеть: следующий интервал попробует снова */ });
