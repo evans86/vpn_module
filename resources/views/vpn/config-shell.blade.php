@@ -337,6 +337,8 @@
                     }
                     if (typeof window.syncVpnToolbarProtoButtons === 'function') window.syncVpnToolbarProtoButtons();
                     if (res.data.lastUpdated && lastUpdatedEl) lastUpdatedEl.textContent = res.data.lastUpdated;
+                    if (res.data.lastUpdated) window.__vpnLastConfigUpdatedLabel = res.data.lastUpdated;
+                    if (typeof res.data.lastUpdatedEpoch === 'number') window.__vpnLastConfigEpoch = res.data.lastUpdatedEpoch;
                 } else {
                     setContentError(res.data && res.data.message ? res.data.message : null);
                 }
@@ -388,16 +390,38 @@
             }
         }
 
-        /** Тихая подгрузка /content после фоновой синхронизации Marzban (обновлённые ключи в БД). */
+        /**
+         * Тихая подгрузка /content после фоновой синхронизации Marzban.
+         * Если lastUpdated изменился относительно ответа «Обновить» — БД уже перезаписана с панели.
+         */
         function refetchVpnConfigContentSilent() {
             fetch(contentUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
                 .then(parseJsonResponse)
                 .then(function(res) {
                     if (res.data && res.data.success && res.data.page && contentEl && typeof window.renderVpnConfigPage === 'function') {
+                        var newLabel = res.data.lastUpdated ? String(res.data.lastUpdated) : '';
+                        var newEpoch = res.data.lastUpdatedEpoch;
+                        var awaiting = window.__vpnAwaitingSyncRefresh === true;
+                        var dataChanged = false;
+                        if (awaiting) {
+                            var bEp = window.__vpnLastUpdatedEpochBeforeSync;
+                            if (typeof newEpoch === 'number' && typeof bEp === 'number') {
+                                dataChanged = newEpoch !== bEp;
+                            } else {
+                                var baseline = window.__vpnLastUpdatedBeforeSync;
+                                dataChanged = baseline !== undefined && newLabel && newLabel !== String(baseline);
+                            }
+                        }
+                        if (dataChanged) {
+                            showCopyNotification('✓ Конфигурация обновлена с сервера панели');
+                            window.__vpnAwaitingSyncRefresh = false;
+                        }
                         window.__vpnConfigPage = res.data.page;
                         window.renderVpnConfigPage(contentEl, res.data.page);
                         if (typeof window.syncVpnToolbarProtoButtons === 'function') window.syncVpnToolbarProtoButtons();
                         if (res.data.lastUpdated && lastUpdatedEl) lastUpdatedEl.textContent = res.data.lastUpdated;
+                        if (newLabel) window.__vpnLastConfigUpdatedLabel = newLabel;
+                        if (typeof newEpoch === 'number') window.__vpnLastConfigEpoch = newEpoch;
                     }
                 })
                 .catch(function() { /* игнорируем: пользователь уже видит данные с первого ответа */ });
@@ -412,6 +436,9 @@
         function runRefresh() {
             if (!progressBar || !refreshBar) return;
             clearVpnRefreshFollowups();
+            window.__vpnAwaitingSyncRefresh = false;
+            window.__vpnLastUpdatedBeforeSync = undefined;
+            window.__vpnLastUpdatedEpochBeforeSync = undefined;
             progressBar.classList.remove('hidden');
             refreshBar.classList.add('hidden');
             showSpinnerState();
@@ -441,9 +468,16 @@
                         }
                         if (typeof window.syncVpnToolbarProtoButtons === 'function') window.syncVpnToolbarProtoButtons();
                         if (res.data.lastUpdated && lastUpdatedEl) lastUpdatedEl.textContent = res.data.lastUpdated;
+                        if (res.data.lastUpdated) window.__vpnLastConfigUpdatedLabel = res.data.lastUpdated;
+                        if (typeof res.data.lastUpdatedEpoch === 'number') window.__vpnLastConfigEpoch = res.data.lastUpdatedEpoch;
                         progressBar.classList.add('hidden');
                         refreshBar.classList.remove('hidden');
                         if (res.data.syncPending) {
+                            window.__vpnAwaitingSyncRefresh = true;
+                            window.__vpnLastUpdatedBeforeSync = res.data.lastUpdated ? String(res.data.lastUpdated) : '';
+                            window.__vpnLastUpdatedEpochBeforeSync = (typeof res.data.lastUpdatedEpoch === 'number')
+                                ? res.data.lastUpdatedEpoch
+                                : undefined;
                             _vpnRefreshFollowupTimers.push(setTimeout(refetchVpnConfigContentSilent, 4500));
                             _vpnRefreshFollowupTimers.push(setTimeout(refetchVpnConfigContentSilent, 11000));
                             _vpnRefreshFollowupTimers.push(setTimeout(refetchVpnConfigContentSilent, 25000));

@@ -286,8 +286,16 @@ class VpnConfigController extends Controller
             $lastUpdated = isset($data['lastUpdated']) && $data['lastUpdated']
                 ? $data['lastUpdated']->format('d.m.Y H:i')
                 : null;
+            $lastUpdatedEpoch = isset($data['lastUpdated']) && $data['lastUpdated']
+                ? $data['lastUpdated']->getTimestamp()
+                : null;
 
-            return response()->json(['success' => true, 'page' => $page, 'lastUpdated' => $lastUpdated]);
+            return response()->json([
+                'success' => true,
+                'page' => $page,
+                'lastUpdated' => $lastUpdated,
+                'lastUpdatedEpoch' => $lastUpdatedEpoch,
+            ]);
         } catch (\Throwable $e) {
             Log::warning('VpnConfig content failed', [
                 'key_activate_id' => $key_activate_id,
@@ -364,6 +372,9 @@ class VpnConfigController extends Controller
             $lastUpdated = isset($data['lastUpdated']) && $data['lastUpdated']
                 ? $data['lastUpdated']->format('d.m.Y H:i')
                 : null;
+            $lastUpdatedEpoch = isset($data['lastUpdated']) && $data['lastUpdated']
+                ? $data['lastUpdated']->getTimestamp()
+                : null;
 
             $durationMs = (int) round((microtime(true) - $t0) * 1000);
             Log::info('VpnConfig refresh: ответ отправлен (из БД)', [
@@ -393,6 +404,7 @@ class VpnConfigController extends Controller
                 'success' => true,
                 'page' => $page,
                 'lastUpdated' => $lastUpdated,
+                'lastUpdatedEpoch' => $lastUpdatedEpoch,
                 'syncPending' => true,
             ]);
         } catch (\Throwable $e) {
