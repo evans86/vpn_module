@@ -1737,7 +1737,7 @@ class VpnConfigController extends Controller
     }
 
     /**
-     * Заголовок для VPN-клиентов: бот @username, срок действия, ключ в скобках.
+     * Заголовок для VPN-клиентов (Profile-Title): @bot until DD.MM.YYYY (key_id), только ASCII.
      */
     private function buildSubscriptionProfileTitle(KeyActivate $keyActivate, string $keyId): string
     {
@@ -1747,13 +1747,14 @@ class VpnConfigController extends Controller
             $rawBotLink = (string) ($packSalesman->salesman->bot_link ?? '');
         }
         $botAt = $this->botLinkToAtUsername($rawBotLink);
-        $until = '—';
+        // Только ASCII: многие VPN-клиенты криво показывают UTF-8 в Profile-Title.
+        $until = 'n/a';
         $finishAt = $keyActivate->finish_at ?? null;
         if ($finishAt !== null && (int) $finishAt > 0) {
             $until = \Carbon\Carbon::createFromTimestamp((int) $finishAt)->format('d.m.Y');
         }
 
-        return sprintf('%s до %s (%s)', $botAt, $until, $keyId);
+        return sprintf('%s until %s (%s)', $botAt, $until, $keyId);
     }
 
     /**

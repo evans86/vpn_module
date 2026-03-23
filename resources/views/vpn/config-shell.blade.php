@@ -130,26 +130,21 @@
                 if (el.id === 'vpn-btn-copy-plain') {
                     el.setAttribute('title', has ? 'Все строки конфигурации, по одной на строку' : 'Нет протоколов подключения');
                 } else {
-                    el.setAttribute('title', has ? 'JSON: ссылка подписки и массив прокси (URI)' : 'Нет протоколов для JSON');
+                    el.setAttribute('title', has ? 'JSON-массив URI (vless/trojan/ss…) для импорта в клиент' : 'Нет протоколов для JSON');
                 }
             });
         };
         window.copyVpnSubscriptionJson = function() {
             var links = window.getVpnConfigAllLinks();
             if (!links.length) {
-                showCopyNotification('Нет данных для JSON подписки.');
+                showCopyNotification('Нет данных для JSON.');
                 return;
             }
-            var subUrl = typeof window.getVpnCleanConfigCanonicalUrl === 'function' ? window.getVpnCleanConfigCanonicalUrl() : '';
-            var payload = {
-                version: 1,
-                subscription_url: subUrl,
-                proxies: links
-            };
             try {
-                var text = JSON.stringify(payload, null, 2);
+                // Один корректный JSON: массив строк URI — такой формат принимают многие клиенты при «импорт из буфера».
+                var text = JSON.stringify(links);
                 navigator.clipboard.writeText(text).then(function() {
-                    showCopyNotification('✓ JSON подписки скопирован!');
+                    showCopyNotification('✓ JSON скопирован (массив ссылок)');
                 }).catch(function() { alert('Не удалось скопировать.'); });
             } catch (e) {
                 alert('Не удалось сформировать JSON.');

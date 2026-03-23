@@ -40,11 +40,6 @@
         return 'дней';
     }
 
-    function gbFromBytes(b) {
-        var n = Number(b) || 0;
-        return (n / (1024 * 1024 * 1024)).toFixed(2);
-    }
-
     /** Панель действий: 4 кнопки — ширина как у контента (без max-w на блоке). */
     function buildVpnActionToolbarHtml() {
         var c = 'inline-flex w-full h-full min-h-[4.25rem] items-center justify-center text-center px-2 py-2.5 sm:px-3 border-2 rounded-xl font-medium text-xs sm:text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all shadow-sm hover:shadow';
@@ -52,14 +47,14 @@
             '<div id="config-action-buttons" class="mb-8">' +
             '<div class="bg-white rounded-2xl shadow-lg p-4 sm:p-6 md:p-8 border border-gray-100 w-full">' +
             '<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 auto-rows-fr">' +
+            '<button type="button" onclick="showVpnPageLinkQr()" class="' + c + ' border-violet-200 text-violet-800 bg-violet-50 hover:bg-violet-100 focus:ring-violet-500">' +
+            '<span class="inline-flex flex-col sm:flex-row items-center justify-center gap-1.5"><svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9h14a2 2 0 012 2v2m0 0H3a2 2 0 01-2-2V9a2 2 0 012-2h14a2 2 0 012 2v2zm0 0h2a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2h2z"/></svg><span>QR-код</span></span></button>' +
+            '<button type="button" id="vpn-btn-copy-sub-json" disabled onclick="copyVpnSubscriptionJson()" class="' + c + ' border-amber-200 text-amber-900 bg-amber-50 hover:bg-amber-100 focus:ring-amber-500 opacity-50 cursor-not-allowed" title="Нет протоколов для JSON">' +
+            '<span class="inline-flex flex-col sm:flex-row items-center justify-center gap-1.5"><svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg><span>Скопировать JSON</span></span></button>' +
             '<button type="button" onclick="copyCurrentUrl()" class="' + c + ' border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:ring-indigo-500">' +
             '<span class="inline-flex flex-col sm:flex-row items-center justify-center gap-1.5"><svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg><span>Скопировать ссылку</span></span></button>' +
-            '<button type="button" onclick="showVpnPageLinkQr()" class="' + c + ' border-violet-200 text-violet-800 bg-violet-50 hover:bg-violet-100 focus:ring-violet-500">' +
-            '<span class="inline-flex flex-col sm:flex-row items-center justify-center gap-1.5"><svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9h14a2 2 0 012 2v2m0 0H3a2 2 0 01-2-2V9a2 2 0 012-2h14a2 2 0 012 2v2zm0 0h2a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2h2z"/></svg><span>QR ссылки</span></span></button>' +
             '<button type="button" id="vpn-btn-copy-plain" disabled onclick="copyAllConfigurations()" class="' + c + ' border-green-200 text-green-700 bg-green-50 hover:bg-green-100 focus:ring-green-500 opacity-50 cursor-not-allowed" title="Нет протоколов подключения">' +
             '<span class="inline-flex flex-col sm:flex-row items-center justify-center gap-1.5"><svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg><span>Скопировать конфигурацию</span></span></button>' +
-            '<button type="button" id="vpn-btn-copy-sub-json" disabled onclick="copyVpnSubscriptionJson()" class="' + c + ' border-amber-200 text-amber-900 bg-amber-50 hover:bg-amber-100 focus:ring-amber-500 opacity-50 cursor-not-allowed" title="Нет протоколов для JSON">' +
-            '<span class="inline-flex flex-col sm:flex-row items-center justify-center gap-1.5"><svg class="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg><span>JSON подписки</span></span></button>' +
             '</div></div></div>'
         );
     }
@@ -189,8 +184,6 @@
             '<div class="space-y-4">' +
             '<div class="flex items-center justify-between"><span class="text-gray-600 font-medium">Статус:</span>' +
             '<span class="px-3 py-1.5 rounded-full text-sm font-semibold ' + statusClass + '">' + escapeHtml(statusText) + '</span></div>' +
-            '<div class="flex items-center justify-between"><span class="text-gray-600 font-medium">Использовано:</span>' +
-            '<span class="font-bold text-gray-900">' + escapeHtml(gbFromBytes(displayUserInfo.data_used)) + ' GB</span></div>' +
             '</div></div>' +
             '<div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200">' +
             '<div class="space-y-4"><div>' +
