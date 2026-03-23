@@ -119,8 +119,23 @@ class VpnConfigController extends Controller
                 $connectionKeys = $this->collectConnectionKeysFromKeyActivateUsers($keyActivateUsers);
                 $bodyPreview = implode("\n", $connectionKeys);
 
-                return response($bodyPreview)
+                $keyActivate->loadMissing([
+                    'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
+                    'packSalesman.salesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
+                ]);
+                $profileTitle = $this->buildSubscriptionProfileTitle($keyActivate, $key_activate_id);
+
+                $response = response($bodyPreview)
                     ->header('Content-Type', 'text/plain; charset=utf-8');
+
+                // Заголовок для VPN-клиентов; не дублируем для обычного браузерного User-Agent без признаков клиента.
+                $looksLikeDesktopBrowser = $this->hasVersionedBrowserInUserAgent($userAgent)
+                    && !$this->isVpnClient($userAgent);
+                if (!$looksLikeDesktopBrowser) {
+                    $response->header('Profile-Title', $profileTitle);
+                }
+
+                return $response;
             }
 
             // Браузер: лёгкая оболочка (shell), контент подгрузится по /config/{token}/content.
@@ -1698,5 +1713,58 @@ class VpnConfigController extends Controller
         }
 
         return $formattedKeys;
+    }
+
+    /**
+     * Заголовок для VPN-клиентов: бот @username, срок действия, ключ в скобках.
+     */
+    private function buildSubscriptionProfileTitle(KeyActivate $keyActivate, string $keyId): string
+    {
+        $rawBotLink = '';
+        $packSalesman = $keyActivate->packSalesman;
+        if ($packSalesman !== null && $packSalesman->salesman !== null) {
+            $rawBotLink = (string) ($packSalesman->salesman->bot_link ?? '');
+        }
+        $botAt = $this->botLinkToAtUsername($rawBotLink);
+        $until = '—';
+        $finishAt = $keyActivate->finish_at ?? null;
+        if ($finishAt !== null && (int) $finishAt > 0) {
+            $until = \Carbon\Carbon::createFromTimestamp((int) $finishAt)->format('d.m.Y');
+        }
+
+        return sprintf('%s до %s (%s)', $botAt, $until, $keyId);
+    }
+
+    /**
+     * Из bot_link (https://t.me/...) в строку вида @@handle для отображения в клиентах.
+     */
+    private function botLinkToAtUsername(string $botLink): string
+    {
+        $botLink = trim($botLink);
+        if ($botLink === '' || $botLink === '#') {
+            return '@bot';
+        }
+        if (strpos($botLink, '@') === 0) {
+            return $botLink;
+        }
+        $host = parse_url($botLink, PHP_URL_HOST);
+        $path = parse_url($botLink, PHP_URL_PATH);
+        if ($host && (strpos($host, 't.me') !== false || strpos($host, 'telegram.me') !== false)) {
+            $name = $path ? ltrim((string) $path, '/') : '';
+            $name = preg_replace('/[?#].*$/', '', $name);
+            $name = explode('/', $name)[0] ?? '';
+            if ($name !== '') {
+                return '@' . ltrim($name, '@');
+            }
+        }
+        if ($path && $path !== '/') {
+            $name = ltrim((string) $path, '/');
+            $name = explode('/', $name)[0] ?? '';
+            if ($name !== '') {
+                return '@' . ltrim($name, '@');
+            }
+        }
+
+        return '@bot';
     }
 }
