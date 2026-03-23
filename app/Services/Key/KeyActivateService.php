@@ -564,7 +564,7 @@ class KeyActivateService
             $this->notificationService->sendKeyActivatedNotification($packSalesman->salesman->telegram_id, $activated->id);
         }
 
-        $this->warmConfigSync((string) $activated->id);
+        $this->scheduleWarmConfigAfterActivation((string) $activated->id);
 
         return $activated;
     }
@@ -682,7 +682,7 @@ class KeyActivateService
                 $this->notificationService->sendKeyActivatedNotification($packSalesman->salesman->telegram_id, $keyLocked->id);
             }
 
-            $this->warmConfigSync((string) $activatedKey->id);
+            $this->scheduleWarmConfigAfterActivation((string) $activatedKey->id);
 
             return $activatedKey;
         } catch (\Throwable $e) {
@@ -702,15 +702,35 @@ class KeyActivateService
     }
 
     /**
-     * Синхронный прогрев конфига: запрос к панелям и сохранение ссылок в БД.
-     * Вызывается после активации ключа, чтобы страница и приложение сразу получали конфиг из БД (без очередей).
+     * Прогрев конфига после активации: по умолчанию после ответа HTTP (terminating), без блокировки Telegram на минуту.
+     */
+    private function scheduleWarmConfigAfterActivation(string $keyActivateId): void
+    {
+        if (config('panel.skip_warm_config_after_activation')) {
+            return;
+        }
+        if (config('panel.defer_warm_config_after_activation', true)) {
+            $id = $keyActivateId;
+            app()->terminating(function () use ($id) {
+                $this->warmConfigSync($id);
+            });
+
+            return;
+        }
+        $this->warmConfigSync($keyActivateId);
+    }
+
+    /**
+     * Запрос к панелям и сохранение ссылок в БД (тяжёлый путь — не держать в критическом пути активации при defer).
      */
     private function warmConfigSync(string $keyActivateId): void
     {
         try {
             $path = route('vpn.config.refresh', ['token' => $keyActivateId], false);
             $url = rtrim(config('app.url'), '/') . $path;
-            Http::timeout(60)->withHeaders(['Accept' => 'application/json'])->get($url);
+            Http::timeout((int) config('panel.warm_config_http_timeout', 45))
+                ->withHeaders(['Accept' => 'application/json'])
+                ->get($url);
         } catch (\Throwable $e) {
             Log::warning('warmConfigSync failed', [
                 'key_activate_id' => $keyActivateId,
@@ -1011,7 +1031,7 @@ class KeyActivateService
                 $this->notificationService->sendKeyActivatedNotification($packSalesman->salesman->telegram_id, $key->id);
             }
 
-            $this->warmConfigSync((string) $activatedKey->id);
+            $this->scheduleWarmConfigAfterActivation((string) $activatedKey->id);
 
             return $activatedKey;
         } catch (\Throwable $e) {

@@ -6,6 +6,7 @@ use App\Models\KeyActivate\KeyActivate;
 use App\Models\Salesman\Salesman;
 use App\Models\TelegramUser\TelegramUser;
 use App\Services\Panel\PanelStrategy;
+use App\Support\KeyActivationMutex;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
@@ -547,14 +548,15 @@ class SalesmanBotController extends AbstractTelegramBot
     {
         try {
             $key = $this->keyActivateRepository->findById($keyId);
-            $botIdFromToken = explode(':', $key->packSalesman->salesman->token)[0];
-
-            // Token validation check
 
             if (!$key) {
                 $this->sendMessage("❌ Ключ не найден.\n\nПожалуйста, проверьте правильность введенного ключа.");
                 return;
             }
+
+            $botIdFromToken = explode(':', $key->packSalesman->salesman->token)[0];
+
+            // Token validation check
 
             if ($botIdFromToken != $this->telegram->getMe()->id) {
                 $this->sendMessage("❌ Ключ не принадлежит боту активации.\n\nПожалуйста, проверьте правильность введенного ключа.");
@@ -587,25 +589,50 @@ class SalesmanBotController extends AbstractTelegramBot
                 return;
             }
 
-            // Сервисное сообщение: пользователь видит, что процесс пошёл (активация может занять 10–30 сек)
-            $this->sendMessage("⏳ Начался процесс активации ключа");
+            // Без Redis: MySQL GET_LOCK между воркерами; иначе file/database Cache::lock
+            $activationLock = KeyActivationMutex::tryAcquire($keyId, (int) $this->chatId, 300);
+            if ($activationLock === null) {
+                $this->sendMessage(
+                    "⏳ Этот ключ уже активируется.\n\nДождитесь сообщения о результате в этот чат — повторный запуск не нужен."
+                );
+                return;
+            }
 
-            // Активируем ключ через сервис (в сервисе — блокировка по ключу, чтобы не было двойной активации при повторной доставке webhook)
-            $result = $this->keyActivateService->activate($key, $this->chatId);
+            try {
+                // Сервисное сообщение: процесс пошёл (Marzban; прогрев конфига может идти после ответа)
+                $this->sendMessage("⏳ Начался процесс активации ключа");
 
-            if ($result) {
-                $this->sendSuccessActivation($result);
-            } else {
-                $this->sendMessage("❌ Не удалось активировать ключ.\n\nПожалуйста, попробуйте позже или обратитесь к @admin");
+                $result = $this->keyActivateService->activate($key, $this->chatId);
+
+                if ($result) {
+                    $this->sendSuccessActivation($result);
+                } else {
+                    $this->sendMessage("❌ Не удалось активировать ключ.\n\nПожалуйста, попробуйте позже или обратитесь к @admin");
+                }
+            } finally {
+                $activationLock->release();
             }
         } catch (\Exception $e) {
             Log::error('Key activation error: ' . $e->getMessage(), ['source' => 'telegram']);
-            // При повторной доставке webhook тот же ключ может обрабатываться дважды: первый раз — успех, второй — ключ уже ACTIVE.
-            // Если ключ уже активирован этим же пользователем — не слать второе сообщение (пользователь уже получил «успешно активирован»).
             $keyRefreshed = $this->keyActivateRepository->findById($keyId);
+
+            // Параллельный запрос: первый ещё в Marzban — второй получил «уже активируется» — не показываем общую ошибку
+            $msg = $e->getMessage();
+            if (strpos($msg, 'уже активируется') !== false || strpos($msg, 'подождите несколько') !== false) {
+                if ($keyRefreshed && $keyRefreshed->status === KeyActivate::ACTIVE && (int) $keyRefreshed->user_tg_id === (int) $this->chatId) {
+                    $this->sendSuccessActivation($keyRefreshed);
+                    return;
+                }
+                $this->sendMessage(
+                    "⏳ Активация ещё выполняется на сервере.\n\nПодождите 1–2 минуты — при успехе придёт сообщение с конфигурацией. Повторно вводить ключ не нужно."
+                );
+                return;
+            }
+
+            // При повторной доставке webhook: второй раз — ключ уже ACTIVE
             if ($keyRefreshed && $keyRefreshed->user_tg_id && $keyRefreshed->status === KeyActivate::ACTIVE) {
                 if ((int) $keyRefreshed->user_tg_id === (int) $this->chatId) {
-                    return; // Дубликат доставки — не дублируем сообщение
+                    return;
                 }
                 $this->sendMessage("✅ Ключ уже был активирован ранее.\n\n" . \App\Helpers\UrlHelper::telegramConfigLinksHtml($keyRefreshed->id));
                 return;

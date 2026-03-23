@@ -127,6 +127,21 @@ return [
     ),
 
     'max_provider_slots' => (int) env('PANEL_MAX_PROVIDER_SLOTS', 3),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Прогрев конфига после активации (HTTP к vpn.config.refresh)
+    |--------------------------------------------------------------------------
+    | defer_warm_config_after_activation — true: не ждать прогрев внутри activate()
+    | (запуск после отправки ответа Laravel, ускоряет ответ Telegram без Redis).
+    | skip_warm_config_after_activation — полностью отключить прогрев (конфиг подтянется при первом открытии).
+    */
+
+    'defer_warm_config_after_activation' => env('KEY_DEFER_WARM_CONFIG_AFTER_ACTIVATION', true),
+
+    'skip_warm_config_after_activation' => env('KEY_ACTIVATE_SKIP_WARM_CONFIG', false),
+
+    'warm_config_http_timeout' => (int) env('KEY_WARM_CONFIG_HTTP_TIMEOUT', 45),
 ];
 
 
