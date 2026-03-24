@@ -15,13 +15,14 @@ class UrlHelper
 
     /**
      * URL маршрута личного кабинета продавца (/personal/...).
-     * База — APP_CONFIG_PUBLIC_URL (как страницы конфигов), а не APP_URL.
+     * Канонический домен — APP_CONFIG_PUBLIC_URL (как страницы конфигов), а не APP_URL.
      *
-     * Если хост текущего запроса совпадает с хостом из APP_CONFIG_PUBLIC_URL, возвращается
-     * только путь (например /personal/faq/update). Тогда форма шлёт POST на тот же origin
-     * (та же схема https/http), без редиректа http↔https и без превращения POST в GET (405).
+     * В HTTP-запросе по умолчанию возвращается только путь (например /personal/faq/update).
+     * Тогда формы и fetch идут на тот же origin, что и страница — без абсолютных ссылок на
+     * другой хост/схему и без редиректов, превращающих POST в GET (405).
      *
-     * Для внешних систем (OAuth Telegram callback в кэше и т.п.) передайте $forceAbsolute = true.
+     * Полный URL (APP_CONFIG_PUBLIC_URL + путь) — в консоли/очередях и при $forceAbsolute = true
+     * (Telegram OAuth callback и т.п.).
      *
      * @param  string  $name  Имя маршрута, например personal.dashboard
      */
@@ -31,18 +32,7 @@ class UrlHelper
         $path = '/' . ltrim((string) $path, '/');
         $base = rtrim((string) config('app.config_public_url'), '/');
 
-        $baseForHost = $base !== '' && str_contains($base, '://')
-            ? $base
-            : ($base !== '' ? 'https://' . $base : '');
-        $targetHost = $baseForHost !== '' ? parse_url($baseForHost, PHP_URL_HOST) : null;
-
-        if (
-            !$forceAbsolute
-            && !app()->runningInConsole()
-            && $targetHost
-            && request()
-            && strcasecmp((string) request()->getHost(), (string) $targetHost) === 0
-        ) {
+        if (!$forceAbsolute && !app()->runningInConsole() && request()) {
             return $path;
         }
 
