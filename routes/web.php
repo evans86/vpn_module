@@ -62,9 +62,11 @@ Route::prefix('personal')
         });
 
         // FAQ и инструкции
+        // POST сохранения — на тот же URI, что и GET (/personal/faq), не /faq/update:
+        // иначе на части nginx/WAF POST на пути с «update» отдаёт 405 до PHP.
         Route::prefix('faq')->group(function () {
             Route::get('/', [PersonalController::class, 'faq'])->name('faq');
-            Route::post('/update', [PersonalController::class, 'updateFaq'])->name('faq.update');
+            Route::post('/', [PersonalController::class, 'updateFaq'])->name('faq.update');
             Route::post('/reset', [PersonalController::class, 'resetFaq'])->name('faq.reset');
             Route::post('/vpn-instructions/update', [PersonalController::class, 'updateVpnInstructions'])->name('faq.vpn-instructions.update');
             Route::post('/vpn-instructions/reset', [PersonalController::class, 'resetVpnInstructions'])->name('faq.vpn-instructions.reset');
