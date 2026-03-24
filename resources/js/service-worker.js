@@ -14,6 +14,7 @@ function skipMirrorFailoverForPath(pathname) {
   if (p.indexOf('/admin') === 0) return true;
   if (p.indexOf('/api') === 0) return true;
   if (p.indexOf('/personal') === 0) return true;
+  if (p.indexOf('/_lk/') === 0) return true;
   if (p.indexOf('/livewire') === 0) return true;
   return false;
 }
@@ -24,6 +25,12 @@ self.addEventListener('fetch', function (event) {
   }
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) {
+    return;
+  }
+  // Failover через redirectHtml — всегда GET; для POST (формы, /_lk/*) нельзя подменять ответ.
+  var m = (event.request.method || 'GET').toUpperCase();
+  if (m !== 'GET' && m !== 'HEAD') {
+    event.respondWith(fetch(event.request));
     return;
   }
   // ЛК, админка и т.д.: пустой return без respondWith ломал в части браузеров POST-навигацию (формы → 405).
