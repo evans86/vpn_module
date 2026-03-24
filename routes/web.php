@@ -57,30 +57,38 @@ Route::prefix('personal')
                 ->where(['size' => '^[0-9]+(kb|mb|b)$'])
                 ->name('payload')
                 ->middleware('throttle:120,1'); // защита от ab/use
-
-            Route::post('/report', [NetworkCheckController::class, 'report'])->name('report');
+            // POST report вынесен в /post/network-check-report (см. группу ниже).
         });
 
-        // FAQ и инструкции
-        // Сохранение — POST /personal/faq (как и страница формы). Старый /faq/update: GET → редирект (иначе 405
-        // при открытии закладки), POST → тот же контроллер (кэшированные формы).
+        // FAQ и инструкции (только GET; POST вынесен ниже — см. комментарий после группы personal)
         Route::prefix('faq')->group(function () {
             Route::get('/', [PersonalController::class, 'faq'])->name('faq');
-            Route::post('/', [PersonalController::class, 'updateFaq'])->name('faq.update');
             Route::get('/update', function () {
                 return redirect()->route('personal.faq');
             });
-            Route::post('/update', [PersonalController::class, 'updateFaq']);
-            Route::post('/reset', [PersonalController::class, 'resetFaq'])->name('faq.reset');
-            Route::post('/vpn-instructions/update', [PersonalController::class, 'updateVpnInstructions'])->name('faq.vpn-instructions.update');
-            Route::post('/vpn-instructions/reset', [PersonalController::class, 'resetVpnInstructions'])->name('faq.vpn-instructions.reset');
         });
     });
+});
 
-    Route::post('/logout', function () {
+/*
+| POST-обработчики ЛК вне префикса /personal/*: на vpnhigh.su (и др.) CDN/nginx отдаёт 405 до PHP для POST на /personal/*.
+| Пути без «/personal» проходят в Laravel.
+*/
+Route::middleware([RedirectPersonalToConfigPublicHost::class, 'auth:salesman'])->group(function () {
+    Route::post('/save-faq-help', [PersonalController::class, 'updateFaq'])->name('personal.faq.update');
+    Route::post('/save-faq-reset', [PersonalController::class, 'resetFaq'])->name('personal.faq.reset');
+    Route::post('/save-vpn-instructions', [PersonalController::class, 'updateVpnInstructions'])->name('personal.faq.vpn-instructions.update');
+    Route::post('/save-vpn-instructions-reset', [PersonalController::class, 'resetVpnInstructions'])->name('personal.faq.vpn-instructions.reset');
+    Route::post('/post/network-check-report', [NetworkCheckController::class, 'report'])
+        ->middleware('throttle:120,1')
+        ->name('personal.network.report');
+});
+
+Route::middleware([RedirectPersonalToConfigPublicHost::class])->group(function () {
+    Route::post('/post/salesman-logout', function () {
         Auth::guard('salesman')->logout();
         return redirect()->to(UrlHelper::personalRoute('personal.auth'));
-    })->name('logout');
+    })->name('personal.logout');
 });
 
 // Telegram Bot Webhook

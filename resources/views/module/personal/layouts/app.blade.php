@@ -277,7 +277,7 @@
         </div>
 
         <div class="absolute bottom-0 w-full p-4 border-t border-gray-200">
-            <form action="{{ \App\Helpers\UrlHelper::personalRoute('personal.logout') }}" method="POST">
+            <form action="{{ route('personal.logout') }}" method="POST">
                 @csrf
                 <button type="submit"
                         class="w-full flex items-center justify-center p-2 rounded-lg text-gray-600 hover:bg-gray-100 tooltip">
