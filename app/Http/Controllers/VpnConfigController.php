@@ -102,7 +102,19 @@ class VpnConfigController extends Controller
                 $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateIdForSubscription($key_activate_id);
 
                 if ($keyActivateUsers->isEmpty()) {
-                    Log::warning('KeyActivateUser not found for KeyActivate', ['key_activate_id' => $key_activate_id, 'source' => 'vpn']);
+                    if (in_array((int) $keyActivate->status, [KeyActivate::ACTIVATING, KeyActivate::PAID], true)) {
+                        Log::debug('Подписка запрошена до создания слотов (активация ещё не завершена)', [
+                            'key_activate_id' => $key_activate_id,
+                            'status' => $keyActivate->status,
+                            'source' => 'vpn',
+                        ]);
+                    } else {
+                        Log::warning('KeyActivateUser not found for KeyActivate', [
+                            'key_activate_id' => $key_activate_id,
+                            'status' => $keyActivate->status,
+                            'source' => 'vpn',
+                        ]);
+                    }
                     $replacedViolation = ConnectionLimitViolation::where('key_activate_id', $key_activate_id)
                         ->whereNotNull('key_replaced_at')->whereNotNull('replaced_key_id')->orderBy('key_replaced_at', 'desc')->first();
                     if ($replacedViolation && $replacedViolation->replaced_key_id) {

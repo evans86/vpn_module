@@ -554,6 +554,7 @@ class SalesmanBotController extends AbstractTelegramBot
             app(DatabaseLogger::class)->info('Запрос активации ключа из бота (ввод ключа)', [
                 'source' => 'key_activate',
                 'action' => 'bot_activation_request',
+                'key_id' => $keyId,
                 'user_tg_id' => $this->chatId,
                 'salesman_id' => $this->salesman->id,
                 'key_hint' => $keyHint,
@@ -613,6 +614,13 @@ class SalesmanBotController extends AbstractTelegramBot
             try {
                 // Сервисное сообщение: процесс пошёл (Marzban; прогрев конфига может идти после ответа)
                 $this->sendMessage("⏳ Начался процесс активации ключа");
+
+                app(DatabaseLogger::class)->info('Активация ключа: проверки и Telegram пройдены, вызов activate()', [
+                    'source' => 'key_activate',
+                    'action' => 'before_activate_service',
+                    'key_id' => $keyId,
+                    'user_tg_id' => $this->chatId,
+                ]);
 
                 $result = $this->keyActivateService->activate($key, $this->chatId);
 

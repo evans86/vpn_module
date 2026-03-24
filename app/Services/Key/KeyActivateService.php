@@ -424,6 +424,13 @@ class KeyActivateService
                 return $this->resolveActivationWithoutClaim($keyId, $userTgId);
             }
 
+            $this->logger->info('Активация ключа: статус PAID→ACTIVATING (резервация успешна)', [
+                'source' => 'key_activate',
+                'action' => 'activation_claimed',
+                'key_id' => $keyId,
+                'user_tg_id' => $userTgId,
+            ]);
+
             /** @var KeyActivate $keyLocked */
             $keyLocked = KeyActivate::with(['packSalesman.pack'])->findOrFail($keyId);
 
@@ -582,6 +589,13 @@ class KeyActivateService
             } else {
                 $finishAt = Carbon::now()->addMonth()->startOfMonth()->timestamp;
             }
+
+            $this->logger->info('Активация ключа: подбор панелей Marzban (старт, до создания пользователей)', [
+                'source' => 'key_activate',
+                'action' => 'panel_selection_start',
+                'key_id' => $keyId,
+                'user_tg_id' => $userTgId,
+            ]);
 
             $panels = $this->getPanelsForActivation($keyLocked, true);
             if (empty($panels)) {
