@@ -602,6 +602,7 @@ class KeyActivateService
                 $finishAt = Carbon::now()->addMonth()->startOfMonth()->timestamp;
             }
 
+            $tSelectionStart = microtime(true);
             $this->logger->info('Активация ключа: подбор панелей Marzban (старт, до создания пользователей)', [
                 'source' => 'key_activate',
                 'action' => 'panel_selection_start',
@@ -610,6 +611,7 @@ class KeyActivateService
             ]);
 
             $panels = $this->getPanelsForActivation($keyLocked, true);
+            $tSelectionEnd = microtime(true);
             if (empty($panels)) {
                 throw new RuntimeException('Активная панель Marzban не найдена');
             }
@@ -620,8 +622,10 @@ class KeyActivateService
                 'user_tg_id' => $userTgId,
                 'action' => $logAction,
                 'panels_count' => count($panels),
+                'ms_panel_selection' => (int) round(($tSelectionEnd - $tSelectionStart) * 1000),
             ]);
 
+            $tMarzbanStart = microtime(true);
             $lastError = null;
             foreach ($panels as $panel) {
                 try {
@@ -661,6 +665,9 @@ class KeyActivateService
                 throw new RuntimeException($errorMessage);
             }
 
+            $tMarzbanEnd = microtime(true);
+
+            $tDbStart = microtime(true);
             $activatedKey = $this->keyActivateRepository->updateActivationData(
                 $keyLocked,
                 $userTgId,
@@ -671,6 +678,7 @@ class KeyActivateService
                 $activatedKey->finish_at = $finishAtOverride;
                 $activatedKey->save();
             }
+            $tDbEnd = microtime(true);
 
             $this->logger->info('Ключ успешно активирован', [
                 'source' => 'key_activate',
@@ -678,6 +686,10 @@ class KeyActivateService
                 'key_id' => $activatedKey->id,
                 'user_tg_id' => $userTgId,
                 'panel_ids' => array_map(fn ($su) => $su->panel_id, $serverUsers),
+                'ms_panel_selection' => (int) round(($tSelectionEnd - $tSelectionStart) * 1000),
+                'ms_marzban_slots' => (int) round(($tMarzbanEnd - $tMarzbanStart) * 1000),
+                'ms_activation_db' => (int) round(($tDbEnd - $tDbStart) * 1000),
+                'ms_activation_after_claim' => (int) round(($tDbEnd - $tSelectionStart) * 1000),
             ]);
 
             if ($logAction === 'activate_module_key') {
