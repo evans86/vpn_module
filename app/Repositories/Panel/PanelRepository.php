@@ -170,6 +170,68 @@ class PanelRepository extends BaseRepository
     }
 
     /**
+     * Один запрос к БД для кандидатов сразу по нескольким провайдерам (вместо N последовательных get).
+     *
+     * @param array<int, string> $providers
+     * @return array<string, Collection> ключ — строка из конфига (как в multi_provider_slots)
+     */
+    private function getCandidatePanelsForRotationBatch(string $panelType, array $providers): array
+    {
+        $providers = array_values(array_unique(array_filter(array_map('trim', $providers), function ($p) {
+            return (string) $p !== '';
+        })));
+
+        $out = [];
+        foreach ($providers as $p) {
+            $out[$p] = collect();
+        }
+
+        if ($providers === []) {
+            return $out;
+        }
+
+        $limit = min(3000, 1000 * count($providers));
+
+        $rows = $this->query()
+            ->where('panel_status', Panel::PANEL_CONFIGURED)
+            ->where('panel', $panelType)
+            ->where('has_error', false)
+            ->where('excluded_from_rotation', false)
+            ->whereNotIn('id', function ($query) {
+                $query->select('panel_id')
+                    ->from('salesman')
+                    ->whereNotNull('panel_id');
+            })
+            ->whereHas('server', function ($sub) use ($providers) {
+                $sub->whereIn('provider', $providers);
+            })
+            ->with('server.location')
+            ->limit($limit)
+            ->get();
+
+        $rows = $this->applyExclusionRulesToPanels($rows);
+
+        foreach ($rows as $panel) {
+            $srv = (string) ($panel->server->provider ?? '');
+            if ($srv === '') {
+                continue;
+            }
+            $matchedKey = null;
+            foreach ($providers as $wanted) {
+                if ($srv === $wanted || strcasecmp($srv, $wanted) === 0) {
+                    $matchedKey = $wanted;
+                    break;
+                }
+            }
+            if ($matchedKey !== null) {
+                $out[$matchedKey]->push($panel);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Последняя запись server_monitoring по каждой панели (один проход БД).
      *
      * @return array<int, array{stats: ?array, fresh: bool, created_at: ?\Carbon\Carbon}>
@@ -450,11 +512,7 @@ class PanelRepository extends BaseRepository
     private function resolveMarzbanPanelsForProvidersUncached(array $missing, string $panelType): array
     {
         $out = [];
-        $collectByProvider = [];
-
-        foreach ($missing as $provider) {
-            $collectByProvider[$provider] = $this->getCandidatePanelsForRotation($panelType, $provider);
-        }
+        $collectByProvider = $this->getCandidatePanelsForRotationBatch($panelType, $missing);
 
         $allIds = [];
         foreach ($collectByProvider as $coll) {
