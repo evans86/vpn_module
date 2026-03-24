@@ -13,6 +13,7 @@ use App\Http\Requests\PackSalesman\PackSalesmanUserKeysRequest;
 use App\Models\Bot\BotModule;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\Salesman\Salesman;
+use App\Logging\DatabaseLogger;
 use App\Services\External\BottApi;
 use App\Services\Key\KeyActivateService;
 use Carbon\Carbon;
@@ -28,10 +29,13 @@ class KeyActivateController extends Controller
      */
     private KeyActivateService $keyActivateService;
 
-    public function __construct(KeyActivateService $keyActivateService)
+    private DatabaseLogger $dbLogger;
+
+    public function __construct(KeyActivateService $keyActivateService, DatabaseLogger $dbLogger)
     {
         $this->middleware('api');
         $this->keyActivateService = $keyActivateService;
+        $this->dbLogger = $dbLogger;
     }
 
     /**
@@ -44,6 +48,14 @@ class KeyActivateController extends Controller
     public function buyKey(PackSalesmanBuyKeyRequest $request)
     {
         try {
+            $this->dbLogger->info('Запрос на покупку ключа (модуль)', [
+                'source' => 'key_activate',
+                'action' => 'buy_key_request',
+                'user_tg_id' => $request->user_tg_id,
+                'product_id' => $request->product_id,
+                'public_key_prefix' => substr((string) $request->public_key, 0, 12),
+            ]);
+
             // Проверка существования модуля бота
             $botModule = BotModule::where('public_key', $request->public_key)->first();
             if (!$botModule) {
@@ -105,6 +117,13 @@ class KeyActivateController extends Controller
     public function getFreeKey(PackSalesmanFreeKeyRequest $request)
     {
         try {
+            $this->dbLogger->info('Запрос бесплатного ключа (модуль)', [
+                'source' => 'key_activate',
+                'action' => 'free_key_request',
+                'user_tg_id' => $request->user_tg_id,
+                'public_key_prefix' => substr((string) $request->public_key, 0, 12),
+            ]);
+
             $botModule = BotModule::where('public_key', $request->public_key)->first();
             if (!$botModule) {
                 throw new RuntimeException('Модуль бота не найден');

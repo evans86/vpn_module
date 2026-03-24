@@ -2,6 +2,7 @@
 
 namespace App\Services\Telegram\ModuleBot;
 
+use App\Logging\DatabaseLogger;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\Salesman\Salesman;
 use App\Models\TelegramUser\TelegramUser;
@@ -547,6 +548,17 @@ class SalesmanBotController extends AbstractTelegramBot
     protected function handleKeyActivation(string $keyId): void
     {
         try {
+            $keyHint = strlen($keyId) > 16
+                ? substr($keyId, 0, 8) . '…' . substr($keyId, -4)
+                : '[short]';
+            app(DatabaseLogger::class)->info('Запрос активации ключа из бота (ввод ключа)', [
+                'source' => 'key_activate',
+                'action' => 'bot_activation_request',
+                'user_tg_id' => $this->chatId,
+                'salesman_id' => $this->salesman->id,
+                'key_hint' => $keyHint,
+            ]);
+
             $key = $this->keyActivateRepository->findById($keyId);
 
             if (!$key) {

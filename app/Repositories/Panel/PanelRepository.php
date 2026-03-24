@@ -639,7 +639,6 @@ class PanelRepository extends BaseRepository
                 'score' => $score,
                 'active_users' => $activeUsers,
                 'has_fresh_stats' => $fresh && $latestStats !== null,
-                'details' => $this->buildPanelSelectionDetailsFromSnapshot($latestStats, $activeUsers, $lastCreated),
             ];
         })->filter(fn ($item) => $item['score'] >= 0);
 
@@ -650,98 +649,8 @@ class PanelRepository extends BaseRepository
         }
 
         $selectedPanelData = $scoredPanels->sortByDesc('score')->first();
-        $this->logPanelSelection($selectedPanelData);
 
         return $selectedPanelData['panel'];
-    }
-
-    /**
-     * Детали для лога без повторных SELECT по panel_id.
-     */
-    private function buildPanelSelectionDetailsFromSnapshot(?array $latestStats, int $activeUsers, ?Carbon $lastActivity): array
-    {
-        $cpuUsage = $latestStats['cpu_usage'] ?? 0;
-        $memoryUsed = $latestStats['mem_used'] ?? 0;
-        $memoryTotal = $latestStats['mem_total'] ?? 1;
-        $memoryUsage = ($memoryTotal > 0) ? ($memoryUsed / $memoryTotal) * 100 : 0;
-
-        $selectionReason = $this->getSelectionReason($activeUsers, $cpuUsage, $memoryUsage, $lastActivity);
-
-        return [
-            'cpu_usage' => round($cpuUsage, 1),
-            'memory_usage' => round($memoryUsage, 1),
-            'last_activity' => $lastActivity,
-            'last_activity_human' => $lastActivity ? $lastActivity->diffForHumans() : 'never',
-            'selection_reason' => $selectionReason,
-        ];
-    }
-
-    /**
-     * Логирование выбора панели
-     */
-    private function logPanelSelection(array $selectedPanelData): void
-    {
-        $panel = $selectedPanelData['panel'];
-        $score = $selectedPanelData['score'];
-        $activeUsers = $selectedPanelData['active_users'];
-        $hasFreshStats = $selectedPanelData['has_fresh_stats'] ?? false;
-        $details = $selectedPanelData['details'];
-
-        $statsStatus = $hasFreshStats ? 'FRESH' : 'STALE/DB';
-        $logMessage = sprintf(
-            "PANEL_SELECTION [NEW]: Selected Panel ID: %d | Score: %.1f | Active Users: %d | Stats: %s | CPU: %.1f%% | Memory: %.1f%% | Last Activity: %s",
-            $panel->id,
-            $score,
-            $activeUsers,
-            $statsStatus,
-            $details['cpu_usage'],
-            $details['memory_usage'],
-            $details['last_activity_human']
-        );
-
-        Log::info($logMessage, [
-            'panel_id' => $panel->id,
-            'panel_address' => $panel->panel_adress,
-            'source' => 'panel',
-            'score' => $score,
-            'active_users' => $activeUsers,
-            'total_users' => $this->getTotalUsersCount($panel->id),
-            'has_fresh_stats' => $hasFreshStats,
-            'cpu_usage' => $details['cpu_usage'],
-            'memory_usage' => $details['memory_usage'],
-            'last_activity' => $details['last_activity'],
-            'selection_reason' => $details['selection_reason']
-        ]);
-    }
-
-    /**
-     * Определение причины выбора панели
-     */
-    private function getSelectionReason(int $activeUsers, float $cpuUsage, float $memoryUsage, ?Carbon $lastActivity): string
-    {
-        $reasons = [];
-
-        if ($activeUsers < 480) {
-            $reasons[] = 'low users';
-        }
-
-        if ($cpuUsage < 40) {
-            $reasons[] = 'low cpu';
-        }
-
-        if ($memoryUsage < 50) {
-            $reasons[] = 'low memory';
-        }
-
-        if ($lastActivity && $lastActivity->diffInMinutes(now()) > 30) {
-            $reasons[] = 'inactive period';
-        }
-
-        if (empty($reasons)) {
-            return 'neutral load';
-        }
-
-        return implode(', ', $reasons);
     }
 
     /**
@@ -916,14 +825,6 @@ class PanelRepository extends BaseRepository
                 $query->where('status', KeyActivate::ACTIVE);
             })
             ->count();
-    }
-
-    /**
-     * Получение общего количества пользователей панели
-     */
-    private function getTotalUsersCount(int $panelId): int
-    {
-        return ServerUser::where('panel_id', $panelId)->count();
     }
 
     /**
