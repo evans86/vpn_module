@@ -27,6 +27,7 @@ class RedirectPersonalToConfigPublicHost
             $url .= '?' . $qs;
         }
 
-        return redirect()->away($url);
+        // 302 превращает POST в GET при следовании редиректу — формы ЛК (POST) давали 405 на целевом хосте.
+        return redirect()->away($url, 307);
     }
 }
