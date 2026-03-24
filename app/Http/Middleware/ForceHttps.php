@@ -11,11 +11,10 @@ class ForceHttps
     public function handle(Request $request, Closure $next)
     {
         if (!$request->secure() && app()->environment('production')) {
-            // Force HTTPS
             URL::forceScheme('https');
-            
-            // Redirect to HTTPS
-            return redirect()->secure($request->getRequestUri());
+
+            // 302 превращает POST в GET при редиректе на HTTPS → 405 на POST-маршрутах. 307 сохраняет метод.
+            return redirect()->secure($request->getRequestUri(), 307);
         }
 
         // Add security headers
