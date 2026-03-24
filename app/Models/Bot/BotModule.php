@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $tariff_cost
  * @property string|null $vpn_instructions
  * @property int|null $bot_user_id
+ * @property string|null $username Telegram @ бота модуля (если задано в БД)
  */
 class BotModule extends Model
 

@@ -69,6 +69,19 @@ class BotModuleService
         $bot->free_show = $dto->free_show;
         $bot->bot_user_id = $dto->bot_user_id;
 
+        // Имя Telegram-бота модуля (для Profile-Title VPN / ссылок), как в PersonalController::dashboard
+        try {
+            $botInfo = BottApi::getBot($dto->public_key);
+            if (! empty($botInfo['result']) && ! empty($botInfo['data']['name'])) {
+                $bot->username = ltrim((string) $botInfo['data']['name'], '@');
+            }
+        } catch (\Throwable $e) {
+            Log::debug('BotModuleService::update getBot username skipped', [
+                'public_key' => $dto->public_key,
+                'message' => $e->getMessage(),
+            ]);
+        }
+
         // Привязка к продавцу через API BOT T — при ошибке не блокируем сохранение настроек модуля
         try {
             $creator = BottApi::getCreator($dto->public_key, $dto->private_key);

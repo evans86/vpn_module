@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Bot\BotModule;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Models\Panel\Panel;
@@ -11,6 +12,7 @@ use App\Jobs\AddMissingSlotsForKeyJob;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Repositories\KeyActivateUser\KeyActivateUserRepository;
 use App\Repositories\ServerUser\ServerUserRepository;
+use App\Services\External\BottApi;
 use App\Services\External\MarzbanAPI;
 use App\Services\Panel\marzban\MarzbanService;
 use App\Services\Panel\PanelStrategy;
@@ -139,6 +141,7 @@ class VpnConfigController extends Controller
                     'packSalesman.pack' => fn ($q) => $q->select('id', 'module_key'),
                     'packSalesman.salesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
                     'moduleSalesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
+                    'moduleSalesman.botModule' => fn ($q) => $q->select('id', 'username', 'public_key'),
                 ]);
                 $profileTitle = $this->buildSubscriptionProfileTitle($keyActivate, $key_activate_id);
 
@@ -1938,48 +1941,33 @@ class VpnConfigController extends Controller
 
     /**
      * Ссылка на бота для страницы конфига и Profile-Title:
-     * ключ из модуля — bot_link продавца, привязанного к модулю (module_salesman / pack с module_key);
-     * иначе — бот, в котором ключ куплен/активирован (pack_salesman.salesman).
+     * — ключ куплен через веб-модуль: есть module_salesman_id → показываем бота модуля (BotModule.username / t.me);
+     * — иначе → бот продаж/активации (pack_salesman.salesman.bot_link).
+     *
+     * Не используем признак pack.module_key: пакет может быть «модульным», но ключ продан через бота продавца.
      */
     private function resolveConfigDisplayBotLink(KeyActivate $keyActivate): string
     {
         $keyActivate->loadMissing([
             'packSalesman.pack',
             'packSalesman.salesman',
-            'moduleSalesman',
+            'moduleSalesman.botModule',
         ]);
 
-        $isModuleKey = false;
         if ($keyActivate->module_salesman_id) {
-            $isModuleKey = true;
-        } else {
-            $psForPack = $keyActivate->packSalesman;
-            $pack = $psForPack ? ($psForPack->pack ?? null) : null;
-            if ($pack && (int) ($pack->module_key ?? 0) === 1) {
-                $isModuleKey = true;
-            }
-        }
-
-        if ($isModuleKey) {
             $moduleSalesman = $keyActivate->moduleSalesman;
             if ($moduleSalesman !== null) {
+                $botModule = $moduleSalesman->botModule;
+                if ($botModule !== null) {
+                    $fromModule = $this->botModulePublicTelegramLink($botModule);
+                    if ($fromModule !== null) {
+                        return $fromModule;
+                    }
+                }
                 $link = trim((string) ($moduleSalesman->bot_link ?? ''));
                 if ($link !== '' && $link !== '#') {
                     return $link;
                 }
-            }
-            $packSalesman = $keyActivate->packSalesman;
-            if ($packSalesman !== null && $packSalesman->salesman !== null) {
-                $link = trim((string) ($packSalesman->salesman->bot_link ?? ''));
-                if ($link !== '' && $link !== '#') {
-                    return $link;
-                }
-            }
-            if ($moduleSalesman !== null) {
-                return (string) ($moduleSalesman->bot_link ?? '#');
-            }
-            if ($packSalesman !== null && $packSalesman->salesman !== null) {
-                return (string) ($packSalesman->salesman->bot_link ?? '#');
             }
 
             return '#';
@@ -1991,6 +1979,58 @@ class VpnConfigController extends Controller
         }
 
         return '#';
+    }
+
+    /**
+     * Ссылка t.me на бота веб-модуля: сначала bot_module.username, иначе BOT-T getBot по public_key (кэш + запись в БД).
+     */
+    private function botModulePublicTelegramLink(BotModule $botModule): ?string
+    {
+        $username = trim((string) ($botModule->username ?? ''));
+        $username = ltrim($username, '@');
+        if ($username !== '') {
+            return 'https://t.me/' . $username;
+        }
+
+        $publicKey = trim((string) ($botModule->public_key ?? ''));
+        if ($publicKey === '') {
+            return null;
+        }
+
+        $cacheKey = 'bot_module_tg_name:' . $botModule->id;
+        $resolved = Cache::remember($cacheKey, 21600, function () use ($botModule, $publicKey) {
+            try {
+                $info = BottApi::getBot($publicKey);
+                if (! empty($info['result']) && ! empty($info['data']['name'])) {
+                    $name = ltrim((string) $info['data']['name'], '@');
+                    if ($name !== '') {
+                        try {
+                            BotModule::where('id', $botModule->id)->update(['username' => $name]);
+                        } catch (\Throwable $e) {
+                            Log::debug('bot_module username cache persist skipped', [
+                                'bot_module_id' => $botModule->id,
+                                'message' => $e->getMessage(),
+                            ]);
+                        }
+
+                        return $name;
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::debug('botModulePublicTelegramLink getBot failed', [
+                    'bot_module_id' => $botModule->id,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+
+            return '';
+        });
+
+        if ($resolved === '') {
+            return null;
+        }
+
+        return 'https://t.me/' . $resolved;
     }
 
     /**
