@@ -31,6 +31,37 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
+/*
+| POST ЛК: префикс /lk/, регистрация до Auth::routes (избегаем конфликтов и 405).
+| В маршрутах используйте middleware auth.salesman (точка), не auth:salesman — иначе
+| подставляется Illuminate Authenticate, а не App\Http\Middleware\SalesmanOnly.
+*/
+Route::middleware([RedirectPersonalToConfigPublicHost::class, 'auth.salesman'])->group(function () {
+    Route::post('/lk/faq/save', [PersonalController::class, 'updateFaq'])->name('personal.faq.update');
+    Route::post('/lk/faq/reset', [PersonalController::class, 'resetFaq'])->name('personal.faq.reset');
+    Route::post('/lk/vpn-instructions/save', [PersonalController::class, 'updateVpnInstructions'])->name('personal.faq.vpn-instructions.update');
+    Route::post('/lk/vpn-instructions/reset', [PersonalController::class, 'resetVpnInstructions'])->name('personal.faq.vpn-instructions.reset');
+    Route::post('/lk/network/report', [NetworkCheckController::class, 'report'])
+        ->middleware('throttle:120,1')
+        ->name('personal.network.report');
+});
+
+Route::middleware([RedirectPersonalToConfigPublicHost::class])->group(function () {
+    Route::post('/lk/logout', function () {
+        if (session()->has('impersonation_admin_id')) {
+            $sid = session('impersonation_salesman_id');
+            Auth::guard('salesman')->logout();
+            session()->forget(['impersonation_admin_id', 'impersonation_salesman_id']);
+            if ($sid) {
+                return redirect()->route('admin.module.salesman.show', $sid)
+                    ->with('success', 'Режим просмотра личного кабинета завершён.');
+            }
+        }
+        Auth::guard('salesman')->logout();
+        return redirect()->to(UrlHelper::personalRoute('personal.auth'));
+    })->middleware('auth.salesman')->name('personal.logout');
+});
+
 Auth::routes(['register' => false]);
 
 // Личный кабинет продавца (канонический хост — APP_CONFIG_PUBLIC_URL)
@@ -47,8 +78,8 @@ Route::prefix('personal')
         ->middleware('signed')
         ->name('auth.impersonate');
 
-    // Защищенные маршруты
-    Route::middleware(['auth:salesman'])->group(function () {
+    // Защищенные маршруты (auth.salesman = SalesmanOnly, см. Kernel)
+    Route::middleware(['auth.salesman'])->group(function () {
         Route::get('/dashboard', [PersonalController::class, 'dashboard'])->name('dashboard');
         Route::get('/keys', [PersonalController::class, 'keys'])->name('keys');
         Route::get('/packages', [PersonalController::class, 'packages'])->name('packages');
@@ -61,10 +92,10 @@ Route::prefix('personal')
                 ->where(['size' => '^[0-9]+(kb|mb|b)$'])
                 ->name('payload')
                 ->middleware('throttle:120,1'); // защита от ab/use
-            // POST report вынесен в /post/network-check-report (см. группу ниже).
+            // POST report: маршрут personal.network.report (POST /lk/network/report).
         });
 
-        // FAQ и инструкции (только GET; POST вынесен ниже — см. комментарий после группы personal)
+        // FAQ и инструкции (GET); POST — имена personal.faq.*, URI /lk/... (см. начало файла)
         Route::prefix('faq')->group(function () {
             Route::get('/', [PersonalController::class, 'faq'])->name('faq');
             Route::get('/update', function () {
@@ -72,36 +103,6 @@ Route::prefix('personal')
             });
         });
     });
-});
-
-/*
-| POST-обработчики ЛК вне префикса /personal/*: на vpnhigh.su (и др.) CDN/nginx отдаёт 405 до PHP для POST на /personal/*.
-| Пути без «/personal» проходят в Laravel.
-*/
-Route::middleware([RedirectPersonalToConfigPublicHost::class, 'auth:salesman'])->group(function () {
-    Route::post('/save-faq-help', [PersonalController::class, 'updateFaq'])->name('personal.faq.update');
-    Route::post('/save-faq-reset', [PersonalController::class, 'resetFaq'])->name('personal.faq.reset');
-    Route::post('/save-vpn-instructions', [PersonalController::class, 'updateVpnInstructions'])->name('personal.faq.vpn-instructions.update');
-    Route::post('/save-vpn-instructions-reset', [PersonalController::class, 'resetVpnInstructions'])->name('personal.faq.vpn-instructions.reset');
-    Route::post('/post/network-check-report', [NetworkCheckController::class, 'report'])
-        ->middleware('throttle:120,1')
-        ->name('personal.network.report');
-});
-
-Route::middleware([RedirectPersonalToConfigPublicHost::class])->group(function () {
-    Route::post('/post/salesman-logout', function () {
-        if (session()->has('impersonation_admin_id')) {
-            $sid = session('impersonation_salesman_id');
-            Auth::guard('salesman')->logout();
-            session()->forget(['impersonation_admin_id', 'impersonation_salesman_id']);
-            if ($sid) {
-                return redirect()->route('admin.module.salesman.show', $sid)
-                    ->with('success', 'Режим просмотра личного кабинета завершён.');
-            }
-        }
-        Auth::guard('salesman')->logout();
-        return redirect()->to(UrlHelper::personalRoute('personal.auth'));
-    })->middleware('auth:salesman')->name('personal.logout');
 });
 
 // Telegram Bot Webhook

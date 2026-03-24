@@ -18,7 +18,7 @@ class SalesmanOnly
     public function handle(Request $request, Closure $next)
     {
         if (!Auth::guard('salesman')->check()) {
-            return redirect()->route('salesman.auth.telegram');
+            return redirect()->to(route('personal.auth.telegram'));
         }
         return $next($request);
     }
