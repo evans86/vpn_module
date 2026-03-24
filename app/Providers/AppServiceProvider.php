@@ -78,7 +78,9 @@ class AppServiceProvider extends ServiceProvider
             try {
                 $request = $this->app->make('request');
                 $host = $request->getHost();
-                if ($host !== '' && is_array($multiHosts) && in_array($host, $multiHosts, true)) {
+                $hostLower = strtolower($host);
+                $multiHostsLower = is_array($multiHosts) ? array_map('strtolower', $multiHosts) : [];
+                if ($host !== '' && $multiHostsLower !== [] && in_array($hostLower, $multiHostsLower, true)) {
                     URL::forceRootUrl(rtrim($request->getSchemeAndHttpHost(), '/'));
                 } elseif ($defaultRoot !== '') {
                     URL::forceRootUrl($defaultRoot);

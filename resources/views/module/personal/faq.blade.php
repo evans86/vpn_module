@@ -38,7 +38,8 @@
                 </div>
 
                 <div class="px-4 py-5 sm:p-6">
-                    <form action="{{ \App\Helpers\UrlHelper::personalRoute('personal.faq.update') }}" method="POST">
+                    {{-- Явный путь: не зависит от route cache / генерации URL; POST на тот же URI, что и страница --}}
+                    <form action="/personal/faq" method="POST">
                         @csrf
 
                         <div class="mb-6">

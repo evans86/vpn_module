@@ -62,11 +62,15 @@ Route::prefix('personal')
         });
 
         // FAQ и инструкции
-        // POST сохранения — на тот же URI, что и GET (/personal/faq), не /faq/update:
-        // иначе на части nginx/WAF POST на пути с «update» отдаёт 405 до PHP.
+        // Сохранение — POST /personal/faq (как и страница формы). Старый /faq/update: GET → редирект (иначе 405
+        // при открытии закладки), POST → тот же контроллер (кэшированные формы).
         Route::prefix('faq')->group(function () {
             Route::get('/', [PersonalController::class, 'faq'])->name('faq');
             Route::post('/', [PersonalController::class, 'updateFaq'])->name('faq.update');
+            Route::get('/update', function () {
+                return redirect()->route('personal.faq');
+            });
+            Route::post('/update', [PersonalController::class, 'updateFaq']);
             Route::post('/reset', [PersonalController::class, 'resetFaq'])->name('faq.reset');
             Route::post('/vpn-instructions/update', [PersonalController::class, 'updateVpnInstructions'])->name('faq.vpn-instructions.update');
             Route::post('/vpn-instructions/reset', [PersonalController::class, 'resetVpnInstructions'])->name('faq.vpn-instructions.reset');
