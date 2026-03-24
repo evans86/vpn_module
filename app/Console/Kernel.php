@@ -62,6 +62,16 @@ class Kernel extends ConsoleKernel
             ->everyFifteenMinutes()
             ->withoutOverlapping()
             ->appendOutputTo(storage_path('logs/panel-error-check.log'));
+
+        // Прогрев кэша интеллектуального выбора панели (активация/покупка попадают в горячий кэш)
+        if (config('panel.selection_warm_enabled', true)) {
+            $warmEvery = (int) config('panel.selection_warm_every_minutes', 1);
+            $warmEvery = max(1, min(59, $warmEvery));
+            $schedule->command('panel:warm-selection-cache')
+                ->cron('*/' . $warmEvery . ' * * * *')
+                ->withoutOverlapping()
+                ->appendOutputTo(storage_path('logs/panel-selection-warm.log'));
+        }
     }
 
     /**

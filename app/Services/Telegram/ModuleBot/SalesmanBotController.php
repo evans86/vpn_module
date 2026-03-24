@@ -605,9 +605,24 @@ class SalesmanBotController extends AbstractTelegramBot
             // Без Redis: MySQL GET_LOCK между воркерами; иначе file/database Cache::lock
             $activationLock = KeyActivationMutex::tryAcquire($keyId, (int) $this->chatId, 300);
             if ($activationLock === null) {
+                // Повторный вебхук или вторая отправка того же ключа, пока первый запрос ещё в работе (подбор панелей / Marzban)
+                $keyFresh = $this->keyActivateRepository->findById($keyId);
+                if ($keyFresh && (int) $keyFresh->user_tg_id === (int) $this->chatId) {
+                    if ($keyFresh->status === KeyActivate::ACTIVE) {
+                        $this->sendSuccessActivation($keyFresh);
+
+                        return;
+                    }
+                    if ($keyFresh->status === KeyActivate::ACTIVATING) {
+                        // Уже есть «Начался процесс активации» — дубль не дублируем текстом
+                        return;
+                    }
+                }
+
                 $this->sendMessage(
-                    "⏳ Этот ключ уже активируется.\n\nДождитесь сообщения о результате в этот чат — повторный запуск не нужен."
+                    "⏳ Этот ключ уже активируется другим запросом.\n\nДождитесь сообщения о результате в этот чат — повторный запуск не нужен."
                 );
+
                 return;
             }
 

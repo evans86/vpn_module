@@ -11,7 +11,22 @@ return [
     |
     */
 
-    'selection_cache_ttl' => (int) env('PANEL_SELECTION_CACHE_TTL', 15),
+    'selection_cache_ttl' => (int) env('PANEL_SELECTION_CACHE_TTL', 90),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Прогрев кэша выбора панели (cron + `php artisan panel:warm-selection-cache`)
+    |--------------------------------------------------------------------------
+    |
+    | Пока кэш живёт, активация и покупка попадают в уже посчитанный выбор.
+    | Рекомендуется: `selection_cache_ttl` не меньше интервала прогрева в секундах
+    | (например TTL 90 с и прогрев каждую минуту).
+    |
+    */
+
+    'selection_warm_enabled' => filter_var(env('PANEL_SELECTION_WARM_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+
+    'selection_warm_every_minutes' => max(1, min(30, (int) env('PANEL_SELECTION_WARM_EVERY_MINUTES', 1))),
 
     /*
     |--------------------------------------------------------------------------
