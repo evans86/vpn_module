@@ -34,6 +34,18 @@ use Illuminate\Support\Facades\Route;
 Auth::routes(['register' => false]);
 
 /*
+| GET на те же URL, что и action POST-форм: prefetch (sec-fetch-dest: empty) иногда бьёт GET-ом — 405 путает;
+| редирект без изменения данных. Выход по GET намеренно не добавляем.
+*/
+Route::middleware([RedirectPersonalToConfigPublicHost::class])->group(function () {
+    Route::get('_lk/faq/save', fn () => redirect(UrlHelper::personalRoute('personal.faq'), 303));
+    Route::get('_lk/faq/reset', fn () => redirect(UrlHelper::personalRoute('personal.faq'), 303));
+    Route::get('_lk/faq/vpn-instructions', fn () => redirect(UrlHelper::personalRoute('personal.faq'), 303));
+    Route::get('_lk/faq/vpn-instructions/reset', fn () => redirect(UrlHelper::personalRoute('personal.faq'), 303));
+    Route::get('_lk/network-check/report', fn () => redirect(UrlHelper::personalRoute('personal.network.index'), 303));
+});
+
+/*
 | POST ЛК: префикс /_lk/ (не /personal/…). У некоторых CDN/прокси POST на /personal/* даёт 405, GET при этом 200.
 | Имена маршрутов прежние — формы через route() / UrlHelper::personalRoute() подставят /_lk/...
 */
