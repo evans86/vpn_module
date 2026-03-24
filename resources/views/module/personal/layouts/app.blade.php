@@ -277,7 +277,7 @@
         </div>
 
         <div class="absolute bottom-0 w-full p-4 border-t border-gray-200">
-            <form action="{{ route('personal.logout') }}" method="POST">
+            <form action="{{ \App\Helpers\UrlHelper::personalRoute('personal.logout') }}" method="POST">
                 @csrf
                 <button type="submit"
                         class="w-full flex items-center justify-center p-2 rounded-lg text-gray-600 hover:bg-gray-100 tooltip">
@@ -332,7 +332,7 @@
                     <p class="text-sm text-amber-900">
                         <strong>Режим администратора:</strong> интерфейс показан так же, как у продавца. Действия выполняются от его имени.
                     </p>
-                    <form action="{{ route('personal.logout') }}" method="POST" class="inline">
+                    <form action="{{ \App\Helpers\UrlHelper::personalRoute('personal.logout') }}" method="POST" class="inline">
                         @csrf
                         <button type="submit" class="text-sm font-medium text-amber-900 underline hover:text-amber-700">
                             Выйти в админку
