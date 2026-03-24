@@ -393,21 +393,95 @@ class PanelRepository extends BaseRepository
      */
     public function getOptimizedMarzbanPanelForProvider(string $provider, ?string $panelType = null, bool $useCacheOnly = false): ?Panel
     {
-        $panelType = $panelType ?? Panel::MARZBAN;
-        $ttl = (int) config('panel.selection_cache_ttl', 15);
-        $cacheKey = $this->rotationPanelCacheKey($panelType, $provider);
+        $map = $this->getOptimizedMarzbanPanelsForProviders([$provider], $panelType, $useCacheOnly);
 
-        return Cache::remember($cacheKey, max(1, $ttl), function () use ($provider, $panelType, $useCacheOnly) {
-            $panels = $this->getCandidatePanelsForRotation($panelType, $provider);
+        return $map[$provider] ?? null;
+    }
+
+    /**
+     * Выбор панели по каждому провайдеру с общим батчем метрик (один проход load* вместо N последовательных).
+     *
+     * @return array<string, Panel|null> ключ — строка провайдера из конфига
+     */
+    public function getOptimizedMarzbanPanelsForProviders(array $providers, ?string $panelType = null, bool $useCacheOnly = false): array
+    {
+        $panelType = $panelType ?? Panel::MARZBAN;
+        $ttl = max(1, (int) config('panel.selection_cache_ttl', 15));
+        $providers = array_values(array_unique(array_filter(array_map('trim', $providers), function ($p) {
+            return (string) $p !== '';
+        })));
+
+        $result = [];
+        $missing = [];
+
+        foreach ($providers as $provider) {
+            $cacheKey = $this->rotationPanelCacheKey($panelType, $provider);
+            if (Cache::has($cacheKey)) {
+                $result[$provider] = Cache::get($cacheKey);
+
+                continue;
+            }
+            $missing[] = $provider;
+        }
+
+        if ($missing !== []) {
+            $resolved = $this->resolveMarzbanPanelsForProvidersUncached($missing, $panelType);
+            foreach ($resolved as $provider => $panel) {
+                $cacheKey = $this->rotationPanelCacheKey($panelType, $provider);
+                Cache::put($cacheKey, $panel, $ttl);
+                $result[$provider] = $panel;
+            }
+        }
+
+        $ordered = [];
+        foreach ($providers as $provider) {
+            $ordered[$provider] = $result[$provider] ?? null;
+        }
+
+        return $ordered;
+    }
+
+    /**
+     * Резолв панелей для списка провайдеров без чтения кэша (тяжёлая часть — один батч по метрикам).
+     *
+     * @param array<int, string> $missing
+     * @return array<string, Panel|null>
+     */
+    private function resolveMarzbanPanelsForProvidersUncached(array $missing, string $panelType): array
+    {
+        $out = [];
+        $collectByProvider = [];
+
+        foreach ($missing as $provider) {
+            $collectByProvider[$provider] = $this->getCandidatePanelsForRotation($panelType, $provider);
+        }
+
+        $allIds = [];
+        foreach ($collectByProvider as $coll) {
+            foreach ($coll->pluck('id') as $id) {
+                $allIds[(int) $id] = true;
+            }
+        }
+        $allIds = array_keys($allIds);
+
+        $monitoring = $this->loadLatestMonitoringByPanelIds($allIds);
+        $activeDb = $this->loadActiveUsersCountByPanelIds($allIds);
+        $lastAt = $this->loadLastServerUserCreatedAtByPanelIds($allIds);
+
+        foreach ($missing as $provider) {
+            $panels = $collectByProvider[$provider];
             if ($panels->isEmpty()) {
                 Log::info('PANEL_SELECTION: No panels for provider', ['provider' => $provider, 'source' => 'panel']);
+                $out[$provider] = null;
 
-                return null;
+                continue;
             }
 
-            $panel = $this->selectOptimalPanelIntelligent($panels, $useCacheOnly);
+            $panel = $this->selectOptimalPanelIntelligentWithMaps($panels, $monitoring, $activeDb, $lastAt);
             if ($panel) {
-                return $panel;
+                $out[$provider] = $panel;
+
+                continue;
             }
 
             Log::warning('PANEL_SELECTION [INTELLIGENT]: No valid score for provider, fallback to lowest id', [
@@ -415,8 +489,10 @@ class PanelRepository extends BaseRepository
                 'source' => 'panel',
             ]);
 
-            return $panels->sortBy('id')->first();
-        });
+            $out[$provider] = $panels->sortBy('id')->first();
+        }
+
+        return $out;
     }
 
     /**
@@ -618,6 +694,18 @@ class PanelRepository extends BaseRepository
         $monitoring = $this->loadLatestMonitoringByPanelIds($ids);
         $activeDb = $this->loadActiveUsersCountByPanelIds($ids);
         $lastAt = $this->loadLastServerUserCreatedAtByPanelIds($ids);
+
+        return $this->selectOptimalPanelIntelligentWithMaps($panels, $monitoring, $activeDb, $lastAt);
+    }
+
+    /**
+     * То же, что selectOptimalPanelIntelligent, но с уже загруженными картами метрик (для батча по провайдерам).
+     */
+    private function selectOptimalPanelIntelligentWithMaps(Collection $panels, array $monitoring, array $activeDb, array $lastAt): ?Panel
+    {
+        if ($panels->isEmpty()) {
+            return null;
+        }
 
         $scoredPanels = $panels->map(function ($panel) use ($monitoring, $activeDb, $lastAt) {
             $pid = (int) $panel->id;

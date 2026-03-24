@@ -78,14 +78,26 @@ class KeyActivateService
             : null;
         $salesmanProvider = $salesmanPanel && $salesmanPanel->server ? $salesmanPanel->server->provider : null;
 
+        $providersToResolve = [];
+        foreach ($slots as $provider) {
+            $provider = (string) $provider;
+            if (! ($salesmanProvider === $provider && $salesmanPanel)) {
+                $providersToResolve[] = $provider;
+            }
+        }
+        $providersToResolve = array_values(array_unique($providersToResolve));
+        $fetchedByProvider = $providersToResolve !== []
+            ? $this->panelRepository->getOptimizedMarzbanPanelsForProviders($providersToResolve, null, $useCacheOnly)
+            : [];
+
         foreach ($slots as $provider) {
             $provider = (string) $provider;
             $panel = null;
             if ($salesmanProvider === $provider && $salesmanPanel) {
                 $panel = $salesmanPanel;
             }
-            if (!$panel) {
-                $panel = $this->panelRepository->getOptimizedMarzbanPanelForProvider($provider, null, $useCacheOnly);
+            if (! $panel) {
+                $panel = $fetchedByProvider[$provider] ?? null;
             }
             if ($panel && !isset($panels[$panel->id])) {
                 $panels[$panel->id] = $panel;

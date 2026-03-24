@@ -45,17 +45,19 @@ class WarmPanelSelectionCacheCommand extends Command
             $this->error('default: ' . $e->getMessage());
         }
 
-        foreach ($providers as $provider) {
+        if ($providers !== []) {
             try {
-                $panel = $panelRepository->getOptimizedMarzbanPanelForProvider($provider, null, false);
-                if ($this->mark($panel, $provider)) {
-                    $ok++;
-                } else {
-                    $fail++;
+                $byProvider = $panelRepository->getOptimizedMarzbanPanelsForProviders($providers, null, false);
+                foreach ($byProvider as $provider => $panel) {
+                    if ($this->mark($panel, $provider)) {
+                        $ok++;
+                    } else {
+                        $fail++;
+                    }
                 }
             } catch (Throwable $e) {
                 $fail++;
-                $this->error("{$provider}: " . $e->getMessage());
+                $this->error('multi-provider warm: ' . $e->getMessage());
             }
         }
 
