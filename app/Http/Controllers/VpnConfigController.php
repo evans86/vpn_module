@@ -124,7 +124,9 @@ class VpnConfigController extends Controller
 
                 $keyActivate->loadMissing([
                     'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
+                    'packSalesman.pack' => fn ($q) => $q->select('id', 'module_key'),
                     'packSalesman.salesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
+                    'moduleSalesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
                 ]);
                 $profileTitle = $this->buildSubscriptionProfileTitle($keyActivate, $key_activate_id);
 
@@ -1252,14 +1254,18 @@ class VpnConfigController extends Controller
                 if (!$keyActivate->relationLoaded('packSalesman')) {
                     $keyActivate->load([
                         'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
+                        'packSalesman.pack' => fn ($q) => $q->select('id', 'module_key'),
                         'packSalesman.salesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
+                        'moduleSalesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
                     ]);
                 }
                 $keyActivate = $this->keyActivateService->checkAndUpdateStatus($keyActivate);
             } elseif (!$keyActivate->relationLoaded('packSalesman')) {
                 $keyActivate->load([
                     'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
+                    'packSalesman.pack' => fn ($q) => $q->select('id', 'module_key'),
                     'packSalesman.salesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
+                    'moduleSalesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
                 ]);
             }
 
@@ -1282,8 +1288,6 @@ class VpnConfigController extends Controller
                 }
             }
 
-            $packSalesman = $keyActivate->packSalesman ?? null;
-            $salesman = $packSalesman->salesman ?? null;
             $finishAt = $keyActivate->finish_at ?? null;
             $daysRemaining = null;
             if ($finishAt && $finishAt > 0) {
@@ -1313,8 +1317,8 @@ class VpnConfigController extends Controller
                 ];
             }
 
-            // Добавляем ссылку на бота
-            $botLink = $salesman->bot_link ?? '#';
+            // Ссылка на бота: для ключа из модуля — бот продавца, привязанного к модулю; иначе — бот, где купили/активировали
+            $botLink = $this->resolveConfigDisplayBotLink($keyActivate);
 
             // Добавляем ссылку на страницу проверки качества сети
             $netcheckUrl = route('netcheck.index');
@@ -1921,15 +1925,68 @@ class VpnConfigController extends Controller
     }
 
     /**
+     * Ссылка на бота для страницы конфига и Profile-Title:
+     * ключ из модуля — bot_link продавца, привязанного к модулю (module_salesman / pack с module_key);
+     * иначе — бот, в котором ключ куплен/активирован (pack_salesman.salesman).
+     */
+    private function resolveConfigDisplayBotLink(KeyActivate $keyActivate): string
+    {
+        $keyActivate->loadMissing([
+            'packSalesman.pack',
+            'packSalesman.salesman',
+            'moduleSalesman',
+        ]);
+
+        $isModuleKey = false;
+        if ($keyActivate->module_salesman_id) {
+            $isModuleKey = true;
+        } else {
+            $psForPack = $keyActivate->packSalesman;
+            $pack = $psForPack ? ($psForPack->pack ?? null) : null;
+            if ($pack && (int) ($pack->module_key ?? 0) === 1) {
+                $isModuleKey = true;
+            }
+        }
+
+        if ($isModuleKey) {
+            $moduleSalesman = $keyActivate->moduleSalesman;
+            if ($moduleSalesman !== null) {
+                $link = trim((string) ($moduleSalesman->bot_link ?? ''));
+                if ($link !== '' && $link !== '#') {
+                    return $link;
+                }
+            }
+            $packSalesman = $keyActivate->packSalesman;
+            if ($packSalesman !== null && $packSalesman->salesman !== null) {
+                $link = trim((string) ($packSalesman->salesman->bot_link ?? ''));
+                if ($link !== '' && $link !== '#') {
+                    return $link;
+                }
+            }
+            if ($moduleSalesman !== null) {
+                return (string) ($moduleSalesman->bot_link ?? '#');
+            }
+            if ($packSalesman !== null && $packSalesman->salesman !== null) {
+                return (string) ($packSalesman->salesman->bot_link ?? '#');
+            }
+
+            return '#';
+        }
+
+        $packSalesman = $keyActivate->packSalesman;
+        if ($packSalesman !== null && $packSalesman->salesman !== null) {
+            return (string) ($packSalesman->salesman->bot_link ?? '#');
+        }
+
+        return '#';
+    }
+
+    /**
      * Заголовок для VPN-клиентов (Profile-Title): @bot until DD.MM.YYYY (key_id), только ASCII.
      */
     private function buildSubscriptionProfileTitle(KeyActivate $keyActivate, string $keyId): string
     {
-        $rawBotLink = '';
-        $packSalesman = $keyActivate->packSalesman;
-        if ($packSalesman !== null && $packSalesman->salesman !== null) {
-            $rawBotLink = (string) ($packSalesman->salesman->bot_link ?? '');
-        }
+        $rawBotLink = $this->resolveConfigDisplayBotLink($keyActivate);
         $botAt = $this->botLinkToAtUsername($rawBotLink);
         // Только ASCII: многие VPN-клиенты криво показывают UTF-8 в Profile-Title.
         $until = 'n/a';
