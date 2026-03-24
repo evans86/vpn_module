@@ -34,21 +34,21 @@ use Illuminate\Support\Facades\Route;
 Auth::routes(['register' => false]);
 
 /*
-| POST ЛК: явные URI (personal/faq, …), без вложенного prefix('faq')->post('/').
-| Так надёжнее для сопоставления маршрута и проще отлаживать 405.
+| POST ЛК: префикс /_lk/ (не /personal/…). У некоторых CDN/прокси POST на /personal/* даёт 405, GET при этом 200.
+| Имена маршрутов прежние — формы через route() / UrlHelper::personalRoute() подставят /_lk/...
 */
 Route::middleware([RedirectPersonalToConfigPublicHost::class, 'auth.salesman'])->group(function () {
-    Route::post('personal/faq', [PersonalController::class, 'updateFaq'])->name('personal.faq.update');
-    Route::post('personal/faq/reset', [PersonalController::class, 'resetFaq'])->name('personal.faq.reset');
-    Route::post('personal/faq/vpn-instructions', [PersonalController::class, 'updateVpnInstructions'])->name('personal.faq.vpn-instructions.update');
-    Route::post('personal/faq/vpn-instructions/reset', [PersonalController::class, 'resetVpnInstructions'])->name('personal.faq.vpn-instructions.reset');
-    Route::post('personal/network-check/report', [NetworkCheckController::class, 'report'])
+    Route::post('_lk/faq/save', [PersonalController::class, 'updateFaq'])->name('personal.faq.update');
+    Route::post('_lk/faq/reset', [PersonalController::class, 'resetFaq'])->name('personal.faq.reset');
+    Route::post('_lk/faq/vpn-instructions', [PersonalController::class, 'updateVpnInstructions'])->name('personal.faq.vpn-instructions.update');
+    Route::post('_lk/faq/vpn-instructions/reset', [PersonalController::class, 'resetVpnInstructions'])->name('personal.faq.vpn-instructions.reset');
+    Route::post('_lk/network-check/report', [NetworkCheckController::class, 'report'])
         ->middleware('throttle:120,1')
         ->name('personal.network.report');
 });
 
 Route::middleware([RedirectPersonalToConfigPublicHost::class])->group(function () {
-    Route::post('personal/logout', function () {
+    Route::post('_lk/logout', function () {
         if (session()->has('impersonation_admin_id')) {
             $sid = session('impersonation_salesman_id');
             Auth::guard('salesman')->logout();
