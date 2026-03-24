@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
+use App\Models\Salesman\Salesman;
 use App\Repositories\Panel\PanelRepository;
 use App\Repositories\Salesman\SalesmanRepository;
 use App\Services\Salesman\SalesmanService;
@@ -10,8 +11,10 @@ use App\Services\Pack\PackSalesmanService;
 use App\Repositories\Pack\PackRepository;
 use Exception;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 use Illuminate\View\View;
 use RuntimeException;
 
@@ -127,6 +130,30 @@ class SalesmanController extends Controller
 
             abort(404, 'Продавец не найден');
         }
+    }
+
+    /**
+     * Редирект на канонический хост ЛК с подписанной ссылкой (админ смотрит кабинет как продавец).
+     */
+    public function impersonatePersonalCabinet(Salesman $salesman): RedirectResponse
+    {
+        $publicUrl = rtrim((string) config('app.config_public_url'), '/');
+        if ($publicUrl === '') {
+            $publicUrl = rtrim((string) config('app.url'), '/');
+        }
+        $defaultRoot = rtrim((string) config('app.url'), '/');
+        URL::forceRootUrl($publicUrl);
+        try {
+            $target = URL::temporarySignedRoute(
+                'personal.auth.impersonate',
+                now()->addMinutes(10),
+                ['salesman' => $salesman->id, 'admin' => auth()->id()]
+            );
+        } finally {
+            URL::forceRootUrl($defaultRoot);
+        }
+
+        return redirect()->away($target);
     }
 
     /**

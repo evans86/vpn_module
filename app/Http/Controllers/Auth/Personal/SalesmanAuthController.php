@@ -60,6 +60,27 @@ class SalesmanAuthController extends Controller
     }
 
     /**
+     * Вход в ЛК по подписанной ссылке из админки (между доменами APP_URL и APP_CONFIG_PUBLIC_URL).
+     */
+    public function impersonateConsume(Request $request): RedirectResponse
+    {
+        $salesmanId = (int) $request->query('salesman');
+        $adminId = (int) $request->query('admin');
+        if ($salesmanId < 1 || $adminId < 1) {
+            abort(400);
+        }
+        $salesman = Salesman::findOrFail($salesmanId);
+        session([
+            'impersonation_admin_id' => $adminId,
+            'impersonation_salesman_id' => $salesman->id,
+        ]);
+        Auth::guard('salesman')->login($salesman);
+
+        return redirect()->to(UrlHelper::personalRoute('personal.dashboard'))
+            ->with('success', 'Режим администратора: вы видите личный кабинет как этот продавец.');
+    }
+
+    /**
      * @throws TelegramSDKException
      */
     public function callback(Request $request)

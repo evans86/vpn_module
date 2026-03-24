@@ -326,6 +326,21 @@
             </div>
         </header>
 
+        @if(session('impersonation_admin_id'))
+            <div class="bg-amber-50 border-b border-amber-200 px-4 py-3">
+                <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+                    <p class="text-sm text-amber-900">
+                        <strong>Режим администратора:</strong> интерфейс показан так же, как у продавца. Действия выполняются от его имени.
+                    </p>
+                    <form action="{{ route('personal.logout') }}" method="POST" class="inline">
+                        @csrf
+                        <button type="submit" class="text-sm font-medium text-amber-900 underline hover:text-amber-700">
+                            Выйти в админку
+                        </button>
+                    </form>
+                </div>
+            </div>
+        @endif
         <!-- Контент -->
         <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
             @yield('content')

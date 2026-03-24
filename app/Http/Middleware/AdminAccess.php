@@ -6,17 +6,16 @@ use App\Helpers\UrlHelper;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class AdminAccess
 {
     /**
      * Handle an incoming request.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Closure(\Illuminate\Http\Request): (\Illuminate\Http\Response|\Illuminate\Http\RedirectResponse)  $next
-     * @return \Illuminate\Http\Response|\Illuminate\Http\RedirectResponse
+     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): SymfonyResponse
     {
         // Проверяем, что пользователь авторизован через guard 'web' (админ)
         if (!Auth::guard('web')->check()) {
@@ -26,9 +25,16 @@ class AdminAccess
             return redirect()->route('login');
         }
 
-        // Дополнительная проверка: убеждаемся, что это не продавец
-        // (продавцы используют guard 'salesman')
+        // Продавец без режима имитации не должен попадать в админку
         if (Auth::guard('salesman')->check()) {
+            $impersonatorId = session('impersonation_admin_id');
+            if (
+                $impersonatorId !== null
+                && Auth::guard('web')->check()
+                && (int) $impersonatorId === (int) Auth::guard('web')->id()
+            ) {
+                return $next($request);
+            }
             if ($request->expectsJson()) {
                 return response()->json(['message' => 'Access denied. Admin access required.'], 403);
             }

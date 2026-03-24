@@ -42,6 +42,10 @@ Route::prefix('personal')
     Route::get('/auth', [SalesmanAuthController::class, 'showLoginForm'])->name('auth');
     Route::get('/auth/telegram', [SalesmanAuthController::class, 'redirect'])->name('auth.telegram');
     Route::get('/auth/telegram/callback', [SalesmanAuthController::class, 'callback'])->name('auth.telegram.callback');
+    // Вход в ЛК по подписанной ссылке из админки (другой домен / APP_CONFIG_PUBLIC_URL)
+    Route::get('/auth/impersonate', [SalesmanAuthController::class, 'impersonateConsume'])
+        ->middleware('signed')
+        ->name('auth.impersonate');
 
     // Защищенные маршруты
     Route::middleware(['auth:salesman'])->group(function () {
@@ -86,9 +90,18 @@ Route::middleware([RedirectPersonalToConfigPublicHost::class, 'auth:salesman'])-
 
 Route::middleware([RedirectPersonalToConfigPublicHost::class])->group(function () {
     Route::post('/post/salesman-logout', function () {
+        if (session()->has('impersonation_admin_id')) {
+            $sid = session('impersonation_salesman_id');
+            Auth::guard('salesman')->logout();
+            session()->forget(['impersonation_admin_id', 'impersonation_salesman_id']);
+            if ($sid) {
+                return redirect()->route('admin.module.salesman.show', $sid)
+                    ->with('success', 'Режим просмотра личного кабинета завершён.');
+            }
+        }
         Auth::guard('salesman')->logout();
         return redirect()->to(UrlHelper::personalRoute('personal.auth'));
-    })->name('personal.logout');
+    })->middleware('auth:salesman')->name('personal.logout');
 });
 
 // Telegram Bot Webhook
@@ -212,6 +225,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
             // Salesman
             Route::prefix('salesman')->name('salesman.')->group(function () {
                 Route::get('/', [SalesmanController::class, 'index'])->name('index');
+                Route::get('/{salesman}/impersonate', [SalesmanController::class, 'impersonatePersonalCabinet'])
+                    ->middleware('admin')
+                    ->name('impersonate');
                 Route::get('/{salesman}', [SalesmanController::class, 'show'])->name('show');
                 Route::post('/', [SalesmanController::class, 'store'])->name('store');
                 Route::put('/{salesman}', [SalesmanController::class, 'update'])->name('update');
