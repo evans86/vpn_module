@@ -18,106 +18,66 @@
         @endif
 
         <div class="bg-white shadow rounded-lg p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Выбор стратегии распределения</h3>
-            <p class="text-sm text-gray-600 mb-6">
-                Выберите систему распределения пользователей по панелям при создании нового пользователя.
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">Распределение по панелям</h3>
+            <p class="text-sm text-gray-600">
+                Используется <strong>интеллектуальный выбор</strong>: score по статистике Marzban (активные пользователи, CPU/память) и времени последней активности.
+                Переключения стратегий нет — кэш выбора настраивается в <code class="text-xs bg-gray-100 px-1 rounded">config/panel.php</code> (<code class="text-xs">selection_cache_ttl</code>).
             </p>
-
-            <form action="{{ route('admin.module.panel-settings.update-strategy') }}" method="POST">
-                @csrf
-                @method('PUT')
-
-                <div class="space-y-4">
-                    @foreach($strategies as $key => $strategy)
-                        <div class="border rounded-lg p-4 hover:bg-gray-50 transition-colors {{ $currentStrategy === $key ? 'border-blue-500 bg-blue-50' : 'border-gray-200' }}">
-                            <label class="flex items-start cursor-pointer">
-                                <input type="radio" 
-                                       name="strategy" 
-                                       value="{{ $key }}" 
-                                       class="mt-1 mr-3"
-                                       {{ $currentStrategy === $key ? 'checked' : '' }}
-                                       required>
-                                <div class="flex-1">
-                                    <div class="flex items-center mb-2">
-                                        <span class="text-2xl mr-2">{{ $strategy['icon'] }}</span>
-                                        <span class="font-semibold text-gray-900">{{ $strategy['name'] }}</span>
-                                        @if($currentStrategy === $key)
-                                            <span class="ml-2 px-2 py-1 text-xs font-semibold bg-blue-500 text-white rounded">
-                                                Активна
-                                            </span>
-                                        @endif
-                                    </div>
-                                    <p class="text-sm text-gray-600">{{ $strategy['description'] }}</p>
-                                </div>
-                            </label>
-                        </div>
-                    @endforeach
-                </div>
-
-                <div class="mt-6 flex items-center justify-end">
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
-                        <i class="fas fa-save mr-2"></i> Сохранить настройки
-                    </button>
-                </div>
-            </form>
         </div>
 
-        <!-- Сравнение стратегий -->
+        <!-- Сводка по ротации -->
         @if(isset($comparison) && !isset($comparison['error']))
             <div class="bg-white shadow rounded-lg p-6">
                 <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-lg font-semibold text-gray-900">Сравнение стратегий</h3>
+                    <h3 class="text-lg font-semibold text-gray-900">Интеллектуальная ротация</h3>
                     <button onclick="location.reload()" class="text-sm text-blue-600 hover:text-blue-800 flex items-center">
                         <i class="fas fa-sync-alt mr-2"></i> Обновить данные
                     </button>
                 </div>
 
-                <!-- Результаты выбора каждой стратегии -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    @foreach(['balanced' => '⚖️', 'traffic_based' => '📊', 'intelligent' => '🧠'] as $strategyKey => $icon)
-                        @php
-                            $strategyInfo = $comparison['strategies'][$strategyKey] ?? null;
-                            $selectedPanel = $strategyInfo['selected_panel_info'] ?? null;
-                        @endphp
-                        <div class="border rounded-lg p-4 {{ $currentStrategy === $strategyKey ? 'border-blue-500 bg-blue-50' : 'border-gray-200' }}">
-                            <div class="flex items-center mb-2">
-                                <span class="text-2xl mr-2">{{ $icon }}</span>
-                                <span class="font-semibold text-sm">{{ $strategies[$strategyKey]['name'] }}</span>
-                            </div>
-                            @if($selectedPanel)
-                                <div class="space-y-1 text-sm">
-                                    <div><strong>Панель ID:</strong> {{ $selectedPanel['id'] }}</div>
-                                    <div><strong>Сервер:</strong> {{ $selectedPanel['server_name'] ?? 'N/A' }}</div>
-                                    <div><strong>Пользователи:</strong> {{ $selectedPanel['total_users'] }} (активных: {{ $selectedPanel['active_users'] }})</div>
-                                    @if($selectedPanel['traffic_used_percent'] !== null)
-                                        <div class="flex items-center gap-2">
-                                            <strong>Трафик:</strong> 
-                                            <span class="px-2 py-0.5 rounded text-xs font-medium 
-                                                {{ $selectedPanel['traffic_used_percent'] > 80 ? 'bg-red-100 text-red-800' : ($selectedPanel['traffic_used_percent'] > 60 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800') }}">
-                                                {{ number_format($selectedPanel['traffic_used_percent'], 1) }}%
-                                            </span>
-                                            @if($selectedPanel['traffic_used_gb'])
-                                                <span class="text-gray-500 text-xs">({{ number_format($selectedPanel['traffic_used_gb'], 0) }} GB)</span>
-                                            @endif
-                                        </div>
-                                    @else
-                                        <div class="text-gray-400 text-xs">Трафик: нет данных</div>
-                                    @endif
-                                    @if($selectedPanel['cpu_usage'] > 0)
-                                        <div><strong>CPU:</strong> {{ $selectedPanel['cpu_usage'] }}%</div>
-                                    @endif
-                                    @if($selectedPanel['memory_usage'] > 0)
-                                        <div><strong>Память:</strong> {{ $selectedPanel['memory_usage'] }}%</div>
-                                    @endif
-                                    @if($selectedPanel['intelligent_score'] > 0)
-                                        <div><strong>Score:</strong> {{ $selectedPanel['intelligent_score'] }}</div>
-                                    @endif
-                                </div>
-                            @else
-                                <p class="text-sm text-gray-500">Не выбрана</p>
-                            @endif
+                @php
+                    $strategyInfo = $comparison['strategies']['intelligent'] ?? null;
+                    $selectedPanel = $strategyInfo['selected_panel_info'] ?? null;
+                @endphp
+                <div class="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
+                    <div class="border rounded-lg p-4 border-blue-500 bg-blue-50">
+                        <div class="flex items-center mb-2">
+                            <span class="text-2xl mr-2">🧠</span>
+                            <span class="font-semibold text-sm">Интеллектуальная ротация (текущая)</span>
                         </div>
-                    @endforeach
+                        @if($selectedPanel)
+                            <div class="space-y-1 text-sm">
+                                <div><strong>Панель ID:</strong> {{ $selectedPanel['id'] }}</div>
+                                <div><strong>Сервер:</strong> {{ $selectedPanel['server_name'] ?? 'N/A' }}</div>
+                                <div><strong>Пользователи:</strong> {{ $selectedPanel['total_users'] }} (активных: {{ $selectedPanel['active_users'] }})</div>
+                                @if($selectedPanel['traffic_used_percent'] !== null)
+                                    <div class="flex items-center gap-2">
+                                        <strong>Трафик:</strong>
+                                        <span class="px-2 py-0.5 rounded text-xs font-medium
+                                            {{ $selectedPanel['traffic_used_percent'] > 80 ? 'bg-red-100 text-red-800' : ($selectedPanel['traffic_used_percent'] > 60 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800') }}">
+                                            {{ number_format($selectedPanel['traffic_used_percent'], 1) }}%
+                                        </span>
+                                        @if($selectedPanel['traffic_used_gb'])
+                                            <span class="text-gray-500 text-xs">({{ number_format($selectedPanel['traffic_used_gb'], 0) }} GB)</span>
+                                        @endif
+                                    </div>
+                                @else
+                                    <div class="text-gray-400 text-xs">Трафик: нет данных</div>
+                                @endif
+                                @if($selectedPanel['cpu_usage'] > 0)
+                                    <div><strong>CPU:</strong> {{ $selectedPanel['cpu_usage'] }}%</div>
+                                @endif
+                                @if($selectedPanel['memory_usage'] > 0)
+                                    <div><strong>Память:</strong> {{ $selectedPanel['memory_usage'] }}%</div>
+                                @endif
+                                @if($selectedPanel['intelligent_score'] > 0)
+                                    <div><strong>Score:</strong> {{ $selectedPanel['intelligent_score'] }}</div>
+                                @endif
+                            </div>
+                        @else
+                            <p class="text-sm text-gray-500">Не выбрана</p>
+                        @endif
+                    </div>
                 </div>
 
                 <!-- Общая статистика -->
@@ -156,7 +116,7 @@
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CPU</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Память</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Выбор</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ротация</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
@@ -225,17 +185,11 @@
                                         @endif
                                     </td>
                                     <td class="px-4 py-3 whitespace-nowrap text-sm">
-                                        <div class="flex flex-col gap-1">
-                                            @if($panel['is_balanced_selected'])
-                                                <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">⚖️ Balanced</span>
-                                            @endif
-                                            @if($panel['is_traffic_selected'])
-                                                <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">📊 Traffic</span>
-                                            @endif
-                                            @if($panel['is_intelligent_selected'])
-                                                <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">🧠 Intelligent</span>
-                                            @endif
-                                        </div>
+                                        @if(!empty($panel['is_intelligent_selected']))
+                                            <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">🧠 Выбрана</span>
+                                        @else
+                                            <span class="text-gray-400">—</span>
+                                        @endif
                                     </td>
                                 </tr>
                             @endforeach
@@ -252,23 +206,6 @@
                 <p class="text-yellow-800">{{ $comparison['error'] }}</p>
             </div>
         @endif
-
-        <!-- Информация о текущей стратегии -->
-        <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
-            <h4 class="text-md font-semibold text-gray-900 mb-3">Текущая стратегия</h4>
-            <div class="space-y-2 text-sm text-gray-700">
-                @if($currentStrategy === 'balanced')
-                    <p><strong>Равномерное распределение</strong> - система выбирает панель с минимальным количеством пользователей.</p>
-                    <p class="text-gray-600">Подходит для равномерного распределения нагрузки между панелями.</p>
-                @elseif($currentStrategy === 'traffic_based')
-                    <p><strong>На основе трафика сервера</strong> - система выбирает панель на сервере с наименьшим процентом использования трафика.</p>
-                    <p class="text-gray-600">Идеально для предотвращения перегрузки серверов по трафику (особенно в конце месяца).</p>
-                @else
-                    <p><strong>Интеллектуальная система</strong> - комплексный анализ: количество пользователей, нагрузка CPU/памяти и трафик.</p>
-                    <p class="text-gray-600">Балансирует все факторы для оптимального распределения.</p>
-                @endif
-            </div>
-        </div>
 
         <!-- Панели с ошибками -->
         @if($panelsWithErrors->isNotEmpty())

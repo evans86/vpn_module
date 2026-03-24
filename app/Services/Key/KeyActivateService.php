@@ -22,7 +22,6 @@ use Illuminate\Support\Facades\Http;
 use DomainException;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -628,14 +627,7 @@ class KeyActivateService
                         'error' => $e->getMessage(),
                         'source' => 'key',
                     ]);
-                    Cache::forget('optimized_marzban_panel_balanced');
-                    Cache::forget('optimized_marzban_panel_traffic_based');
-                    Cache::forget('optimized_marzban_panel_intelligent');
-                    if ($provider) {
-                        foreach (['balanced', 'traffic_based', 'intelligent'] as $strategy) {
-                            Cache::forget("optimized_marzban_panel_{$strategy}_provider_{$provider}");
-                        }
-                    }
+                    $this->panelRepository->forgetRotationSelectionCache($provider ?: null);
                 }
             }
 
@@ -993,11 +985,7 @@ class KeyActivateService
                         'error' => $e->getMessage(),
                         'source' => 'key_activate',
                     ]);
-                    if ($provider) {
-                        foreach (['balanced', 'traffic_based', 'intelligent'] as $strategy) {
-                            Cache::forget("optimized_marzban_panel_{$strategy}_provider_{$provider}");
-                        }
-                    }
+                    $this->panelRepository->forgetRotationSelectionCache($provider ?: null);
                 }
             }
 

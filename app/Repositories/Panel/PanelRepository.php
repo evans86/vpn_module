@@ -69,116 +69,229 @@ class PanelRepository extends BaseRepository
     }
 
     /**
-     * Получить настроенную панель с минимальной нагрузкой
-     * 
-     * @param string|null $panelType Тип панели (по умолчанию Panel::MARZBAN для обратной совместимости)
-     * @return Panel|null
+     * Ключ кэша выбора панели (полный цикл: кандидаты + интеллектуальный score).
      */
-    public function getConfiguredMarzbanPanel(?string $panelType = null): ?Panel
+    private function rotationPanelCacheKey(string $panelType, ?string $provider): string
     {
-        // Используем Panel::MARZBAN по умолчанию для обратной совместимости
-        $panelType = $panelType ?? Panel::MARZBAN;
-        
-        // Получаем все настроенные панели указанного типа (исключаем панели с ошибками)
-        $panels = $this->query()
+        if ($provider === null || $provider === '') {
+            return 'panel_rotation:' . $panelType;
+        }
+
+        return 'panel_rotation:' . $panelType . ':p:' . md5(strtolower(trim($provider)));
+    }
+
+    /**
+     * Сброс кэша выбора панели (после ошибки панели, смены ротации и т.д.).
+     */
+    public function forgetRotationSelectionCache(?string $provider = null): void
+    {
+        $panelType = Panel::MARZBAN;
+        Cache::forget($this->rotationPanelCacheKey($panelType, null));
+        if ($provider !== null && $provider !== '') {
+            Cache::forget($this->rotationPanelCacheKey($panelType, $provider));
+
+            return;
+        }
+        foreach (config('panel.multi_provider_slots', []) as $p) {
+            $p = trim((string) $p);
+            if ($p !== '') {
+                Cache::forget($this->rotationPanelCacheKey($panelType, $p));
+            }
+        }
+    }
+
+    /**
+     * Базовый запрос кандидатов в ротацию (без исключений по локации/IP в PHP).
+     */
+    private function buildCandidatePanelsQuery(string $panelType, ?string $provider = null)
+    {
+        $q = $this->query()
             ->where('panel_status', Panel::PANEL_CONFIGURED)
             ->where('panel', $panelType)
-            ->where('has_error', false) // Исключаем панели с ошибками
-            ->where('excluded_from_rotation', false) // Исключаем панели из ротации (для тестирования)
+            ->where('has_error', false)
+            ->where('excluded_from_rotation', false)
             ->whereNotIn('id', function ($query) {
-                // Исключаем панели, которые привязаны к продавцам
                 $query->select('panel_id')
                     ->from('salesman')
                     ->whereNotNull('panel_id');
             })
             ->with('server.location')
-            ->limit(1000)
-            ->get();
-
-        // Исключаем панели по различным критериям
-        $excludedLocations = array_map('intval', array_filter(config('panel.excluded_locations', [])));
-        $excludedServerIPs = array_filter(config('panel.excluded_server_ips', []));
-        $excludedServerIDs = array_map('intval', array_filter(config('panel.excluded_server_ids', [])));
-        
-        if (!empty($excludedLocations) || !empty($excludedServerIPs) || !empty($excludedServerIDs)) {
-            $panels = $panels->filter(function ($panel) use ($excludedLocations, $excludedServerIPs, $excludedServerIDs) {
-                // Проверяем локацию
-                if (!empty($excludedLocations) && $panel->server && $panel->server->location_id) {
-                    if (in_array($panel->server->location_id, $excludedLocations)) {
-                        return false;
-                    }
-                }
-                
-                // Проверяем IP-адрес сервера
-                if (!empty($excludedServerIPs) && $panel->server && $panel->server->ip) {
-                    $serverIP = is_numeric($panel->server->ip) ? long2ip($panel->server->ip) : $panel->server->ip;
-                    if (in_array($serverIP, $excludedServerIPs)) {
-                        return false;
-                    }
-                }
-                
-                // Проверяем ID сервера
-                if (!empty($excludedServerIDs) && $panel->server && $panel->server->id) {
-                    if (in_array($panel->server->id, $excludedServerIDs)) {
-                        return false;
-                    }
-                }
-                
-                return true;
-            });
-            
-            if ($panels->isEmpty()) {
-                Log::warning('PANEL_SELECTION [OLD]: No available panels after filtering', [
-                    'excluded_locations' => $excludedLocations,
-                    'excluded_server_ips' => $excludedServerIPs,
-                    'excluded_server_ids' => $excludedServerIDs,
-                    'source' => 'panel'
-                ]);
-                return null;
-            }
+            ->limit(1000);
+        if ($provider !== null && $provider !== '') {
+            $q->whereHas('server', fn ($sub) => $sub->where('provider', $provider));
         }
 
-        if ($panels->isEmpty()) {
-            Log::info('PANEL_SELECTION: No configured panels available', ['source' => 'panel']);
-            return null;
-        }
-
-        // Считаем количество ключей для каждой панели
-        $panelsWithKeyCount = $panels->map(function ($panel) {
-            $keyCount = $this->getKeyCountForPanel($panel->id);
-            return [
-                'panel' => $panel,
-                'key_count' => $keyCount,
-            ];
-        });
-
-        // Если на всех панелях нет ключей, выбираем случайную панель
-        if ($panelsWithKeyCount->sum('key_count') === 0) {
-            $selectedPanel = $panels->random();
-            Log::info('PANEL_SELECTION [OLD]: Random selection - Panel ID: ' . $selectedPanel->id . ' (no keys on any panel)', ['source' => 'panel']);
-            return $selectedPanel;
-        }
-
-        // Иначе выбираем панель с минимальным количеством ключей
-        $selectedPanel = $panelsWithKeyCount->sortBy('key_count')->first()['panel'];
-
-        Log::info('PANEL_SELECTION [OLD]: Least loaded panel - Panel ID: ' . $selectedPanel->id .
-            ', Keys: ' . $panelsWithKeyCount->sortBy('key_count')->first()['key_count'], ['source' => 'panel']);
-
-        return $selectedPanel;
+        return $q;
     }
 
     /**
-     * Получаем количество ключей, привязанных к панели
-     *
-     * @param int $panelId
-     * @return int
+     * Исключения из конфига (локации, IP, ID серверов).
      */
-    private function getKeyCountForPanel(int $panelId): int
+    private function applyExclusionRulesToPanels(Collection $panels): Collection
     {
-        return DB::table('server_user')
-            ->where('panel_id', $panelId)
-            ->count();
+        $excludedLocations = array_map('intval', array_filter(config('panel.excluded_locations', [])));
+        $excludedServerIPs = array_filter(config('panel.excluded_server_ips', []));
+        $excludedServerIDs = array_map('intval', array_filter(config('panel.excluded_server_ids', [])));
+
+        if (empty($excludedLocations) && empty($excludedServerIPs) && empty($excludedServerIDs)) {
+            return $panels;
+        }
+
+        return $panels->filter(function ($panel) use ($excludedLocations, $excludedServerIPs, $excludedServerIDs) {
+            if (!empty($excludedLocations) && $panel->server && $panel->server->location_id) {
+                if (in_array($panel->server->location_id, $excludedLocations)) {
+                    return false;
+                }
+            }
+            if (!empty($excludedServerIPs) && $panel->server && $panel->server->ip) {
+                $serverIP = is_numeric($panel->server->ip) ? long2ip($panel->server->ip) : $panel->server->ip;
+                if (in_array($serverIP, $excludedServerIPs)) {
+                    return false;
+                }
+            }
+            if (!empty($excludedServerIDs) && $panel->server && $panel->server->id) {
+                if (in_array($panel->server->id, $excludedServerIDs)) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    }
+
+    /**
+     * Панели, участвующие в ротации (запрос + фильтры исключений).
+     */
+    private function getCandidatePanelsForRotation(string $panelType, ?string $provider = null): Collection
+    {
+        $panels = $this->buildCandidatePanelsQuery($panelType, $provider)->get();
+
+        return $this->applyExclusionRulesToPanels($panels);
+    }
+
+    /**
+     * Последняя запись server_monitoring по каждой панели (один проход БД).
+     *
+     * @return array<int, array{stats: ?array, fresh: bool, created_at: ?\Carbon\Carbon}>
+     */
+    private function loadLatestMonitoringByPanelIds(array $panelIds): array
+    {
+        $panelIds = array_values(array_unique(array_map('intval', $panelIds)));
+        if ($panelIds === []) {
+            return [];
+        }
+
+        $maxAgeMinutes = 5;
+
+        $latestIds = DB::table('server_monitoring')
+            ->select('panel_id', DB::raw('MAX(id) as max_id'))
+            ->whereIn('panel_id', $panelIds)
+            ->groupBy('panel_id');
+
+        $rows = DB::table('server_monitoring as sm')
+            ->joinSub($latestIds, 't', function ($join) {
+                $join->on('sm.panel_id', '=', 't.panel_id')
+                    ->on('sm.id', '=', 't.max_id');
+            })
+            ->select('sm.*')
+            ->get();
+
+        $out = [];
+        foreach ($rows as $row) {
+            $pid = (int) $row->panel_id;
+            $decoded = json_decode($row->statistics, true);
+            $stats = is_array($decoded) ? $decoded : null;
+            $createdAt = Carbon::parse($row->created_at);
+            $out[$pid] = [
+                'stats' => $stats,
+                'fresh' => Carbon::now()->diffInMinutes($createdAt) <= $maxAgeMinutes,
+                'created_at' => $createdAt,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Активные пользователи по панелям (один запрос с group by).
+     *
+     * @return array<int, int>
+     */
+    private function loadActiveUsersCountByPanelIds(array $panelIds): array
+    {
+        $panelIds = array_values(array_unique(array_map('intval', $panelIds)));
+        if ($panelIds === []) {
+            return [];
+        }
+
+        $rows = ServerUser::query()
+            ->whereIn('panel_id', $panelIds)
+            ->whereHas('keyActivateUser.keyActivate', function ($q) {
+                $q->where('status', KeyActivate::ACTIVE);
+            })
+            ->select('panel_id', DB::raw('COUNT(*) as cnt'))
+            ->groupBy('panel_id')
+            ->get();
+
+        $map = array_fill_keys($panelIds, 0);
+        foreach ($rows as $row) {
+            $map[(int) $row->panel_id] = (int) $row->cnt;
+        }
+
+        return $map;
+    }
+
+    /**
+     * Время создания последнего server_user по панелям.
+     *
+     * @return array<int, ?Carbon>
+     */
+    private function loadLastServerUserCreatedAtByPanelIds(array $panelIds): array
+    {
+        $panelIds = array_values(array_unique(array_map('intval', $panelIds)));
+        if ($panelIds === []) {
+            return [];
+        }
+
+        $rows = ServerUser::query()
+            ->whereIn('panel_id', $panelIds)
+            ->select('panel_id', DB::raw('MAX(created_at) as last_at'))
+            ->groupBy('panel_id')
+            ->get();
+
+        $map = array_fill_keys($panelIds, null);
+        foreach ($rows as $row) {
+            $ts = $row->last_at ?? null;
+            $map[(int) $row->panel_id] = $ts ? Carbon::parse($ts) : null;
+        }
+
+        return $map;
+    }
+
+    /**
+     * Всего пользователей панели (для админки сравнения — пакетно).
+     *
+     * @return array<int, int>
+     */
+    private function loadTotalUsersCountByPanelIds(array $panelIds): array
+    {
+        $panelIds = array_values(array_unique(array_map('intval', $panelIds)));
+        if ($panelIds === []) {
+            return [];
+        }
+
+        $rows = DB::table('server_user')
+            ->whereIn('panel_id', $panelIds)
+            ->select('panel_id', DB::raw('COUNT(*) as cnt'))
+            ->groupBy('panel_id')
+            ->get();
+
+        $map = array_fill_keys($panelIds, 0);
+        foreach ($rows as $row) {
+            $map[(int) $row->panel_id] = (int) $row->cnt;
+        }
+
+        return $map;
     }
 
     /**
@@ -240,297 +353,89 @@ class PanelRepository extends BaseRepository
         return $query->latest()->paginate($perPage);
     }
 
-    // ==================== НОВЫЕ МЕТОДЫ ДЛЯ ИНТЕЛЛЕКТУАЛЬНОГО ВЫБОРА ====================
+    // ==================== ВЫБОР ПАНЕЛИ (ИНТЕЛЛЕКТУАЛЬНЫЙ) ====================
 
     /**
-     * НОВАЯ СИСТЕМА: Получение оптимальной панели с интеллектуальным распределением
-     * @return Panel|null
-     */
-    /**
-     * Получить оптимизированную панель с минимальной нагрузкой
-     * 
-     * @param string|null $panelType Тип панели (по умолчанию Panel::MARZBAN для обратной совместимости)
-     * @param bool $useCacheOnly Если true, использует только кэшированные данные (для быстрой активации ключей)
-     * @return Panel|null
+     * Оптимальная панель Marzban для ротации.
+     * Кэшируется весь цикл: загрузка кандидатов + расчёт score (без «тяжёлого» SELECT на каждый miss только по стратегии).
+     *
+     * @param bool $useCacheOnly зарезервировано (совместимость вызовов)
      */
     public function getOptimizedMarzbanPanel(?string $panelType = null, bool $useCacheOnly = false): ?Panel
     {
-        // Используем Panel::MARZBAN по умолчанию для обратной совместимости
         $panelType = $panelType ?? Panel::MARZBAN;
-        
-        // Получаем панели с исключением привязанных к продавцам (как в оригинальном методе)
-        // Оптимизация: добавляем eager loading для сервера
-        $panels = $this->query()
-            ->where('panel_status', Panel::PANEL_CONFIGURED)
-            ->where('panel', $panelType)
-            ->where('has_error', false) // Исключаем панели с ошибками
-            ->where('excluded_from_rotation', false) // Исключаем панели из ротации (для тестирования)
-            ->whereNotIn('id', function ($query) {
-                $query->select('panel_id')
-                    ->from('salesman')
-                    ->whereNotNull('panel_id');
-            })
-            ->with('server.location')
-            ->limit(1000)
-            ->get();
+        $ttl = (int) config('panel.selection_cache_ttl', 15);
+        $cacheKey = $this->rotationPanelCacheKey($panelType, null);
 
-        // Исключаем панели по различным критериям
-        $excludedLocations = array_map('intval', array_filter(config('panel.excluded_locations', [])));
-        $excludedServerIPs = array_filter(config('panel.excluded_server_ips', []));
-        $excludedServerIDs = array_map('intval', array_filter(config('panel.excluded_server_ids', [])));
-        
-        if (!empty($excludedLocations) || !empty($excludedServerIPs) || !empty($excludedServerIDs)) {
-            $panels = $panels->filter(function ($panel) use ($excludedLocations, $excludedServerIPs, $excludedServerIDs) {
-                // Проверяем локацию
-                if (!empty($excludedLocations) && $panel->server && $panel->server->location_id) {
-                    if (in_array($panel->server->location_id, $excludedLocations)) {
-                        return false;
-                    }
-                }
-                
-                // Проверяем IP-адрес сервера
-                if (!empty($excludedServerIPs) && $panel->server && $panel->server->ip) {
-                    $serverIP = is_numeric($panel->server->ip) ? long2ip($panel->server->ip) : $panel->server->ip;
-                    if (in_array($serverIP, $excludedServerIPs)) {
-                        return false;
-                    }
-                }
-                
-                // Проверяем ID сервера
-                if (!empty($excludedServerIDs) && $panel->server && $panel->server->id) {
-                    if (in_array($panel->server->id, $excludedServerIDs)) {
-                        return false;
-                    }
-                }
-                
-                return true;
-            });
-            
+        return Cache::remember($cacheKey, max(1, $ttl), function () use ($panelType, $useCacheOnly) {
+            $panels = $this->getCandidatePanelsForRotation($panelType, null);
             if ($panels->isEmpty()) {
-                Log::warning('PANEL_SELECTION: No available panels after filtering', [
-                    'excluded_locations' => $excludedLocations,
-                    'excluded_server_ips' => $excludedServerIPs,
-                    'excluded_server_ids' => $excludedServerIDs,
-                    'source' => 'panel'
-                ]);
+                Log::warning('PANEL_SELECTION: No available panels after filtering', ['source' => 'panel']);
+
                 return null;
             }
-            
-            Log::info('PANEL_SELECTION: Filtered panels by exclusion rules', [
-                'excluded_locations' => $excludedLocations,
-                'excluded_server_ips' => $excludedServerIPs,
-                'excluded_server_ids' => $excludedServerIDs,
-                'panels_after_filter' => $panels->count(),
-                'source' => 'panel'
-            ]);
-        }
 
-        if ($panels->isEmpty()) {
-            Log::warning('PANEL_SELECTION: No available panels after filtering', ['source' => 'panel']);
-            return null;
-        }
+            $panel = $this->selectOptimalPanelIntelligent($panels, $useCacheOnly);
+            if ($panel) {
+                return $panel;
+            }
 
-        // Получаем стратегию выбора из конфига
-        $strategy = config('panel.selection_strategy', 'intelligent');
-        
-        // Используем выбранную стратегию даже в режиме useCacheOnly
-        // Методы selectPanelByTraffic и selectOptimalPanelIntelligent уже поддерживают useCacheOnly
-        // и будут использовать кэшированные данные для быстрой работы
-        if ($useCacheOnly) {
-            Log::info('PANEL_SELECTION: Using selected strategy with cache-only mode for fast key activation', [
-                'strategy' => $strategy,
-                'source' => 'panel'
-            ]);
-        }
+            Log::warning('PANEL_SELECTION [INTELLIGENT]: No valid score, fallback to lowest panel id', ['source' => 'panel']);
 
-        // Уменьшено время кэширования до 15 секунд для лучшей актуальности
-        $cacheKey = "optimized_marzban_panel_{$strategy}";
-        return Cache::remember($cacheKey, 15, function () use ($panels, $strategy, $useCacheOnly) {
-            return $this->selectPanelByStrategy($panels, $strategy, $useCacheOnly);
+            return $panels->sortBy('id')->first();
         });
     }
 
     /**
-     * Получить оптимизированную панель с минимальной нагрузкой для заданного провайдера (server.provider).
-     * Используется для мульти-провайдерных ключей: по одному слоту на провайдера.
+     * То же для конкретного провайдера (мульти-провайдер).
      *
-     * @param string $provider Значение server.provider (например Server::VDSINA, Server::TIMEWEB)
-     * @param string|null $panelType
-     * @param bool $useCacheOnly
-     * @return Panel|null
+     * @param bool $useCacheOnly зарезервировано
      */
     public function getOptimizedMarzbanPanelForProvider(string $provider, ?string $panelType = null, bool $useCacheOnly = false): ?Panel
     {
         $panelType = $panelType ?? Panel::MARZBAN;
+        $ttl = (int) config('panel.selection_cache_ttl', 15);
+        $cacheKey = $this->rotationPanelCacheKey($panelType, $provider);
 
-        $panels = $this->query()
-            ->where('panel_status', Panel::PANEL_CONFIGURED)
-            ->where('panel', $panelType)
-            ->where('has_error', false)
-            ->where('excluded_from_rotation', false)
-            ->whereNotIn('id', function ($query) {
-                $query->select('panel_id')
-                    ->from('salesman')
-                    ->whereNotNull('panel_id');
-            })
-            ->whereHas('server', fn ($q) => $q->where('provider', $provider))
-            ->with('server.location')
-            ->limit(1000)
-            ->get();
+        return Cache::remember($cacheKey, max(1, $ttl), function () use ($provider, $panelType, $useCacheOnly) {
+            $panels = $this->getCandidatePanelsForRotation($panelType, $provider);
+            if ($panels->isEmpty()) {
+                Log::info('PANEL_SELECTION: No panels for provider', ['provider' => $provider, 'source' => 'panel']);
 
-        $excludedLocations = array_map('intval', array_filter(config('panel.excluded_locations', [])));
-        $excludedServerIPs = array_filter(config('panel.excluded_server_ips', []));
-        $excludedServerIDs = array_map('intval', array_filter(config('panel.excluded_server_ids', [])));
+                return null;
+            }
 
-        if (!empty($excludedLocations) || !empty($excludedServerIPs) || !empty($excludedServerIDs)) {
-            $panels = $panels->filter(function ($panel) use ($excludedLocations, $excludedServerIPs, $excludedServerIDs) {
-                if (!empty($excludedLocations) && $panel->server && $panel->server->location_id) {
-                    if (in_array($panel->server->location_id, $excludedLocations)) {
-                        return false;
-                    }
-                }
-                if (!empty($excludedServerIPs) && $panel->server && $panel->server->ip) {
-                    $serverIP = is_numeric($panel->server->ip) ? long2ip($panel->server->ip) : $panel->server->ip;
-                    if (in_array($serverIP, $excludedServerIPs)) {
-                        return false;
-                    }
-                }
-                if (!empty($excludedServerIDs) && $panel->server && $panel->server->id) {
-                    if (in_array($panel->server->id, $excludedServerIDs)) {
-                        return false;
-                    }
-                }
-                return true;
-            });
-        }
+            $panel = $this->selectOptimalPanelIntelligent($panels, $useCacheOnly);
+            if ($panel) {
+                return $panel;
+            }
 
-        if ($panels->isEmpty()) {
-            Log::info('PANEL_SELECTION: No panels for provider', ['provider' => $provider, 'source' => 'panel']);
-            return null;
-        }
+            Log::warning('PANEL_SELECTION [INTELLIGENT]: No valid score for provider, fallback to lowest id', [
+                'provider' => $provider,
+                'source' => 'panel',
+            ]);
 
-        $strategy = config('panel.selection_strategy', 'intelligent');
-        $cacheKey = "optimized_marzban_panel_{$strategy}_provider_{$provider}";
-        return Cache::remember($cacheKey, 15, function () use ($panels, $strategy, $useCacheOnly) {
-            return $this->selectPanelByStrategy($panels, $strategy, $useCacheOnly);
+            return $panels->sortBy('id')->first();
         });
     }
 
     /**
-     * Выбор панели в зависимости от стратегии
-     * 
-     * @param Collection $panels
-     * @param string $strategy
-     * @param bool $useCacheOnly Если true, использует только кэшированные данные (не делает запросы к API)
-     * @return Panel|null
+     * Сводка по интеллектуальной ротации для админки (без сравнения со старыми стратегиями).
+     *
+     * @param string|null $panelType по умолчанию Panel::MARZBAN
      */
-    private function selectPanelByStrategy(Collection $panels, string $strategy, bool $useCacheOnly = false): ?Panel
-    {
-        switch ($strategy) {
-            case 'first':
-                // Первая подходящая панель по id, без выравнивания по нагрузке (быстро, без API)
-                return $panels->sortBy('id')->first();
-
-            case 'balanced':
-                // Старая система - равномерное распределение (быстро, не требует API)
-                return $this->getConfiguredMarzbanPanel();
-                
-            case 'traffic_based':
-                // Новая система - на основе трафика сервера
-                return $this->selectPanelByTraffic($panels, $useCacheOnly);
-                
-            case 'intelligent':
-            default:
-                // Интеллектуальная система - комплексный анализ
-                $panel = $this->selectOptimalPanelIntelligent($panels, $useCacheOnly);
-                
-                // Используем выбранную панель даже если статистика устарела
-                // Метод selectOptimalPanelIntelligent уже использует fallback на данные из БД
-                // если статистика недоступна, поэтому не нужно дополнительно переключаться на balanced
-                if ($panel) {
-                    $hasFreshStats = $this->isStatsFresh($panel->id);
-                    if (!$hasFreshStats) {
-                        Log::info('PANEL_SELECTION [INTELLIGENT]: Using panel with stale/DB stats (selected strategy preserved)', [
-                            'source' => 'panel',
-                            'panel_id' => $panel->id
-                        ]);
-                    }
-                    return $panel;
-                }
-                
-                // Fallback на balanced только если вообще не удалось выбрать панель
-                Log::warning('PANEL_SELECTION [INTELLIGENT]: No panel selected, falling back to balanced', [
-                    'source' => 'panel'
-                ]);
-                return $this->getConfiguredMarzbanPanel();
-        }
-    }
-
-    /**
-     * Сравнение старой и новой системы выбора
-     * @return array
-     */
-    public function comparePanelSelection(): array
-    {
-        $panels = $this->getAllConfiguredPanels();
-
-        if ($panels->isEmpty()) {
-            return ['error' => 'No panels available'];
-        }
-
-        $oldSelection = $this->getConfiguredMarzbanPanel();
-        $newSelection = $this->getOptimizedMarzbanPanel();
-
-        $panelsWithInfo = $panels->map(function ($panel) use ($oldSelection, $newSelection) {
-            $totalUsers = $this->getTotalUsersCount($panel->id);
-            $activeUsersFromStats = $this->getActiveUsersFromStats($panel->id);
-
-            return [
-                'id' => $panel->id,
-                'address' => $panel->panel_adress,
-                'active_users_db' => $this->getActiveUsersCount($panel->id), // Старый метод (для отладки)
-                'active_users_stats' => $activeUsersFromStats, // Новый метод из статистики
-                'total_users' => $totalUsers,
-                'last_activity' => $this->getLastUserCreationTime($panel->id),
-                'server_stats' => $this->getLatestPanelStats($panel->id),
-                'optimized_score' => $this->calculatePanelScore($panel, $activeUsersFromStats),
-                'is_old_selected' => $oldSelection && $oldSelection->id === $panel->id,
-                'is_new_selected' => $newSelection && $newSelection->id === $panel->id,
-            ];
-        });
-
-        return [
-            'old_system_selected' => $oldSelection ? $oldSelection->id : null,
-            'new_system_selected' => $newSelection ? $newSelection->id : null,
-            'panels' => $panelsWithInfo,
-            'timestamp' => now()->toDateTimeString(),
-        ];
-    }
-
-    /**
-     * Сравнение всех стратегий выбора панели
-     * @return array
-     */
-    /**
-     * Сравнить все стратегии выбора панели
-     * 
-     * @param string|null $panelType Тип панели (по умолчанию Panel::MARZBAN для обратной совместимости)
-     * @return array
-     */
-    /** Максимум панелей для сравнения стратегий (чтобы страница не грузилась минутами) */
     private const COMPARISON_PANELS_LIMIT = 150;
 
     public function compareAllStrategies(?string $panelType = null): array
     {
-        // Используем Panel::MARZBAN по умолчанию для обратной совместимости
         $panelType = $panelType ?? Panel::MARZBAN;
-        
+
         try {
-            $panels = $this->query()
+            $rotationPanels = $this->query()
                 ->where('panel_status', Panel::PANEL_CONFIGURED)
                 ->where('panel', $panelType)
-                ->where('has_error', false) // Исключаем панели с ошибками
-                ->where('excluded_from_rotation', false) // Исключаем панели из ротации (для тестирования)
+                ->where('has_error', false)
+                ->where('excluded_from_rotation', false)
                 ->whereNotIn('id', function ($query) {
                     $query->select('panel_id')
                         ->from('salesman')
@@ -541,41 +446,22 @@ class PanelRepository extends BaseRepository
                 ->limit(self::COMPARISON_PANELS_LIMIT)
                 ->get();
 
-            if ($panels->isEmpty()) {
+            if ($rotationPanels->isEmpty()) {
                 return ['error' => 'Нет доступных панелей'];
             }
 
-            // Получаем выбор каждой стратегии
-            // Используем кэш для ускорения, но с коротким временем жизни
-            $balancedPanel = $this->getConfiguredMarzbanPanel();
-            
-            // Для traffic_based получаем панели, но с обработкой ошибок rate limit
-            $trafficPanel = null;
-            try {
-                $trafficPanel = $this->selectPanelByTraffic($panels);
-            } catch (\Exception $e) {
-                Log::warning('Failed to select panel by traffic in comparison', [
-                    'error' => $e->getMessage(),
-                    'source' => 'panel'
-                ]);
-                // Fallback на balanced при ошибке
-                $trafficPanel = $balancedPanel;
-            }
-            
-            // Для intelligent также получаем с обработкой ошибок
             $intelligentPanel = null;
             try {
-                $intelligentPanel = $this->selectOptimalPanelIntelligent($panels);
+                $intelligentPanel = $this->selectOptimalPanelIntelligent($rotationPanels, false)
+                    ?? $rotationPanels->sortBy('id')->first();
             } catch (\Exception $e) {
                 Log::warning('Failed to select panel intelligently in comparison', [
                     'error' => $e->getMessage(),
-                    'source' => 'panel'
+                    'source' => 'panel',
                 ]);
-                // Fallback на balanced при ошибке
-                $intelligentPanel = $balancedPanel;
+                $intelligentPanel = $rotationPanels->sortBy('id')->first();
             }
 
-            // Панели для таблицы (ограничиваем, иначе N запросов/API делают страницу очень медленной)
             $allPanels = $this->query()
                 ->where('panel_status', Panel::PANEL_CONFIGURED)
                 ->where('panel', $panelType)
@@ -590,41 +476,54 @@ class PanelRepository extends BaseRepository
                 ->limit(self::COMPARISON_PANELS_LIMIT)
                 ->get();
 
-            // Собираем детальную информацию по каждой панели (включая исключенные для отображения)
-            // Оборачиваем в try-catch для каждой панели, чтобы ошибки не блокировали всю страницу
-            $panelsInfo = $allPanels->map(function ($panel) use ($balancedPanel, $trafficPanel, $intelligentPanel) {
+            $ids = $allPanels->pluck('id')->map(fn ($id) => (int) $id)->all();
+            $monitoring = $this->loadLatestMonitoringByPanelIds($ids);
+            $activeDb = $this->loadActiveUsersCountByPanelIds($ids);
+            $totals = $this->loadTotalUsersCountByPanelIds($ids);
+            $lastAt = $this->loadLastServerUserCreatedAtByPanelIds($ids);
+
+            $panelsInfo = $allPanels->map(function ($panel) use ($intelligentPanel, $monitoring, $activeDb, $totals, $lastAt) {
                 try {
-                    $totalUsers = $this->getTotalUsersCount($panel->id);
-                    $activeUsers = $this->getActiveUsersFromStats($panel->id);
-                    $latestStats = $this->getLatestPanelStats($panel->id);
-                    
-                    // Получаем данные о трафике с обработкой ошибок
+                    $pid = (int) $panel->id;
+                    $mon = $monitoring[$pid] ?? null;
+                    $latestStats = $mon['stats'] ?? null;
+                    $fresh = $mon['fresh'] ?? false;
+
+                    if (! $latestStats || ! $fresh) {
+                        $activeUsers = $activeDb[$pid] ?? 0;
+                    } else {
+                        $activeUsers = (int) ($latestStats['users_active'] ?? 0);
+                    }
+
                     $trafficData = null;
                     try {
                         $trafficData = $this->getServerTrafficData($panel);
                     } catch (\Exception $e) {
-                        // Логируем ошибку, но продолжаем работу
                         Log::warning('Failed to get traffic data for panel in comparison', [
                             'panel_id' => $panel->id,
                             'error' => $e->getMessage(),
-                            'source' => 'panel'
+                            'source' => 'panel',
                         ]);
                     }
-                    
+
                     $cpuUsage = $latestStats['cpu_usage'] ?? 0;
                     $memoryUsed = $latestStats['mem_used'] ?? 0;
                     $memoryTotal = $latestStats['mem_total'] ?? 1;
                     $memoryUsage = ($memoryTotal > 0) ? ($memoryUsed / $memoryTotal) * 100 : 0;
 
-                    // Score для интеллектуальной системы
-                    $intelligentScore = $this->calculatePanelScore($panel, $activeUsers, $latestStats);
+                    $intelligentScore = $this->calculatePanelScore(
+                        $panel,
+                        $activeUsers,
+                        $latestStats,
+                        $lastAt[$pid] ?? null
+                    );
 
                     return [
                         'id' => $panel->id,
                         'address' => $panel->panel_adress,
                         'server_name' => $panel->server->name ?? 'N/A',
                         'server_id' => $panel->server_id,
-                        'total_users' => $totalUsers,
+                        'total_users' => $totals[$pid] ?? 0,
                         'active_users' => $activeUsers,
                         'cpu_usage' => round($cpuUsage, 1),
                         'memory_usage' => round($memoryUsage, 1),
@@ -633,22 +532,19 @@ class PanelRepository extends BaseRepository
                         'traffic_limit_gb' => $trafficData ? round($trafficData['limit'] / (1024 * 1024 * 1024), 2) : null,
                         'traffic_remaining_percent' => $trafficData['remaining_percent'] ?? null,
                         'intelligent_score' => round($intelligentScore, 1),
-                        'last_activity' => $this->getLastUserCreationTime($panel->id),
-                        'is_balanced_selected' => $balancedPanel && $balancedPanel->id === $panel->id,
-                        'is_traffic_selected' => $trafficPanel && $trafficPanel->id === $panel->id,
+                        'last_activity' => $lastAt[$pid] ?? null,
                         'is_intelligent_selected' => $intelligentPanel && $intelligentPanel->id === $panel->id,
-                        'has_fresh_stats' => $this->isStatsFresh($panel->id),
+                        'has_fresh_stats' => $fresh && $latestStats !== null,
                         'has_traffic_data' => $trafficData !== null,
                         'excluded_from_rotation' => $panel->excluded_from_rotation ?? false,
                     ];
                 } catch (\Exception $e) {
-                    // Если произошла ошибка при обработке панели, возвращаем минимальные данные
                     Log::warning('Error processing panel in comparison', [
                         'panel_id' => $panel->id,
                         'error' => $e->getMessage(),
-                        'source' => 'panel'
+                        'source' => 'panel',
                     ]);
-                    
+
                     return [
                         'id' => $panel->id,
                         'address' => $panel->panel_adress,
@@ -664,8 +560,6 @@ class PanelRepository extends BaseRepository
                         'traffic_remaining_percent' => null,
                         'intelligent_score' => 0,
                         'last_activity' => null,
-                        'is_balanced_selected' => false,
-                        'is_traffic_selected' => false,
                         'is_intelligent_selected' => false,
                         'has_fresh_stats' => false,
                         'has_traffic_data' => false,
@@ -674,16 +568,7 @@ class PanelRepository extends BaseRepository
                 }
             });
 
-            // Статистика по стратегиям
             $strategyStats = [
-                'balanced' => [
-                    'selected_panel_id' => $balancedPanel ? $balancedPanel->id : null,
-                    'selected_panel_info' => $balancedPanel ? $panelsInfo->firstWhere('id', $balancedPanel->id) : null,
-                ],
-                'traffic_based' => [
-                    'selected_panel_id' => $trafficPanel ? $trafficPanel->id : null,
-                    'selected_panel_info' => $trafficPanel ? $panelsInfo->firstWhere('id', $trafficPanel->id) : null,
-                ],
                 'intelligent' => [
                     'selected_panel_id' => $intelligentPanel ? $intelligentPanel->id : null,
                     'selected_panel_info' => $intelligentPanel ? $panelsInfo->firstWhere('id', $intelligentPanel->id) : null,
@@ -694,7 +579,7 @@ class PanelRepository extends BaseRepository
                 'strategies' => $strategyStats,
                 'panels' => $panelsInfo->values(),
                 'summary' => [
-                    'total_panels' => $panels->count(),
+                    'total_panels' => $allPanels->count(),
                     'panels_with_stats' => $panelsInfo->where('has_fresh_stats', true)->count(),
                     'panels_with_traffic' => $panelsInfo->where('has_traffic_data', true)->count(),
                     'avg_users' => round($panelsInfo->avg('total_users'), 1),
@@ -711,6 +596,7 @@ class PanelRepository extends BaseRepository
                 'trace' => $e->getTraceAsString(),
                 'source' => 'panel',
             ]);
+
             return ['error' => 'Ошибка при получении данных: ' . $e->getMessage()];
         }
     }
@@ -718,52 +604,76 @@ class PanelRepository extends BaseRepository
     // ==================== ПРИВАТНЫЕ МЕТОДЫ НОВОЙ СИСТЕМЫ ====================
 
     /**
-     * Интеллектуальный выбор панели
-     * 
-     * @param Collection $panels
-     * @param bool $useCacheOnly Если true, использует только кэшированные данные (не делает запросы к API)
-     * @return Panel|null
+     * Интеллектуальный выбор панели (пакетные запросы к БД вместо N+1 по каждой панели).
+     *
+     * @param bool $useCacheOnly зарезервировано
      */
     private function selectOptimalPanelIntelligent(Collection $panels, bool $useCacheOnly = false): ?Panel
     {
-        $scoredPanels = $panels->map(function ($panel) {
-            // Проверяем наличие актуальной статистики
-            $latestStats = $this->getLatestPanelStats($panel->id);
-            
-            // Если статистики нет или она устарела, используем данные из БД
-            if (!$latestStats || !$this->isStatsFresh($panel->id)) {
-                // Fallback: используем количество пользователей из БД
-                $activeUsers = $this->getActiveUsersCount($panel->id);
+        if ($panels->isEmpty()) {
+            return null;
+        }
+
+        $ids = $panels->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $monitoring = $this->loadLatestMonitoringByPanelIds($ids);
+        $activeDb = $this->loadActiveUsersCountByPanelIds($ids);
+        $lastAt = $this->loadLastServerUserCreatedAtByPanelIds($ids);
+
+        $scoredPanels = $panels->map(function ($panel) use ($monitoring, $activeDb, $lastAt) {
+            $pid = (int) $panel->id;
+            $mon = $monitoring[$pid] ?? null;
+            $latestStats = $mon['stats'] ?? null;
+            $fresh = $mon['fresh'] ?? false;
+
+            if (! $latestStats || ! $fresh) {
+                $activeUsers = $activeDb[$pid] ?? 0;
             } else {
-                $activeUsers = $this->getActiveUsersFromStats($panel->id);
+                $activeUsers = (int) ($latestStats['users_active'] ?? 0);
             }
-            
-            $score = $this->calculatePanelScore($panel, $activeUsers, $latestStats);
+
+            $lastCreated = $lastAt[$pid] ?? null;
+            $score = $this->calculatePanelScore($panel, $activeUsers, $latestStats, $lastCreated);
 
             return [
                 'panel' => $panel,
                 'score' => $score,
                 'active_users' => $activeUsers,
-                'has_fresh_stats' => $latestStats && $this->isStatsFresh($panel->id),
-                'details' => $this->getPanelSelectionDetails($panel, $activeUsers, $score)
+                'has_fresh_stats' => $fresh && $latestStats !== null,
+                'details' => $this->buildPanelSelectionDetailsFromSnapshot($latestStats, $activeUsers, $lastCreated),
             ];
-        })->filter(function ($item) {
-            // Фильтруем панели с валидным score
-            return $item['score'] >= 0;
-        });
+        })->filter(fn ($item) => $item['score'] >= 0);
 
         if ($scoredPanels->isEmpty()) {
             Log::warning('PANEL_SELECTION [NEW]: No panels with valid scores', ['source' => 'panel']);
+
             return null;
         }
 
         $selectedPanelData = $scoredPanels->sortByDesc('score')->first();
-        $selectedPanel = $selectedPanelData['panel'];
-
-        // Логируем детали выбора
         $this->logPanelSelection($selectedPanelData);
 
-        return $selectedPanel;
+        return $selectedPanelData['panel'];
+    }
+
+    /**
+     * Детали для лога без повторных SELECT по panel_id.
+     */
+    private function buildPanelSelectionDetailsFromSnapshot(?array $latestStats, int $activeUsers, ?Carbon $lastActivity): array
+    {
+        $cpuUsage = $latestStats['cpu_usage'] ?? 0;
+        $memoryUsed = $latestStats['mem_used'] ?? 0;
+        $memoryTotal = $latestStats['mem_total'] ?? 1;
+        $memoryUsage = ($memoryTotal > 0) ? ($memoryUsed / $memoryTotal) * 100 : 0;
+
+        $selectionReason = $this->getSelectionReason($activeUsers, $cpuUsage, $memoryUsage, $lastActivity);
+
+        return [
+            'cpu_usage' => round($cpuUsage, 1),
+            'memory_usage' => round($memoryUsage, 1),
+            'last_activity' => $lastActivity,
+            'last_activity_human' => $lastActivity ? $lastActivity->diffForHumans() : 'never',
+            'selection_reason' => $selectionReason,
+        ];
     }
 
     /**
@@ -805,31 +715,6 @@ class PanelRepository extends BaseRepository
     }
 
     /**
-     * Получение деталей для логирования
-     */
-    private function getPanelSelectionDetails(Panel $panel, int $activeUsers, float $score): array
-    {
-        $latestStats = $this->getLatestPanelStats($panel->id);
-        $lastActivity = $this->getLastUserCreationTime($panel->id);
-
-        $cpuUsage = $latestStats['cpu_usage'] ?? 0;
-        $memoryUsed = $latestStats['mem_used'] ?? 0;
-        $memoryTotal = $latestStats['mem_total'] ?? 1;
-        $memoryUsage = ($memoryTotal > 0) ? ($memoryUsed / $memoryTotal) * 100 : 0;
-
-        // Определяем причину выбора
-        $selectionReason = $this->getSelectionReason($activeUsers, $cpuUsage, $memoryUsage, $lastActivity);
-
-        return [
-            'cpu_usage' => round($cpuUsage, 1),
-            'memory_usage' => round($memoryUsage, 1),
-            'last_activity' => $lastActivity,
-            'last_activity_human' => $lastActivity ? $lastActivity->diffForHumans() : 'never',
-            'selection_reason' => $selectionReason
-        ];
-    }
-
-    /**
      * Определение причины выбора панели
      */
     private function getSelectionReason(int $activeUsers, float $cpuUsage, float $memoryUsage, ?Carbon $lastActivity): string
@@ -853,7 +738,7 @@ class PanelRepository extends BaseRepository
         }
 
         if (empty($reasons)) {
-            return 'balanced load';
+            return 'neutral load';
         }
 
         return implode(', ', $reasons);
@@ -862,21 +747,23 @@ class PanelRepository extends BaseRepository
     /**
      * Расчет комплексного score для панели
      */
-    private function calculatePanelScore(Panel $panel, int $activeUsers, ?array $latestStats = null): float
-    {
+    private function calculatePanelScore(
+        Panel $panel,
+        int $activeUsers,
+        ?array $latestStats = null,
+        ?Carbon $lastUserCreatedAt = null
+    ): float {
         $score = 100.0;
 
-        // 1. Score на основе количества активных пользователей (50% веса)
         $userScore = $this->calculateUserBasedScore($activeUsers);
         $score += $userScore * 50;
 
-        // 2. Score на основе нагрузки сервера (40% веса)
-        // Используем переданную статистику или получаем заново
         $loadScore = $this->calculateLoadBasedScore($panel, $latestStats);
         $score += $loadScore * 40;
 
-        // 3. Score на основе времени последней активности (5% веса - уменьшено с 10%)
-        $timeScore = $this->calculateTimeBasedScore($panel);
+        $timeScore = $lastUserCreatedAt !== null
+            ? $this->calculateTimeBasedScoreFromCarbon($lastUserCreatedAt)
+            : $this->calculateTimeBasedScore($panel);
         $score += $timeScore * 5;
 
         return max($score, 0);
@@ -939,19 +826,31 @@ class PanelRepository extends BaseRepository
      */
     private function calculateTimeBasedScore(Panel $panel): float
     {
-        $lastUserTime = $this->getLastUserCreationTime($panel->id);
+        return $this->calculateTimeBasedScoreFromCarbon($this->getLastUserCreationTime($panel->id));
+    }
 
-        if (!$lastUserTime) {
-            return 1.0; // Панель никогда не использовалась
+    private function calculateTimeBasedScoreFromCarbon(?Carbon $lastUserTime): float
+    {
+        if (! $lastUserTime) {
+            return 1.0;
         }
 
         $minutesSinceLast = Carbon::now()->diffInMinutes($lastUserTime);
 
-        if ($minutesSinceLast < 5) return 0.0;     // Только что использовалась
-        if ($minutesSinceLast < 15) return 0.3;    // Недавно
-        if ($minutesSinceLast < 30) return 0.6;    // Некоторое время назад
-        if ($minutesSinceLast < 60) return 0.8;    // Давно
-        return 1.0;                                // Очень давно
+        if ($minutesSinceLast < 5) {
+            return 0.0;
+        }
+        if ($minutesSinceLast < 15) {
+            return 0.3;
+        }
+        if ($minutesSinceLast < 30) {
+            return 0.6;
+        }
+        if ($minutesSinceLast < 60) {
+            return 0.8;
+        }
+
+        return 1.0;
     }
 
     /**
@@ -1075,149 +974,6 @@ class PanelRepository extends BaseRepository
         return $ageMinutes <= $maxAgeMinutes;
     }
 
-    /**
-     * Проверка, есть ли хотя бы одна панель с актуальной статистикой
-     * 
-     * @param Collection $panels
-     * @return bool
-     */
-    private function hasAnyFreshStats(Collection $panels): bool
-    {
-        return $panels->contains(function ($panel) {
-            return $this->isStatsFresh($panel->id);
-        });
-    }
-
-    /**
-     * Выбор панели на основе нагрузки трафика сервера
-     * Выбирает панель на сервере с наименьшим процентом использования трафика
-     * 
-     * @param Collection $panels
-     * @param bool $useCacheOnly Если true, использует только кэшированные данные (не делает запросы к API)
-     * @return Panel|null
-     */
-    private function selectPanelByTraffic(Collection $panels, bool $useCacheOnly = false): ?Panel
-    {
-        // Проверяем, заблокирован ли API из-за rate limit (403 Blacklisted)
-        // Согласно поддержке VDSina, блокировка снимается автоматически через 4 часа
-        $rateLimitBlocked = Cache::get('vdsina_api_rate_limit_blocked', false);
-        $rateLimitBlockedUntil = Cache::get('vdsina_api_rate_limit_blocked_until', 0);
-        
-        // Если блокировка активна, используем только кэш (не делаем запросы к API)
-        if ($rateLimitBlocked && $rateLimitBlockedUntil > time()) {
-            $useCacheOnly = true; // Принудительно используем только кэш
-            $remainingTime = $rateLimitBlockedUntil - time();
-            $remainingHours = round($remainingTime / 3600, 1);
-            
-            Log::info('PANEL_SELECTION [TRAFFIC]: API blocked (403 Blacklisted), using cache only mode', [
-                'source' => 'panel',
-                'blocked_until' => date('Y-m-d H:i:s', $rateLimitBlockedUntil),
-                'remaining_hours' => $remainingHours,
-                'message' => 'VDSina API will auto-unblock after 4 hours from last problematic request'
-            ]);
-        }
-        
-        $panelsWithTraffic = $panels->map(function ($panel) use ($useCacheOnly) {
-            // Если режим "только кэш", используем специальный метод, который не делает запросы к API
-            $trafficData = $useCacheOnly 
-                ? $this->getServerTrafficDataFromCache($panel)
-                : $this->getServerTrafficData($panel);
-            
-            return [
-                'panel' => $panel,
-                'traffic_used_percent' => $trafficData['used_percent'] ?? null,
-                'traffic_remaining_percent' => $trafficData['remaining_percent'] ?? null,
-                'traffic_data' => $trafficData,
-                'has_traffic_data' => $trafficData !== null
-            ];
-        });
-        
-        // Сначала пытаемся найти панели с валидными данными о трафике (не критическая загрузка)
-        $validPanels = $panelsWithTraffic->filter(function ($item) {
-            return $item['has_traffic_data'] 
-                && $item['traffic_used_percent'] !== null 
-                && $item['traffic_used_percent'] < 95;
-        });
-        
-        // Если есть панели с валидными данными - выбираем из них
-        if ($validPanels->isNotEmpty()) {
-            $selectedPanelData = $validPanels->sortBy('traffic_used_percent')->first();
-            $selectedPanel = $selectedPanelData['panel'];
-            
-            Log::info('PANEL_SELECTION [TRAFFIC]: Selected panel based on traffic load', [
-                'panel_id' => $selectedPanel->id,
-                'traffic_used_percent' => $selectedPanelData['traffic_used_percent'],
-                'traffic_remaining_percent' => $selectedPanelData['traffic_remaining_percent'],
-                'server_id' => $selectedPanel->server_id,
-                'server_name' => $selectedPanel->server->name ?? 'N/A'
-            ]);
-            
-            return $selectedPanel;
-        }
-        
-        // Если нет валидных панелей, но есть панели с данными (даже с высокой загрузкой) - используем их
-        $panelsWithAnyData = $panelsWithTraffic->filter(function ($item) {
-            return $item['has_traffic_data'] && $item['traffic_used_percent'] !== null;
-        });
-        
-        if ($panelsWithAnyData->isNotEmpty()) {
-            $selectedPanelData = $panelsWithAnyData->sortBy('traffic_used_percent')->first();
-            $selectedPanel = $selectedPanelData['panel'];
-            
-            Log::warning('PANEL_SELECTION [TRAFFIC]: Using panel with high traffic load (no better options)', [
-                'panel_id' => $selectedPanel->id,
-                'traffic_used_percent' => $selectedPanelData['traffic_used_percent'],
-                'server_id' => $selectedPanel->server_id,
-                'server_name' => $selectedPanel->server->name ?? 'N/A',
-                'source' => 'panel'
-            ]);
-            
-            return $selectedPanel;
-        }
-        
-        // Если данных о трафике нет вообще, используем альтернативный метод выбора
-        // на основе количества активных пользователей из БД (сохраняем выбранную стратегию)
-        Log::warning('PANEL_SELECTION [TRAFFIC]: No traffic data available, using fallback based on active users count', [
-            'panels_count' => $panels->count(),
-            'rate_limit_blocked' => $rateLimitBlocked,
-            'use_cache_only' => $useCacheOnly,
-            'source' => 'panel'
-        ]);
-        
-        // Выбираем панель с минимальным количеством активных пользователей
-        $panelsWithUsers = $panels->map(function ($panel) {
-            return [
-                'panel' => $panel,
-                'active_users' => $this->getActiveUsersCount($panel->id),
-                'total_users' => $this->getTotalUsersCount($panel->id)
-            ];
-        });
-        
-        $selectedPanelData = $panelsWithUsers->sortBy('active_users')->first();
-        
-        if ($selectedPanelData) {
-            Log::info('PANEL_SELECTION [TRAFFIC]: Selected panel using fallback (active users count)', [
-                'panel_id' => $selectedPanelData['panel']->id,
-                'active_users' => $selectedPanelData['active_users'],
-                'total_users' => $selectedPanelData['total_users'],
-                'source' => 'panel'
-            ]);
-            return $selectedPanelData['panel'];
-        }
-        
-        // Только в крайнем случае используем balanced
-        Log::warning('PANEL_SELECTION [TRAFFIC]: No panels available, falling back to balanced', [
-            'source' => 'panel'
-        ]);
-        return $this->getConfiguredMarzbanPanel();
-    }
-
-    /**
-     * Получение данных о трафике сервера
-     * 
-     * @param Panel $panel
-     * @return array|null
-     */
     /**
      * Получить данные о трафике сервера только из кэша (без запросов к API)
      * Используется для быстрой активации ключей

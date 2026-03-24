@@ -183,9 +183,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
             Route::prefix('panel-settings')->name('panel-settings.')->group(function () {
                 Route::get('/', [\App\Http\Controllers\Module\PanelSettingsController::class, 'index'])->name('index');
-                Route::put('/strategy', [\App\Http\Controllers\Module\PanelSettingsController::class, 'updateStrategy'])->name('update-strategy');
                 Route::post('/clear-error', [\App\Http\Controllers\Module\PanelSettingsController::class, 'clearPanelError'])->name('clear-error');
-                Route::post('/toggle-rotation', [\App\Http\Controllers\Module\PanelSettingsController::class, 'toggleRotation'])->name('toggle-rotation');
             });
 
             // Salesman
