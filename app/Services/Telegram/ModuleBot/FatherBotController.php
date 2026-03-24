@@ -372,7 +372,7 @@ class FatherBotController extends AbstractTelegramBot
             // Сохраняем в кэше информацию о том, что запрос идет из бота
             Cache::put("telegram_auth:{$hash}", [
                 'user_id' => $this->chatId,
-                'callback_url' => UrlHelper::personalRoute('personal.auth.telegram.callback'),
+                'callback_url' => UrlHelper::personalRoute('personal.auth.telegram.callback', [], true),
                 'source' => 'bot' // Добавляем метку источника
             ], now()->addMinutes(5));
 
@@ -435,7 +435,7 @@ class FatherBotController extends AbstractTelegramBot
             $hash = bin2hex(random_bytes(16));
             Cache::put("telegram_auth:{$hash}", [
                 'user_id' => $this->chatId,
-                'callback_url' => UrlHelper::personalRoute('personal.auth.telegram.callback'),
+                'callback_url' => UrlHelper::personalRoute('personal.auth.telegram.callback', [], true),
             ], now()->addMinutes(5));
 
             return "https://t.me/{$botUsername}?start=auth_{$hash}";

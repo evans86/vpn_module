@@ -14,16 +14,37 @@ class UrlHelper
     }
 
     /**
-     * Абсолютный URL маршрута личного кабинета продавца (/personal/...).
-     * Всегда на APP_CONFIG_PUBLIC_URL (как страницы конфигов), а не на APP_URL.
+     * URL маршрута личного кабинета продавца (/personal/...).
+     * База — APP_CONFIG_PUBLIC_URL (как страницы конфигов), а не APP_URL.
+     *
+     * Если хост текущего запроса совпадает с хостом из APP_CONFIG_PUBLIC_URL, возвращается
+     * только путь (например /personal/faq/update). Тогда форма шлёт POST на тот же origin
+     * (та же схема https/http), без редиректа http↔https и без превращения POST в GET (405).
+     *
+     * Для внешних систем (OAuth Telegram callback в кэше и т.п.) передайте $forceAbsolute = true.
      *
      * @param  string  $name  Имя маршрута, например personal.dashboard
      */
-    public static function personalRoute(string $name, array $parameters = []): string
+    public static function personalRoute(string $name, array $parameters = [], bool $forceAbsolute = false): string
     {
         $path = route($name, $parameters, false);
         $path = '/' . ltrim((string) $path, '/');
         $base = rtrim((string) config('app.config_public_url'), '/');
+
+        $baseForHost = $base !== '' && str_contains($base, '://')
+            ? $base
+            : ($base !== '' ? 'https://' . $base : '');
+        $targetHost = $baseForHost !== '' ? parse_url($baseForHost, PHP_URL_HOST) : null;
+
+        if (
+            !$forceAbsolute
+            && !app()->runningInConsole()
+            && $targetHost
+            && request()
+            && strcasecmp((string) request()->getHost(), (string) $targetHost) === 0
+        ) {
+            return $path;
+        }
 
         return $base . $path;
     }
