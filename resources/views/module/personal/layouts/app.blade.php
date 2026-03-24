@@ -419,5 +419,12 @@
         }
     });
 </script>
+{{-- Обновить service worker (failover на зеркала): старая версия без respondWith ломала POST-формы в ЛК --}}
+<script>
+(function () {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.getRegistration().then(function (reg) { if (reg) reg.update(); });
+})();
+</script>
 </body>
 </html>

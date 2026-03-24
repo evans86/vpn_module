@@ -133,7 +133,7 @@
         </div>
     </div>
     @if(!empty(config('app.mirror_urls', [])) && in_array(request()->getHost(), config('app.pwa_service_worker_hosts', []), true))
-    <script>(function(){if('serviceWorker'in navigator)navigator.serviceWorker.register('{{ url("/service-worker.js") }}',{scope:'/'}).catch(function(){});})();</script>
+    <script>(function(){if('serviceWorker'in navigator)navigator.serviceWorker.register('{{ url("/service-worker.js") }}?v=4',{scope:'/'}).catch(function(){});})();</script>
     @endif
 </body>
 </html>

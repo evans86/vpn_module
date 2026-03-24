@@ -148,7 +148,7 @@
 <script>
 (function(){
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('{{ url("/service-worker.js") }}', { scope: '/' }).catch(function(){});
+    navigator.serviceWorker.register('{{ url("/service-worker.js") }}?v=4', { scope: '/' }).catch(function(){});
   }
 })();
 </script>

@@ -86,15 +86,24 @@ Route::prefix('personal')
 // Telegram Bot Webhook
 Route::post('/telegram/webhook/{token}', [FatherBotController::class, 'handle'])->name('telegram.webhook');
 
-// Service Worker для failover на зеркала (берёт список из APP_MIRROR_URLS)
+// Service Worker для failover на зеркала (берёт список из APP_MIRROR_URLS). Код — resources/js/service-worker.js.
 Route::get('/service-worker.js', function () {
     $mirrors = config('app.mirror_urls', []);
     if (empty($mirrors)) {
         return response('', 404);
     }
-    return response()->view('service-worker', ['mirrorOrigins' => $mirrors], 200, [
+    $path = resource_path('js/service-worker.js');
+    if (! is_readable($path)) {
+        abort(500, 'resources/js/service-worker.js is missing');
+    }
+    $prefix = "'use strict';\nconst MIRROR_ORIGINS = "
+        . json_encode(array_values($mirrors), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)
+        . ";\n";
+    $body = $prefix . file_get_contents($path);
+
+    return response($body, 200, [
         'Content-Type' => 'application/javascript; charset=UTF-8',
-        'Cache-Control' => 'max-age=0, must-revalidate',
+        'Cache-Control' => 'no-store, must-revalidate',
     ]);
 })->name('service-worker');
 

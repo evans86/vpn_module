@@ -1,9 +1,11 @@
-'use strict';
-const MIRROR_ORIGINS = @json($mirrorOrigins ?? []);
-
 function redirectHtml(mirrorFullUrl) {
-  var safe = mirrorFullUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return '<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=' + safe + '"><script>location.replace(' + JSON.stringify(mirrorFullUrl) + ');</script></head><body><p>Перенаправление на зеркало…</p></body></html>';
+  var safe = mirrorFullUrl
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=' + safe + '">'
+    + '<script>location.replace(' + JSON.stringify(mirrorFullUrl) + ');</script></head><body><p>Перенаправление на зеркало…</p></body></html>';
 }
 
 /** Не уводим на зеркало админку, API и ЛК — только публичные страницы (конфиги, netcheck и т.д.). */
@@ -24,7 +26,9 @@ self.addEventListener('fetch', function (event) {
   if (url.origin !== self.location.origin) {
     return;
   }
+  // ЛК, админка и т.д.: пустой return без respondWith ломал в части браузеров POST-навигацию (формы → 405).
   if (skipMirrorFailoverForPath(url.pathname)) {
+    event.respondWith(fetch(event.request));
     return;
   }
   const candidates = MIRROR_ORIGINS.filter(function (origin) {
