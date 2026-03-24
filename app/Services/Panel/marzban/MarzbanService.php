@@ -468,8 +468,6 @@ class MarzbanService
      */
     public function updateMarzbanToken(int $panel_id): Panel
     {
-        Log::info('Updating panel token', ['panel_id' => $panel_id, 'source' => 'panel']);
-
         try {
             /**
              * @var Panel $panel
@@ -481,8 +479,6 @@ class MarzbanService
                 $panel->auth_token = $marzbanApi->getToken($panel->panel_login, $panel->panel_password);
                 $panel->token_died_time = time() + \App\Constants\TimeConstants::PANEL_TOKEN_LIFETIME;
                 $panel->save();
-
-                Log::info('Panel token updated', ['panel_id' => $panel_id, 'source' => 'panel']);
             }
 
             return $panel;
@@ -2300,13 +2296,6 @@ class MarzbanService
                 ? null
                 : KeyActivate::query()->where('id', $key_activate_id)->firstOrFail();
 
-            // При массовой миграции не пишем info-логи — только ошибки (меньше I/O, быстрее обработка).
-            Log::debug('Creating server user', [
-                'panel_id' => $panel_id,
-                'key_activate_id' => $key_activate_id,
-                'source' => 'panel',
-            ]);
-
             $panel = self::updateMarzbanToken($panel_id);
             if (!$panel->server) {
                 throw new RuntimeException('Server not found for panel');
@@ -2358,8 +2347,6 @@ class MarzbanService
                     throw new RuntimeException('Failed to create key activate user: ' . $e->getMessage());
                 }
             }
-
-            Log::debug('Server user created successfully', ['user_id' => $userId, 'panel_id' => $panel_id, 'source' => 'panel']);
 
             return $serverUser;
         } catch (RuntimeException $r) {

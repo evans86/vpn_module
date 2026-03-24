@@ -238,16 +238,6 @@ class KeyActivateService
 
             $keyActivate = $this->keyActivateRepository->createKey($keyData);
 
-            $this->logger->info('Ключ успешно создан', [
-                'source' => 'key_activate',
-                'action' => 'create',
-                'key_id' => $keyActivate->id,
-                'pack_salesman_id' => $pack_salesman_id,
-                'traffic_limit' => $traffic_limit,
-                'finish_at' => $finish_at,
-                'deleted_at' => $deleted_at
-            ]);
-
             return $keyActivate;
         } catch (RuntimeException $e) {
             $this->logger->error('Ошибка при создании ключа (RuntimeException)', [
@@ -339,16 +329,12 @@ class KeyActivateService
                 );
 
                 throw new RuntimeException('Ошибка при списании баланса, ' . OrderHelper::formingError($order['message']));
-            } else {
-                $this->logger->warning('ORDER', [
-                    'ORDER' => $order,
-                ]);
-
-                $keyID = $order['data']['product']['data'];
-
-                BottApi::createOrder($botModuleDto, $userData, $key_price_kopecks,
-                    'Покупка VPN доступа: ' . $keyID);
             }
+
+            $keyID = $order['data']['product']['data'];
+
+            BottApi::createOrder($botModuleDto, $userData, $key_price_kopecks,
+                'Покупка VPN доступа: ' . $keyID);
 
             $salesman = Salesman::query()->where('module_bot_id', $botModuleDto->id)->first();
 
@@ -361,15 +347,16 @@ class KeyActivateService
             if ($salesman) {
                 $keyActivate->module_salesman_id = $salesman->id;
                 $keyActivate->save();
-            } else {
-                // Логируем только один раз, что ключ создан без привязки к продавцу
-                // Это не критическая ошибка, так как процесс продолжается успешно
-                $this->logger->info('Ключ создан без привязки к продавцу (модуль не привязан к продавцу)', [
-                    'key_id' => $keyID,
-                    'module_bot_id' => $botModuleDto->id,
-                    'source' => 'key'
-                ]);
             }
+
+            $this->logger->info('Покупка ключа', [
+                'source' => 'key_activate',
+                'action' => 'buy_key',
+                'key_id' => $keyActivate->id,
+                'user_tg_id' => $userData['user_tg_id'] ?? null,
+                'product_id' => $product_id,
+                'module_bot_id' => $botModuleDto->id,
+            ]);
 
             return $keyActivate;
         } catch (Exception $e) {
@@ -551,7 +538,7 @@ class KeyActivateService
             return $this->keyActivateRepository->updateActivationData($locked, $userTgId, KeyActivate::ACTIVE);
         });
 
-        $this->logger->info('Ключ завершён после прерванной активации', [
+        $this->logger->info('Ключ успешно активирован', [
             'source' => 'key_activate',
             'action' => 'finalize_stuck_activation',
             'key_id' => $activated->id,
@@ -601,6 +588,14 @@ class KeyActivateService
                 throw new RuntimeException('Активная панель Marzban не найдена');
             }
 
+            $this->logger->info('Начало активации ключа', [
+                'source' => 'key_activate',
+                'key_id' => $keyId,
+                'user_tg_id' => $userTgId,
+                'action' => $logAction,
+                'panels_count' => count($panels),
+            ]);
+
             $lastError = null;
             foreach ($panels as $panel) {
                 try {
@@ -621,11 +616,12 @@ class KeyActivateService
                         'Ошибка при создании пользователя: ' . $e->getMessage()
                     );
                     $provider = $panel->server ? $panel->server->provider : '';
-                    Log::warning('Panel marked with error (multi-provider slot)', [
+                    Log::error('Ошибка панели при активации (слот)', [
                         'panel_id' => $panel->id,
                         'provider' => $provider,
+                        'key_id' => $keyId,
                         'error' => $e->getMessage(),
-                        'source' => 'key',
+                        'source' => 'key_activate',
                     ]);
                     $this->panelRepository->forgetRotationSelectionCache($provider ?: null);
                 }
@@ -655,10 +651,7 @@ class KeyActivateService
                 'action' => $logAction,
                 'key_id' => $activatedKey->id,
                 'user_tg_id' => $userTgId,
-                'server_user_ids' => array_map(fn ($su) => $su->id, $serverUsers),
                 'panel_ids' => array_map(fn ($su) => $su->panel_id, $serverUsers),
-                'traffic_limit' => $keyLocked->traffic_limit,
-                'finish_at' => $activatedKey->finish_at,
             ]);
 
             if ($logAction === 'activate_module_key') {
@@ -682,7 +675,7 @@ class KeyActivateService
             if (count($serverUsers) === 0) {
                 $this->keyActivateRepository->releaseActivationClaim($keyId);
             } else {
-                Log::error('Активация: ошибка после создания пользователей на панелях (ключ остаётся ACTIVATING для доведения)', [
+                $this->logger->error('Ошибка активации после создания пользователей на панелях (ключ ACTIVATING)', [
                     'source' => 'key_activate',
                     'key_id' => $keyId,
                     'user_tg_id' => $userTgId,
@@ -724,7 +717,8 @@ class KeyActivateService
                 ->withHeaders(['Accept' => 'application/json'])
                 ->get($url);
         } catch (\Throwable $e) {
-            Log::warning('warmConfigSync failed', [
+            Log::error('Ошибка прогрева конфига после активации', [
+                'source' => 'key_activate',
                 'key_activate_id' => $keyActivateId,
                 'error' => $e->getMessage(),
             ]);
@@ -979,9 +973,10 @@ class KeyActivateService
                         'Ошибка при создании пользователя при перевыпуске: ' . $e->getMessage()
                     );
                     $provider = $panel->server ? $panel->server->provider : '';
-                    Log::warning('Panel marked with error (renew)', [
+                    Log::error('Ошибка панели при перевыпуске ключа', [
                         'panel_id' => $panel->id,
                         'provider' => $provider,
+                        'key_id' => $key->id,
                         'error' => $e->getMessage(),
                         'source' => 'key_activate',
                     ]);
