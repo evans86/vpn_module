@@ -38,7 +38,6 @@
                 </div>
 
                 <div class="px-4 py-5 sm:p-6">
-                    {{-- POST вне /personal/* — иначе CDN/nginx отдаёт 405 до PHP --}}
                     <form action="{{ route('personal.faq.update') }}" method="POST">
                         @csrf
 

@@ -31,37 +31,6 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-/*
-| POST ЛК: префикс /lk/, регистрация до Auth::routes (избегаем конфликтов и 405).
-| В маршрутах используйте middleware auth.salesman (точка), не auth:salesman — иначе
-| подставляется Illuminate Authenticate, а не App\Http\Middleware\SalesmanOnly.
-*/
-Route::middleware([RedirectPersonalToConfigPublicHost::class, 'auth.salesman'])->group(function () {
-    Route::post('/lk/faq/save', [PersonalController::class, 'updateFaq'])->name('personal.faq.update');
-    Route::post('/lk/faq/reset', [PersonalController::class, 'resetFaq'])->name('personal.faq.reset');
-    Route::post('/lk/vpn-instructions/save', [PersonalController::class, 'updateVpnInstructions'])->name('personal.faq.vpn-instructions.update');
-    Route::post('/lk/vpn-instructions/reset', [PersonalController::class, 'resetVpnInstructions'])->name('personal.faq.vpn-instructions.reset');
-    Route::post('/lk/network/report', [NetworkCheckController::class, 'report'])
-        ->middleware('throttle:120,1')
-        ->name('personal.network.report');
-});
-
-Route::middleware([RedirectPersonalToConfigPublicHost::class])->group(function () {
-    Route::post('/lk/logout', function () {
-        if (session()->has('impersonation_admin_id')) {
-            $sid = session('impersonation_salesman_id');
-            Auth::guard('salesman')->logout();
-            session()->forget(['impersonation_admin_id', 'impersonation_salesman_id']);
-            if ($sid) {
-                return redirect()->route('admin.module.salesman.show', $sid)
-                    ->with('success', 'Режим просмотра личного кабинета завершён.');
-            }
-        }
-        Auth::guard('salesman')->logout();
-        return redirect()->to(UrlHelper::personalRoute('personal.auth'));
-    })->middleware('auth.salesman')->name('personal.logout');
-});
-
 Auth::routes(['register' => false]);
 
 // Личный кабинет продавца (канонический хост — APP_CONFIG_PUBLIC_URL)
@@ -92,16 +61,35 @@ Route::prefix('personal')
                 ->where(['size' => '^[0-9]+(kb|mb|b)$'])
                 ->name('payload')
                 ->middleware('throttle:120,1'); // защита от ab/use
-            // POST report: маршрут personal.network.report (POST /lk/network/report).
+            Route::post('/report', [NetworkCheckController::class, 'report'])
+                ->middleware('throttle:120,1')
+                ->name('report');
         });
 
-        // FAQ и инструкции (GET); POST — имена personal.faq.*, URI /lk/... (см. начало файла)
         Route::prefix('faq')->group(function () {
             Route::get('/', [PersonalController::class, 'faq'])->name('faq');
+            Route::post('/', [PersonalController::class, 'updateFaq'])->name('faq.update');
+            Route::post('/reset', [PersonalController::class, 'resetFaq'])->name('faq.reset');
+            Route::post('/vpn-instructions', [PersonalController::class, 'updateVpnInstructions'])->name('faq.vpn-instructions.update');
+            Route::post('/vpn-instructions/reset', [PersonalController::class, 'resetVpnInstructions'])->name('faq.vpn-instructions.reset');
             Route::get('/update', function () {
                 return redirect()->route('personal.faq');
             });
         });
+
+        Route::post('/logout', function () {
+            if (session()->has('impersonation_admin_id')) {
+                $sid = session('impersonation_salesman_id');
+                Auth::guard('salesman')->logout();
+                session()->forget(['impersonation_admin_id', 'impersonation_salesman_id']);
+                if ($sid) {
+                    return redirect()->route('admin.module.salesman.show', $sid)
+                        ->with('success', 'Режим просмотра личного кабинета завершён.');
+                }
+            }
+            Auth::guard('salesman')->logout();
+            return redirect()->to(UrlHelper::personalRoute('personal.auth'));
+        })->name('logout');
     });
 });
 
