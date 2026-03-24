@@ -48,6 +48,8 @@ class KeyActivateController extends Controller
     public function buyKey(PackSalesmanBuyKeyRequest $request)
     {
         try {
+            $t0 = microtime(true);
+
             $this->dbLogger->info('Запрос на покупку ключа (модуль)', [
                 'source' => 'key_activate',
                 'action' => 'buy_key_request',
@@ -57,6 +59,7 @@ class KeyActivateController extends Controller
             ]);
 
             // Проверка существования модуля бота
+            $tBeforeModule = microtime(true);
             $botModule = BotModule::where('public_key', $request->public_key)->first();
             if (!$botModule) {
                 throw new RuntimeException('Модуль бота не найден');
@@ -64,12 +67,14 @@ class KeyActivateController extends Controller
 
             $botModuleDto = BotModuleFactory::fromEntity($botModule);
 
+            $tBeforeCheckUser = microtime(true);
             $userCheck = BottApi::checkUser(
                 $request->user_tg_id,
                 $request->user_secret_key,
                 $botModule->public_key,
                 $botModule->private_key
             );
+            $tAfterCheckUser = microtime(true);
             if (!$userCheck['result']) {
                 throw new RuntimeException($userCheck['message']);
             }
@@ -77,11 +82,43 @@ class KeyActivateController extends Controller
                 throw new RuntimeException('Пополните баланс в боте');
             }
 
+            $this->dbLogger->info('Покупка (модуль): тайминг до buyKey', [
+                'source' => 'key_activate',
+                'action' => 'buy_key_timing_before_purchase',
+                'user_tg_id' => $request->user_tg_id,
+                'product_id' => $request->product_id,
+                'ms_db_module' => (int) round(($tBeforeCheckUser - $tBeforeModule) * 1000),
+                'ms_bott_check_user' => (int) round(($tAfterCheckUser - $tBeforeCheckUser) * 1000),
+                'ms_subtotal' => (int) round(($tAfterCheckUser - $t0) * 1000),
+            ]);
+
             // Покупка ключа в боте продаж
+            $tBeforeBuyKey = microtime(true);
             $key = $this->keyActivateService->buyKey($botModuleDto, $request->product_id, $userCheck['data']);
+            $tAfterBuyKey = microtime(true);
+
+            $this->dbLogger->info('Покупка (модуль): тайминг buyKey (Bott + ключ в БД)', [
+                'source' => 'key_activate',
+                'action' => 'buy_key_timing_bott_purchase',
+                'user_tg_id' => $request->user_tg_id,
+                'key_id' => $key->id,
+                'ms_buy_key' => (int) round(($tAfterBuyKey - $tBeforeBuyKey) * 1000),
+                'ms_total' => (int) round(($tAfterBuyKey - $t0) * 1000),
+            ]);
 
             // Активация ключа в системе
+            $tBeforeActivate = microtime(true);
             $activatedKey = $this->keyActivateService->activateModuleKey($key, $request->user_tg_id);
+            $tAfterActivate = microtime(true);
+
+            $this->dbLogger->info('Покупка (модуль): тайминг activateModuleKey', [
+                'source' => 'key_activate',
+                'action' => 'buy_key_timing_activation',
+                'user_tg_id' => $request->user_tg_id,
+                'key_id' => $activatedKey->id,
+                'ms_activate_module_key' => (int) round(($tAfterActivate - $tBeforeActivate) * 1000),
+                'ms_total_request' => (int) round(($tAfterActivate - $t0) * 1000),
+            ]);
 
             return ApiHelpers::success(array_merge([
                 'key' => $activatedKey->id,
