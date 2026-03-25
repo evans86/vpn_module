@@ -609,6 +609,7 @@ class KeyActivateService
                 'action' => 'panel_selection_start',
                 'key_id' => $keyId,
                 'user_tg_id' => $userTgId,
+                'panel_selection_strategy' => config('panel.selection_strategy'),
             ]);
 
             $panels = $this->getPanelsForActivation($keyLocked, true);
@@ -622,6 +623,7 @@ class KeyActivateService
                 'key_id' => $keyId,
                 'user_tg_id' => $userTgId,
                 'action' => $logAction,
+                'panel_selection_strategy' => config('panel.selection_strategy'),
                 'panels_count' => count($panels),
                 'ms_panel_selection' => (int) round(($tSelectionEnd - $tSelectionStart) * 1000),
             ]);
@@ -686,6 +688,7 @@ class KeyActivateService
                 'action' => $logAction,
                 'key_id' => $activatedKey->id,
                 'user_tg_id' => $userTgId,
+                'panel_selection_strategy' => config('panel.selection_strategy'),
                 'panel_ids' => array_map(fn ($su) => $su->panel_id, $serverUsers),
                 'ms_panel_selection' => (int) round(($tSelectionEnd - $tSelectionStart) * 1000),
                 'ms_marzban_slots' => (int) round(($tMarzbanEnd - $tMarzbanStart) * 1000),

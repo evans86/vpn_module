@@ -105,16 +105,13 @@ class PanelRepository extends BaseRepository
      */
     private function buildCandidatePanelsQuery(string $panelType, ?string $provider = null)
     {
-        $q = $this->query()
-            ->where('panel_status', Panel::PANEL_CONFIGURED)
-            ->where('panel', $panelType)
-            ->where('has_error', false)
-            ->where('excluded_from_rotation', false)
-            ->whereNotIn('id', function ($query) {
-                $query->select('panel_id')
-                    ->from('salesman')
-                    ->whereNotNull('panel_id');
-            })
+        $q = $this->applyExcludeSalesmanAssignedPanels(
+            $this->query()
+                ->where('panel_status', Panel::PANEL_CONFIGURED)
+                ->where('panel', $panelType)
+                ->where('has_error', false)
+                ->where('excluded_from_rotation', false)
+        )
             ->with('server.location')
             ->limit(1000);
         if ($provider !== null && $provider !== '') {
@@ -122,6 +119,23 @@ class PanelRepository extends BaseRepository
         }
 
         return $q;
+    }
+
+    /**
+     * Панели, закреплённые за salesman (не участвуют в общей ротации).
+     * NOT EXISTS обычно дешевле, чем NOT IN (SELECT DISTINCT panel_id …).
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    private function applyExcludeSalesmanAssignedPanels($query)
+    {
+        return $query->whereNotExists(function ($sub) {
+            $sub->select(DB::raw(1))
+                ->from('salesman')
+                ->whereColumn('salesman.panel_id', 'panel.id')
+                ->whereNotNull('salesman.panel_id');
+        });
     }
 
     /**
@@ -192,16 +206,13 @@ class PanelRepository extends BaseRepository
 
         $limit = min(3000, 1000 * count($providers));
 
-        $rows = $this->query()
-            ->where('panel_status', Panel::PANEL_CONFIGURED)
-            ->where('panel', $panelType)
-            ->where('has_error', false)
-            ->where('excluded_from_rotation', false)
-            ->whereNotIn('id', function ($query) {
-                $query->select('panel_id')
-                    ->from('salesman')
-                    ->whereNotNull('panel_id');
-            })
+        $rows = $this->applyExcludeSalesmanAssignedPanels(
+            $this->query()
+                ->where('panel_status', Panel::PANEL_CONFIGURED)
+                ->where('panel', $panelType)
+                ->where('has_error', false)
+                ->where('excluded_from_rotation', false)
+        )
             ->whereHas('server', function ($sub) use ($providers) {
                 $sub->whereIn('provider', $providers);
             })
@@ -515,6 +526,7 @@ class PanelRepository extends BaseRepository
      */
     private function resolveMarzbanPanelsForProvidersUncached(array $missing, string $panelType): array
     {
+        $t0 = microtime(true);
         $out = [];
         $collectByProvider = $this->getCandidatePanelsForRotationBatch($panelType, $missing);
 
@@ -540,6 +552,15 @@ class PanelRepository extends BaseRepository
                 $panel = $this->selectOptimalPanelByLeastCount($panels, $activeByPanel);
                 $out[$provider] = $panel ?? $panels->sortBy('id')->first();
             }
+
+            $ms = (int) round((microtime(true) - $t0) * 1000);
+            Log::info('PANEL_SELECTION_UNCACHED', [
+                'source' => 'panel',
+                'strategy' => $this->panelSelectionStrategy(),
+                'ms' => $ms,
+                'providers_count' => count($missing),
+                'distinct_candidate_panel_ids' => count($allIds),
+            ]);
 
             return $out;
         }
@@ -572,6 +593,15 @@ class PanelRepository extends BaseRepository
             $out[$provider] = $panels->sortBy('id')->first();
         }
 
+        $ms = (int) round((microtime(true) - $t0) * 1000);
+        Log::info('PANEL_SELECTION_UNCACHED', [
+            'source' => 'panel',
+            'strategy' => $this->panelSelectionStrategy(),
+            'ms' => $ms,
+            'providers_count' => count($missing),
+            'distinct_candidate_panel_ids' => count($allIds),
+        ]);
+
         return $out;
     }
 
@@ -588,15 +618,12 @@ class PanelRepository extends BaseRepository
 
         try {
             // Одна выборка: в таблице показываем и панели, исключённые из ротации (бейдж).
-            $allPanels = $this->query()
-                ->where('panel_status', Panel::PANEL_CONFIGURED)
-                ->where('panel', $panelType)
-                ->where('has_error', false)
-                ->whereNotIn('id', function ($query) {
-                    $query->select('panel_id')
-                        ->from('salesman')
-                        ->whereNotNull('panel_id');
-                })
+            $allPanels = $this->applyExcludeSalesmanAssignedPanels(
+                $this->query()
+                    ->where('panel_status', Panel::PANEL_CONFIGURED)
+                    ->where('panel', $panelType)
+                    ->where('has_error', false)
+            )
                 ->with('server.location')
                 ->orderBy('id')
                 ->limit(self::COMPARISON_PANELS_LIMIT)
@@ -998,16 +1025,13 @@ class PanelRepository extends BaseRepository
      */
     public function getActiveUserCountPerPanelFromStats(): array
     {
-        $panelIds = Panel::query()
-            ->where('panel', Panel::MARZBAN)
-            ->where('panel_status', Panel::PANEL_CONFIGURED)
-            ->where('has_error', false)
-            ->where('excluded_from_rotation', false)
-            ->whereNotIn('id', function ($query) {
-                $query->select('panel_id')
-                    ->from('salesman')
-                    ->whereNotNull('panel_id');
-            })
+        $panelIds = $this->applyExcludeSalesmanAssignedPanels(
+            Panel::query()
+                ->where('panel', Panel::MARZBAN)
+                ->where('panel_status', Panel::PANEL_CONFIGURED)
+                ->where('has_error', false)
+                ->where('excluded_from_rotation', false)
+        )
             ->pluck('id');
 
         if ($panelIds->isEmpty()) {
