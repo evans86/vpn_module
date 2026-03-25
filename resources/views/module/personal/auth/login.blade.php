@@ -47,7 +47,7 @@
             <!-- Email + password -->
             <div>
                 <h2 class="text-sm font-medium text-gray-700 mb-3">По email и паролю</h2>
-                <p class="text-xs text-gray-500 mb-4">Используйте, если Telegram заблокирован. Email и пароль выдаёт администратор в карточке продавца.</p>
+                <p class="text-xs text-gray-500 mb-4">Используйте, если Telegram недоступен. Email и пароль задаются в личном кабинете в разделе «Резервный вход».</p>
 
                 <form method="POST" action="{{ \App\Helpers\UrlHelper::personalRoute('personal.auth.email') }}" class="space-y-4">
                     @csrf
