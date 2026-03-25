@@ -529,6 +529,7 @@ class PanelRepository extends BaseRepository
         $t0 = microtime(true);
         $out = [];
         $collectByProvider = $this->getCandidatePanelsForRotationBatch($panelType, $missing);
+        $tAfterCandidates = microtime(true);
 
         $allIds = [];
         foreach ($collectByProvider as $coll) {
@@ -540,6 +541,7 @@ class PanelRepository extends BaseRepository
 
         if ($this->isSimplePanelSelection()) {
             $activeByPanel = $this->loadActiveUsersCountByPanelIds($allIds);
+            $tAfterActive = microtime(true);
             foreach ($missing as $provider) {
                 $panels = $collectByProvider[$provider];
                 if ($panels->isEmpty()) {
@@ -558,6 +560,8 @@ class PanelRepository extends BaseRepository
                 'source' => 'panel',
                 'strategy' => $this->panelSelectionStrategy(),
                 'ms' => $ms,
+                'ms_candidates_batch' => (int) round(($tAfterCandidates - $t0) * 1000),
+                'ms_active_users_query' => (int) round(($tAfterActive - $tAfterCandidates) * 1000),
                 'providers_count' => count($missing),
                 'distinct_candidate_panel_ids' => count($allIds),
             ]);
@@ -566,8 +570,11 @@ class PanelRepository extends BaseRepository
         }
 
         $monitoring = $this->loadLatestMonitoringByPanelIds($allIds);
+        $tAfterMonitoring = microtime(true);
         $activeDb = $this->loadActiveUsersCountByPanelIds($allIds);
+        $tAfterActive = microtime(true);
         $lastAt = $this->loadLastServerUserCreatedAtByPanelIds($allIds);
+        $tAfterLastAt = microtime(true);
 
         foreach ($missing as $provider) {
             $panels = $collectByProvider[$provider];
@@ -598,6 +605,10 @@ class PanelRepository extends BaseRepository
             'source' => 'panel',
             'strategy' => $this->panelSelectionStrategy(),
             'ms' => $ms,
+            'ms_candidates_batch' => (int) round(($tAfterCandidates - $t0) * 1000),
+            'ms_monitoring_batch' => (int) round(($tAfterMonitoring - $tAfterCandidates) * 1000),
+            'ms_active_users_query' => (int) round(($tAfterActive - $tAfterMonitoring) * 1000),
+            'ms_last_server_user_batch' => (int) round(($tAfterLastAt - $tAfterActive) * 1000),
             'providers_count' => count($missing),
             'distinct_candidate_panel_ids' => count($allIds),
         ]);
