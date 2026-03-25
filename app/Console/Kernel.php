@@ -72,6 +72,16 @@ class Kernel extends ConsoleKernel
                 ->withoutOverlapping()
                 ->appendOutputTo(storage_path('logs/panel-selection-warm.log'));
         }
+
+        // Страница «Настройки распределения»: тяжёлый compareAllStrategies только здесь, не в HTTP.
+        if (config('panel.rotation_settings_warm_enabled', true)) {
+            $uiWarmEvery = (int) config('panel.rotation_settings_warm_every_minutes', 5);
+            $uiWarmEvery = max(1, min(59, $uiWarmEvery));
+            $schedule->command('panel:warm-rotation-settings')
+                ->cron('*/' . $uiWarmEvery . ' * * * *')
+                ->withoutOverlapping()
+                ->appendOutputTo(storage_path('logs/panel-rotation-settings-warm.log'));
+        }
     }
 
     /**

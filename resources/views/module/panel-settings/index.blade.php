@@ -23,7 +23,8 @@
                 Активная стратегия: <code class="text-xs bg-gray-100 px-1 rounded">PANEL_SELECTION_STRATEGY</code> —
                 <strong>simple</strong> (минимум <em>активных</em> привязок к ключу на панели, один JOIN + GROUP BY) или
                 <strong>intelligent</strong> (статистика Marzban + активные ключи + score).
-                Кэш: <code class="text-xs">selection_cache_ttl</code>, прогрев: <code class="text-xs">panel:warm-selection-cache</code>.
+                Кэш выбора панели: <code class="text-xs">PANEL_SELECTION_CACHE_TTL</code>, прогрев: <code class="text-xs">panel:warm-selection-cache</code>.
+                Таблица на этой странице: <code class="text-xs">panel:warm-rotation-settings</code> (cron, см. .env <code class="text-xs">PANEL_ROTATION_SETTINGS_WARM_*</code>).
             </p>
         </div>
 

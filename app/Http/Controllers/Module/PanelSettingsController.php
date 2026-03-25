@@ -18,10 +18,15 @@ class PanelSettingsController extends Controller
     {
         $panelRepository = app(PanelRepository::class);
 
-        // v2: compareAllStrategies без N HTTP к трафику и без дублирующих SQL (см. PanelRepository).
-        $comparison = Cache::remember('panel_rotation_settings_comparison_v2', 900, function () use ($panelRepository) {
-            return $panelRepository->compareAllStrategies();
-        });
+        // Только чтение кэша: compareAllStrategies() на больших БД занимает минуты и рвёт таймаут HTTP.
+        // Прогрев: `php artisan panel:warm-rotation-settings` и cron (panel.rotation_settings_warm_*).
+        $cacheKey = (string) config('panel.rotation_settings_cache_key', 'panel_rotation_settings_comparison_v2');
+        $comparison = Cache::get($cacheKey);
+        if ($comparison === null) {
+            $comparison = [
+                'error' => 'Данные для таблицы ещё не собраны или кэш истёк. На сервере выполните один раз: php artisan panel:warm-rotation-settings — затем обновите страницу. Для автообновления включите cron (команда в расписании Laravel, см. PANEL_ROTATION_SETTINGS_WARM_* в .env).',
+            ];
+        }
 
         $panelsWithErrors = $panelRepository->getPanelsWithErrors();
 
@@ -62,7 +67,7 @@ class PanelSettingsController extends Controller
         try {
             $panelRepository->clearPanelError($validated['panel_id'], 'manual', 'Проблема решена администратором');
             $panelRepository->forgetRotationSelectionCache();
-            Cache::forget('panel_rotation_settings_comparison_v2');
+            Cache::forget((string) config('panel.rotation_settings_cache_key', 'panel_rotation_settings_comparison_v2'));
             Cache::forget('panel_intelligent_rotation_comparison');
 
             Log::info('Panel error cleared by admin', [

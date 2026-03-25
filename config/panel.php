@@ -42,6 +42,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Кэш страницы «Настройки распределения» (админка)
+    |--------------------------------------------------------------------------
+    |
+    | Сборка данных — тяжёлая (SQL по многим панелям). В HTTP-запросе только чтение кэша;
+    | прогрев: `php artisan panel:warm-rotation-settings` и cron (см. Console\\Kernel).
+    |
+    */
+
+    'rotation_settings_cache_key' => 'panel_rotation_settings_comparison_v2',
+
+    'rotation_settings_cache_ttl' => max(60, (int) env('PANEL_ROTATION_SETTINGS_CACHE_TTL', 900)),
+
+    'rotation_settings_warm_enabled' => filter_var(env('PANEL_ROTATION_SETTINGS_WARM_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+
+    'rotation_settings_warm_every_minutes' => max(1, min(59, (int) env('PANEL_ROTATION_SETTINGS_WARM_EVERY_MINUTES', 5))),
+
+    /*
+    |--------------------------------------------------------------------------
     | Server Traffic Limit
     |--------------------------------------------------------------------------
     |
