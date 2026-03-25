@@ -294,7 +294,7 @@
     </div>
 
     <!-- Основное содержимое -->
-    <div class="content flex-1 overflow-y-auto" id="main-content">
+    <div class="content flex-1 overflow-y-auto min-w-0" id="main-content">
         <!-- Шапка -->
         <header class="bg-white shadow-sm">
             <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
@@ -342,7 +342,7 @@
             </div>
         @endif
         <!-- Контент -->
-        <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 min-w-0 w-full">
             @yield('content')
         </main>
     </div>
