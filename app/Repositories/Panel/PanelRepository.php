@@ -275,7 +275,8 @@ class PanelRepository extends BaseRepository
     }
 
     /**
-     * Активные пользователи по панелям (один запрос с group by).
+     * Активные пользователи по панелям: server_user с привязкой к key_activate со статусом ACTIVE.
+     * Один JOIN-запрос (без whereHas / EXISTS по каждой строке).
      *
      * @return array<int, int>
      */
@@ -286,13 +287,13 @@ class PanelRepository extends BaseRepository
             return [];
         }
 
-        $rows = ServerUser::query()
-            ->whereIn('panel_id', $panelIds)
-            ->whereHas('keyActivateUser.keyActivate', function ($q) {
-                $q->where('status', KeyActivate::ACTIVE);
-            })
-            ->select('panel_id', DB::raw('COUNT(*) as cnt'))
-            ->groupBy('panel_id')
+        $rows = DB::table('server_user as su')
+            ->join('key_activate_user as kau', 'kau.server_user_id', '=', 'su.id')
+            ->join('key_activate as ka', 'ka.id', '=', 'kau.key_activate_id')
+            ->whereIn('su.panel_id', $panelIds)
+            ->where('ka.status', KeyActivate::ACTIVE)
+            ->select('su.panel_id', DB::raw('COUNT(DISTINCT su.id) as cnt'))
+            ->groupBy('su.panel_id')
             ->get();
 
         $map = array_fill_keys($panelIds, 0);
@@ -437,12 +438,15 @@ class PanelRepository extends BaseRepository
                 return null;
             }
 
-            $panel = $this->selectOptimalPanelIntelligent($panels, $useCacheOnly);
+            $panel = $this->selectOptimalPanelForRotation($panels, $useCacheOnly);
             if ($panel) {
                 return $panel;
             }
 
-            Log::warning('PANEL_SELECTION [INTELLIGENT]: No valid score, fallback to lowest panel id', ['source' => 'panel']);
+            Log::warning('PANEL_SELECTION: No panel from strategy, fallback to lowest panel id', [
+                'strategy' => $this->panelSelectionStrategy(),
+                'source' => 'panel',
+            ]);
 
             return $panels->sortBy('id')->first();
         });
@@ -522,6 +526,24 @@ class PanelRepository extends BaseRepository
         }
         $allIds = array_keys($allIds);
 
+        if ($this->isSimplePanelSelection()) {
+            $activeByPanel = $this->loadActiveUsersCountByPanelIds($allIds);
+            foreach ($missing as $provider) {
+                $panels = $collectByProvider[$provider];
+                if ($panels->isEmpty()) {
+                    Log::info('PANEL_SELECTION: No panels for provider', ['provider' => $provider, 'source' => 'panel']);
+                    $out[$provider] = null;
+
+                    continue;
+                }
+
+                $panel = $this->selectOptimalPanelByLeastCount($panels, $activeByPanel);
+                $out[$provider] = $panel ?? $panels->sortBy('id')->first();
+            }
+
+            return $out;
+        }
+
         $monitoring = $this->loadLatestMonitoringByPanelIds($allIds);
         $activeDb = $this->loadActiveUsersCountByPanelIds($allIds);
         $lastAt = $this->loadLastServerUserCreatedAtByPanelIds($allIds);
@@ -584,6 +606,11 @@ class PanelRepository extends BaseRepository
                 return ['error' => 'Нет доступных панелей'];
             }
 
+            $idsRotation = $rotationPanels->pluck('id')->map(fn ($id) => (int) $id)->all();
+            $activeRotation = $this->loadActiveUsersCountByPanelIds($idsRotation);
+            $simplePanel = $this->selectOptimalPanelByLeastCount($rotationPanels, $activeRotation)
+                ?? $rotationPanels->sortBy('id')->first();
+
             $intelligentPanel = null;
             try {
                 $intelligentPanel = $this->selectOptimalPanelIntelligent($rotationPanels, false)
@@ -616,7 +643,7 @@ class PanelRepository extends BaseRepository
             $totals = $this->loadTotalUsersCountByPanelIds($ids);
             $lastAt = $this->loadLastServerUserCreatedAtByPanelIds($ids);
 
-            $panelsInfo = $allPanels->map(function ($panel) use ($intelligentPanel, $monitoring, $activeDb, $totals, $lastAt) {
+            $panelsInfo = $allPanels->map(function ($panel) use ($intelligentPanel, $simplePanel, $monitoring, $activeDb, $totals, $lastAt) {
                 try {
                     $pid = (int) $panel->id;
                     $mon = $monitoring[$pid] ?? null;
@@ -668,6 +695,7 @@ class PanelRepository extends BaseRepository
                         'intelligent_score' => round($intelligentScore, 1),
                         'last_activity' => $lastAt[$pid] ?? null,
                         'is_intelligent_selected' => $intelligentPanel && $intelligentPanel->id === $panel->id,
+                        'is_simple_selected' => $simplePanel && (int) $simplePanel->id === (int) $panel->id,
                         'has_fresh_stats' => $fresh && $latestStats !== null,
                         'has_traffic_data' => $trafficData !== null,
                         'excluded_from_rotation' => $panel->excluded_from_rotation ?? false,
@@ -695,6 +723,7 @@ class PanelRepository extends BaseRepository
                         'intelligent_score' => 0,
                         'last_activity' => null,
                         'is_intelligent_selected' => false,
+                        'is_simple_selected' => false,
                         'has_fresh_stats' => false,
                         'has_traffic_data' => false,
                         'excluded_from_rotation' => $panel->excluded_from_rotation ?? false,
@@ -703,6 +732,10 @@ class PanelRepository extends BaseRepository
             });
 
             $strategyStats = [
+                'simple' => [
+                    'selected_panel_id' => $simplePanel ? $simplePanel->id : null,
+                    'selected_panel_info' => $simplePanel ? $panelsInfo->firstWhere('id', $simplePanel->id) : null,
+                ],
                 'intelligent' => [
                     'selected_panel_id' => $intelligentPanel ? $intelligentPanel->id : null,
                     'selected_panel_info' => $intelligentPanel ? $panelsInfo->firstWhere('id', $intelligentPanel->id) : null,
@@ -710,6 +743,7 @@ class PanelRepository extends BaseRepository
             ];
 
             return [
+                'active_strategy' => $this->panelSelectionStrategy(),
                 'strategies' => $strategyStats,
                 'panels' => $panelsInfo->values(),
                 'summary' => [
@@ -736,6 +770,58 @@ class PanelRepository extends BaseRepository
     }
 
     // ==================== ПРИВАТНЫЕ МЕТОДЫ НОВОЙ СИСТЕМЫ ====================
+
+    private function panelSelectionStrategy(): string
+    {
+        $s = strtolower(trim((string) config('panel.selection_strategy', 'simple')));
+
+        return in_array($s, ['simple', 'intelligent'], true) ? $s : 'simple';
+    }
+
+    private function isSimplePanelSelection(): bool
+    {
+        return $this->panelSelectionStrategy() === 'simple';
+    }
+
+    /**
+     * Выбор панели по стратегии из конфига (simple | intelligent).
+     *
+     * @param bool $useCacheOnly зарезервировано
+     */
+    private function selectOptimalPanelForRotation(Collection $panels, bool $useCacheOnly = false): ?Panel
+    {
+        if ($panels->isEmpty()) {
+            return null;
+        }
+
+        if ($this->isSimplePanelSelection()) {
+            $ids = $panels->pluck('id')->map(fn ($id) => (int) $id)->all();
+            $activeByPanel = $this->loadActiveUsersCountByPanelIds($ids);
+
+            return $this->selectOptimalPanelByLeastCount($panels, $activeByPanel);
+        }
+
+        return $this->selectOptimalPanelIntelligent($panels, $useCacheOnly);
+    }
+
+    /**
+     * Панель с минимальным значением метрики (для simple — число активных привязок key_activate = ACTIVE).
+     * При равенстве — меньший id (детерминированно).
+     *
+     * @param  array<int, int>  $countByPanelId
+     */
+    private function selectOptimalPanelByLeastCount(Collection $panels, array $countByPanelId): ?Panel
+    {
+        if ($panels->isEmpty()) {
+            return null;
+        }
+
+        return $panels->sortBy(function ($panel) use ($countByPanelId) {
+            $pid = (int) $panel->id;
+
+            return [(int) ($countByPanelId[$pid] ?? 0), $pid];
+        })->first();
+    }
 
     /**
      * Интеллектуальный выбор панели (пакетные запросы к БД вместо N+1 по каждой панели).
@@ -962,15 +1048,11 @@ class PanelRepository extends BaseRepository
     }
 
     /**
-     * Старый метод подсчета активных пользователей (для отладки)
+     * Активные пользователи на одной панели (тот же критерий, что loadActiveUsersCountByPanelIds).
      */
     private function getActiveUsersCount(int $panelId): int
     {
-        return ServerUser::where('panel_id', $panelId)
-            ->whereHas('keyActivateUser.keyActivate', function ($query) {
-                $query->where('status', KeyActivate::ACTIVE);
-            })
-            ->count();
+        return (int) ($this->loadActiveUsersCountByPanelIds([(int) $panelId])[(int) $panelId] ?? 0);
     }
 
     /**

@@ -20,8 +20,10 @@
         <div class="bg-white shadow rounded-lg p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-2">Распределение по панелям</h3>
             <p class="text-sm text-gray-600">
-                Используется <strong>интеллектуальный выбор</strong>: score по статистике Marzban (активные пользователи, CPU/память) и времени последней активности.
-                Переключения стратегий нет — кэш выбора настраивается в <code class="text-xs bg-gray-100 px-1 rounded">config/panel.php</code> (<code class="text-xs">selection_cache_ttl</code>).
+                Активная стратегия: <code class="text-xs bg-gray-100 px-1 rounded">PANEL_SELECTION_STRATEGY</code> —
+                <strong>simple</strong> (минимум <em>активных</em> привязок к ключу на панели, один JOIN + GROUP BY) или
+                <strong>intelligent</strong> (статистика Marzban + активные ключи + score).
+                Кэш: <code class="text-xs">selection_cache_ttl</code>, прогрев: <code class="text-xs">panel:warm-selection-cache</code>.
             </p>
         </div>
 
@@ -36,14 +38,34 @@
                 </div>
 
                 @php
-                    $strategyInfo = $comparison['strategies']['intelligent'] ?? null;
-                    $selectedPanel = $strategyInfo['selected_panel_info'] ?? null;
+                    $activeStrategy = $comparison['active_strategy'] ?? 'simple';
+                    $simpleInfo = $comparison['strategies']['simple'] ?? null;
+                    $intelligentInfo = $comparison['strategies']['intelligent'] ?? null;
+                    $simplePanelInfo = $simpleInfo['selected_panel_info'] ?? null;
+                    $selectedPanel = $intelligentInfo['selected_panel_info'] ?? null;
                 @endphp
-                <div class="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
+                <p class="text-xs text-gray-500 mb-4">Сейчас в проде для активации: <strong>{{ $activeStrategy }}</strong></p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div class="border rounded-lg p-4 border-green-500 bg-green-50">
+                        <div class="flex items-center mb-2">
+                            <span class="text-2xl mr-2">⚖️</span>
+                            <span class="font-semibold text-sm">Простая ротация (min активных)</span>
+                        </div>
+                        @if($simplePanelInfo)
+                            <div class="space-y-1 text-sm">
+                                <div><strong>Панель ID:</strong> {{ $simplePanelInfo['id'] }}</div>
+                                <div><strong>Сервер:</strong> {{ $simplePanelInfo['server_name'] ?? 'N/A' }}</div>
+                                <div><strong>Активных (по БД):</strong> {{ $simplePanelInfo['active_users'] }}</div>
+                                <div class="text-xs text-gray-600">Всего server_user: {{ $simplePanelInfo['total_users'] }}</div>
+                            </div>
+                        @else
+                            <p class="text-sm text-gray-500">Не выбрана</p>
+                        @endif
+                    </div>
                     <div class="border rounded-lg p-4 border-blue-500 bg-blue-50">
                         <div class="flex items-center mb-2">
                             <span class="text-2xl mr-2">🧠</span>
-                            <span class="font-semibold text-sm">Интеллектуальная ротация (текущая)</span>
+                            <span class="font-semibold text-sm">Интеллектуальная ротация (сравнение)</span>
                         </div>
                         @if($selectedPanel)
                             <div class="space-y-1 text-sm">
@@ -117,6 +139,7 @@
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Память</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ротация</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Simple</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
@@ -186,7 +209,14 @@
                                     </td>
                                     <td class="px-4 py-3 whitespace-nowrap text-sm">
                                         @if(!empty($panel['is_intelligent_selected']))
-                                            <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">🧠 Выбрана</span>
+                                            <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">🧠</span>
+                                        @else
+                                            <span class="text-gray-400">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm">
+                                        @if(!empty($panel['is_simple_selected']))
+                                            <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">⚖️</span>
                                         @else
                                             <span class="text-gray-400">—</span>
                                         @endif
