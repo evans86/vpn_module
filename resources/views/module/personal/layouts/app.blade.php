@@ -225,6 +225,16 @@
                     </a>
                 </li>
                 <li>
+                    <a href="{{ \App\Helpers\UrlHelper::personalRoute('personal.cabinet-login') }}"
+                       class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.cabinet-login') ? 'active' : '' }} tooltip">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                        <span class="ml-3" id="cabinet-login-text">Резервный вход</span>
+                        <span class="tooltip-text">Email и пароль, если недоступен Telegram</span>
+                    </a>
+                </li>
+                <li>
                     <a href="{{ \App\Helpers\UrlHelper::personalRoute('personal.keys') }}"
                        class="nav-link flex items-center p-3 rounded-lg {{ request()->routeIs('personal.keys') ? 'active' : '' }} tooltip">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none"

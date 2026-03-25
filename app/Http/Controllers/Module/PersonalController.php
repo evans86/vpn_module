@@ -19,6 +19,9 @@ use App\Services\Bot\BotModuleService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class PersonalController extends Controller
 {
@@ -429,5 +432,66 @@ class PersonalController extends Controller
         ]);
 
         return redirect()->to(UrlHelper::personalRoute('personal.faq'))->with('success', 'Текст FAQ сброшен к стандартному!');
+    }
+
+    /**
+     * Резервный вход в ЛК: email и пароль (продавец задаёт сам).
+     */
+    public function cabinetLoginSettings(): View
+    {
+        $salesman = Auth::guard('salesman')->user();
+
+        return view('module.personal.cabinet-login', compact('salesman'));
+    }
+
+    /**
+     * Сохранение email/пароля для резервного входа (POST через /_lk/…).
+     */
+    public function updateCabinetLoginSettings(Request $request): RedirectResponse
+    {
+        /** @var Salesman $salesman */
+        $salesman = Auth::guard('salesman')->user();
+
+        $validated = $request->validate([
+            'cabinet_email' => [
+                'nullable',
+                'email:rfc',
+                'max:255',
+                Rule::unique('salesman', 'email')->ignore($salesman->id),
+            ],
+            'cabinet_password' => ['nullable', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $rawEmail = $validated['cabinet_email'] ?? null;
+        $email = ($rawEmail === null || $rawEmail === '') ? '' : trim((string) $rawEmail);
+
+        if ($email === '') {
+            $salesman->email = null;
+            $salesman->password = null;
+            $salesman->save();
+            Log::info('Salesman disabled cabinet email login', ['salesman_id' => $salesman->id]);
+
+            return redirect()->to(UrlHelper::personalRoute('personal.cabinet-login'))
+                ->with('success', 'Вход по email отключён.');
+        }
+
+        $hasPassword = ! empty($salesman->getRawOriginal('password'));
+        if (! $hasPassword && ! $request->filled('cabinet_password')) {
+            return redirect()->to(UrlHelper::personalRoute('personal.cabinet-login'))
+                ->withErrors(['cabinet_password' => 'Укажите пароль (минимум 8 символов).']);
+        }
+
+        $salesman->email = $email;
+
+        if ($request->filled('cabinet_password')) {
+            $salesman->password = Hash::make($request->input('cabinet_password'));
+        }
+
+        $salesman->save();
+
+        Log::info('Salesman updated cabinet email login', ['salesman_id' => $salesman->id]);
+
+        return redirect()->to(UrlHelper::personalRoute('personal.cabinet-login'))
+            ->with('success', 'Настройки резервного входа сохранены.');
     }
 }

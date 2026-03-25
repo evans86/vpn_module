@@ -15,6 +15,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\ValidationException;
 use Telegram\Bot\Exceptions\TelegramSDKException;
 
 class SalesmanAuthController extends Controller
@@ -57,6 +59,43 @@ class SalesmanAuthController extends Controller
         }
 
         return view('module.personal.auth.login');
+    }
+
+    /**
+     * Резервный вход в ЛК по email и паролю (если Telegram недоступен).
+     */
+    public function loginWithEmail(Request $request): RedirectResponse
+    {
+        $throttleKey = 'salesman-email-login:' . $request->ip();
+        if (RateLimiter::tooManyAttempts($throttleKey, 10)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+            throw ValidationException::withMessages([
+                'email' => 'Слишком много попыток входа. Повторите через ' . $seconds . ' сек.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
+            'remember' => 'nullable|boolean',
+        ]);
+
+        if (! Auth::guard('salesman')->attempt(
+            ['email' => $validated['email'], 'password' => $validated['password']],
+            $request->boolean('remember')
+        )) {
+            RateLimiter::hit($throttleKey, 120);
+
+            return back()
+                ->withErrors(['email' => 'Неверный email или пароль.'])
+                ->onlyInput('email');
+        }
+
+        RateLimiter::clear($throttleKey);
+        $request->session()->regenerate();
+
+        return redirect()->intended(UrlHelper::personalRoute('personal.dashboard'))
+            ->with('success', 'Вы вошли в личный кабинет');
     }
 
     /**

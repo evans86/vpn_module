@@ -74,6 +74,26 @@
                 </div>
             </div>
 
+            <!-- Резервный вход в ЛК — только просмотр (настраивает продавец в ЛК) -->
+            <div class="mb-6 border-t border-gray-200 pt-6">
+                <h5 class="text-lg font-semibold text-gray-900 mb-2">Резервный вход в личный кабинет (email)</h5>
+                <p class="text-sm text-gray-600 mb-4">
+                    Продавец включает и задаёт email и пароль в своём личном кабинете (раздел «Резервный вход»).
+                </p>
+                @if($salesman->hasCabinetEmailLoginEnabled())
+                    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl text-sm">
+                        <dt class="font-medium text-gray-700">Статус</dt>
+                        <dd><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Включён</span></dd>
+                        <dt class="font-medium text-gray-700">Логин (email)</dt>
+                        <dd class="text-gray-900 font-mono break-all">{{ $salesman->email }}</dd>
+                        <dt class="font-medium text-gray-700">Пароль</dt>
+                        <dd class="text-gray-600">Задан (хранится в виде хеша, показать нельзя)</dd>
+                    </dl>
+                @else
+                    <p class="text-sm text-gray-500">Не включён — продавец ещё не настроил резервный вход.</p>
+                @endif
+            </div>
+
             <!-- Токен и ссылка на бота -->
             <div class="mb-6">
                 <h5 class="text-lg font-semibold text-gray-900 mb-4">Данные бота</h5>

@@ -28,6 +28,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property Panel|null $panel
  * @property BotModule|null $botModule
  * @property string $updated_at
+ * @property string|null $email
+ * @property string|null $password Хеш пароля для входа в ЛК (не путать с токеном бота)
  */
 class Salesman extends Authenticatable
 {
@@ -43,7 +45,8 @@ class Salesman extends Authenticatable
      */
     protected $hidden = [
         'token',
-        'remember_token', // Добавьте это поле в миграцию если нужно
+        'password',
+        'remember_token',
     ];
 
     /**
@@ -115,23 +118,23 @@ class Salesman extends Authenticatable
     }
 
     /**
-     * Получить пароль для аутентификации (если не используете стандартный)
+     * Пароль для входа по email (колонка password). Токен бота — отдельное поле token.
      */
-    public function getAuthPassword()
+    public function getAuthPassword(): string
     {
-        return $this->token; // Используем token как пароль
+        return (string) ($this->attributes['password'] ?? '');
     }
 
     /**
-     * Получить имя уникального идентификатора (используем telegram_id)
+     * Сессия guard salesman привязана к telegram_id (как при входе через Telegram).
      */
-    public function getAuthIdentifierName()
+    public function getAuthIdentifierName(): string
     {
         return 'telegram_id';
     }
 
     /**
-     * Получить значение уникального идентификатора
+     * @return int|string|null
      */
     public function getAuthIdentifier()
     {
@@ -163,5 +166,16 @@ class Salesman extends Authenticatable
     public function packSales(): HasMany
     {
         return $this->hasMany(PackSalesman::class, 'salesman_id');
+    }
+
+    /**
+     * Резервный вход в ЛК по email: включён, если заданы email и хеш пароля (колонка password).
+     */
+    public function hasCabinetEmailLoginEnabled(): bool
+    {
+        $email = trim((string) ($this->email ?? ''));
+        $pwd = $this->attributes['password'] ?? null;
+
+        return $email !== '' && $pwd !== null && $pwd !== '';
     }
 }

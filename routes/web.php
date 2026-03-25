@@ -38,6 +38,8 @@ Auth::routes(['register' => false]);
 | редирект без изменения данных. Выход по GET намеренно не добавляем.
 */
 Route::middleware([RedirectPersonalToConfigPublicHost::class])->group(function () {
+    Route::get('_lk/cabinet-login/save', fn () => redirect(UrlHelper::personalRoute('personal.cabinet-login'), 303));
+    Route::get('_lk/auth/email', fn () => redirect(UrlHelper::personalRoute('personal.auth'), 303));
     Route::get('_lk/faq/save', fn () => redirect(UrlHelper::personalRoute('personal.faq'), 303));
     Route::get('_lk/faq/reset', fn () => redirect(UrlHelper::personalRoute('personal.faq'), 303));
     Route::get('_lk/faq/vpn-instructions', fn () => redirect(UrlHelper::personalRoute('personal.faq'), 303));
@@ -49,7 +51,15 @@ Route::middleware([RedirectPersonalToConfigPublicHost::class])->group(function (
 | POST ЛК: префикс /_lk/ (не /personal/…). У некоторых CDN/прокси POST на /personal/* даёт 405, GET при этом 200.
 | Имена маршрутов прежние — формы через route() / UrlHelper::personalRoute() подставят /_lk/...
 */
+Route::middleware([RedirectPersonalToConfigPublicHost::class])->group(function () {
+    Route::post('_lk/auth/email', [SalesmanAuthController::class, 'loginWithEmail'])
+        ->middleware('throttle:10,1')
+        ->name('personal.auth.email');
+});
+
 Route::middleware([RedirectPersonalToConfigPublicHost::class, 'auth.salesman'])->group(function () {
+    Route::post('_lk/cabinet-login/save', [PersonalController::class, 'updateCabinetLoginSettings'])
+        ->name('personal.cabinet-login.update');
     Route::post('_lk/faq/save', [PersonalController::class, 'updateFaq'])->name('personal.faq.update');
     Route::post('_lk/faq/reset', [PersonalController::class, 'resetFaq'])->name('personal.faq.reset');
     Route::post('_lk/faq/vpn-instructions', [PersonalController::class, 'updateVpnInstructions'])->name('personal.faq.vpn-instructions.update');
@@ -93,6 +103,7 @@ Route::prefix('personal')
     Route::middleware(['auth.salesman'])->group(function () {
         Route::get('/dashboard', [PersonalController::class, 'dashboard'])->name('dashboard');
         Route::get('/keys', [PersonalController::class, 'keys'])->name('keys');
+        Route::get('/cabinet-login', [PersonalController::class, 'cabinetLoginSettings'])->name('cabinet-login');
         Route::get('/packages', [PersonalController::class, 'packages'])->name('packages');
 
         // Проверка соединения
