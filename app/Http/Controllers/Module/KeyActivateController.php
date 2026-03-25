@@ -148,6 +148,50 @@ class KeyActivateController extends Controller
     }
 
     /**
+     * Деактивация ключа: снятие со всех панелей Marzban (слоты), статус EXPIRED, запись ключа сохраняется.
+     */
+    public function deactivate(string $id): JsonResponse
+    {
+        ini_set('memory_limit', '256M');
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(180);
+        }
+
+        try {
+            /** @var KeyActivate $key */
+            $key = KeyActivate::query()->findOrFail($id);
+
+            $out = $this->keyActivateService->deactivate($key);
+
+            $payload = [
+                'success' => true,
+                'message' => 'Ключ деактивирован (пользователи сняты с панелей, статус «Просрочен»).',
+            ];
+            if (! empty($out['warning'])) {
+                $payload['warning'] = $out['warning'];
+            }
+
+            return response()->json($payload);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['success' => false, 'message' => 'Ключ не найден'], 404);
+        } catch (RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        } catch (Exception $e) {
+            Log::error('KeyActivateController::deactivate', [
+                'key_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'source' => 'key_activate',
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Ошибка деактивации: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Remove the specified key activate
      * @param string $id
      * @return JsonResponse

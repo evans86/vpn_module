@@ -6,6 +6,7 @@ use App\Dto\Bot\BotModuleDto;
 use App\Helpers\OrderHelper;
 use App\Models\Bot\BotModule;
 use App\Models\KeyActivate\KeyActivate;
+use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Models\Panel\Panel;
 use App\Models\Salesman\Salesman;
 use App\Repositories\KeyActivate\KeyActivateRepository;
@@ -761,6 +762,130 @@ class KeyActivateService
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Ручная деактивация ключа (админка): снятие пользователей со всех панелей (все слоты),
+     * очистка связей в БД через deleteServerUser, статус EXPIRED, finish_at = сейчас (если ещё не в прошлом).
+     *
+     * @return array{key: KeyActivate, warning: ?string}
+     */
+    public function deactivate(KeyActivate $key): array
+    {
+        return DB::transaction(function () use ($key) {
+            $warning = null;
+
+            $key->refresh();
+
+            if ($key->status === KeyActivate::DELETED) {
+                throw new RuntimeException('Ключ в статусе «Удалён» — деактивация не применяется.');
+            }
+
+            if ($key->status === KeyActivate::EXPIRED) {
+                $stillLinked = $key->keyActivateUsers()->exists();
+                if (! $stillLinked) {
+                    return ['key' => $key, 'warning' => null];
+                }
+            } elseif (! in_array($key->status, [KeyActivate::ACTIVE, KeyActivate::ACTIVATING, KeyActivate::PAID], true)) {
+                throw new RuntimeException('Деактивация доступна для статусов: активирован, активация…, оплачен; либо просрочен с оставшимися слотами на панелях.');
+            }
+
+            $slots = $key->keyActivateUsers()->with('serverUser.panel')->orderBy('id')->get();
+
+            foreach ($slots as $kau) {
+                $serverUser = $kau->serverUser;
+                if (! $serverUser) {
+                    $kau->delete();
+
+                    continue;
+                }
+
+                $panel = $serverUser->panel;
+                if (! $panel) {
+                    $this->logger->warning('Деактивация: слот без панели, удаляем только связи', [
+                        'source' => 'key_activate',
+                        'action' => 'deactivate',
+                        'key_id' => $key->id,
+                        'server_user_id' => $serverUser->id,
+                    ]);
+                    try {
+                        $kau->delete();
+                        $serverUser->delete();
+                    } catch (Exception $e) {
+                        $this->logger->error('Деактивация: не удалось удалить осиротевший server_user', [
+                            'key_id' => $key->id,
+                            'error' => $e->getMessage(),
+                            'source' => 'key_activate',
+                        ]);
+                    }
+
+                    continue;
+                }
+
+                $panelType = $panel->panel ?? Panel::MARZBAN;
+                if ($panelType === '') {
+                    $panelType = Panel::MARZBAN;
+                }
+
+                try {
+                    $panelStrategy = new PanelStrategy($panelType);
+                    $panelStrategy->deleteServerUser((int) $panel->id, (string) $serverUser->id);
+                    $this->logger->info('Деактивация: пользователь снят с панели', [
+                        'source' => 'key_activate',
+                        'action' => 'deactivate',
+                        'key_id' => $key->id,
+                        'panel_id' => $panel->id,
+                        'server_user_id' => $serverUser->id,
+                    ]);
+                } catch (Exception $e) {
+                    $this->logger->warning('Деактивация: ошибка Marzban/БД при удалении пользователя панели', [
+                        'source' => 'key_activate',
+                        'action' => 'deactivate',
+                        'key_id' => $key->id,
+                        'panel_id' => $panel->id,
+                        'server_user_id' => $serverUser->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    try {
+                        $this->panelRepository->markPanelWithError(
+                            (int) $panel->id,
+                            'Деактивация ключа: ' . $e->getMessage()
+                        );
+                    } catch (Exception $ignore) {
+                    }
+                    $provider = $panel->server ? (string) $panel->server->provider : '';
+                    $this->panelRepository->forgetRotationSelectionCache($provider !== '' ? $provider : null);
+                }
+            }
+
+            $remaining = KeyActivateUser::where('key_activate_id', $key->id)->count();
+            if ($remaining > 0) {
+                $warning = "Остались привязки к панелям ({$remaining}): проверьте логи и панели Marzban.";
+                $this->logger->error('Деактивация ключа завершена с остаточными слотами', [
+                    'source' => 'key_activate',
+                    'action' => 'deactivate',
+                    'key_id' => $key->id,
+                    'remaining_key_activate_user' => $remaining,
+                ]);
+            }
+
+            $key->refresh();
+            $now = time();
+            $key->status = KeyActivate::EXPIRED;
+            if (! $key->finish_at || $key->finish_at > $now) {
+                $key->finish_at = $now;
+            }
+            $key->save();
+
+            $this->logger->info('Ключ деактивирован (админка)', [
+                'source' => 'key_activate',
+                'action' => 'deactivate',
+                'key_id' => $key->id,
+                'had_warning' => $warning !== null,
+            ]);
+
+            return ['key' => $key->fresh(), 'warning' => $warning];
+        });
     }
 
     /**

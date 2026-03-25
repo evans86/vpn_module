@@ -18,7 +18,8 @@ class PanelSettingsController extends Controller
     {
         $panelRepository = app(PanelRepository::class);
 
-        $comparison = Cache::remember('panel_intelligent_rotation_comparison', 900, function () use ($panelRepository) {
+        // v2: compareAllStrategies без N HTTP к трафику и без дублирующих SQL (см. PanelRepository).
+        $comparison = Cache::remember('panel_rotation_settings_comparison_v2', 900, function () use ($panelRepository) {
             return $panelRepository->compareAllStrategies();
         });
 
@@ -61,6 +62,7 @@ class PanelSettingsController extends Controller
         try {
             $panelRepository->clearPanelError($validated['panel_id'], 'manual', 'Проблема решена администратором');
             $panelRepository->forgetRotationSelectionCache();
+            Cache::forget('panel_rotation_settings_comparison_v2');
             Cache::forget('panel_intelligent_rotation_comparison');
 
             Log::info('Panel error cleared by admin', [

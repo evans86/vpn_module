@@ -587,42 +587,7 @@ class PanelRepository extends BaseRepository
         $panelType = $panelType ?? Panel::MARZBAN;
 
         try {
-            $rotationPanels = $this->query()
-                ->where('panel_status', Panel::PANEL_CONFIGURED)
-                ->where('panel', $panelType)
-                ->where('has_error', false)
-                ->where('excluded_from_rotation', false)
-                ->whereNotIn('id', function ($query) {
-                    $query->select('panel_id')
-                        ->from('salesman')
-                        ->whereNotNull('panel_id');
-                })
-                ->with('server.location')
-                ->orderBy('id')
-                ->limit(self::COMPARISON_PANELS_LIMIT)
-                ->get();
-
-            if ($rotationPanels->isEmpty()) {
-                return ['error' => 'Нет доступных панелей'];
-            }
-
-            $idsRotation = $rotationPanels->pluck('id')->map(fn ($id) => (int) $id)->all();
-            $activeRotation = $this->loadActiveUsersCountByPanelIds($idsRotation);
-            $simplePanel = $this->selectOptimalPanelByLeastCount($rotationPanels, $activeRotation)
-                ?? $rotationPanels->sortBy('id')->first();
-
-            $intelligentPanel = null;
-            try {
-                $intelligentPanel = $this->selectOptimalPanelIntelligent($rotationPanels, false)
-                    ?? $rotationPanels->sortBy('id')->first();
-            } catch (\Exception $e) {
-                Log::warning('Failed to select panel intelligently in comparison', [
-                    'error' => $e->getMessage(),
-                    'source' => 'panel',
-                ]);
-                $intelligentPanel = $rotationPanels->sortBy('id')->first();
-            }
-
+            // Одна выборка: в таблице показываем и панели, исключённые из ротации (бейдж).
             $allPanels = $this->query()
                 ->where('panel_status', Panel::PANEL_CONFIGURED)
                 ->where('panel', $panelType)
@@ -637,11 +602,39 @@ class PanelRepository extends BaseRepository
                 ->limit(self::COMPARISON_PANELS_LIMIT)
                 ->get();
 
+            if ($allPanels->isEmpty()) {
+                return ['error' => 'Нет доступных панелей'];
+            }
+
+            $rotationPanels = $allPanels->filter(function ($p) {
+                return empty($p->excluded_from_rotation);
+            })->values();
+
+            if ($rotationPanels->isEmpty()) {
+                return ['error' => 'Нет панелей в ротации (все исключены или список пуст)'];
+            }
+
+            // Один пакет метрик на все панели страницы — без повторных SELECT и без N HTTP к провайдерам.
             $ids = $allPanels->pluck('id')->map(fn ($id) => (int) $id)->all();
             $monitoring = $this->loadLatestMonitoringByPanelIds($ids);
             $activeDb = $this->loadActiveUsersCountByPanelIds($ids);
             $totals = $this->loadTotalUsersCountByPanelIds($ids);
             $lastAt = $this->loadLastServerUserCreatedAtByPanelIds($ids);
+
+            $simplePanel = $this->selectOptimalPanelByLeastCount($rotationPanels, $activeDb)
+                ?? $rotationPanels->sortBy('id')->first();
+
+            $intelligentPanel = null;
+            try {
+                $intelligentPanel = $this->selectOptimalPanelIntelligentWithMaps($rotationPanels, $monitoring, $activeDb, $lastAt)
+                    ?? $rotationPanels->sortBy('id')->first();
+            } catch (\Exception $e) {
+                Log::warning('Failed to select panel intelligently in comparison', [
+                    'error' => $e->getMessage(),
+                    'source' => 'panel',
+                ]);
+                $intelligentPanel = $rotationPanels->sortBy('id')->first();
+            }
 
             $panelsInfo = $allPanels->map(function ($panel) use ($intelligentPanel, $simplePanel, $monitoring, $activeDb, $totals, $lastAt) {
                 try {
@@ -656,16 +649,8 @@ class PanelRepository extends BaseRepository
                         $activeUsers = (int) ($latestStats['users_active'] ?? 0);
                     }
 
-                    $trafficData = null;
-                    try {
-                        $trafficData = $this->getServerTrafficData($panel);
-                    } catch (\Exception $e) {
-                        Log::warning('Failed to get traffic data for panel in comparison', [
-                            'panel_id' => $panel->id,
-                            'error' => $e->getMessage(),
-                            'source' => 'panel',
-                        ]);
-                    }
+                    // Только кэш: синхронные запросы к Timeweb/VDSina по каждой панели давали таймаут страницы.
+                    $trafficData = $this->getServerTrafficDataFromCache($panel);
 
                     $cpuUsage = $latestStats['cpu_usage'] ?? 0;
                     $memoryUsed = $latestStats['mem_used'] ?? 0;

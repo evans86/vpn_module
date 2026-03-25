@@ -215,6 +215,13 @@
                                                     <i class="fas fa-exchange-alt mr-2"></i> Перенести на другой сервер
                                                 </button>
                                             @endif
+                                            @if(in_array($key->status, [\App\Models\KeyActivate\KeyActivate::ACTIVE, \App\Models\KeyActivate\KeyActivate::ACTIVATING, \App\Models\KeyActivate\KeyActivate::PAID], true) || (\App\Models\KeyActivate\KeyActivate::EXPIRED === (int) $key->status && (int) ($key->key_activate_users_count ?? 0) > 0))
+                                                <button type="button"
+                                                        class="block w-full text-left px-4 py-2 text-sm text-amber-800 hover:bg-amber-50 deactivate-key"
+                                                        data-id="{{ $key->id }}">
+                                                    <i class="fas fa-user-slash mr-2"></i> Деактивировать
+                                                </button>
+                                            @endif
                                             <button type="button"
                                                     class="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 delete-key"
                                                     data-id="{{ $key->id }}">
@@ -610,6 +617,33 @@
                         submitBtn.prop('disabled', false);
                         spinner.addClass('d-none');
                         btnText.removeClass('d-none');
+                    }
+                });
+            });
+
+            $(document).on('click', '.deactivate-key', function (e) {
+                e.preventDefault();
+                const id = $(this).data('id');
+                if (!confirm('Деактивировать ключ? Пользователи будут удалены на всех панелях Marzban (все слоты), статус станет «Просрочен». Запись ключа останется в системе.')) {
+                    return;
+                }
+                $.ajax({
+                    url: '{{ url('/admin/module/key-activate') }}/' + id + '/deactivate',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                    },
+                    success: function (data) {
+                        if (data.warning) {
+                            toastr.warning(data.warning);
+                        } else {
+                            toastr.success(data.message || 'Ключ деактивирован');
+                        }
+                        setTimeout(() => window.location.reload(), 1200);
+                    },
+                    error: function (xhr) {
+                        const msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Ошибка деактивации';
+                        toastr.error(msg);
                     }
                 });
             });

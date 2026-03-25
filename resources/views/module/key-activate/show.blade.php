@@ -110,6 +110,13 @@
                                     Обновить даты
                                 </button>
 
+                                @if(in_array($key->status, [\App\Models\KeyActivate\KeyActivate::ACTIVE, \App\Models\KeyActivate\KeyActivate::ACTIVATING, \App\Models\KeyActivate\KeyActivate::PAID], true) || (\App\Models\KeyActivate\KeyActivate::EXPIRED === (int) $key->status && $key->keyActivateUsers->isNotEmpty()))
+                                    <button onclick="deactivateKey('{{ $key->id }}')"
+                                            class="btn btn-warning">
+                                        Деактивировать
+                                    </button>
+                                @endif
+
                                 <button onclick="deleteKey('{{ $key->id }}')"
                                         class="btn btn-danger">
                                     Удалить
@@ -156,6 +163,27 @@
                         if (data.success) location.reload();
                     })
                     .catch(error => alert('Ошибка при обновлении дат'));
+            }
+
+            function deactivateKey(keyId) {
+                if (!confirm('Деактивировать ключ? Пользователи будут сняты со всех панелей Marzban, статус «Просрочен». Запись останется.')) return;
+
+                fetch(`{{ url('/admin/module/key-activate') }}/${keyId}/deactivate`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    }
+                })
+                    .then(response => response.json().then(data => ({ ok: response.ok, data })))
+                    .then(({ ok, data }) => {
+                        if (data.warning) {
+                            alert((data.message || 'Готово') + '\n\n' + data.warning);
+                        } else {
+                            alert(data.message || 'Ключ деактивирован');
+                        }
+                        if (ok) location.reload();
+                    })
+                    .catch(() => alert('Ошибка при деактивации'));
             }
 
             function deleteKey(keyId) {

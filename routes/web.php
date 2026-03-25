@@ -291,6 +291,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             // Key Activate
             Route::prefix('key-activate')->name('key-activate.')->group(function () {
                 Route::get('/', [KeyActivateController::class, 'index'])->name('index');
+                Route::post('/{id}/deactivate', [KeyActivateController::class, 'deactivate'])->name('deactivate');
                 Route::delete('/{id}', [KeyActivateController::class, 'destroy'])->name('destroy');
                 Route::post('/update-date', [KeyActivateController::class, 'updateDate'])->name('update-date');
                 Route::post('/renew', [KeyActivateController::class, 'renew'])->name('renew');
