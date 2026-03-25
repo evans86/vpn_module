@@ -90,7 +90,7 @@
         </div>
 
         <!-- Таблица ключей -->
-        <div class="bg-white shadow rounded-lg overflow-hidden max-w-full">
+        <div class="bg-white shadow rounded-lg overflow-hidden max-w-full border border-gray-100">
             <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
                 <h3 class="text-lg leading-6 font-medium text-gray-900">
                     Список ключей
@@ -99,156 +99,155 @@
                     Всего ключей: {{ $keys->total() }}
                 </p>
             </div>
-            <div class="overflow-x-auto max-w-full -mx-px">
-                <table class="min-w-[920px] w-full divide-y divide-gray-200 table-fixed">
+            <div class="overflow-x-auto max-w-full">
+                <table class="min-w-[800px] w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                     <tr>
-                        <th scope="col" class="w-[200px] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[148px]">
                             Ключ
                         </th>
-                        <th scope="col" class="w-[100px] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[88px]">
                             Период
                         </th>
-                        <th scope="col" class="w-[110px] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[112px]">
                             Статус
                         </th>
-                        <th scope="col" class="w-[100px] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[104px]">
                             Источник
                         </th>
-                        <th scope="col" class="w-[160px] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px]">
                             Пользователь
                         </th>
-                        <th scope="col" class="w-[120px] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Срок действия
+                        <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[128px]">
+                            Срок
                         </th>
-                        <th scope="col" class="w-[min(320px,30%)] min-w-[260px] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th scope="col" class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[132px]">
                             Действия
                         </th>
                     </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                    <tbody class="bg-white divide-y divide-gray-100">
                     @forelse($keys as $key)
-                        <tr class="align-top">
-                            <td class="px-3 py-3 min-w-0">
-                                <div class="flex items-start gap-2 min-w-0">
+                        @php
+                            $kid = (string) $key->id;
+                            $kidShort = strlen($kid) > 24
+                                ? substr($kid, 0, 13) . '…' . substr($kid, -8)
+                                : $kid;
+                        @endphp
+                        <tr class="hover:bg-gray-50/80 align-middle">
+                            <td class="px-3 py-2.5 min-w-0">
+                                <div class="flex items-center gap-1.5 min-w-0">
                                     <button type="button"
-                                            class="flex-shrink-0 p-1 rounded text-gray-400 hover:text-indigo-600 hover:bg-gray-100 border border-transparent hover:border-gray-200"
-                                            data-copy="{{ $key->id }}"
-                                            title="Скопировать ID ключа"
+                                            class="keys-icon-btn flex-shrink-0"
+                                            data-copy="{{ $kid }}"
+                                            title="Скопировать полный ID"
                                             aria-label="Скопировать ID ключа">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                                         </svg>
                                     </button>
-                                    <span class="text-xs text-gray-800 font-mono break-all leading-snug" title="{{ $key->id }}">{{ $key->id }}</span>
+                                    <span class="font-mono text-xs text-gray-800 truncate block max-w-[7.5rem] sm:max-w-[9rem]" title="{{ $kid }}">{{ $kidShort }}</span>
                                 </div>
                             </td>
-                            <td class="px-3 py-3 text-sm text-gray-600 break-words">
+                            <td class="px-3 py-2.5 text-sm text-gray-600 whitespace-nowrap">
                                 {{ $key->getPeriodInfo() }}
                             </td>
-                            <td class="px-3 py-3">
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $key->getStatusBadgeClassSalesman() }}">
+                            <td class="px-3 py-2.5 whitespace-nowrap">
+                                <span class="px-2 py-0.5 inline-flex text-xs leading-5 font-medium rounded-full {{ $key->getStatusBadgeClassSalesman() }}">
                                     {{ $key->getStatusText() }}
                                 </span>
                             </td>
 
-                            <td class="px-3 py-3 text-sm text-gray-600">
+                            <td class="px-3 py-2.5 whitespace-nowrap">
                                 @if($key->module_salesman_id)
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                        Модуль VPN
+                                        Модуль
                                     </span>
                                 @elseif($key->pack_salesman_id)
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                        Telegram бот
+                                        Бот
                                     </span>
                                 @endif
                             </td>
 
-                            <td class="px-3 py-3 min-w-0 text-sm">
-                                <div class="text-gray-900 break-words line-clamp-3" title="{{ $key->user_nickname }}">
+                            <td class="px-3 py-2.5 text-sm min-w-0 max-w-[200px]">
+                                <div class="text-gray-900 text-sm truncate" title="{{ $key->user_nickname }}">
                                     {{ $key->user_nickname }}
                                 </div>
                                 @if($key->user_tg_id)
-                                    <div class="text-xs text-gray-500 mt-0.5 break-all">
-                                        TG: {{ $key->user_tg_id }}
-                                    </div>
-                                @endif
-                                @if($key->user_name)
-                                    <div class="text-xs text-indigo-600 font-medium mt-0.5 break-words">
-                                        {{ $key->user_name }}
-                                    </div>
+                                    <div class="text-xs text-gray-500 truncate">TG {{ $key->user_tg_id }}</div>
                                 @endif
                             </td>
-                            <td class="px-3 py-3 text-sm text-gray-600 whitespace-normal break-words">
+                            <td class="px-3 py-2.5 text-xs text-gray-600 leading-snug">
                                 {{ $key->expiry_date_formatted }}
                             </td>
-                            <td class="px-3 py-3 text-sm min-w-0">
+                            <td class="px-3 py-2.5 text-right whitespace-nowrap">
                                 @if($key->status == \App\Models\KeyActivate\KeyActivate::ACTIVE)
                                     @php
                                         $configMainUrl = \App\Helpers\UrlHelper::configUrl($key->id);
                                         $mirrorUrls = \App\Helpers\UrlHelper::configMirrorUrls($key->id);
                                         $refreshUrl = route('vpn.config.refresh', ['token' => $key->id], false);
                                     @endphp
-                                    <div class="flex flex-col gap-2 min-w-0">
-                                        <div class="flex flex-wrap items-center gap-1.5">
-                                            <a href="{{ $configMainUrl }}"
-                                               target="_blank" rel="noopener noreferrer"
-                                               class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500 flex-shrink-0">
-                                                <svg class="w-3.5 h-3.5 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                                    <details class="keys-actions-dropdown relative inline-block text-left">
+                                        <summary class="keys-actions-summary cursor-pointer select-none inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                            Меню
+                                            <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                            </svg>
+                                        </summary>
+                                        <div class="keys-actions-panel absolute right-0 z-30 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5">
+                                            <a href="{{ $configMainUrl }}" target="_blank" rel="noopener noreferrer"
+                                               class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-indigo-50">
+                                                <svg class="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
                                                 </svg>
-                                                Конфигурация
+                                                Открыть конфигурацию
                                             </a>
                                             <button type="button"
-                                                    class="inline-flex items-center px-2 py-1 text-xs font-medium rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                                                    data-copy="{{ $configMainUrl }}"
-                                                    title="Копировать ссылку на конфигурацию"
-                                                    aria-label="Копировать ссылку на конфигурацию">
-                                                <svg class="w-3.5 h-3.5 mr-1 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                                    class="flex w-full items-center gap-2 px-3 py-2 text-xs text-left text-gray-700 hover:bg-gray-50"
+                                                    data-copy="{{ $configMainUrl }}">
+                                                <svg class="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                                                 </svg>
                                                 Копировать ссылку
                                             </button>
+                                            @foreach($mirrorUrls as $idx => $mirrorUrl)
+                                                <div class="border-t border-gray-100 my-1"></div>
+                                                <div class="px-2 py-1">
+                                                    <div class="text-[10px] uppercase tracking-wide text-gray-400 px-1 mb-0.5">Зеркало {{ $idx + 1 }}</div>
+                                                    <div class="flex items-center gap-1">
+                                                        <a href="{{ $mirrorUrl }}" target="_blank" rel="noopener noreferrer"
+                                                           class="flex-1 min-w-0 truncate rounded px-2 py-1 text-xs text-amber-800 hover:bg-amber-50"
+                                                           title="{{ $mirrorUrl }}">Открыть</a>
+                                                        <button type="button" class="keys-icon-btn p-1 rounded text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                                                                data-copy="{{ $mirrorUrl }}" title="Копировать URL">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                            <div class="border-t border-gray-100 my-1"></div>
+                                            <button type="button"
+                                                    class="key-refresh-btn flex w-full items-center gap-2 px-3 py-2 text-xs text-left text-indigo-800 hover:bg-indigo-50 disabled:opacity-50"
+                                                    data-refresh-url="{{ $refreshUrl }}">
+                                                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357 2m15.357-2H15"/>
+                                                </svg>
+                                                Обновить данные
+                                            </button>
                                         </div>
-                                        @foreach($mirrorUrls as $idx => $mirrorUrl)
-                                            <div class="flex flex-wrap items-center gap-1.5 min-w-0 border-t border-gray-100 pt-2">
-                                                <a href="{{ $mirrorUrl }}" target="_blank" rel="noopener noreferrer"
-                                                   class="text-xs text-amber-800 hover:text-amber-950 underline truncate min-w-0 max-w-[200px] sm:max-w-[240px]"
-                                                   title="{{ $mirrorUrl }}">Зеркало {{ $idx + 1 }}</a>
-                                                <button type="button"
-                                                        class="inline-flex items-center px-2 py-0.5 text-xs rounded border border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100 flex-shrink-0"
-                                                        data-copy="{{ $mirrorUrl }}"
-                                                        title="Копировать URL зеркала"
-                                                        aria-label="Копировать URL зеркала {{ $idx + 1 }}">
-                                                    Копировать
-                                                </button>
-                                            </div>
-                                        @endforeach
-                                        <button type="button"
-                                                class="key-refresh-btn inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 mt-1 text-xs font-medium rounded-md border border-indigo-200 bg-indigo-50 text-indigo-800 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed w-fit max-w-full"
-                                                data-refresh-url="{{ $refreshUrl }}"
-                                                title="Подтянуть актуальные данные с панелей (как «Обновить» на странице конфига)">
-                                            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357 2m15.357-2H15"/>
-                                            </svg>
-                                            Обновить данные
-                                        </button>
-                                    </div>
+                                    </details>
                                 @else
-                                    <span class="text-xs text-gray-500"
-                                          title="Конфигурация доступна только для активированных ключей">
-                                        Недоступно
-                                    </span>
+                                    <span class="text-xs text-gray-400">—</span>
                                 @endif
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">
+                            <td colspan="7" class="px-6 py-10 text-center text-sm text-gray-500">
                                 Нет доступных ключей
                             </td>
                         </tr>
@@ -291,7 +290,7 @@
             function showNotification(message, type) {
                 type = type || 'success';
                 var el = document.createElement('div');
-                el.className = 'fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-50 transition-all duration-300 transform translate-x-full max-w-[min(100vw-2rem,24rem)] text-sm break-words ' +
+                el.className = 'fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-[100] transition-all duration-300 transform translate-x-full max-w-[min(100vw-2rem,24rem)] text-sm break-words ' +
                     (type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white');
                 el.textContent = message;
                 document.body.appendChild(el);
@@ -312,9 +311,10 @@
                 var btn = e.target.closest('[data-copy]');
                 if (!btn || !btn.getAttribute('data-copy')) return;
                 e.preventDefault();
+                e.stopPropagation();
                 var v = btn.getAttribute('data-copy');
                 copyText(v).then(function () {
-                    showNotification('Скопировано в буфер обмена', 'success');
+                    showNotification('Скопировано', 'success');
                 }).catch(function () {
                     showNotification('Не удалось скопировать', 'error');
                 });
@@ -324,8 +324,10 @@
                 var btn = e.target.closest('.key-refresh-btn');
                 if (!btn) return;
                 e.preventDefault();
+                e.stopPropagation();
                 var url = btn.getAttribute('data-refresh-url');
                 if (!url) return;
+                var details = btn.closest('details');
                 btn.disabled = true;
                 fetch(url, {
                     method: 'GET',
@@ -343,7 +345,8 @@
                     .then(function (_ref) {
                         var j = _ref.j;
                         if (j && j.success) {
-                            showNotification('Данные обновлены. Синхронизация с панелями может занять несколько секунд. Страница перезагрузится…', 'success');
+                            if (details) details.open = false;
+                            showNotification('Данные обновлены. Страница перезагрузится…', 'success');
                             setTimeout(function () { window.location.reload(); }, 2200);
                         } else {
                             var msg = (j && j.message) ? j.message : 'Не удалось обновить данные';
@@ -356,15 +359,31 @@
                         btn.disabled = false;
                     });
             });
+
+            // Закрыть другие выпадающие меню при открытии нового
+            document.querySelectorAll('.keys-actions-dropdown').forEach(function (d) {
+                d.addEventListener('toggle', function () {
+                    if (!d.open) return;
+                    document.querySelectorAll('.keys-actions-dropdown').forEach(function (other) {
+                        if (other !== d) other.open = false;
+                    });
+                });
+            });
+
+            document.addEventListener('click', function (e) {
+                if (e.target.closest('.keys-actions-dropdown')) return;
+                document.querySelectorAll('.keys-actions-dropdown[open]').forEach(function (d) {
+                    d.open = false;
+                });
+            });
         })();
     </script>
 
     <style>
-        .line-clamp-3 {
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
+        .keys-actions-dropdown > summary::-webkit-details-marker { display: none; }
+        .keys-actions-dropdown > summary { list-style: none; }
+        .keys-icon-btn { background: transparent; border: none; padding: 0.125rem; border-radius: 0.25rem; cursor: pointer; }
+        .keys-icon-btn:hover { background: rgba(99, 102, 241, 0.08); }
+        .keys-icon-btn:focus { outline: 2px solid rgba(99, 102, 241, 0.4); outline-offset: 1px; }
     </style>
 @endsection
