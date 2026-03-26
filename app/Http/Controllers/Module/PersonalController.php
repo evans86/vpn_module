@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\PackSalesman\PackSalesman;
 use App\Models\Salesman\Salesman;
+use App\Models\VPN\ConnectionLimitViolation;
 use App\Services\External\BottApi;
 use App\Services\Key\KeyActivateService;
 use GuzzleHttp\Exception\GuzzleException;
@@ -229,48 +230,62 @@ class PersonalController extends Controller
 
         // Применяем фильтры
         if ($request->has('key_search') && !empty($request->key_search)) {
-            $query->where('id', 'like', '%' . $request->key_search . '%');
+            $term = $request->key_search;
+            $like = '%' . addcslashes((string) $term, '%_\\') . '%';
+            $query->where('key_activate.id', 'like', $like);
         }
 
         if ($request->has('telegram_search') && !empty($request->telegram_search)) {
-            $query->where('user_tg_id', 'like', '%' . $request->telegram_search . '%');
+            $query->where('key_activate.user_tg_id', 'like', '%' . addcslashes((string) $request->telegram_search, '%_\\') . '%');
         }
 
         if ($request->has('status_filter') && !empty($request->status_filter)) {
-            $query->where('status', $request->status_filter);
+            $query->where('key_activate.status', $request->status_filter);
         }
 
         if ($request->has('expiry_filter') && !empty($request->expiry_filter)) {
             if ($request->expiry_filter === 'active') {
                 $query->where(function ($q) {
-                    $q->whereNull('finish_at')
-                        ->orWhere('finish_at', '>', Carbon::now()->timestamp);
+                    $q->whereNull('key_activate.finish_at')
+                        ->orWhere('key_activate.finish_at', '>', Carbon::now()->timestamp);
                 });
             } elseif ($request->expiry_filter === 'expired') {
-                $query->where('finish_at', '<=', Carbon::now()->timestamp);
+                $query->where('key_activate.finish_at', '<=', Carbon::now()->timestamp);
             }
         }
 
         if ($request->has('source_filter') && !empty($request->source_filter)) {
             if ($request->source_filter === 'module') {
-                $query->whereNotNull('module_salesman_id');
+                $query->whereNotNull('key_activate.module_salesman_id');
             } elseif ($request->source_filter === 'bot') {
-                $query->whereNotNull('pack_salesman_id');
+                $query->whereNotNull('key_activate.pack_salesman_id');
             }
         }
 
-        // Только ключи, связанные с нарушением лимита подключений (отключённый или выданный взамен)
+        // Только ключи, связанные с нарушением лимита подключений (явные EXISTS — без orderBy в подзапросе whereHas)
         if ($request->filled('violation_filter') && $request->violation_filter === 'only') {
-            $query->where(function ($q) {
-                $q->whereHas('replacedViolation')
-                    ->orWhereHas('replacementSourceViolation');
+            $vTable = (new ConnectionLimitViolation())->getTable();
+            $query->where(function ($q) use ($vTable) {
+                $q->whereExists(function ($sub) use ($vTable) {
+                    $sub->selectRaw('1')
+                        ->from($vTable . ' as clv_old')
+                        ->whereColumn('clv_old.key_activate_id', 'key_activate.id')
+                        ->whereNotNull('clv_old.key_replaced_at')
+                        ->whereNotNull('clv_old.replaced_key_id');
+                })->orWhereExists(function ($sub) use ($vTable) {
+                    $sub->selectRaw('1')
+                        ->from($vTable . ' as clv_new')
+                        ->whereColumn('clv_new.replaced_key_id', 'key_activate.id')
+                        ->whereNotNull('clv_new.key_replaced_at');
+                });
             });
         }
 
         // Ограничиваем максимальное количество записей на странице для защиты от перегрузки памяти
         $perPage = min($request->get('per_page', 15), 50); // Максимум 50 записей на странице
-        
-        $keys = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
+        // Явное имя таблицы: иначе при join с pack_salesman неоднозначен created_at → SQL-ошибка (500)
+        $keys = $query->orderBy('key_activate.created_at', 'desc')->paginate($perPage);
 
         $statuses = [
             '' => 'Все статусы',

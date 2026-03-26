@@ -203,15 +203,25 @@
                                         Неактивен из‑за нарушения лимита подключений.
                                     </p>
                                     @if($key->replacedViolation->replaced_key_id)
+                                        @php
+                                            $newKeyLinkParams = ['key_search' => $key->replacedViolation->replaced_key_id];
+                                            if (request('violation_filter') === 'only') {
+                                                $newKeyLinkParams['violation_filter'] = 'only';
+                                            }
+                                        @endphp
                                         <p class="text-gray-600 leading-snug">
                                             <span class="text-gray-500">Новый ключ:</span>
-                                            <a href="{{ \App\Helpers\UrlHelper::personalRoute('personal.keys') }}?{{ http_build_query(['key_search' => $key->replacedViolation->replaced_key_id]) }}"
+                                            <a href="{{ route('personal.keys', $newKeyLinkParams) }}"
                                                class="font-mono text-indigo-600 hover:text-indigo-800 break-all"
                                                title="{{ $key->replacedViolation->replaced_key_id }}">
                                                 {{ $key->replacedViolation->replaced_key_id }}
                                             </a>
                                         </p>
                                     @endif
+                                @elseif($key->replacementSourceViolation)
+                                    <p class="text-gray-800 leading-snug">
+                                        Активный ключ, выдан взамен после нарушения лимита подключений.
+                                    </p>
                                 @else
                                     <span class="text-gray-400">—</span>
                                 @endif
@@ -230,7 +240,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                             </svg>
                                         </summary>
-                                        <div class="keys-actions-panel fixed z-[200] w-56 max-h-[min(70vh,24rem)] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1.5 shadow-xl ring-1 ring-black/5">
+                                        <div class="keys-actions-panel fixed z-[9999] w-56 max-h-[min(70vh,24rem)] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1.5 shadow-2xl ring-1 ring-black/10">
                                             <a href="{{ $configMainUrl }}" target="_blank" rel="noopener noreferrer"
                                                class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-indigo-50">
                                                 <svg class="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -418,9 +428,16 @@
 
             document.querySelectorAll('.keys-actions-dropdown').forEach(function (d) {
                 d.addEventListener('toggle', function () {
+                    var td = d.closest('td');
+                    if (td) {
+                        td.classList.toggle('keys-menu-open-cell', d.open);
+                    }
                     if (!d.open) return;
                     document.querySelectorAll('.keys-actions-dropdown').forEach(function (other) {
                         if (other !== d) other.open = false;
+                    });
+                    document.querySelectorAll('td.keys-menu-open-cell').forEach(function (cell) {
+                        if (cell !== td) cell.classList.remove('keys-menu-open-cell');
                     });
                     requestAnimationFrame(function () {
                         positionKeysMenu(d);
@@ -466,5 +483,11 @@
         .keys-icon-btn { background: transparent; border: none; padding: 0.125rem; border-radius: 0.25rem; cursor: pointer; }
         .keys-icon-btn:hover { background: rgba(99, 102, 241, 0.08); }
         .keys-icon-btn:focus { outline: 2px solid rgba(99, 102, 241, 0.4); outline-offset: 1px; }
+        /* Иначе следующие строки таблицы рисуются поверх fixed-панели */
+        td.keys-menu-open-cell {
+            position: relative;
+            z-index: 10000;
+            isolation: isolate;
+        }
     </style>
 @endsection
