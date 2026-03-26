@@ -401,27 +401,25 @@ class FatherBotController extends AbstractTelegramBot
     /**
      * Генерация URL для авторизации
      *
+     * С сайта (без входящего Telegram-update) chatId отсутствует — ссылка всё равно строится;
+     * user_id в кэше выставляется в {@see handleAuthRequest}, когда пользователь нажимает Start в боте.
+     *
      * @return string|null
      */
     public function generateAuthUrl(): ?string
     {
         try {
-            if (!$this->chatId) {
-                Log::warning('Chat ID not available, cannot generate auth URL', ['source' => 'telegram']);
-                return null;
-            }
+            $botUsername = ltrim((string) env('TELEGRAM_FATHER_BOT_NAME'), '@');
 
-            // Пытаемся получить username из env
-            $botUsername = ltrim(env('TELEGRAM_FATHER_BOT_NAME'), '@');
-            
-            // Если не настроен в env, получаем через API (с кэшированием)
-            if (empty($botUsername)) {
+            if ($botUsername === '') {
                 $botUsername = Cache::remember('telegram_father_bot_username', 3600, function () {
                     try {
                         $botInfo = $this->telegram->getMe();
+
                         return $botInfo->getUsername();
                     } catch (\Exception $e) {
                         Log::error('Failed to get bot username from API: ' . $e->getMessage(), ['source' => 'telegram']);
+
                         return null;
                     }
                 });
@@ -429,21 +427,28 @@ class FatherBotController extends AbstractTelegramBot
 
             if (empty($botUsername)) {
                 Log::warning('Bot username not available, cannot generate auth URL', ['source' => 'telegram']);
+
                 return null;
             }
 
             $hash = bin2hex(random_bytes(16));
-            Cache::put("telegram_auth:{$hash}", [
-                'user_id' => $this->chatId,
+            $payload = [
                 'callback_url' => UrlHelper::personalRoute('personal.auth.telegram.callback', [], true),
-            ], now()->addMinutes(5));
+                'source' => $this->chatId ? 'bot' : 'web',
+            ];
+            if ($this->chatId) {
+                $payload['user_id'] = $this->chatId;
+            }
+
+            Cache::put("telegram_auth:{$hash}", $payload, now()->addMinutes(5));
 
             return "https://t.me/{$botUsername}?start=auth_{$hash}";
         } catch (\Exception $e) {
             Log::error('Error generating auth URL: ' . $e->getMessage(), [
                 'source' => 'telegram',
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return null;
         }
     }
@@ -457,9 +462,16 @@ class FatherBotController extends AbstractTelegramBot
     private function handleAuthRequest(string $commandText): void
     {
         try {
-            $hash = explode('auth_', $commandText)[1] ?? null;
+            $hash = null;
+            if (preg_match('/auth_([a-f0-9]+)/i', $commandText, $m)) {
+                $hash = $m[1];
+            }
             if (!$hash) {
                 throw new \Exception('Invalid auth command format');
+            }
+
+            if (!$this->chatId) {
+                throw new \Exception('Не удалось определить пользователя Telegram');
             }
 
             $authData = Cache::get("telegram_auth:{$hash}");
@@ -467,12 +479,16 @@ class FatherBotController extends AbstractTelegramBot
                 throw new \Exception('Auth session expired or invalid');
             }
 
+            // Аккаунт входа — тот, кто нажал Start (переход с сайта раньше не содержал chatId).
+            $authData['user_id'] = $this->chatId;
+            Cache::put("telegram_auth:{$hash}", $authData, now()->addMinutes(5));
+
             // Всегда добавляем параметр redirect=profile
             $confirmationUrl = $authData['callback_url'] . '?' . http_build_query([
-                    'hash' => $hash,
-                    'user' => $authData['user_id'],
-                    'redirect' => 'profile' // Жестко задаем редирект в профиль
-                ]);
+                'hash' => $hash,
+                'user' => $this->chatId,
+                'redirect' => 'profile', // Жестко задаем редирект в профиль
+            ]);
 
             $this->sendMessage(
                 "✅ Для завершения авторизации нажмите кнопку:",

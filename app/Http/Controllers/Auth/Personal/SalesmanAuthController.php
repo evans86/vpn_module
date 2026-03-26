@@ -137,6 +137,11 @@ class SalesmanAuthController extends Controller
                 throw new Exception('Invalid or expired auth session');
             }
 
+            $expectedUserId = (int) ($authData['user_id'] ?? 0);
+            if ($expectedUserId < 1 || (int) $userId !== $expectedUserId) {
+                throw new Exception('Неверные параметры входа');
+            }
+
             $salesman = Salesman::where('telegram_id', $userId)->first();
             if (!$salesman) {
                 throw new Exception('Salesman not found');
