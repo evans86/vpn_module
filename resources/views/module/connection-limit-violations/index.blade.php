@@ -280,16 +280,22 @@
                                                 </small>
                                             </div>
                                             @if($violation->isKeyReplaced())
-                                                <div class="mt-1">
-                                                    <small class="text-green-600 text-xs">
-                                                        <i class="fas fa-key"></i> Ключ заменен
-                                                        @if($violation->getReplacedKeyId())
+                                                <div class="mt-2 p-2 rounded-md bg-amber-50 border border-amber-200 text-xs space-y-1">
+                                                    <div class="font-semibold text-amber-900">
+                                                        <i class="fas fa-exchange-alt mr-1"></i> Ключ перевыпущен (лимит подключений)
+                                                    </div>
+                                                    @if($violation->key_replaced_at)
+                                                        <div class="text-amber-800">{{ $violation->key_replaced_at->format('d.m.Y H:i') }}</div>
+                                                    @endif
+                                                    @if($violation->getReplacedKeyId())
+                                                        <div class="text-amber-900">
+                                                            <span class="text-amber-700">Новый ID ключа:</span>
                                                             <a href="{{ route('admin.module.key-activate.index', ['id' => $violation->getReplacedKeyId()]) }}"
-                                                               class="text-green-600 hover:text-green-800 ml-1">
-                                                                (новый)
+                                                               class="font-mono text-indigo-600 hover:text-indigo-800 break-all">
+                                                                {{ $violation->getReplacedKeyId() }}
                                                             </a>
-                                                        @endif
-                                                    </small>
+                                                        </div>
+                                                    @endif
                                                 </div>
                                             @endif
                                         @else

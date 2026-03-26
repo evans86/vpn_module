@@ -222,7 +222,9 @@ class PersonalController extends Controller
                 },
                 'user' => function($q) {
                     $q->select('telegram_id', 'username', 'first_name');
-                }
+                },
+                'replacedViolation',
+                'replacementSourceViolation',
             ]);
 
         // Применяем фильтры
@@ -255,6 +257,14 @@ class PersonalController extends Controller
             } elseif ($request->source_filter === 'bot') {
                 $query->whereNotNull('pack_salesman_id');
             }
+        }
+
+        // Только ключи, связанные с нарушением лимита подключений (отключённый или выданный взамен)
+        if ($request->filled('violation_filter') && $request->violation_filter === 'only') {
+            $query->where(function ($q) {
+                $q->whereHas('replacedViolation')
+                    ->orWhereHas('replacementSourceViolation');
+            });
         }
 
         // Ограничиваем максимальное количество записей на странице для защиты от перегрузки памяти

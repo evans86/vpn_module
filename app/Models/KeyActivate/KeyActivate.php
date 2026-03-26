@@ -106,6 +106,16 @@ class KeyActivate extends Model
             ->orderBy('key_replaced_at', 'desc');
     }
 
+    /**
+     * Нарушение, по которому этот ключ выдан как замена (текущая запись — новый ключ после перевыпуска).
+     */
+    public function replacementSourceViolation(): HasOne
+    {
+        return $this->hasOne(ConnectionLimitViolation::class, 'replaced_key_id')
+            ->whereNotNull('key_replaced_at')
+            ->orderByDesc('key_replaced_at');
+    }
+
     public function getTgStatusText(): string
     {
         switch ($this->status) {

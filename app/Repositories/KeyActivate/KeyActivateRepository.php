@@ -28,7 +28,12 @@ class KeyActivateRepository extends BaseRepository
     public function getPaginatedWithPack(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
         $query = $this->query()
-            ->with(['packSalesman.pack', 'packSalesman.salesman'])
+            ->with([
+                'packSalesman.pack',
+                'packSalesman.salesman',
+                'replacedViolation',
+                'replacementSourceViolation',
+            ])
             ->withCount('keyActivateUsers')
             ->orderBy('created_at', 'desc');
 

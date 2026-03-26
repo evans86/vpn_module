@@ -66,7 +66,7 @@
                     title="Ключи не найдены"
                     description="Попробуйте изменить параметры фильтрации" />
             @else
-                <x-admin.table :headers="['ID', 'Трафик', 'Пакет продавца', 'Пакет модуля', 'Продавец', 'Дата окончания', 'Telegram ID', 'Пользователь сервера', 'Статус', 'Действия']">
+                <x-admin.table :headers="['ID', 'Трафик', 'Пакет продавца', 'Пакет модуля', 'Продавец', 'Дата окончания', 'Telegram ID', 'Пользователь сервера', 'Статус', 'Лимит подключений', 'Действия']">
                     @php
                         $totalKeys = $activate_keys->count();
                         $currentIndex = 0;
@@ -167,6 +167,44 @@
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $key->getStatusBadgeClassSalesman() }}">
                                     {{ $key->getStatusText() }}
                                 </span>
+                            </td>
+                            <td class="px-3 sm:px-6 py-4 text-xs text-gray-700 max-w-xs">
+                                @if($key->replacedViolation)
+                                    <div class="space-y-1" title="Ключ перевыпущен из-за нарушения лимита одновременных подключений">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-medium">Исходный ключ отключён</span>
+                                        <div class="text-gray-600">
+                                            Новый ключ:
+                                            <a href="{{ route('admin.module.key-activate.index', ['id' => $key->replacedViolation->replaced_key_id]) }}"
+                                               class="font-mono text-indigo-600 hover:text-indigo-800 break-all">
+                                                {{ \Illuminate\Support\Str::limit($key->replacedViolation->replaced_key_id, 20) }}
+                                            </a>
+                                        </div>
+                                        <a href="{{ route('admin.module.connection-limit-violations.show', $key->replacedViolation) }}"
+                                           class="text-indigo-600 hover:text-indigo-800">
+                                            Нарушение #{{ $key->replacedViolation->id }}
+                                        </a>
+                                        @if($key->replacedViolation->key_replaced_at)
+                                            <div class="text-gray-500">{{ $key->replacedViolation->key_replaced_at->format('d.m.Y H:i') }}</div>
+                                        @endif
+                                    </div>
+                                @elseif($key->replacementSourceViolation)
+                                    <div class="space-y-1" title="Этот ключ выдан автоматически взамен старого при нарушении лимита">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded bg-green-100 text-green-900 font-medium">Замена по нарушению</span>
+                                        <div class="text-gray-600">
+                                            Был ключ:
+                                            <a href="{{ route('admin.module.key-activate.index', ['id' => $key->replacementSourceViolation->key_activate_id]) }}"
+                                               class="font-mono text-indigo-600 hover:text-indigo-800 break-all">
+                                                {{ \Illuminate\Support\Str::limit($key->replacementSourceViolation->key_activate_id, 20) }}
+                                            </a>
+                                        </div>
+                                        <a href="{{ route('admin.module.connection-limit-violations.show', $key->replacementSourceViolation) }}"
+                                           class="text-indigo-600 hover:text-indigo-800">
+                                            Нарушение #{{ $key->replacementSourceViolation->id }}
+                                        </a>
+                                    </div>
+                                @else
+                                    <span class="text-gray-400">—</span>
+                                @endif
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" style="overflow: visible !important; position: relative;">
                                 <div class="relative inline-block text-left" x-data="{ open: false, buttonRect: null }" x-init="$watch('open', value => {

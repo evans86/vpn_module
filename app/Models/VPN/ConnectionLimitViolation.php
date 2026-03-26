@@ -52,6 +52,14 @@ class ConnectionLimitViolation extends Model
     }
 
     /**
+     * Новый ключ после перевыпуска (если был).
+     */
+    public function replacedKeyActivate(): BelongsTo
+    {
+        return $this->belongsTo(KeyActivate::class, 'replaced_key_id');
+    }
+
+    /**
      * Отношение к пользователю сервера
      */
     public function serverUser(): BelongsTo

@@ -126,7 +126,34 @@
 
         <!-- Информация о ключе -->
         @if($violation->keyActivate)
-        <x-admin.card title="Информация о ключе">
+        <x-admin.card title="Информация о ключе (исходный)">
+            @if($violation->isKeyReplaced() && $violation->getReplacedKeyId())
+                <div class="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200">
+                    <h5 class="text-sm font-semibold text-amber-900 mb-2">
+                        <i class="fas fa-exchange-alt mr-2"></i> Ключ перевыпущен из-за нарушения лимита подключений
+                    </h5>
+                    <p class="text-sm text-amber-800 mb-2">
+                        Исходный ключ ниже деактивирован; пользователю выдан новый ключ с сохранением остатка срока и трафика.
+                    </p>
+                    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                        @if($violation->key_replaced_at)
+                            <div>
+                                <dt class="text-amber-700">Дата перевыпуска</dt>
+                                <dd class="font-medium text-amber-900">{{ $violation->key_replaced_at->format('d.m.Y H:i:s') }}</dd>
+                            </div>
+                        @endif
+                        <div class="sm:col-span-2">
+                            <dt class="text-amber-700 mb-1">Новый ключ (ID)</dt>
+                            <dd class="font-mono text-amber-950 break-all">
+                                <a href="{{ route('admin.module.key-activate.index', ['id' => $violation->getReplacedKeyId()]) }}"
+                                   class="text-indigo-600 hover:text-indigo-800">
+                                    {{ $violation->getReplacedKeyId() }}
+                                </a>
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+            @endif
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">ID ключа</label>
@@ -472,33 +499,11 @@
                     </div>
                 </div>
 
-                <!-- Информация о замене ключа -->
                 @if($violation->isKeyReplaced())
-                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <h5 class="text-sm font-semibold text-green-900 mb-3">
-                        <i class="fas fa-key mr-2"></i>
-                        Информация о замене ключа
-                    </h5>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-medium text-green-700 mb-1">Дата замены</label>
-                            <p class="text-sm text-green-900 font-semibold">
-                                {{ $violation->key_replaced_at->format('d.m.Y H:i:s') }}
-                            </p>
-                        </div>
-                        @if($violation->getReplacedKeyId())
-                        <div>
-                            <label class="block text-xs font-medium text-green-700 mb-1">Новый ключ</label>
-                            <p class="text-sm text-green-900 font-mono break-all">
-                                <a href="{{ route('admin.module.key-activate.index', ['id' => $violation->getReplacedKeyId()]) }}" 
-                                   class="text-green-700 hover:text-green-900 underline">
-                                    {{ $violation->getReplacedKeyId() }}
-                                </a>
-                            </p>
-                        </div>
-                        @endif
-                    </div>
-                </div>
+                <p class="text-xs text-gray-500 mt-4">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Сведения о перевыпуске и ID нового ключа — в блоке <strong>«Информация о ключе (исходный)»</strong> выше.
+                </p>
                 @endif
             </div>
         </x-admin.card>

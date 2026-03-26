@@ -36,8 +36,9 @@ class ConnectionLimitViolationController extends Controller
         $query = ConnectionLimitViolation::with([
             'keyActivate.packSalesman.salesman',
             'keyActivate.moduleSalesman',
+            'replacedKeyActivate',
             'serverUser',
-            'panel.server'
+            'panel.server',
         ])->latest();
 
         // Фильтрация по статусу
@@ -273,8 +274,9 @@ class ConnectionLimitViolationController extends Controller
         $violation->load([
             'keyActivate.packSalesman.salesman',
             'keyActivate.moduleSalesman',
+            'replacedKeyActivate',
             'serverUser',
-            'panel.server'
+            'panel.server',
         ]);
 
         return view('module.connection-limit-violations.show', compact('violation'));
