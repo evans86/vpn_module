@@ -86,17 +86,16 @@
                                 </option>
                             </select>
                         </div>
-
-                        <div class="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-3 xl:col-span-1 xl:justify-end">
-                            <button type="submit"
-                                    class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 whitespace-nowrap">
-                                Применить
-                            </button>
-                            <a href="{{ \App\Helpers\UrlHelper::personalRoute('personal.keys') }}"
-                               class="inline-flex items-center px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 whitespace-nowrap">
-                                Сбросить
-                            </a>
-                        </div>
+                    </div>
+                    <div class="mt-5 flex flex-wrap items-center justify-end gap-3 border-t border-gray-100 pt-4">
+                        <button type="submit"
+                                class="px-5 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 whitespace-nowrap text-sm font-medium shadow-sm">
+                            Применить
+                        </button>
+                        <a href="{{ \App\Helpers\UrlHelper::personalRoute('personal.keys') }}"
+                           class="inline-flex items-center px-5 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 whitespace-nowrap text-sm font-medium">
+                            Сбросить
+                        </a>
                     </div>
                 </form>
             </div>
@@ -112,7 +111,7 @@
                     Всего ключей: {{ $keys->total() }}
                 </p>
             </div>
-            <div class="overflow-x-auto max-w-full">
+            <div class="keys-table-scroll overflow-x-auto max-w-full">
                 <table class="min-w-[960px] w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                     <tr>
@@ -231,7 +230,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                             </svg>
                                         </summary>
-                                        <div class="keys-actions-panel absolute right-0 z-30 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5">
+                                        <div class="keys-actions-panel fixed z-[200] w-56 max-h-[min(70vh,24rem)] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1.5 shadow-xl ring-1 ring-black/5">
                                             <a href="{{ $configMainUrl }}" target="_blank" rel="noopener noreferrer"
                                                class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-indigo-50">
                                                 <svg class="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -247,24 +246,26 @@
                                                 </svg>
                                                 Копировать ссылку
                                             </button>
+                                            @if(count($mirrorUrls))
+                                                <div class="mx-2 my-2 border-t border-gray-100"></div>
+                                            @endif
                                             @foreach($mirrorUrls as $idx => $mirrorUrl)
-                                                <div class="border-t border-gray-100 my-1"></div>
-                                                <div class="px-2 py-1">
-                                                    <div class="text-[10px] uppercase tracking-wide text-gray-400 px-1 mb-0.5">Зеркало {{ $idx + 1 }}</div>
-                                                    <div class="flex items-center gap-1">
+                                                <div class="mx-2 mb-2">
+                                                    <div class="px-1 mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">Зеркало {{ $idx + 1 }}</div>
+                                                    <div class="flex items-center gap-1 rounded-md bg-amber-50/80 px-1.5 py-1">
                                                         <a href="{{ $mirrorUrl }}" target="_blank" rel="noopener noreferrer"
-                                                           class="flex-1 min-w-0 truncate rounded px-2 py-1 text-xs text-amber-800 hover:bg-amber-50"
+                                                           class="flex-1 min-w-0 truncate text-xs font-medium text-amber-900 hover:underline"
                                                            title="{{ $mirrorUrl }}">Открыть</a>
-                                                        <button type="button" class="keys-icon-btn p-1 rounded text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                                                        <button type="button" class="keys-icon-btn flex-shrink-0 rounded p-1 text-amber-800 hover:bg-amber-100"
                                                                 data-copy="{{ $mirrorUrl }}" title="Копировать URL">
-                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                                                             </svg>
                                                         </button>
                                                     </div>
                                                 </div>
                                             @endforeach
-                                            <div class="border-t border-gray-100 my-1"></div>
+                                            <div class="mx-2 my-1 border-t border-gray-100"></div>
                                             <button type="button"
                                                     class="key-refresh-btn flex w-full items-center gap-2 px-3 py-2 text-xs text-left text-indigo-800 hover:bg-indigo-50 disabled:opacity-50"
                                                     data-refresh-url="{{ $refreshUrl }}">
@@ -395,15 +396,60 @@
                     });
             });
 
-            // Закрыть другие выпадающие меню при открытии нового
+            function positionKeysMenu(d) {
+                var panel = d.querySelector('.keys-actions-panel');
+                var summary = d.querySelector('.keys-actions-summary');
+                if (!panel || !summary) return;
+                var r = summary.getBoundingClientRect();
+                var pw = Math.min(panel.offsetWidth || 224, window.innerWidth - 16);
+                var ph = panel.offsetHeight;
+                var margin = 8;
+                var left = r.right - pw;
+                if (left < margin) left = margin;
+                if (left + pw > window.innerWidth - margin) left = window.innerWidth - pw - margin;
+                var top = r.bottom + 6;
+                if (top + ph > window.innerHeight - margin) {
+                    top = r.top - ph - 6;
+                }
+                if (top < margin) top = margin;
+                panel.style.left = left + 'px';
+                panel.style.top = top + 'px';
+            }
+
             document.querySelectorAll('.keys-actions-dropdown').forEach(function (d) {
                 d.addEventListener('toggle', function () {
                     if (!d.open) return;
                     document.querySelectorAll('.keys-actions-dropdown').forEach(function (other) {
                         if (other !== d) other.open = false;
                     });
+                    requestAnimationFrame(function () {
+                        positionKeysMenu(d);
+                        requestAnimationFrame(function () { positionKeysMenu(d); });
+                    });
                 });
             });
+
+            window.addEventListener('resize', function () {
+                document.querySelectorAll('.keys-actions-dropdown[open]').forEach(function (d) {
+                    positionKeysMenu(d);
+                });
+            });
+
+            document.querySelectorAll('.keys-table-scroll').forEach(function (el) {
+                el.addEventListener('scroll', function () {
+                    document.querySelectorAll('.keys-actions-dropdown[open]').forEach(function (d) {
+                        d.open = false;
+                    });
+                });
+            });
+
+            document.addEventListener('scroll', function (e) {
+                var t = e.target;
+                if (t && t.closest && t.closest('.keys-actions-panel')) return;
+                document.querySelectorAll('.keys-actions-dropdown[open]').forEach(function (d) {
+                    d.open = false;
+                });
+            }, true);
 
             document.addEventListener('click', function (e) {
                 if (e.target.closest('.keys-actions-dropdown')) return;
