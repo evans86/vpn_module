@@ -66,6 +66,10 @@ class SalesmanAuthController extends Controller
      */
     public function loginWithEmail(Request $request): RedirectResponse
     {
+        if ($request->isMethod('get') && ! $request->has('_token')) {
+            return redirect()->to(UrlHelper::personalRoute('personal.auth'));
+        }
+
         $throttleKey = 'salesman-email-login:' . $request->ip();
         if (RateLimiter::tooManyAttempts($throttleKey, 10)) {
             $seconds = RateLimiter::availableIn($throttleKey);

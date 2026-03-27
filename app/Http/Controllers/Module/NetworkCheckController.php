@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Module;
 
+use App\Helpers\UrlHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Salesman\Salesman;
 use Carbon\Carbon;
@@ -76,6 +77,10 @@ class NetworkCheckController extends Controller
 
     public function report(Request $request)
     {
+        if ($request->isMethod('get')) {
+            return redirect()->to(UrlHelper::personalRoute('personal.network.index'));
+        }
+
         $data = $request->validate([
             'summary'    => 'required|array',
             'latency'    => 'required|array',

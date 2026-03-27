@@ -399,6 +399,10 @@ class PersonalController extends Controller
      */
     public function updateVpnInstructions(Request $request)
     {
+        if ($request->isMethod('get') && ! $request->has('_token')) {
+            return redirect()->to(UrlHelper::personalRoute('personal.faq'));
+        }
+
         $request->validate(['instructions' => 'required|string']);
 
         $salesman = Auth::guard('salesman')->user();
@@ -412,8 +416,12 @@ class PersonalController extends Controller
     /**
      * @return RedirectResponse
      */
-    public function resetVpnInstructions()
+    public function resetVpnInstructions(Request $request)
     {
+        if ($request->isMethod('get') && ! $request->has('_token')) {
+            return redirect()->to(UrlHelper::personalRoute('personal.faq'));
+        }
+
         $salesman = Auth::guard('salesman')->user();
 //        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
@@ -447,8 +455,12 @@ class PersonalController extends Controller
     /**
      * @return RedirectResponse
      */
-    public function resetFaq()
+    public function resetFaq(Request $request)
     {
+        if ($request->isMethod('get') && ! $request->has('_token')) {
+            return redirect()->to(UrlHelper::personalRoute('personal.faq'));
+        }
+
         $salesman = Auth::guard('salesman')->user();
 //        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
@@ -474,6 +486,10 @@ class PersonalController extends Controller
      */
     public function updateCabinetLoginSettings(Request $request): RedirectResponse
     {
+        if ($request->isMethod('get') && ! $request->has('_token')) {
+            return redirect()->to(UrlHelper::personalRoute('personal.cabinet-login'));
+        }
+
         /** @var Salesman $salesman */
         $salesman = Auth::guard('salesman')->user();
 

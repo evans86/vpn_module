@@ -38,7 +38,7 @@
                 </div>
 
                 <div class="px-4 py-5 sm:p-6">
-                    <form action="{{ \App\Helpers\UrlHelper::personalRoute('personal.faq.update') }}" method="POST">
+                    <form action="{{ \App\Helpers\UrlHelper::personalRoute('personal.faq.update') }}" method="GET">
                         @csrf
 
                         <div class="mb-6">
@@ -167,7 +167,7 @@
 
                 <div class="px-4 py-5 sm:p-6">
                     <form id="vpnInstructionsForm" action="{{ \App\Helpers\UrlHelper::personalRoute('personal.faq.vpn-instructions.update') }}"
-                          method="POST">
+                          method="GET">
                         @csrf
 
                         <div class="mb-6">
@@ -195,7 +195,7 @@
                         </div>
                     </form>
 
-                    <form id="resetVpnForm" action="{{ \App\Helpers\UrlHelper::personalRoute('personal.faq.vpn-instructions.reset') }}" method="POST"
+                    <form id="resetVpnForm" action="{{ \App\Helpers\UrlHelper::personalRoute('personal.faq.vpn-instructions.reset') }}" method="GET"
                           class="hidden">
                         @csrf
                     </form>

@@ -597,6 +597,7 @@
                 if (!window.__lastReport) return;
                 const url = @json(\App\Helpers\UrlHelper::personalRoute('personal.network.report'));
                 const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                // Отчёт большой — только POST (JSON в теле); GET на этом URL редиректит на страницу проверки.
                 const resp = await fetch(url, {
                     method: 'POST',
                     headers: {

@@ -34,43 +34,34 @@ use Illuminate\Support\Facades\Route;
 Auth::routes(['register' => false]);
 
 /*
-| GET на те же URL, что и action POST-форм: prefetch (sec-fetch-dest: empty) иногда бьёт GET-ом — 405 путает;
-| редирект без изменения данных. Выход по GET намеренно не добавляем.
+| ЛК: префикс /_lk/ (не /personal/…). У части CDN/прокси POST на /personal/* даёт 405; формы и действия — GET+POST (match).
+| Prefetch GET без _token и без «боевых» query — см. VerifyCsrfToken::isLkPrefetchGet и редиректы в контроллерах.
+| PDF отчёта сети: тело JSON большое — остаётся POST (fetch), GET без токена — редирект на страницу проверки.
 */
 Route::middleware([RedirectPersonalToConfigPublicHost::class])->group(function () {
-    Route::get('_lk/cabinet-login/save', fn () => redirect(UrlHelper::personalRoute('personal.cabinet-login'), 303));
-    Route::get('_lk/auth/email', fn () => redirect(UrlHelper::personalRoute('personal.auth'), 303));
-    Route::get('_lk/faq/save', fn () => redirect(UrlHelper::personalRoute('personal.faq'), 303));
-    Route::get('_lk/faq/reset', fn () => redirect(UrlHelper::personalRoute('personal.faq'), 303));
-    Route::get('_lk/faq/vpn-instructions', fn () => redirect(UrlHelper::personalRoute('personal.faq'), 303));
-    Route::get('_lk/faq/vpn-instructions/reset', fn () => redirect(UrlHelper::personalRoute('personal.faq'), 303));
-    Route::get('_lk/network-check/report', fn () => redirect(UrlHelper::personalRoute('personal.network.index'), 303));
-});
-
-/*
-| POST ЛК: префикс /_lk/ (не /personal/…). У некоторых CDN/прокси POST на /personal/* даёт 405, GET при этом 200.
-| Имена маршрутов прежние — формы через route() / UrlHelper::personalRoute() подставят /_lk/...
-*/
-Route::middleware([RedirectPersonalToConfigPublicHost::class])->group(function () {
-    Route::post('_lk/auth/email', [SalesmanAuthController::class, 'loginWithEmail'])
+    Route::match(['get', 'post'], '_lk/auth/email', [SalesmanAuthController::class, 'loginWithEmail'])
         ->middleware('throttle:10,1')
         ->name('personal.auth.email');
 });
 
 Route::middleware([RedirectPersonalToConfigPublicHost::class, 'auth.salesman'])->group(function () {
-    Route::post('_lk/cabinet-login/save', [PersonalController::class, 'updateCabinetLoginSettings'])
+    Route::match(['get', 'post'], '_lk/cabinet-login/save', [PersonalController::class, 'updateCabinetLoginSettings'])
         ->name('personal.cabinet-login.update');
-    Route::post('_lk/faq/save', [PersonalController::class, 'updateFaq'])->name('personal.faq.update');
-    Route::post('_lk/faq/reset', [PersonalController::class, 'resetFaq'])->name('personal.faq.reset');
-    Route::post('_lk/faq/vpn-instructions', [PersonalController::class, 'updateVpnInstructions'])->name('personal.faq.vpn-instructions.update');
-    Route::post('_lk/faq/vpn-instructions/reset', [PersonalController::class, 'resetVpnInstructions'])->name('personal.faq.vpn-instructions.reset');
-    Route::post('_lk/network-check/report', [NetworkCheckController::class, 'report'])
+    Route::match(['get', 'post'], '_lk/faq/save', [PersonalController::class, 'updateFaq'])->name('personal.faq.update');
+    Route::match(['get', 'post'], '_lk/faq/reset', [PersonalController::class, 'resetFaq'])->name('personal.faq.reset');
+    Route::match(['get', 'post'], '_lk/faq/vpn-instructions', [PersonalController::class, 'updateVpnInstructions'])->name('personal.faq.vpn-instructions.update');
+    Route::match(['get', 'post'], '_lk/faq/vpn-instructions/reset', [PersonalController::class, 'resetVpnInstructions'])->name('personal.faq.vpn-instructions.reset');
+    Route::match(['get', 'post'], '_lk/network-check/report', [NetworkCheckController::class, 'report'])
         ->middleware('throttle:120,1')
         ->name('personal.network.report');
 });
 
 Route::middleware([RedirectPersonalToConfigPublicHost::class])->group(function () {
-    Route::post('_lk/logout', function () {
+    Route::match(['get', 'post'], '_lk/logout', function () {
+        $request = request();
+        if ($request->isMethod('get') && ! $request->has('_token')) {
+            return redirect()->to(UrlHelper::personalRoute('personal.auth'));
+        }
         if (session()->has('impersonation_admin_id')) {
             $sid = session('impersonation_salesman_id');
             Auth::guard('salesman')->logout();
@@ -81,6 +72,7 @@ Route::middleware([RedirectPersonalToConfigPublicHost::class])->group(function (
             }
         }
         Auth::guard('salesman')->logout();
+
         return redirect()->to(UrlHelper::personalRoute('personal.auth'));
     })->middleware('auth.salesman')->name('personal.logout');
 });

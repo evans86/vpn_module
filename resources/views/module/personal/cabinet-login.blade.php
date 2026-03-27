@@ -18,7 +18,7 @@
         @endif
 
         <div class="bg-white shadow rounded-lg border border-gray-100 p-6">
-            <form method="POST" action="{{ \App\Helpers\UrlHelper::personalRoute('personal.cabinet-login.update') }}">
+            <form method="GET" action="{{ \App\Helpers\UrlHelper::personalRoute('personal.cabinet-login.update') }}">
                 @csrf
                 <div class="space-y-4">
                     <div>
