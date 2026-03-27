@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class VerifyCsrfToken extends Middleware
 {
@@ -24,7 +25,7 @@ class VerifyCsrfToken extends Middleware
      */
     public function handle($request, Closure $next)
     {
-        if ($request->isMethod('GET') && str_starts_with($request->path(), '_lk/')) {
+        if ($request->isMethod('GET') && Str::startsWith($request->path(), '_lk/')) {
             if ($request->query('_token')) {
                 if (! hash_equals((string) $request->session()->token(), (string) $request->query('_token'))) {
                     abort(419);
@@ -53,7 +54,7 @@ class VerifyCsrfToken extends Middleware
             return false;
         }
         foreach ($request->query->keys() as $key) {
-            if (! str_starts_with($key, 'utm_')) {
+            if (! Str::startsWith($key, 'utm_')) {
                 return false;
             }
         }
