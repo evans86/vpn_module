@@ -30,6 +30,18 @@
     
     <!-- jQuery и Toastr -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        (function () {
+            var t = document.querySelector('meta[name="csrf-token"]');
+            if (typeof jQuery !== 'undefined' && t) {
+                jQuery.ajaxSetup({
+                    headers: {
+                        'X-CSRF-TOKEN': t.getAttribute('content')
+                    }
+                });
+            }
+        })();
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
     

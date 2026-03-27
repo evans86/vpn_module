@@ -6,6 +6,7 @@ use App\Http\Middleware\AdminAccess;
 use App\Http\Middleware\Authenticate;
 use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\ForceHttps;
+use App\Http\Middleware\PreventAdminResponseCaching;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\SalesmanOnly;
@@ -64,6 +65,7 @@ class Kernel extends HttpKernel
             ShareErrorsFromSession::class,
             VerifyCsrfToken::class,
             SubstituteBindings::class,
+            PreventAdminResponseCaching::class,
         ],
 
         /**
