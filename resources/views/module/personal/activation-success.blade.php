@@ -43,7 +43,7 @@
                         <p class="mt-3 text-amber-800 text-xs">Лимит Telegram на одно сообщение ~4096 символов.</p>
                     </div>
 
-                    <form action="{{ \App\Helpers\UrlHelper::personalRoute('personal.activation-success.update') }}" method="POST">
+                    <form action="{{ \App\Helpers\UrlHelper::personalRoute('personal.activation-success.update') }}" method="GET">
                         @csrf
                         <div>
                             <label for="activation_success_text" class="block text-sm font-medium text-gray-700 mb-2">Шаблон сообщения</label>
@@ -90,7 +90,7 @@
                         </div>
                     </form>
 
-                    <form id="resetActivationForm" action="{{ \App\Helpers\UrlHelper::personalRoute('personal.activation-success.reset') }}" method="POST" class="hidden">
+                    <form id="resetActivationForm" action="{{ \App\Helpers\UrlHelper::personalRoute('personal.activation-success.reset') }}" method="GET" class="hidden">
                         @csrf
                     </form>
 

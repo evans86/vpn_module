@@ -591,6 +591,10 @@ class PersonalController extends Controller
         ]);
 
         $salesman = Auth::guard('salesman')->user();
+        if (! $salesman instanceof Salesman) {
+            abort(403);
+        }
+
         $raw = isset($validated['activation_success_text']) ? trim((string) $validated['activation_success_text']) : '';
         $salesman->custom_activation_success_text = $raw === '' ? null : $raw;
 
@@ -634,6 +638,10 @@ class PersonalController extends Controller
         }
 
         $salesman = Auth::guard('salesman')->user();
+        if (! $salesman instanceof Salesman) {
+            abort(403);
+        }
+
         $salesman->custom_activation_success_text = null;
         $salesman->activation_success_keyboard_links = null;
         $salesman->save();
