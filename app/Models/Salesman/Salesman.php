@@ -30,6 +30,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $updated_at
  * @property string|null $email
  * @property string|null $password Хеш пароля для входа в ЛК (не путать с токеном бота)
+ * @property string|null $custom_activation_success_text Шаблон HTML сообщения после активации ключа в боте активации
+ * @property array|null $activation_success_keyboard_links Кнопки-ссылки под сообщением (текст + url)
  */
 class Salesman extends Authenticatable
 {
@@ -55,7 +57,7 @@ class Salesman extends Authenticatable
      * @var array<string, string>
      */
     protected $casts = [
-        // Базовые типы
+        'activation_success_keyboard_links' => 'array',
     ];
 
     /**

@@ -51,6 +51,10 @@ Route::middleware([RedirectPersonalToConfigPublicHost::class, 'auth.salesman'])-
     Route::match(['get', 'post'], '_lk/faq/reset', [PersonalController::class, 'resetFaq'])->name('personal.faq.reset');
     Route::match(['get', 'post'], '_lk/faq/vpn-instructions', [PersonalController::class, 'updateVpnInstructions'])->name('personal.faq.vpn-instructions.update');
     Route::match(['get', 'post'], '_lk/faq/vpn-instructions/reset', [PersonalController::class, 'resetVpnInstructions'])->name('personal.faq.vpn-instructions.reset');
+    Route::match(['get', 'post'], '_lk/activation-message/save', [PersonalController::class, 'updateActivationSuccessMessage'])
+        ->name('personal.activation-success.update');
+    Route::match(['get', 'post'], '_lk/activation-message/reset', [PersonalController::class, 'resetActivationSuccessMessage'])
+        ->name('personal.activation-success.reset');
     Route::match(['get', 'post'], '_lk/network-check/report', [NetworkCheckController::class, 'report'])
         ->middleware('throttle:120,1')
         ->name('personal.network.report');
@@ -114,6 +118,8 @@ Route::prefix('personal')
                 return redirect()->route('personal.faq');
             });
         });
+
+        Route::get('/activation-success', [PersonalController::class, 'activationSuccessMessage'])->name('activation-success');
     });
 });
 

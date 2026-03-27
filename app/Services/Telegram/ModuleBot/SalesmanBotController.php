@@ -5,6 +5,8 @@ namespace App\Services\Telegram\ModuleBot;
 use App\Logging\DatabaseLogger;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\Salesman\Salesman;
+use App\Services\Bot\ActivationSuccessKeyboard;
+use App\Services\Bot\ActivationSuccessMessageRenderer;
 use App\Models\TelegramUser\TelegramUser;
 use App\Services\Panel\PanelStrategy;
 use App\Support\KeyActivationMutex;
@@ -678,57 +680,8 @@ class SalesmanBotController extends AbstractTelegramBot
 
     protected function sendSuccessActivation(KeyActivate $key): void
     {
-        $finishDate = date('d.m.Y', $key->finish_at);
-
-        $text = "✅ <b>VPN успешно активирован!</b>\n\n";
-        $text .= "📅 Срок действия: до {$finishDate}\n\n";
-
-        $text .= "🔗 <b>Ваша VPN-конфигурация:</b>\n\n";
-        $text .= \App\Helpers\UrlHelper::telegramConfigLinksHtml($key->id) . "\n\n";
-
-        $text .= "📝 <b>Инструкция по настройке:</b>\n\n";
-        $text .= "1️⃣ Установите VPN-клиент на Ваше устройство\n";
-        $text .= "2️⃣ Скопируйте ссылку конфигурации выше\n";
-        $text .= "3️⃣ Следуйте инструкциям для подключения на различных устройствах\n\n";
-
-
-        $text .= "❓ Если возникли вопросы, обратитесь к администратору бота";
-        $text .= "📱 Инструкции для настройки подключения:\n";
-
-        $keyboard = [
-            'inline_keyboard' => [
-                [
-                    [
-                        'text' => '🤖 Android',
-                        'url' => 'https://teletype.in/@bott_manager/C0WFg-Bsren'
-                    ]
-                ],
-                [
-                    [
-                        'text' => '🍏 iOS',
-                        'url' => 'https://teletype.in/@bott_manager/8jEexiKqjlEWQ'
-                    ]
-                ],
-                [
-                    [
-                        'text' => '🪟️ Windows',
-                        'url' => 'https://teletype.in/@bott_manager/kJaChoXUqmZ'
-                    ]
-                ],
-                [
-                    [
-                        'text' => '💻 MacOS',
-                        'url' => 'https://teletype.in/@bott_manager/Q8vOQ-_lnQ_'
-                    ]
-                ],
-                [
-                    [
-                        'text' => '📺 AndroidTV',
-                        'url' => 'https://teletype.in/@bott_manager/OIc2Dwer6jV'
-                    ]
-                ]
-            ]
-        ];
+        $text = ActivationSuccessMessageRenderer::render($this->salesman, $key);
+        $keyboard = ActivationSuccessKeyboard::telegramKeyboard($this->salesman);
 
         $this->sendMessage($text, $keyboard);
     }

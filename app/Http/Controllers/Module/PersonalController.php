@@ -16,6 +16,8 @@ use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use App\Services\Bot\ActivationSuccessKeyboard;
+use App\Services\Bot\ActivationSuccessMessageRenderer;
 use App\Services\Bot\BotModuleService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -534,5 +536,109 @@ class PersonalController extends Controller
 
         return redirect()->to(UrlHelper::personalRoute('personal.cabinet-login'))
             ->with('success', 'Настройки резервного входа сохранены.');
+    }
+
+    /**
+     * Редактор сообщения после успешной активации ключа (бот активации).
+     */
+    public function activationSuccessMessage(): View
+    {
+        $salesman = Auth::guard('salesman')->user();
+        if (! $salesman instanceof Salesman) {
+            abort(403);
+        }
+
+        $hasBot = $salesman->bot_link !== null;
+
+        $sampleKey = new KeyActivate([
+            'id' => '00000000-0000-0000-0000-000000000001',
+            'finish_at' => Carbon::now()->addDays(30)->timestamp,
+        ]);
+        $preview = ActivationSuccessMessageRenderer::render($salesman, $sampleKey);
+        $defaultTemplate = ActivationSuccessMessageRenderer::defaultTemplate();
+
+        $keyboardRows = $salesman->activation_success_keyboard_links;
+        if (! is_array($keyboardRows) || count($keyboardRows) === 0) {
+            $keyboardRows = ActivationSuccessKeyboard::defaultRows();
+        }
+        if (old('activation_links') !== null) {
+            $oldLinks = old('activation_links');
+            $keyboardRows = is_array($oldLinks) && count($oldLinks) > 0
+                ? $oldLinks
+                : ActivationSuccessKeyboard::defaultRows();
+        }
+
+        return view('module.personal.activation-success', compact(
+            'salesman',
+            'hasBot',
+            'preview',
+            'defaultTemplate',
+            'keyboardRows'
+        ));
+    }
+
+    public function updateActivationSuccessMessage(Request $request): RedirectResponse
+    {
+        if ($request->isMethod('get') && ! $request->has('_token')) {
+            return redirect()->to(UrlHelper::personalRoute('personal.activation-success'));
+        }
+
+        $validated = $request->validate([
+            'activation_success_text' => 'nullable|string|max:12000',
+            'activation_links' => 'nullable|array|max:20',
+            'activation_links.*.text' => 'nullable|string|max:64',
+            'activation_links.*.url' => 'nullable|string|max:2048',
+        ]);
+
+        $salesman = Auth::guard('salesman')->user();
+        $raw = isset($validated['activation_success_text']) ? trim((string) $validated['activation_success_text']) : '';
+        $salesman->custom_activation_success_text = $raw === '' ? null : $raw;
+
+        $linksIn = $request->input('activation_links', []);
+        $cleanLinks = [];
+        if (is_array($linksIn)) {
+            foreach ($linksIn as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                $t = trim((string) ($row['text'] ?? ''));
+                $u = trim((string) ($row['url'] ?? ''));
+                if ($t === '' && $u === '') {
+                    continue;
+                }
+                if ($t === '' || $u === '') {
+                    return redirect()->back()
+                        ->withErrors(['activation_links' => 'Для каждой кнопки укажите и подпись, и ссылку, либо оставьте оба поля пустыми.'])
+                        ->withInput();
+                }
+                if (! preg_match('#^https?://#i', $u)) {
+                    return redirect()->back()
+                        ->withErrors(['activation_links' => 'Ссылки кнопок должны начинаться с http:// или https://'])
+                        ->withInput();
+                }
+                $cleanLinks[] = ['text' => $t, 'url' => $u];
+            }
+        }
+        $salesman->activation_success_keyboard_links = count($cleanLinks) > 0 ? $cleanLinks : null;
+
+        $salesman->save();
+
+        return redirect()->to(UrlHelper::personalRoute('personal.activation-success'))
+            ->with('success', 'Сообщение и кнопки после активации сохранены.');
+    }
+
+    public function resetActivationSuccessMessage(Request $request): RedirectResponse
+    {
+        if ($request->isMethod('get') && ! $request->has('_token')) {
+            return redirect()->to(UrlHelper::personalRoute('personal.activation-success'));
+        }
+
+        $salesman = Auth::guard('salesman')->user();
+        $salesman->custom_activation_success_text = null;
+        $salesman->activation_success_keyboard_links = null;
+        $salesman->save();
+
+        return redirect()->to(UrlHelper::personalRoute('personal.activation-success'))
+            ->with('success', 'Сообщение и кнопки сброшены к шаблону по умолчанию.');
     }
 }
