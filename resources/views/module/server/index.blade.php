@@ -221,6 +221,15 @@
                                     @if(strtolower((string)$server->provider) === 'manual' && (int)$server->server_status === (int)Server::SERVER_CREATED)
                                         <div class="flex flex-col gap-2 mb-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
                                             <p class="text-sm text-amber-800 font-medium">Настройте DNS и проверьте доступность:</p>
+                                            <div class="flex flex-wrap items-end gap-2">
+                                                <label class="flex flex-col text-xs text-amber-900">
+                                                    <span class="mb-1">Порт SSH (для проверки TCP)</span>
+                                                    <input type="number" min="1" max="65535" id="manualSshPort-{{ $server->id }}"
+                                                           class="w-28 rounded-md border border-amber-300 px-2 py-1.5 text-sm text-gray-900 shadow-sm focus:border-amber-500 focus:ring-amber-500"
+                                                           value="{{ $server->ssh_port ?? '' }}"
+                                                           placeholder="22">
+                                                </label>
+                                            </div>
                                             <div class="flex flex-wrap gap-2">
                                                 <button type="button" onclick="setupDnsManual({{ $server->id }})"
                                                         class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300 transition-colors">
@@ -359,6 +368,8 @@
             <div class="mb-4">
                 <label for="manualServerPassword" class="block text-sm font-medium text-gray-700 mb-1">Пароль (опционально)</label>
                 <input type="password" id="manualServerPassword" name="password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" placeholder="Пароль доступа к серверу">
+                <p class="mt-3 text-sm text-gray-600 mb-1">Порт SSH (для проверки «Пинг»)</p>
+                <input type="number" min="1" max="65535" id="manualServerSshPort" name="ssh_port" class="mt-1 block w-full max-w-xs rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" placeholder="22 — по умолчанию; у части хостеров — 3333 и др.">
             </div>
         </form>
         <x-slot name="footer">
@@ -427,14 +438,25 @@
                 });
             }
 
-            // Пинг и переход в статус «Настроен» для ручного сервера
+                // Пинг и переход в статус «Настроен» для ручного сервера
             function pingAndConfigureManual(id) {
+                var rawPort = $('#manualSshPort-' + id).val();
+                rawPort = (rawPort != null && String(rawPort).trim() !== '') ? String(rawPort).trim() : '';
+                var portNum = rawPort === '' ? 22 : parseInt(rawPort, 10);
+                if (rawPort !== '' && (isNaN(portNum) || portNum < 1 || portNum > 65535)) {
+                    toastr.error('Укажите порт SSH от 1 до 65535 или оставьте пустым (22)');
+                    return;
+                }
+                var postData = { _token: '{{ csrf_token() }}' };
+                if (rawPort !== '') {
+                    postData.ssh_port = portNum;
+                }
                 $.ajax({
                     url: '{{ route('admin.module.server.ping-and-configure', ['server' => ':id']) }}'.replace(':id', id),
                     method: 'POST',
-                    data: { _token: '{{ csrf_token() }}' },
+                    data: postData,
                     beforeSend: function () {
-                        toastr.info('Проверка доступности (порт 22)...', '', { timeOut: 2000 });
+                        toastr.info('Проверка TCP к порту SSH ' + (rawPort !== '' ? portNum : '22 (по умолчанию)') + '...', '', { timeOut: 2000 });
                     },
                     success: function (response) {
                         if (response.success) {
@@ -553,6 +575,17 @@
                     const host = $('#manualServerHost').val().trim();
                     const login = $('#manualServerLogin').val().trim();
                     const password = $('#manualServerPassword').val();
+                    const sshPortRaw = $('#manualServerSshPort').val();
+                    const sshPortTrim = (sshPortRaw != null && String(sshPortRaw).trim() !== '') ? String(sshPortRaw).trim() : '';
+                    let ssh_port = null;
+                    if (sshPortTrim !== '') {
+                        const p = parseInt(sshPortTrim, 10);
+                        if (isNaN(p) || p < 1 || p > 65535) {
+                            toastr.error('Порт SSH: число от 1 до 65535 или оставьте пустым');
+                            return;
+                        }
+                        ssh_port = p;
+                    }
 
                     if (!location_id || !name || !ip) {
                         toastr.error('Заполните обязательные поля: Локация, Название, IP-адрес');
@@ -563,18 +596,22 @@
                     const originalHtml = btn.html();
                     btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Добавление...');
 
+                    var manualServerPost = {
+                        _token: '{{ csrf_token() }}',
+                        location_id: location_id,
+                        name: name,
+                        ip: ip,
+                        host: host || null,
+                        login: login || null,
+                        password: password || null
+                    };
+                    if (ssh_port !== null) {
+                        manualServerPost.ssh_port = ssh_port;
+                    }
                     $.ajax({
                         url: '{{ route('admin.module.server.store-manual') }}',
                         method: 'POST',
-                        data: {
-                            _token: '{{ csrf_token() }}',
-                            location_id: location_id,
-                            name: name,
-                            ip: ip,
-                            host: host || null,
-                            login: login || null,
-                            password: password || null
-                        },
+                        data: manualServerPost,
                         success: function (response) {
                             if (response.success) {
                                 toastr.success('Сервер добавлен');

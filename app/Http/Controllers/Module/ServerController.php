@@ -200,7 +200,7 @@ class ServerController extends Controller
 
     /**
      * Добавить сервер вручную (провайдер без API).
-     * Принимает: location_id, name, ip, host (опц.), login (опц.), password (опц.).
+     * Принимает: location_id, name, ip, host (опц.), ssh_port (опц., иначе проверка TCP — порт 22), login (опц.), password (опц.).
      *
      * @param Request $request
      * @return JsonResponse
@@ -213,6 +213,7 @@ class ServerController extends Controller
                 'name' => 'required|string|max:255',
                 'ip' => 'required|string|max:45',
                 'host' => 'nullable|string|max:255',
+                'ssh_port' => 'nullable|integer|min:1|max:65535',
                 'login' => 'nullable|string|max:255',
                 'password' => 'nullable|string|max:500',
             ]);
@@ -222,6 +223,7 @@ class ServerController extends Controller
             $server->name = $validated['name'];
             $server->ip = $validated['ip'];
             $server->host = $validated['host'] ?? $validated['ip'];
+            $server->ssh_port = $validated['ssh_port'] ?? null;
             $server->login = $validated['login'] ?? null;
             $server->password = $validated['password'] ?? null;
             $server->provider = Server::MANUAL;
@@ -275,6 +277,7 @@ class ServerController extends Controller
                 'name' => 'sometimes|string|max:255',
                 'ip' => 'sometimes|ip',
                 'host' => 'sometimes|string|max:255',
+                'ssh_port' => 'sometimes|nullable|integer|min:1|max:65535',
                 'location_id' => 'sometimes|integer|exists:location,id',
             ]);
 
@@ -416,12 +419,13 @@ class ServerController extends Controller
     }
 
     /**
-     * Пинг ручного сервера (TCP порт 22). При успехе — статус «Настроен».
+     * Пинг ручного сервера (TCP к порту SSH: ssh_port или 22). При успехе — статус «Настроен».
+     * В теле запроса можно передать ssh_port — сохранится в БД перед проверкой.
      *
      * @param Server $server
      * @return JsonResponse
      */
-    public function pingAndConfigure(Server $server): JsonResponse
+    public function pingAndConfigure(Request $request, Server $server): JsonResponse
     {
         if (strtolower((string)$server->provider) !== Server::MANUAL) {
             return response()->json(['success' => false, 'message' => 'Только для серверов, добавленных вручную'], 400);
@@ -431,12 +435,21 @@ class ServerController extends Controller
         }
 
         try {
+            $portRule = $request->validate([
+                'ssh_port' => 'sometimes|nullable|integer|min:1|max:65535',
+            ]);
+            if (array_key_exists('ssh_port', $portRule)) {
+                $server->ssh_port = $portRule['ssh_port'];
+                $server->save();
+            }
+
             $strategy = new ServerStrategy($server->provider);
             $ok = $strategy->ping($server);
+            $checkPort = $server->ssh_port ?? 22;
             if (!$ok) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Сервер недоступен (порт 22). Проверьте хост/IP и фаервол.',
+                    'message' => 'Сервер недоступен (TCP порт SSH ' . $checkPort . '). Проверьте хост/IP, порт и фаервол.',
                 ], 400);
             }
             $server->server_status = Server::SERVER_CONFIGURED;

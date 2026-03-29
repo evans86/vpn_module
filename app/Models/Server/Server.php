@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $name
  * @property string|null $dns_record_id
  * @property string|null $host
+ * @property int|null $ssh_port
  * @property string|null $provider
  * @property int|null $location_id
  * @property int|null $server_status
@@ -54,6 +55,7 @@ class Server extends Model
      */
     protected $casts = [
         'server_status' => 'integer',
+        'ssh_port' => 'integer',
     ];
 
     /**

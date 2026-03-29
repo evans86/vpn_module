@@ -28,7 +28,7 @@ class ServerManualStrategy extends ServerMainStrategy
     }
 
     /**
-     * Проверка доступности по TCP (порт 22). Используется для кнопки «Пинг» и перевода в «Настроен».
+     * Проверка доступности по TCP (порт SSH: поле ssh_port или 22). Для «Пинг» и перевода в «Настроен».
      */
     public function ping(Server $server): bool
     {
@@ -36,7 +36,7 @@ class ServerManualStrategy extends ServerMainStrategy
         if (empty($host)) {
             return false;
         }
-        $port = 22;
+        $port = $server->ssh_port !== null ? (int) $server->ssh_port : 22;
         $timeout = 5;
         $errno = 0;
         $errstr = '';
