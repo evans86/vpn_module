@@ -12,6 +12,8 @@ class ServerDto
     public ?string $name; //имя из панели
     public ?string $dns_record_id;
     public string $host; //строка ssh подключения
+    /** Порт SSH; null — 22 (phpseclib по умолчанию) */
+    public ?int $ssh_port = null;
     public string $provider; // vdsina
     public int $location_id; // ru/ne
     public int $server_status;
@@ -28,6 +30,7 @@ class ServerDto
             'name' => $this->name,
             'dns_record_id' => $this->dns_record_id,
             'host' => $this->host,
+            'ssh_port' => $this->ssh_port,
             'provider' => $this->provider,
             'location_id' => $this->location_id,
             'server_status' => $this->server_status,

@@ -440,7 +440,8 @@ class MarzbanService
     public function connectSshAdapter(ServerDto $serverDto): SSH2
     {
         try {
-            $ssh = new SSH2($serverDto->ip);
+            $port = $serverDto->ssh_port ?? 22;
+            $ssh = new SSH2($serverDto->ip, $port);
             $ssh->setTimeout(100000);
 
             if (!$ssh->login($serverDto->login, $serverDto->password)) {
@@ -452,6 +453,7 @@ class MarzbanService
             Log::error('SSH connection failed', [
                 'source' => 'panel',
                 'ip' => $serverDto->ip,
+                'port' => $serverDto->ssh_port ?? 22,
                 'error' => $e->getMessage()
             ]);
             throw new RuntimeException('SSH connection failed: ' . $e->getMessage());

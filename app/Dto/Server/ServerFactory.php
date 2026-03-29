@@ -21,6 +21,7 @@ class ServerFactory
         $dto->name = $server->name;
         $dto->dns_record_id = $server->dns_record_id;
         $dto->host = $server->host;
+        $dto->ssh_port = $server->ssh_port !== null ? (int) $server->ssh_port : null;
         $dto->provider = $server->provider;
         $dto->location_id = $server->location_id;
         $dto->server_status = $server->server_status;

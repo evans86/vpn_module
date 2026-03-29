@@ -603,8 +603,8 @@ class PanelController extends Controller
                     // Создаем директорию на сервере, если её нет
                     $ssh->exec("mkdir -p {$remoteCertDir} 2>&1");
                     
-                    // Копируем файлы через SFTP
-                    $sftp = new SFTP($serverDto->ip);
+                    // Копируем файлы через SFTP (тот же порт, что и SSH)
+                    $sftp = new SFTP($serverDto->ip, $serverDto->ssh_port ?? 22);
                     if ($sftp->login($serverDto->login, $serverDto->password)) {
                         $sftp->put($remoteCertPath, $localCertPath, SFTP::SOURCE_LOCAL_FILE);
                         $sftp->put($remoteKeyPath, $localKeyPath, SFTP::SOURCE_LOCAL_FILE);
