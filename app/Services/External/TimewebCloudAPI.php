@@ -96,14 +96,32 @@ class TimewebCloudAPI
             
             $response = $client->request($method, $endpoint, $options);
 
+            $statusCode = $response->getStatusCode();
             $result = $response->getBody()->getContents();
+            $trimmed = trim($result);
+
+            // POST reboot/start/shutdown и др. часто отдают 204 или пустое тело без JSON
+            if ($statusCode >= 200 && $statusCode < 300 && ($trimmed === '' || $trimmed === 'null')) {
+                return [];
+            }
+
             $data = json_decode($result, true);
 
             if (!is_array($data)) {
+                if ($statusCode >= 200 && $statusCode < 300) {
+                    Log::info('Timeweb Cloud API: успех без JSON-массива в теле', [
+                        'status' => $statusCode,
+                        'body_preview' => substr($trimmed, 0, 300),
+                        'endpoint' => $endpoint,
+                        'source' => 'api',
+                    ]);
+                    return [];
+                }
                 Log::error('Invalid JSON response from Timeweb Cloud', [
                     'response' => $result,
                     'endpoint' => $endpoint,
-                    'source' => 'api'
+                    'status' => $statusCode,
+                    'source' => 'api',
                 ]);
                 throw new RuntimeException('Invalid JSON response from Timeweb Cloud');
             }
