@@ -244,48 +244,42 @@
                                             </div>
                                         </div>
                                     @endif
-                                    <div class="grid grid-cols-2 gap-4">
-                                        <!-- Left Side: Navigation Actions -->
-                                        <div class="flex flex-col gap-2">
-                                            @if($server->panel)
-                                                <a href="{{ route('admin.module.panel.index', ['panel_id' => $server->panel->id]) }}" 
-                                                   class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors w-full">
-                                                    <i class="fas fa-desktop mr-2"></i>
-                                                    <span>Панель</span>
-                                                </a>
-                                            @endif
-                                            <a href="{{ route('admin.module.server-users.index', ['server_id' => $server->id]) }}" 
-                                               class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors w-full">
-                                                <i class="fas fa-users mr-2"></i>
-                                                <span>Пользователи</span>
+                                    {{-- Одна строка кнопок: по 2 в ряд (flex + basis), «Удалить» на всю ширину --}}
+                                    <div class="flex flex-wrap gap-2">
+                                        @if($server->panel)
+                                            <a href="{{ route('admin.module.panel.index', ['panel_id' => $server->panel->id]) }}"
+                                               class="inline-flex flex-1 min-w-[min(100%,10rem)] basis-[calc(50%-0.25rem)] max-w-full items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors">
+                                                <i class="fas fa-desktop mr-2"></i>
+                                                <span>Панель</span>
                                             </a>
-                                        </div>
-                                        
-                                        <!-- Right Side: Service Actions -->
-                                        <div class="flex flex-col gap-2">
-                                            @if(!$server->logs_upload_enabled)
-                                                <button onclick="enableLogUpload({{ $server->id }})"
-                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors w-full">
-                                                    <i class="fas fa-upload mr-2"></i>
-                                                    <span>Включить логи</span>
-                                                </button>
-                                            @endif
-                                            <button onclick="checkLogUploadStatus({{ $server->id }})"
-                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 transition-colors w-full">
-                                                <i class="fas fa-check-circle mr-2"></i>
-                                                <span>Проверить логи</span>
+                                        @endif
+                                        <a href="{{ route('admin.module.server-users.index', ['server_id' => $server->id]) }}"
+                                           class="inline-flex flex-1 min-w-[min(100%,10rem)] basis-[calc(50%-0.25rem)] max-w-full items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors">
+                                            <i class="fas fa-users mr-2"></i>
+                                            <span>Пользователи</span>
+                                        </a>
+                                        @if(!$server->logs_upload_enabled)
+                                            <button type="button" onclick="enableLogUpload({{ $server->id }})"
+                                                    class="inline-flex flex-1 min-w-[min(100%,10rem)] basis-[calc(50%-0.25rem)] max-w-full items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors">
+                                                <i class="fas fa-upload mr-2"></i>
+                                                <span>Включить логи</span>
                                             </button>
-                                            <button type="button" onclick="rebootServer({{ $server->id }})"
-                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 transition-colors w-full">
-                                                <i class="fas fa-power-off mr-2"></i>
-                                                <span>Перезагрузить сервер</span>
-                                            </button>
-                                            <button onclick="deleteServer({{ $server->id }})"
-                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors w-full">
-                                                <i class="fas fa-trash mr-2"></i>
-                                                <span>Удалить</span>
-                                            </button>
-                                        </div>
+                                        @endif
+                                        <button type="button" onclick="checkLogUploadStatus({{ $server->id }})"
+                                                class="inline-flex flex-1 min-w-[min(100%,10rem)] basis-[calc(50%-0.25rem)] max-w-full items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 transition-colors">
+                                            <i class="fas fa-check-circle mr-2"></i>
+                                            <span>Проверить логи</span>
+                                        </button>
+                                        <button type="button" onclick="rebootServer({{ $server->id }})"
+                                                class="inline-flex flex-1 min-w-[min(100%,10rem)] basis-[calc(50%-0.25rem)] max-w-full items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 transition-colors">
+                                            <i class="fas fa-power-off mr-2"></i>
+                                            <span>Перезагрузить сервер</span>
+                                        </button>
+                                        <button type="button" onclick="deleteServer({{ $server->id }})"
+                                                class="inline-flex w-full items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors">
+                                            <i class="fas fa-trash mr-2"></i>
+                                            <span>Удалить</span>
+                                        </button>
                                     </div>
                                 </div>
                             @endif
