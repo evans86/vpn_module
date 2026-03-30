@@ -2,12 +2,14 @@
 
 namespace App\Services\Server\strategy;
 
+use App\Dto\Server\ServerFactory;
 use App\Models\Server\Server;
 use App\Services\Cloudflare\CloudflareService;
+use App\Services\Panel\marzban\MarzbanService;
 use App\Services\Panel\PanelStrategy;
-use App\Services\Server\ServerInterface;
 use DomainException;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 
 /**
  * Стратегия для серверов, добавленных вручную (провайдер без API).
@@ -78,6 +80,46 @@ class ServerManualStrategy extends ServerMainStrategy
         }
         $panelStrategy = new PanelStrategy($panel);
         $panelStrategy->create($server->id);
+    }
+
+    /**
+     * Перезагрузка по SSH (shutdown через минуту, чтобы ответ успел вернуться).
+     */
+    public function reboot(Server $server): void
+    {
+        if (empty($server->login) || $server->password === null || $server->password === '') {
+            throw new RuntimeException('Укажите логин и пароль SSH для сервера в карточке (редактирование сервера)');
+        }
+        $host = $server->host ?: $server->ip;
+        if (empty($host)) {
+            throw new RuntimeException('Не задан хост или IP сервера');
+        }
+
+        try {
+            $dto = ServerFactory::fromEntity($server);
+            $ssh = app(MarzbanService::class)->connectSshAdapter($dto);
+            $out = $ssh->exec('/sbin/shutdown -r +1 "admin-panel" 2>&1');
+            $exit = $ssh->getExitStatus();
+            if ($exit !== 0 && $exit !== null) {
+                throw new RuntimeException(
+                    'Не удалось запланировать перезагрузку: ' . trim((string) $out)
+                );
+            }
+            Log::info('Manual server reboot scheduled via SSH (+1 min)', [
+                'server_id' => $server->id,
+                'source' => 'server',
+            ]);
+        } catch (\Throwable $e) {
+            if ($e instanceof RuntimeException) {
+                throw $e;
+            }
+            Log::error('Manual server reboot failed', [
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+                'source' => 'server',
+            ]);
+            throw new RuntimeException('Ошибка перезагрузки по SSH: ' . $e->getMessage());
+        }
     }
 
     /**

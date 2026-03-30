@@ -275,6 +275,11 @@
                                                 <i class="fas fa-check-circle mr-2"></i>
                                                 <span>Проверить логи</span>
                                             </button>
+                                            <button type="button" onclick="rebootServer({{ $server->id }})"
+                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 transition-colors w-full">
+                                                <i class="fas fa-power-off mr-2"></i>
+                                                <span>Перезагрузить сервер</span>
+                                            </button>
                                             <button onclick="deleteServer({{ $server->id }})"
                                                     class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors w-full">
                                                 <i class="fas fa-trash mr-2"></i>
@@ -468,6 +473,28 @@
                     },
                     error: function (xhr) {
                         var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Сервер недоступен или ошибка запроса';
+                        toastr.error(msg);
+                    }
+                });
+            }
+
+            function rebootServer(id) {
+                if (!confirm('Перезагрузить сервер? Сервисы на нём (в т.ч. VPN) будут недоступны 1–3 минуты.')) {
+                    return;
+                }
+                $.ajax({
+                    url: '{{ route('admin.module.server.reboot', ['server' => ':id']) }}'.replace(':id', id),
+                    method: 'POST',
+                    data: { _token: '{{ csrf_token() }}' },
+                    success: function (response) {
+                        if (response.success) {
+                            toastr.success(response.message || 'Перезагрузка запланирована');
+                        } else {
+                            toastr.error(response.message || 'Ошибка');
+                        }
+                    },
+                    error: function (xhr) {
+                        var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Ошибка перезагрузки';
                         toastr.error(msg);
                     }
                 });

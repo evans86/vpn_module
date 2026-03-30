@@ -102,4 +102,14 @@ class ServerStrategy
     {
         $this->strategy->delete($server);
     }
+
+    /**
+     * Перезагрузка сервера у провайдера или по SSH (ручной сервер).
+     *
+     * @throws Exception
+     */
+    public function reboot(Server $server): void
+    {
+        $this->strategy->reboot($server);
+    }
 }

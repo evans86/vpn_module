@@ -46,4 +46,13 @@ interface ServerInterface
      * @throws \Exception
      */
     public function delete(Server $server): void;
+
+    /**
+     * Перезагрузка сервера (API провайдера или SSH для ручных серверов).
+     *
+     * @param Server $server
+     * @return void
+     * @throws \RuntimeException
+     */
+    public function reboot(Server $server): void;
 }

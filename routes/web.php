@@ -201,6 +201,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/store-manual', [ServerController::class, 'storeManual'])->name('store-manual');
                 Route::post('/{server}/setup-dns', [ServerController::class, 'setupDns'])->name('setup-dns');
                 Route::post('/{server}/ping-and-configure', [ServerController::class, 'pingAndConfigure'])->name('ping-and-configure');
+                Route::post('/{server}/reboot', [ServerController::class, 'reboot'])->name('reboot');
                 Route::put('/{server}', [ServerController::class, 'update'])->name('update');
                 Route::delete('/{server}', [ServerController::class, 'destroy'])->name('destroy');
                 Route::post('/{server}/toggle-status', [ServerController::class, 'toggleStatus'])->name('toggle-status');

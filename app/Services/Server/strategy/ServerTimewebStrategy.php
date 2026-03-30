@@ -142,6 +142,14 @@ class ServerTimewebStrategy extends ServerMainStrategy
     }
 
     /**
+     * Перезагрузка сервера через API Timeweb Cloud
+     */
+    public function reboot(Server $server): void
+    {
+        $this->service->reboot($server);
+    }
+
+    /**
      * Удаление сервера у провайдера Timeweb Cloud
      *
      * @param Server $server Сервер для удаления

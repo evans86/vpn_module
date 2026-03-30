@@ -601,6 +601,32 @@ class TimewebService
     }
 
     /**
+     * Перезагрузка сервера через API Timeweb Cloud
+     */
+    public function reboot(Server $server): void
+    {
+        if (!$server->provider_id) {
+            throw new RuntimeException('Нет ID сервера у провайдера (provider_id)');
+        }
+        try {
+            $this->timewebApi->rebootServer((int) $server->provider_id);
+            Log::info('Timeweb Cloud server reboot requested', [
+                'server_id' => $server->id,
+                'provider_id' => $server->provider_id,
+                'source' => 'server',
+            ]);
+        } catch (Exception $e) {
+            Log::error('Timeweb Cloud server reboot failed', [
+                'server_id' => $server->id,
+                'provider_id' => $server->provider_id,
+                'error' => $e->getMessage(),
+                'source' => 'server',
+            ]);
+            throw new RuntimeException('Ошибка перезагрузки Timeweb: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Удаление сервера
      */
     public function delete(Server $server): void

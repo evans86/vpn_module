@@ -142,6 +142,14 @@ class ServerVdsinaStrategy extends ServerMainStrategy
     }
 
     /**
+     * Перезагрузка сервера через API VDSina
+     */
+    public function reboot(Server $server): void
+    {
+        $this->service->reboot($server);
+    }
+
+    /**
      * Удаление сервера у провайдера VDSina
      *
      * @param Server $server Сервер для удаления

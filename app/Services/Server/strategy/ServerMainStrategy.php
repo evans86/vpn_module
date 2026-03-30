@@ -48,4 +48,12 @@ abstract class ServerMainStrategy implements ServerInterface
     {
         throw new RuntimeException('Method not implemented');
     }
+
+    /**
+     * Перезагрузка по умолчанию не поддерживается — переопределить в стратегии провайдера.
+     */
+    public function reboot(Server $server): void
+    {
+        throw new RuntimeException('Перезагрузка для этого провайдера не поддерживается');
+    }
 }

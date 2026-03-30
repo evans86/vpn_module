@@ -359,6 +359,60 @@ class ServerController extends Controller
     }
 
     /**
+     * Перезагрузка сервера (API VDSina/Timeweb или SSH для ручных серверов).
+     */
+    public function reboot(Server $server): JsonResponse
+    {
+        if ((int) $server->server_status === (int) Server::SERVER_DELETED) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Сервер удалён',
+            ], 400);
+        }
+
+        $provider = strtolower((string) $server->provider);
+        if (in_array($provider, [Server::VDSINA, Server::TIMEWEB], true) && empty($server->provider_id)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Нет provider_id — перезагрузка через API недоступна',
+            ], 400);
+        }
+
+        try {
+            $strategy = new ServerStrategy($server->provider);
+            $strategy->reboot($server);
+
+            $this->logger->info('Server reboot requested', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'server_id' => $server->id,
+                'provider' => $server->provider,
+            ]);
+
+            $msg = $provider === Server::MANUAL
+                ? 'Перезагрузка запланирована примерно через 1 минуту (SSH)'
+                : 'Запрос на перезагрузку отправлен провайдеру';
+
+            return response()->json([
+                'success' => true,
+                'message' => $msg,
+            ]);
+        } catch (Exception $e) {
+            $this->logger->error('Server reboot failed', [
+                'source' => 'server',
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+                'user_id' => auth()->id(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 400);
+        }
+    }
+
+    /**
      * Настроить DNS (Cloudflare) для ручного сервера. Только для provider=manual и статуса «Создан».
      *
      * @param Server $server
