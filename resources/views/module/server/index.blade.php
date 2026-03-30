@@ -54,6 +54,28 @@
                         Server::SERVER_DELETED => 'Удален'
                     ]"
                     value="{{ request('status') }}" />
+
+                <x-admin.filter-select
+                    name="provider"
+                    label="Провайдер"
+                    placeholder="Все провайдеры"
+                    :options="[
+                        Server::VDSINA => 'VDSina',
+                        Server::TIMEWEB => 'Timeweb Cloud',
+                        Server::MANUAL => 'Без API',
+                    ]"
+                    value="{{ request('provider') }}" />
+
+                <x-admin.filter-select
+                    name="sort"
+                    label="Сортировка"
+                    placeholder="По умолчанию"
+                    :options="[
+                        'id_desc' => 'Сначала новые (по ID)',
+                        'provider_asc' => 'По провайдеру (А → Я)',
+                        'provider_desc' => 'По провайдеру (Я → А)',
+                    ]"
+                    value="{{ request('sort', 'id_desc') }}" />
             </x-admin.filter-form>
 
             <!-- Table -->

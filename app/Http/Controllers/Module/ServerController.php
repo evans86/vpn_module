@@ -86,13 +86,27 @@ class ServerController extends Controller
                 if ($request->filled('status')) {
                     $query->where('server_status', $request->input('status'));
                 }
+
+                if ($request->filled('provider')) {
+                    $p = strtolower((string) $request->input('provider'));
+                    if (in_array($p, [Server::VDSINA, Server::TIMEWEB, Server::MANUAL], true)) {
+                        $query->where('provider', $p);
+                    }
+                }
             }
 
-            $servers = $query->orderBy('id', 'desc')
-                ->paginate(10);
-            
-            // Добавляем параметр show_deleted в пагинацию
-            $servers->appends($request->only(['show_deleted', 'name', 'ip', 'host', 'status']));
+            $sort = (string) $request->input('sort', 'id_desc');
+            if ($sort === 'provider_asc') {
+                $query->orderBy('provider', 'asc')->orderBy('id', 'desc');
+            } elseif ($sort === 'provider_desc') {
+                $query->orderBy('provider', 'desc')->orderBy('id', 'desc');
+            } else {
+                $query->orderBy('id', 'desc');
+            }
+
+            $servers = $query->paginate(10);
+
+            $servers->appends($request->only(['show_deleted', 'name', 'ip', 'host', 'status', 'provider', 'sort']));
 
             // Получаем список локаций для формы создания сервера
             $locations = \App\Models\Location\Location::all();
