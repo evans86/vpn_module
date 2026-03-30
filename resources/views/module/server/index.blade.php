@@ -483,7 +483,7 @@
                     return;
                 }
                 $.ajax({
-                    url: '{{ route('admin.module.server.reboot', ['server' => ':id']) }}'.replace(':id', id),
+                    url: '{{ url('/admin/module/server') }}/' + id + '/reboot',
                     method: 'POST',
                     data: { _token: '{{ csrf_token() }}' },
                     success: function (response) {
