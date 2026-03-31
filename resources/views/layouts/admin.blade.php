@@ -117,116 +117,171 @@
             </button>
         </div>
 
-        <!-- Navigation -->
+        <!-- Navigation (группы со сворачиваемыми подразделами) -->
         <nav class="flex-1 overflow-y-auto py-4 px-2">
             <ul class="space-y-1">
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.module.server.index',
-                    'icon' => 'fa-server',
-                    'label' => 'Серверы',
-                    'routes' => ['admin.module.server.*']
+                @include('layouts.admin.nav-group', [
+                    'icon' => 'fa-network-wired',
+                    'label' => 'Серверы и панели',
+                    'activeRoutes' => [
+                        'admin.module.server.*',
+                        'admin.module.panel.*',
+                        'admin.module.panel-settings.*',
+                        'admin.module.panel-statistics.*',
+                        'admin.module.server-users.*',
+                        'admin.module.server-monitoring.*',
+                        'admin.module.connection-limit-violations.*',
+                    ],
+                    'items' => [
+                        [
+                            'route' => 'admin.module.server.index',
+                            'icon' => 'fa-server',
+                            'label' => 'Серверы',
+                            'routes' => ['admin.module.server.*'],
+                        ],
+                        [
+                            'route' => 'admin.module.panel.index',
+                            'icon' => 'fa-desktop',
+                            'label' => 'Панели',
+                            'routes' => ['admin.module.panel.*'],
+                        ],
+                        [
+                            'route' => 'admin.module.panel-settings.index',
+                            'icon' => 'fa-cog',
+                            'label' => 'Настройки распределения',
+                            'routes' => ['admin.module.panel-settings.*'],
+                        ],
+                        [
+                            'route' => 'admin.module.panel-statistics.index',
+                            'icon' => 'fa-chart-bar',
+                            'label' => 'Статистика панелей',
+                            'routes' => ['admin.module.panel-statistics.*'],
+                        ],
+                        [
+                            'route' => 'admin.module.server-users.index',
+                            'icon' => 'fa-users',
+                            'label' => 'Пользователи сервера',
+                            'routes' => ['admin.module.server-users.*'],
+                        ],
+                        [
+                            'route' => 'admin.module.server-monitoring.index',
+                            'icon' => 'fa-chart-line',
+                            'label' => 'Статистика',
+                            'routes' => ['admin.module.server-monitoring.*'],
+                        ],
+                        [
+                            'route' => 'admin.module.connection-limit-violations.index',
+                            'icon' => 'fa-shield-alt',
+                            'label' => 'Лимиты подключений',
+                            'routes' => ['admin.module.connection-limit-violations.*'],
+                        ],
+                    ],
                 ])
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.module.panel.index',
-                    'icon' => 'fa-desktop',
-                    'label' => 'Панели',
-                    'routes' => ['admin.module.panel.*']
+
+                @include('layouts.admin.nav-group', [
+                    'icon' => 'fa-store',
+                    'label' => 'Продажи и ключи',
+                    'activeRoutes' => [
+                        'admin.module.salesman.*',
+                        'admin.module.pack.*',
+                        'admin.module.pack-salesman.*',
+                        'admin.module.key-activate.*',
+                        'admin.module.server-user-transfer.*',
+                        'admin.module.order.*',
+                        'admin.module.payment-method.*',
+                        'admin.module.order-settings.*',
+                    ],
+                    'items' => [
+                        [
+                            'route' => 'admin.module.salesman.index',
+                            'icon' => 'fa-user-tie',
+                            'label' => 'Продавцы',
+                            'routes' => ['admin.module.salesman.*'],
+                        ],
+                        [
+                            'route' => 'admin.module.pack.index',
+                            'icon' => 'fa-box',
+                            'label' => 'Пакеты',
+                            'routes' => ['admin.module.pack.*'],
+                        ],
+                        [
+                            'route' => 'admin.module.pack-salesman.index',
+                            'icon' => 'fa-file-invoice',
+                            'label' => 'Пакеты продавцов',
+                            'routes' => ['admin.module.pack-salesman.*'],
+                        ],
+                        [
+                            'route' => 'admin.module.key-activate.index',
+                            'icon' => 'fa-key',
+                            'label' => 'Активация ключей',
+                            'routes' => ['admin.module.key-activate.*'],
+                        ],
+                        [
+                            'route' => 'admin.module.server-user-transfer.mass-transfer',
+                            'icon' => 'fa-exchange-alt',
+                            'label' => 'Массовый перенос ключей',
+                            'routes' => ['admin.module.server-user-transfer.*'],
+                        ],
+                        [
+                            'route' => 'admin.module.order.index',
+                            'icon' => 'fa-shopping-cart',
+                            'label' => 'Система заказов',
+                            'routes' => ['admin.module.order.*', 'admin.module.payment-method.*', 'admin.module.order-settings.*'],
+                        ],
+                    ],
                 ])
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.module.panel-settings.index',
-                    'icon' => 'fa-cog',
-                    'label' => 'Настройки распределения',
-                    'routes' => ['admin.module.panel-settings.*']
+
+                @include('layouts.admin.nav-group', [
+                    'icon' => 'fa-comments',
+                    'label' => 'Бот и аудитория',
+                    'activeRoutes' => [
+                        'admin.module.bot.*',
+                        'admin.module.telegram-users.*',
+                        'admin.module.broadcast.*',
+                    ],
+                    'items' => [
+                        [
+                            'route' => 'admin.module.bot.index',
+                            'icon' => 'fa-robot',
+                            'label' => 'Настройки бота',
+                            'routes' => ['admin.module.bot.*'],
+                        ],
+                        [
+                            'route' => 'admin.module.telegram-users.index',
+                            'icon' => 'fa-user-friends',
+                            'label' => 'Пользователи',
+                            'routes' => ['admin.module.telegram-users.*'],
+                        ],
+                        [
+                            'route' => 'admin.module.broadcast.index',
+                            'icon' => 'fa-paper-plane',
+                            'label' => 'Рассылки',
+                            'routes' => ['admin.module.broadcast.*'],
+                        ],
+                    ],
                 ])
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.module.panel-statistics.index',
-                    'icon' => 'fa-chart-bar',
-                    'label' => 'Статистика панелей',
-                    'routes' => ['admin.module.panel-statistics.*']
-                ])
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.module.server-users.index',
-                    'icon' => 'fa-users',
-                    'label' => 'Пользователи сервера',
-                    'routes' => ['admin.module.server-users.*']
-                ])
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.module.salesman.index',
-                    'icon' => 'fa-user-tie',
-                    'label' => 'Продавцы',
-                    'routes' => ['admin.module.salesman.*']
-                ])
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.module.pack.index',
-                    'icon' => 'fa-box',
-                    'label' => 'Пакеты',
-                    'routes' => ['admin.module.pack.*']
-                ])
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.module.pack-salesman.index',
-                    'icon' => 'fa-file-invoice',
-                    'label' => 'Пакеты продавцов',
-                    'routes' => ['admin.module.pack-salesman.*']
-                ])
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.module.key-activate.index',
-                    'icon' => 'fa-key',
-                    'label' => 'Активация ключей',
-                    'routes' => ['admin.module.key-activate.*']
-                ])
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.module.server-user-transfer.mass-transfer',
-                    'icon' => 'fa-exchange-alt',
-                    'label' => 'Массовый перенос ключей',
-                    'routes' => ['admin.module.server-user-transfer.*']
-                ])
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.module.bot.index',
-                    'icon' => 'fa-robot',
-                    'label' => 'Настройки бота',
-                    'routes' => ['admin.module.bot.*']
-                ])
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.module.telegram-users.index',
-                    'icon' => 'fa-user-friends',
-                    'label' => 'Пользователи',
-                    'routes' => ['admin.module.telegram-users.*']
-                ])
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.module.broadcast.index',
-                    'icon' => 'fa-paper-plane',
-                    'label' => 'Рассылки',
-                    'routes' => ['admin.module.broadcast.*']
-                ])
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.module.queue.index',
-                    'icon' => 'fa-tasks',
-                    'label' => 'Очередь заданий',
-                    'routes' => ['admin.module.queue.*']
-                ])
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.module.server-monitoring.index',
-                    'icon' => 'fa-chart-line',
-                    'label' => 'Статистика',
-                    'routes' => ['admin.module.server-monitoring.*']
-                ])
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.module.order.index',
-                    'icon' => 'fa-shopping-cart',
-                    'label' => 'Система заказов',
-                    'routes' => ['admin.module.order.*', 'admin.module.payment-method.*', 'admin.module.order-settings.*']
-                ])
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.module.connection-limit-violations.index',
-                    'icon' => 'fa-shield-alt',
-                    'label' => 'Лимиты подключений',
-                    'routes' => ['admin.module.connection-limit-violations.*']
-                ])
-                @include('layouts.admin.nav-item', [
-                    'route' => 'admin.logs.index',
-                    'icon' => 'fa-file-alt',
-                    'label' => 'Логи',
-                    'routes' => ['admin.logs.*']
+
+                @include('layouts.admin.nav-group', [
+                    'icon' => 'fa-screwdriver-wrench',
+                    'label' => 'Служебное',
+                    'activeRoutes' => [
+                        'admin.module.queue.*',
+                        'admin.logs.*',
+                    ],
+                    'items' => [
+                        [
+                            'route' => 'admin.module.queue.index',
+                            'icon' => 'fa-tasks',
+                            'label' => 'Очередь заданий',
+                            'routes' => ['admin.module.queue.*'],
+                        ],
+                        [
+                            'route' => 'admin.logs.index',
+                            'icon' => 'fa-file-alt',
+                            'label' => 'Логи',
+                            'routes' => ['admin.logs.*'],
+                        ],
+                    ],
                 ])
             </ul>
         </nav>
