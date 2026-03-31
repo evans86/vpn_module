@@ -50,6 +50,14 @@
     
     <style>
         [x-cloak] { display: none !important; }
+        /* Ширина + выезд на мобильных — одна кривая, без конфликта с transition-transform */
+        .admin-sidebar {
+            transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                        transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .admin-sidebar-label {
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
     </style>
 
     @stack('css')
@@ -100,7 +108,7 @@
                x-transition:leave="transition ease-in duration-300"
                x-transition:leave-start="translate-x-0"
                x-transition:leave-end="-translate-x-full"
-               class="fixed lg:static inset-y-0 left-0 z-50 bg-white border-r border-gray-200 transition-transform duration-300 flex flex-col">
+               class="admin-sidebar fixed lg:static inset-y-0 left-0 z-50 bg-white border-r border-gray-200 flex flex-col">
         <!-- Logo -->
         <div class="flex items-center justify-between h-16 px-4 border-b border-gray-200">
             <div class="flex items-center space-x-3" :class="sidebarCollapsed ? 'justify-center w-full' : ''">
@@ -109,17 +117,26 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
                     </svg>
                 </div>
-                <span x-show="!sidebarCollapsed" class="text-xl font-bold text-gray-900">VPN Admin</span>
+                <span x-show="!sidebarCollapsed"
+                      x-transition:enter="transition ease-out duration-200"
+                      x-transition:enter-start="opacity-0 -translate-x-1"
+                      x-transition:enter-end="opacity-100 translate-x-0"
+                      x-transition:leave="transition ease-in duration-150"
+                      x-transition:leave-start="opacity-100"
+                      x-transition:leave-end="opacity-0"
+                      class="admin-sidebar-label text-xl font-bold text-gray-900 whitespace-nowrap">VPN Admin</span>
             </div>
             <button @click="sidebarCollapsed = !sidebarCollapsed" 
-                    class="hidden lg:block p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100">
-                <i class="fas fa-chevron-left" :class="sidebarCollapsed ? 'fa-chevron-right' : ''"></i>
+                    type="button"
+                    class="hidden lg:block p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors duration-200">
+                <i class="fas fa-chevron-left text-sm transition-transform duration-300 ease-out"
+                   :class="sidebarCollapsed ? 'rotate-180' : ''"></i>
             </button>
         </div>
 
         <!-- Navigation (группы со сворачиваемыми подразделами) -->
         <nav class="flex-1 overflow-y-auto py-4 px-2">
-            <ul class="space-y-1">
+            <ul class="space-y-2">
                 @include('layouts.admin.nav-group', [
                     'icon' => 'fa-network-wired',
                     'label' => 'Серверы и панели',
