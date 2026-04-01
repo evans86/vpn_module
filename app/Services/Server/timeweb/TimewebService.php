@@ -248,8 +248,8 @@ class TimewebService
         try {
             Log::info('Starting server configuration', ['server_id' => $server_id, 'source' => 'server']);
 
-            $server = Server::find($server_id);
-            if (!$server instanceof Server) {
+            $server = Server::query()->where('id', $server_id)->first();
+            if (! $server instanceof Server) {
                 throw new RuntimeException('Server not found');
             }
 
@@ -412,8 +412,8 @@ class TimewebService
     public function getServerPassword(int $server_id): ?string
     {
         try {
-            $server = Server::find($server_id);
-            if (!$server instanceof Server || !$server->provider_id) {
+            $server = Server::query()->where('id', $server_id)->first();
+            if (! $server instanceof Server || !$server->provider_id) {
                 Log::error('Server not found or no provider_id', ['server_id' => $server_id, 'source' => 'server']);
                 return null;
             }
