@@ -25,6 +25,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $server_status
  * @property bool|null $is_free
  * @property string|null $tariff_tier Тариф сервера для фильтра при активации (free|full|whitelist)
+ * @property string|null $timeweb_api_profile null = TIMEWEB_API_KEY; legacy = TIMEWEB_API_KEY_LEGACY
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Panel|null $panel
@@ -47,6 +48,7 @@ class Server extends Model
         'server_status',
         'is_free',
         'tariff_tier',
+        'timeweb_api_profile',
         'logs_upload_enabled'
     ];
 
@@ -121,8 +123,26 @@ class Server extends Model
     // Провайдеры серверов
     public const VDSINA = 'vdsina';
     public const TIMEWEB = 'timeweb';
+    /** Запросы к Timeweb API со старым токеном (другой аккаунт облака) */
+    public const TIMEWEB_API_PROFILE_LEGACY = 'legacy';
     /** Провайдер без API — сервер добавлен вручную (IP, логин, пароль задаются в форме) */
     public const MANUAL = 'manual';
+
+    /**
+     * Bearer-токен Timeweb Cloud для этого сервера (основной или legacy-аккаунт).
+     */
+    public function getTimewebBearerToken(): string
+    {
+        if ($this->provider === self::TIMEWEB
+            && ($this->timeweb_api_profile ?? null) === self::TIMEWEB_API_PROFILE_LEGACY) {
+            $legacy = (string) config('services.api_keys.timeweb_key_legacy', '');
+            if ($legacy !== '') {
+                return $legacy;
+            }
+        }
+
+        return (string) config('services.api_keys.timeweb_key', '');
+    }
 
     // Действия с сервером
     public const PASSWORD_UPDATE = 'password_update';

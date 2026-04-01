@@ -18,11 +18,20 @@ use RuntimeException;
  */
 class TimewebService
 {
+    /** API текущего аккаунта (создание новых серверов) */
     private TimewebCloudAPI $timewebApi;
 
     public function __construct()
     {
         $this->timewebApi = new TimewebCloudAPI(config('services.api_keys.timeweb_key'));
+    }
+
+    /**
+     * Клиент Timeweb для уже существующего сервера (основной или legacy-токен).
+     */
+    private function apiForServer(Server $server): TimewebCloudAPI
+    {
+        return new TimewebCloudAPI($server->getTimewebBearerToken());
     }
 
     /**
@@ -239,8 +248,8 @@ class TimewebService
         try {
             Log::info('Starting server configuration', ['server_id' => $server_id, 'source' => 'server']);
 
-            $server = Server::query()->where('id', $server_id)->first();
-            if (!$server) {
+            $server = Server::find($server_id);
+            if (!$server instanceof Server) {
                 throw new RuntimeException('Server not found');
             }
 
@@ -249,7 +258,7 @@ class TimewebService
             }
 
             // Получаем информацию о сервере от провайдера
-            $timeweb_server = $this->timewebApi->getServerById((int)$server->provider_id);
+            $timeweb_server = $this->apiForServer($server)->getServerById((int)$server->provider_id);
 
             // Проверяем различные форматы ответа
             $serverData = null;
@@ -298,9 +307,9 @@ class TimewebService
                     'source' => 'server'
                 ]);
                 try {
-                    $this->timewebApi->addServerIp((int)$server->provider_id, 'ipv4');
+                    $this->apiForServer($server)->addServerIp((int)$server->provider_id, 'ipv4');
                     sleep(5);
-                    $timeweb_server = $this->timewebApi->getServerById((int)$server->provider_id);
+                    $timeweb_server = $this->apiForServer($server)->getServerById((int)$server->provider_id);
                     $serverData = $timeweb_server['server'] ?? $timeweb_server['data'] ?? $timeweb_server['cloud_server'] ?? null;
                     if ($serverData && isset($serverData['networks']) && is_array($serverData['networks'])) {
                         foreach ($serverData['networks'] as $net) {
@@ -403,8 +412,8 @@ class TimewebService
     public function getServerPassword(int $server_id): ?string
     {
         try {
-            $server = Server::query()->where('id', $server_id)->first();
-            if (!$server || !$server->provider_id) {
+            $server = Server::find($server_id);
+            if (!$server instanceof Server || !$server->provider_id) {
                 Log::error('Server not found or no provider_id', ['server_id' => $server_id, 'source' => 'server']);
                 return null;
             }
@@ -416,7 +425,7 @@ class TimewebService
             ]);
 
             // Используем специальный эндпоинт для получения пароля
-            $passwordResponse = $this->timewebApi->getServerPassword((int)$server->provider_id);
+            $passwordResponse = $this->apiForServer($server)->getServerPassword((int)$server->provider_id);
 
             // Пароль может быть в разных местах ответа (API возвращает из getServerById)
             if (isset($passwordResponse['root_pass']) && $passwordResponse['root_pass'] !== '') {
@@ -488,7 +497,7 @@ class TimewebService
                 'source' => 'server'
             ]);
 
-            $status = $this->serverStatus((int)$server->provider_id);
+            $status = $this->serverStatus($server);
 
             if ($status) {
                 Log::info('Server is ready for configuration', [
@@ -535,27 +544,28 @@ class TimewebService
     /**
      * Проверка статуса создания сервера у провайдера
      */
-    public function serverStatus(int $provider_id): bool
+    public function serverStatus(Server $server): bool
     {
+        $provider_id = (int) $server->provider_id;
         try {
-            $server = $this->timewebApi->getServerById($provider_id);
+            $response = $this->apiForServer($server)->getServerById($provider_id);
 
             // Проверяем различные форматы ответа
             $serverInfo = null;
-            if (isset($server['server'])) {
-                $serverInfo = $server['server'];
-            } elseif (isset($server['data'])) {
-                $serverInfo = $server['data'];
-            } elseif (isset($server['cloud_server'])) {
-                $serverInfo = $server['cloud_server'];
+            if (isset($response['server'])) {
+                $serverInfo = $response['server'];
+            } elseif (isset($response['data'])) {
+                $serverInfo = $response['data'];
+            } elseif (isset($response['cloud_server'])) {
+                $serverInfo = $response['cloud_server'];
             } else {
-                $serverInfo = $server; // Если данные уже на верхнем уровне
+                $serverInfo = $response; // Если данные уже на верхнем уровне
             }
 
             if (!isset($serverInfo['status'])) {
                 Log::error('Invalid server response from Timeweb Cloud', [
                     'provider_id' => $provider_id,
-                    'response' => $server,
+                    'response' => $response,
                     'source' => 'server'
                 ]);
                 throw new RuntimeException('Invalid server response: status not found');
@@ -565,7 +575,7 @@ class TimewebService
             Log::info('Server status received from Timeweb Cloud', [
                 'provider_id' => $provider_id,
                 'status' => $external_status,
-                'source' => 'server'
+                'source' => 'server',
             ]);
 
             // Статусы Timeweb Cloud: 'on' = запущен, 'creating'/'installing' = ещё создаётся
@@ -609,7 +619,7 @@ class TimewebService
             throw new RuntimeException('Нет ID сервера у провайдера (provider_id)');
         }
         try {
-            $this->timewebApi->rebootServer((int) $server->provider_id);
+            $this->apiForServer($server)->rebootServer((int) $server->provider_id);
             Log::info('Timeweb Cloud server reboot requested', [
                 'server_id' => $server->id,
                 'provider_id' => $server->provider_id,
@@ -641,7 +651,7 @@ class TimewebService
             // Удаляем сервер у провайдера
             if ($server->provider_id) {
                 try {
-                    $this->timewebApi->deleteServer((int)$server->provider_id);
+                    $this->apiForServer($server)->deleteServer((int)$server->provider_id);
                     Log::info('Server deleted from provider', [
                         'source' => 'server',
                         'server_id' => $server->id,
@@ -712,7 +722,7 @@ class TimewebService
                 return false;
             }
 
-            $serverData = $this->timewebApi->getServerById((int)$server->provider_id);
+            $serverData = $this->apiForServer($server)->getServerById((int)$server->provider_id);
 
             if (!isset($serverData['server'])) {
                 return false;

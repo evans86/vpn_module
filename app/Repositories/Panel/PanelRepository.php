@@ -1230,8 +1230,22 @@ class PanelRepository extends BaseRepository
         if (!$provider || !$panel->server->provider_id) {
             return null;
         }
-        $cacheKey = "server_traffic_{$provider}_{$panel->server->provider_id}";
+        $cacheKey = $this->serverTrafficCacheKey($panel->server, $provider);
         return Cache::get($cacheKey);
+    }
+
+    /**
+     * Ключ кэша трафика: для Timeweb учитываем аккаунт API (основной / legacy).
+     */
+    private function serverTrafficCacheKey(Server $server, string $provider): string
+    {
+        if ($provider === Server::TIMEWEB) {
+            $profile = $server->timeweb_api_profile ?? 'default';
+
+            return "server_traffic_timeweb_{$profile}_{$server->provider_id}";
+        }
+
+        return "server_traffic_{$provider}_{$server->provider_id}";
     }
 
     /**
@@ -1254,7 +1268,7 @@ class PanelRepository extends BaseRepository
             return null;
         }
 
-        $cacheKey = "server_traffic_{$provider}_{$panel->server->provider_id}";
+        $cacheKey = $this->serverTrafficCacheKey($panel->server, $provider);
         $cacheTtl = (int) config('panel.traffic_cache_ttl', 1800);
 
         // Ветвление по провайдеру сервера (при добавлении нового провайдера — добавить ветку и API)
@@ -1268,7 +1282,7 @@ class PanelRepository extends BaseRepository
                 }
             }
             try {
-                $timewebApi = new TimewebCloudAPI(config('services.api_keys.timeweb_key'));
+                $timewebApi = new TimewebCloudAPI($panel->server->getTimewebBearerToken());
                 $trafficData = $timewebApi->getServerTraffic((int) $panel->server->provider_id);
                 if ($trafficData !== null) {
                     Cache::put($cacheKey, $trafficData, $cacheTtl);

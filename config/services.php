@@ -33,6 +33,8 @@ return [
     'api_keys' => [
         'vdsina_key' => env('VDSINA_API_KEY'),
         'timeweb_key' => env('TIMEWEB_API_KEY'),
+        /** Токен другого аккаунта Timeweb (старые сервера), если TIMEWEB_API_KEY — новый аккаунт */
+        'timeweb_key_legacy' => env('TIMEWEB_API_KEY_LEGACY'),
     ],
 
     'timeweb' => [
