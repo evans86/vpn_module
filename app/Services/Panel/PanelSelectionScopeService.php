@@ -3,6 +3,7 @@
 namespace App\Services\Panel;
 
 use App\Models\Panel\Panel;
+use App\Models\Server\Server;
 use App\Models\ServerMonitoring\ServerMonitoring;
 use App\Repositories\Panel\PanelRepository;
 use App\Support\SelectionScopeCalculator;
@@ -38,11 +39,22 @@ class PanelSelectionScopeService
         $traffic = $this->panelRepository->getServerTrafficData($panel);
         $limitTb = 0.0;
         $usedTb = 0.0;
-        if ($traffic && ! empty($traffic['limit'])) {
-            $limitBytes = (float) $traffic['limit'];
+        $nominalLimitBytes = (float) config('panel.server_traffic_limit', 32 * 1024 ** 4);
+        $limitSubstitute = false;
+
+        if ($traffic) {
+            $limitBytes = (float) ($traffic['limit'] ?? 0);
             $usedBytes = (float) ($traffic['current_month'] ?? 0);
+            if ($limitBytes <= 0) {
+                $limitBytes = $nominalLimitBytes;
+                $limitSubstitute = true;
+            }
             $limitTb = $limitBytes > 0 ? $limitBytes / (1024 ** 4) : 0.0;
             $usedTb = $usedBytes / (1024 ** 4);
+        } elseif ($panel->server && $panel->server->provider === Server::MANUAL) {
+            $limitTb = $nominalLimitBytes / (1024 ** 4);
+            $usedTb = 0.0;
+            $limitSubstitute = true;
         }
 
         $forecastTb = ($limitTb > 0 && $usedTb >= 0)
@@ -72,7 +84,10 @@ class PanelSelectionScopeService
             'formula' => 'hard_product',
             'day' => $currentDay,
             'days_in_month' => $daysInMonth,
-            'traffic_source' => $traffic ? 'provider_api' : 'none',
+            'traffic_source' => $traffic
+                ? ($limitSubstitute ? 'provider_api_nominal_limit' : 'provider_api')
+                : ($limitSubstitute ? 'nominal_manual' : 'none'),
+            'limit_substitute' => $limitSubstitute,
         ];
 
         $panel->selection_scope_score = $scope;
