@@ -14,9 +14,12 @@ use Illuminate\Support\Facades\Log;
  */
 class PanelSelectionScopeService
 {
-    public function __construct(
-        private PanelRepository $panelRepository
-    ) {
+    /** @var PanelRepository */
+    private $panelRepository;
+
+    public function __construct(PanelRepository $panelRepository)
+    {
+        $this->panelRepository = $panelRepository;
     }
 
     /**
