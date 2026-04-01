@@ -24,6 +24,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $location_id
  * @property int|null $server_status
  * @property bool|null $is_free
+ * @property string|null $tariff_tier Тариф сервера для фильтра при активации (free|full|whitelist)
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Panel|null $panel
@@ -45,6 +46,7 @@ class Server extends Model
         'location_id',
         'server_status',
         'is_free',
+        'tariff_tier',
         'logs_upload_enabled'
     ];
 

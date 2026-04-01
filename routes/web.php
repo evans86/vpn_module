@@ -242,6 +242,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::post('/clear-error', [\App\Http\Controllers\Module\PanelSettingsController::class, 'clearPanelError'])->name('clear-error');
             });
 
+            Route::prefix('panel-distribution')->name('panel-distribution.')->group(function () {
+                Route::get('/', [\App\Http\Controllers\Module\PanelDistributionController::class, 'index'])->name('index');
+            });
+
             // Salesman
             Route::prefix('salesman')->name('salesman.')->group(function () {
                 Route::get('/', [SalesmanController::class, 'index'])->name('index');

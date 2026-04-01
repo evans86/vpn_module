@@ -144,6 +144,7 @@
                         'admin.module.server.*',
                         'admin.module.panel.*',
                         'admin.module.panel-settings.*',
+                        'admin.module.panel-distribution.*',
                         'admin.module.panel-statistics.*',
                         'admin.module.server-users.*',
                         'admin.module.server-monitoring.*',
@@ -167,6 +168,12 @@
                             'icon' => 'fa-cog',
                             'label' => 'Настройки распределения',
                             'routes' => ['admin.module.panel-settings.*'],
+                        ],
+                        [
+                            'route' => 'admin.module.panel-distribution.index',
+                            'icon' => 'fa-gauge-high',
+                            'label' => 'Распределение (scope v2)',
+                            'routes' => ['admin.module.panel-distribution.*'],
                         ],
                         [
                             'route' => 'admin.module.panel-statistics.index',

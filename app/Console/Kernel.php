@@ -82,6 +82,14 @@ class Kernel extends ConsoleKernel
                 ->withoutOverlapping()
                 ->appendOutputTo(storage_path('logs/panel-rotation-settings-warm.log'));
         }
+
+        // Пересчёт selection_scope_score для панелей (трафик провайдера + CPU Marzban)
+        if (config('panel.scope_recalc_enabled', true)) {
+            $schedule->command('panel:recalculate-selection-scope')
+                ->everyFiveMinutes()
+                ->withoutOverlapping()
+                ->appendOutputTo(storage_path('logs/panel-selection-scope.log'));
+        }
     }
 
     /**

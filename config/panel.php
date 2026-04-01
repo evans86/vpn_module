@@ -19,6 +19,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Выбор панели v2 (scope в БД, см. panel:recalculate-selection-scope)
+    |--------------------------------------------------------------------------
+    |
+    | При включении игнорируется simple/intelligent: порядок по selection_scope_score.
+    | PANEL_SELECTION_V2_CACHE_TTL=0 — без кэша выбора (актуальный score при каждой активации).
+    |
+    */
+
+    'selection_v2_enabled' => filter_var(env('PANEL_SELECTION_V2', false), FILTER_VALIDATE_BOOLEAN),
+
+    'selection_v2_cache_ttl' => (int) env('PANEL_SELECTION_V2_CACHE_TTL', 0),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Тариф для фильтра серверов при активации (пока одно значение из server.tariff_tier)
+    |--------------------------------------------------------------------------
+    */
+
+    'activation_tariff_tier' => strtolower((string) env('PANEL_ACTIVATION_TARIFF_TIER', 'full')),
+
+    'scope_recalc_enabled' => filter_var(env('PANEL_SCOPE_RECALC_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+
+    /*
+    |--------------------------------------------------------------------------
     | Кэш результата выбора панели
     |--------------------------------------------------------------------------
     */

@@ -5,6 +5,7 @@ namespace App\Repositories\Panel;
 use App\Models\Panel\Panel;
 use App\Models\Panel\PanelErrorHistory;
 use App\Models\Panel\PanelMonthlyStatistics;
+use App\Constants\TariffTier;
 use App\Models\Server\Server;
 use App\Models\ServerMonitoring\ServerMonitoring;
 use App\Models\ServerUser\ServerUser;
@@ -116,6 +117,11 @@ class PanelRepository extends BaseRepository
             ->limit(1000);
         if ($provider !== null && $provider !== '') {
             $q->whereHas('server', fn ($sub) => $sub->where('provider', $provider));
+        }
+
+        $tier = strtolower(trim((string) config('panel.activation_tariff_tier', TariffTier::FULL)));
+        if ($tier !== '') {
+            $q->whereHas('server', fn ($sub) => $sub->where('tariff_tier', $tier));
         }
 
         return $q;
@@ -438,10 +444,9 @@ class PanelRepository extends BaseRepository
     public function getOptimizedMarzbanPanel(?string $panelType = null, bool $useCacheOnly = false): ?Panel
     {
         $panelType = $panelType ?? Panel::MARZBAN;
-        $ttl = (int) config('panel.selection_cache_ttl', 15);
         $cacheKey = $this->rotationPanelCacheKey($panelType, null);
 
-        return Cache::remember($cacheKey, max(1, $ttl), function () use ($panelType, $useCacheOnly) {
+        $resolve = function () use ($panelType, $useCacheOnly) {
             $panels = $this->getCandidatePanelsForRotation($panelType, null);
             if ($panels->isEmpty()) {
                 Log::warning('PANEL_SELECTION: No available panels after filtering', ['source' => 'panel']);
@@ -455,12 +460,25 @@ class PanelRepository extends BaseRepository
             }
 
             Log::warning('PANEL_SELECTION: No panel from strategy, fallback to lowest panel id', [
-                'strategy' => $this->panelSelectionStrategy(),
+                'strategy' => $this->isSelectionV2Enabled() ? 'v2_scope' : $this->panelSelectionStrategy(),
                 'source' => 'panel',
             ]);
 
             return $panels->sortBy('id')->first();
-        });
+        };
+
+        if ($this->isSelectionV2Enabled()) {
+            $v2Ttl = (int) config('panel.selection_v2_cache_ttl', 0);
+            if ($v2Ttl <= 0) {
+                return $resolve();
+            }
+
+            return Cache::remember($cacheKey, max(1, $v2Ttl), $resolve);
+        }
+
+        $ttl = (int) config('panel.selection_cache_ttl', 15);
+
+        return Cache::remember($cacheKey, max(1, $ttl), $resolve);
     }
 
     /**
@@ -483,10 +501,23 @@ class PanelRepository extends BaseRepository
     public function getOptimizedMarzbanPanelsForProviders(array $providers, ?string $panelType = null, bool $useCacheOnly = false): array
     {
         $panelType = $panelType ?? Panel::MARZBAN;
-        $ttl = max(1, (int) config('panel.selection_cache_ttl', 15));
         $providers = array_values(array_unique(array_filter(array_map('trim', $providers), function ($p) {
             return (string) $p !== '';
         })));
+
+        if ($this->isSelectionV2Enabled() && (int) config('panel.selection_v2_cache_ttl', 0) <= 0) {
+            $resolved = $this->resolveMarzbanPanelsForProvidersUncached($providers, $panelType);
+            $ordered = [];
+            foreach ($providers as $provider) {
+                $ordered[$provider] = $resolved[$provider] ?? null;
+            }
+
+            return $ordered;
+        }
+
+        $ttl = $this->isSelectionV2Enabled()
+            ? max(1, (int) config('panel.selection_v2_cache_ttl', 90))
+            : max(1, (int) config('panel.selection_cache_ttl', 15));
 
         $result = [];
         $missing = [];
@@ -538,6 +569,33 @@ class PanelRepository extends BaseRepository
             }
         }
         $allIds = array_keys($allIds);
+
+        if ($this->isSelectionV2Enabled()) {
+            foreach ($missing as $provider) {
+                $panels = $collectByProvider[$provider];
+                if ($panels->isEmpty()) {
+                    Log::info('PANEL_SELECTION: No panels for provider', ['provider' => $provider, 'source' => 'panel']);
+                    $out[$provider] = null;
+
+                    continue;
+                }
+
+                $panel = $this->selectOptimalPanelByStoredScope($panels);
+                $out[$provider] = $panel ?? $panels->sortBy('id')->first();
+            }
+
+            $ms = (int) round((microtime(true) - $t0) * 1000);
+            Log::info('PANEL_SELECTION_UNCACHED', [
+                'source' => 'panel',
+                'strategy' => 'v2_scope',
+                'ms' => $ms,
+                'ms_candidates_batch' => (int) round(($tAfterCandidates - $t0) * 1000),
+                'providers_count' => count($missing),
+                'distinct_candidate_panel_ids' => count($allIds),
+            ]);
+
+            return $out;
+        }
 
         if ($this->isSimplePanelSelection()) {
             $activeByPanel = $this->loadActiveUsersCountByPanelIds($allIds);
@@ -807,6 +865,34 @@ class PanelRepository extends BaseRepository
     }
 
     /**
+     * Новая стратегия: score в БД (panel.selection_scope_score), см. panel:recalculate-selection-scope.
+     */
+    private function isSelectionV2Enabled(): bool
+    {
+        return filter_var(config('panel.selection_v2_enabled', false), FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * Лучшая панель по убыванию selection_scope_score, при равенстве — меньший id.
+     */
+    private function selectOptimalPanelByStoredScope(Collection $panels): ?Panel
+    {
+        if ($panels->isEmpty()) {
+            return null;
+        }
+
+        return $panels->sort(function ($a, $b) {
+            $sa = (float) ($a->selection_scope_score ?? 0);
+            $sb = (float) ($b->selection_scope_score ?? 0);
+            if ($sa !== $sb) {
+                return $sb <=> $sa;
+            }
+
+            return $a->id <=> $b->id;
+        })->first();
+    }
+
+    /**
      * Выбор панели по стратегии из конфига (simple | intelligent).
      *
      * @param bool $useCacheOnly зарезервировано
@@ -815,6 +901,10 @@ class PanelRepository extends BaseRepository
     {
         if ($panels->isEmpty()) {
             return null;
+        }
+
+        if ($this->isSelectionV2Enabled()) {
+            return $this->selectOptimalPanelByStoredScope($panels) ?? $panels->sortBy('id')->first();
         }
 
         if ($this->isSimplePanelSelection()) {

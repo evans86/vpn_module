@@ -27,6 +27,9 @@ use Illuminate\Support\Carbon;
  * @property-read string $panel_type_label Текстовое описание типа панели
  * @property-read string $panel_api_address Форматированный адрес панели для API запросов
  * @property-read string $api_address Форматированный адрес панели для API запросов
+ * @property float $selection_scope_score
+ * @property Carbon|null $selection_scope_computed_at
+ * @property array|null $selection_scope_meta
  */
 class Panel extends Model
 {
@@ -83,7 +86,10 @@ class Panel extends Model
         'tls_certificate_path',
         'tls_key_path',
         'excluded_from_rotation',
-        'use_tls'
+        'use_tls',
+        'selection_scope_score',
+        'selection_scope_computed_at',
+        'selection_scope_meta',
     ];
 
     protected $hidden = [
@@ -101,6 +107,9 @@ class Panel extends Model
         'config_updated_at' => 'datetime',
         'excluded_from_rotation' => 'boolean',
         'use_tls' => 'boolean',
+        'selection_scope_score' => 'float',
+        'selection_scope_computed_at' => 'datetime',
+        'selection_scope_meta' => 'array',
     ];
 
     /**
