@@ -62,7 +62,7 @@
                                     {{ number_format((float) $panel->selection_scope_score, 2, '.', ' ') }}
                                 </td>
                                 <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">
-                                    {{ $panel->selection_scope_computed_at?->format('Y-m-d H:i') ?? '—' }}
+                                    {{ optional($panel->selection_scope_computed_at)->format('Y-m-d H:i') ?? '—' }}
                                 </td>
                                 <td class="px-4 py-2 text-xs text-gray-600 max-w-md truncate" title="{{ json_encode($meta, JSON_UNESCAPED_UNICODE) }}">
                                     @if(!empty($meta))
