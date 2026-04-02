@@ -27,6 +27,24 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
+        // Сбор статистики панелей (на сервере часто отдельным cron в * * * * * — дублируйте только через schedule:run ИЛИ отдельной строкой)
+        $schedule->command('statistics:cron')
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/statistics-cron.log'));
+
+        // Просроченные ключи: PAID → EXPIRED, ACTIVE при истёкшем finish_at
+        $schedule->command('expired:check-keys')
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/expired-keys.log'));
+
+        // Ежемесячный снимок статистики панелей (админка)
+        $schedule->command('panels:save-monthly-statistics')
+            ->dailyAt('22:00')
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/panels-monthly-statistics.log'));
+
         // Проверяем статус серверов каждые 5 минут
         $schedule->command('servers:check-status')
             ->everyFiveMinutes()
