@@ -51,9 +51,9 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->appendOutputTo(storage_path('logs/server-status.log'));
 
-        // Проверяем истекающие ключи каждый день в 10:00
+        // Уведомления об истекающих ключах (время в timezone приложения, см. APP_TIMEZONE)
         $schedule->command('notify:expiring-keys')
-            ->dailyAt('10:00')
+            ->dailyAt('01:00')
             ->withoutOverlapping()
             ->appendOutputTo(storage_path('logs/key-notifications.log'));
 
