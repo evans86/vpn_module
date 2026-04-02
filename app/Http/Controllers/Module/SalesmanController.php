@@ -90,39 +90,13 @@ class SalesmanController extends Controller
     }
 
     /**
-     * Фильтры списка: при непустом «q» — только быстрый поиск; иначе точные поля (AND).
-     *
      * @return array<string, mixed>
      */
     private function buildSalesmanListFilters(Request $request): array
     {
         $q = trim((string) $request->input('q', ''));
-        if ($q !== '') {
-            return ['q' => $q];
-        }
 
-        $filters = [];
-
-        if ($request->has('id') && $request->input('id') !== null && $request->input('id') !== '') {
-            $filters['id'] = (int) $request->input('id');
-        }
-
-        $telegramId = $request->input('telegram_id');
-        if ($telegramId !== null && $telegramId !== '') {
-            $filters['telegram_id'] = trim((string) $telegramId);
-        }
-
-        $username = trim((string) $request->input('username', ''));
-        if ($username !== '') {
-            $filters['username'] = $username;
-        }
-
-        $botLink = trim((string) $request->input('bot_link', ''));
-        if ($botLink !== '') {
-            $filters['bot_link'] = $botLink;
-        }
-
-        return $filters;
+        return $q !== '' ? ['q' => $q] : [];
     }
 
     /**

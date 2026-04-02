@@ -10,45 +10,18 @@
             <x-admin.filter-form action="{{ route('admin.module.salesman.index') }}">
                 <div class="md:col-span-2 lg:col-span-4">
                     <label for="salesman-search-q" class="block text-sm font-medium text-gray-700 mb-1">
-                        Быстрый поиск
+                        Поиск
                     </label>
                     <input type="text"
                            id="salesman-search-q"
                            name="q"
                            value="{{ request('q') }}"
-                           placeholder="Никнейм (@username или без), email, часть ссылки на бота, числовой ID или Telegram ID"
+                           placeholder="Никнейм, @username, email, часть ссылки на бота, ID или Telegram ID"
                            class="form-control" />
                     <p class="mt-1.5 text-xs text-gray-500">
-                        Один запрос по никнейму (учитывается <span class="font-mono">@</span> и без), почте для входа в ЛК, ссылке на бота; если ввести только цифры — также совпадение по внутреннему ID и Telegram ID.
-                        Если поле заполнено, фильтры ниже не применяются.
+                        По никнейму (с <span class="font-mono">@</span> или без), почте ЛК, фрагменту ссылки на бота; строка только из цифр — также по внутреннему ID и Telegram ID. Пустое поле — весь список.
                     </p>
                 </div>
-
-                <x-admin.filter-input
-                    name="id"
-                    label="ID"
-                    value="{{ request('id') }}"
-                    placeholder="Точный ID записи"
-                    type="number" />
-
-                <x-admin.filter-input
-                    name="telegram_id"
-                    label="Telegram ID"
-                    value="{{ request('telegram_id') }}"
-                    placeholder="Точный Telegram ID"
-                    type="text" />
-
-                <x-admin.filter-input
-                    name="username"
-                    label="Никнейм (username)"
-                    value="{{ request('username') }}"
-                    placeholder="Фрагмент никнейма, с @ или без" />
-
-                <x-admin.filter-input
-                    name="bot_link"
-                    label="Ссылка на бота"
-                    value="{{ request('bot_link') }}"
-                    placeholder="Часть URL бота" />
             </x-admin.filter-form>
 
             <!-- Table -->

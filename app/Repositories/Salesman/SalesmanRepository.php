@@ -42,9 +42,7 @@ class SalesmanRepository extends BaseRepository
     /**
      * Get paginated salesmen list with filters
      *
-     * @param  array<string, mixed>  $filters
-     *        — «q»: быстрый поиск (никнейм с/без @, email, фрагмент bot_link, число → id и telegram_id);
-     *        иначе комбинация id, telegram_id, username, bot_link (логика AND).
+     * @param  array<string, mixed>  $filters  ключ «q»: поиск по никнейму, email, bot_link, при строке из цифр — id и telegram_id
      */
     public function getPaginated(int $perPage = 20, array $filters = []): LengthAwarePaginator
     {
@@ -52,23 +50,6 @@ class SalesmanRepository extends BaseRepository
 
         if (! empty($filters['q']) && is_string($filters['q'])) {
             $this->applyQuickSearch($query, $filters['q']);
-        } else {
-            if (isset($filters['id']) && $filters['id'] !== '' && $filters['id'] !== null) {
-                $query->where('id', (int) $filters['id']);
-            }
-
-            if (isset($filters['telegram_id']) && $filters['telegram_id'] !== '' && $filters['telegram_id'] !== null) {
-                $query->where('telegram_id', (string) $filters['telegram_id']);
-            }
-
-            if (! empty($filters['username']) && is_string($filters['username'])) {
-                $this->applyUsernameLike($query, $filters['username']);
-            }
-
-            if (! empty($filters['bot_link']) && is_string($filters['bot_link'])) {
-                $like = '%'.$this->escapeLike(trim($filters['bot_link'])).'%';
-                $query->where('bot_link', 'like', $like);
-            }
         }
 
         return $query
@@ -82,29 +63,6 @@ class SalesmanRepository extends BaseRepository
     private function escapeLike(string $value): string
     {
         return addcslashes($value, '%_\\');
-    }
-
-    /**
-     * Поиск по никнейму: учитываем ввод с @ и без, экранируем спецсимволы LIKE.
-     */
-    private function applyUsernameLike(Builder $query, string $raw): void
-    {
-        $term = trim($raw);
-        if ($term === '') {
-            return;
-        }
-        $termNoAt = ltrim($term, '@');
-        $escaped = $this->escapeLike($term);
-        $escapedNoAt = $this->escapeLike($termNoAt);
-        $like = '%'.$escaped.'%';
-        $likeNoAt = '%'.$escapedNoAt.'%';
-
-        $query->where(function (Builder $q) use ($like, $likeNoAt) {
-            $q->where('username', 'like', $like);
-            if ($like !== $likeNoAt) {
-                $q->orWhere('username', 'like', $likeNoAt);
-            }
-        });
     }
 
     /**
