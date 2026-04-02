@@ -241,8 +241,9 @@ class PersonalController extends Controller
             $query->where('key_activate.user_tg_id', 'like', '%' . addcslashes((string) $request->telegram_search, '%_\\') . '%');
         }
 
-        if ($request->has('status_filter') && !empty($request->status_filter)) {
-            $query->where('key_activate.status', $request->status_filter);
+        // Нельзя использовать empty(): статус EXPIRED = 0, empty('0') === true — фильтр «Просрочен» не применялся
+        if ($request->filled('status_filter')) {
+            $query->where('key_activate.status', (int) $request->input('status_filter'));
         }
 
         if ($request->has('expiry_filter') && !empty($request->expiry_filter)) {
