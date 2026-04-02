@@ -490,8 +490,17 @@ class KeyActivateController extends Controller
 
             $total = $query->count();
 
-            // Сначала новые покупки (created_at записи ключа ≈ дата покупки/выдачи)
-            $query->orderByDesc('created_at');
+            // Порядок: по умолчанию — новые покупки первыми (created_at). Иначе экран с «датой окончания» выглядит «ломано»:
+            // ключ с более ранним сроком мог купить позже (короткий пакет). sort=expires — сортировка по finish_at (как на скрине логичнее).
+            $sort = (string) $request->input('sort', 'purchase');
+            if ($sort === 'expires') {
+                $query->orderByRaw('CASE WHEN finish_at IS NULL THEN 1 ELSE 0 END ASC')
+                    ->orderBy('finish_at', 'asc')
+                    ->orderByDesc('id');
+            } else {
+                $query->orderByDesc('created_at')
+                    ->orderByDesc('id');
+            }
 
 //            if ($request->has('limit')) {
 //                $limit = (int)$request->input('limit', 10);

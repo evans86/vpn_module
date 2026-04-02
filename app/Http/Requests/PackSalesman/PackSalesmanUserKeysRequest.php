@@ -28,6 +28,8 @@ class PackSalesmanUserKeysRequest extends FormRequest
 //            'private_key' => 'required|string',
             'user_tg_id' => 'required',
             'user_secret_key' => 'required|string',
+            /** purchase — по дате выдачи ключа (created_at); expires — по дате окончания (finish_at), удобно если в UI только «окончание» */
+            'sort' => 'sometimes|string|in:purchase,expires',
 //            'offset' => 'required',
 //            'limit' => 'required'
         ];
