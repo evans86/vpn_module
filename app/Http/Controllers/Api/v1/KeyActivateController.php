@@ -490,15 +490,15 @@ class KeyActivateController extends Controller
 
             $total = $query->count();
 
-            // По умолчанию — по дате окончания (finish_at): при массовой выдаче ключей created_at у всех одинаковый, порядок «ломается».
-            // sort=purchase — по дате создания (как раньше по умолчанию).
+            // По умолчанию — по дате окончания: сначала «самые долгие» (позже всего заканчиваются), без даты — в начале.
+            // sort=purchase — по дате создания.
             $sort = (string) $request->input('sort', 'expires');
             if ($sort === 'purchase') {
                 $query->orderByDesc('created_at')
                     ->orderByDesc('id');
             } else {
-                $query->orderByRaw('CASE WHEN finish_at IS NULL THEN 1 ELSE 0 END ASC')
-                    ->orderBy('finish_at', 'asc')
+                $query->orderByRaw('CASE WHEN finish_at IS NULL THEN 0 ELSE 1 END ASC')
+                    ->orderBy('finish_at', 'desc')
                     ->orderByDesc('id');
             }
 
