@@ -8,31 +8,47 @@
         <x-admin.card title="Список продавцов">
             <!-- Filters -->
             <x-admin.filter-form action="{{ route('admin.module.salesman.index') }}">
-                <x-admin.filter-input 
-                    name="id" 
-                    label="ID" 
-                    value="{{ request('id') }}" 
-                    placeholder="Введите ID"
+                <div class="md:col-span-2 lg:col-span-4">
+                    <label for="salesman-search-q" class="block text-sm font-medium text-gray-700 mb-1">
+                        Быстрый поиск
+                    </label>
+                    <input type="text"
+                           id="salesman-search-q"
+                           name="q"
+                           value="{{ request('q') }}"
+                           placeholder="Никнейм (@username или без), email, часть ссылки на бота, числовой ID или Telegram ID"
+                           class="form-control" />
+                    <p class="mt-1.5 text-xs text-gray-500">
+                        Один запрос по никнейму (учитывается <span class="font-mono">@</span> и без), почте для входа в ЛК, ссылке на бота; если ввести только цифры — также совпадение по внутреннему ID и Telegram ID.
+                        Если поле заполнено, фильтры ниже не применяются.
+                    </p>
+                </div>
+
+                <x-admin.filter-input
+                    name="id"
+                    label="ID"
+                    value="{{ request('id') }}"
+                    placeholder="Точный ID записи"
                     type="number" />
-                
-                <x-admin.filter-input 
-                    name="telegram_id" 
-                    label="Telegram ID" 
-                    value="{{ request('telegram_id') }}" 
-                    placeholder="Введите Telegram ID"
-                    type="number" />
-                
-                <x-admin.filter-input 
-                    name="username" 
-                    label="Username" 
-                    value="{{ request('username') }}" 
-                    placeholder="Введите username" />
-                
-                <x-admin.filter-input 
-                    name="bot_link" 
-                    label="Ссылка на бота" 
-                    value="{{ request('bot_link') }}" 
-                    placeholder="Введите ссылку на бота" />
+
+                <x-admin.filter-input
+                    name="telegram_id"
+                    label="Telegram ID"
+                    value="{{ request('telegram_id') }}"
+                    placeholder="Точный Telegram ID"
+                    type="text" />
+
+                <x-admin.filter-input
+                    name="username"
+                    label="Никнейм (username)"
+                    value="{{ request('username') }}"
+                    placeholder="Фрагмент никнейма, с @ или без" />
+
+                <x-admin.filter-input
+                    name="bot_link"
+                    label="Ссылка на бота"
+                    value="{{ request('bot_link') }}"
+                    placeholder="Часть URL бота" />
             </x-admin.filter-form>
 
             <!-- Table -->
@@ -42,7 +58,7 @@
                     title="Продавцы не найдены"
                     description="Попробуйте изменить параметры фильтрации" />
             @else
-                <x-admin.table :headers="['#', 'Telegram ID', 'Username', 'Токен', 'Ссылка на бота', 'Статус', 'Действия']">
+                <x-admin.table :headers="['#', 'Telegram ID', 'Username', 'Email (ЛК)', 'Токен', 'Ссылка на бота', 'Статус', 'Действия']">
                     @foreach($salesmen as $salesman)
                         <tr class="hover:bg-gray-50">
                             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">
@@ -55,6 +71,14 @@
                             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
                                 <span class="hidden sm:inline">{{ $salesman->username ?? 'N/A' }}</span>
                                 <span class="sm:hidden">{{ Str::limit($salesman->username ?? 'N/A', 10) }}</span>
+                            </td>
+                            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
+                                @if($salesman->email)
+                                    <span class="hidden sm:inline">{{ Str::limit($salesman->email, 28) }}</span>
+                                    <span class="sm:hidden">{{ Str::limit($salesman->email, 12) }}</span>
+                                @else
+                                    <span class="text-gray-400">—</span>
+                                @endif
                             </td>
                             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
                                 <div class="flex items-center">
