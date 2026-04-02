@@ -92,17 +92,17 @@ class ExpiredKeysCommand extends Command
                 }
             };
 
+            // Нельзя chunk() с offset: после смены статуса строка выпадает из выборки, OFFSET «перескакивает» и целые
+            // пачки ключей никогда не обрабатываются. chunkById курсором по id не пропускает записи.
             KeyActivate::where('status', KeyActivate::PAID)
                 ->whereNotNull('deleted_at')
                 ->where('deleted_at', '<', $currentTime)
-                ->orderBy('id')
-                ->chunk(200, $processChunk);
+                ->chunkById(200, $processChunk, 'id');
 
             KeyActivate::where('status', KeyActivate::ACTIVE)
                 ->whereNotNull('finish_at')
                 ->where('finish_at', '<', $currentTime)
-                ->orderBy('id')
-                ->chunk(200, $processChunk);
+                ->chunkById(200, $processChunk, 'id');
 
             $this->info("✓ Command completed. Updated {$updatedCount} keys to EXPIRED status.");
 
