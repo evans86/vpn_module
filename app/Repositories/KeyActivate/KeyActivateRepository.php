@@ -59,8 +59,9 @@ class KeyActivateRepository extends BaseRepository
             });
         }
 
-        if (!empty($filters['status'])) {
-            $query->where('status', $filters['status']);
+        // !empty(0) === true — фильтр «Просрочен» (EXPIRED = 0) не применялся
+        if (isset($filters['status']) && $filters['status'] !== '' && $filters['status'] !== null) {
+            $query->where('status', (int) $filters['status']);
         }
 
         if (!empty($filters['user_tg_id'])) {

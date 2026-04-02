@@ -66,7 +66,11 @@ class KeyActivateController extends Controller
                 ini_set('memory_limit', '256M');
             }
 
-            $filters = array_filter($request->only(['id', 'pack_id', 'status', 'user_tg_id', 'telegram_id']));
+            // Не array_filter без callback: status EXPIRED = 0 считается «пустым» и выкидывается из фильтра
+            $filters = array_filter(
+                $request->only(['id', 'pack_id', 'status', 'user_tg_id', 'telegram_id']),
+                static fn ($v) => $v !== null && $v !== ''
+            );
 
             // Добавляем pack_salesman_id в фильтры, если он есть
             if ($request->has('pack_salesman_id')) {

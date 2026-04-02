@@ -1,5 +1,9 @@
 @props(['name', 'label', 'options' => [], 'value' => '', 'placeholder' => 'Выберите...'])
 
+@php
+    // Строгое сравнение: иначе '' == 0 в PHP помечает «Просрочен» при пустом фильтре
+    $current = old($name, $value);
+@endphp
 <div>
     <label for="{{ $name }}" class="block text-sm font-medium text-gray-700 mb-1">
         {{ $label }}
@@ -7,9 +11,9 @@
     <select id="{{ $name }}" 
             name="{{ $name }}" 
             class="form-control">
-        <option value="">{{ $placeholder }}</option>
+        <option value="" {{ ($current === null || $current === '') ? 'selected' : '' }}>{{ $placeholder }}</option>
         @foreach($options as $optionValue => $optionLabel)
-            <option value="{{ $optionValue }}" {{ old($name, $value) == $optionValue ? 'selected' : '' }}>
+            <option value="{{ $optionValue }}" {{ (string) $optionValue === (string) $current ? 'selected' : '' }}>
                 {{ $optionLabel }}
             </option>
         @endforeach
