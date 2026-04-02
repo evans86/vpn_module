@@ -894,10 +894,9 @@ class KeyActivateService
     /**
      * Проверка и обновление статуса ключа
      *
-     * @param KeyActivate $key
-     * @return KeyActivate
+     * @param  bool  $quiet  true — без тяжёлого логирования и лишних связей (cron expired:check-keys, десятки тысяч ключей)
      */
-    public function checkAndUpdateStatus(KeyActivate $key): KeyActivate
+    public function checkAndUpdateStatus(KeyActivate $key, bool $quiet = false): KeyActivate
     {
         $originalStatus = $key->status;
         $currentTime = time();
@@ -907,100 +906,106 @@ class KeyActivateService
 
             // Проверяем срок активации для оплаченных ключей (deleted_at)
             if ($key->status === KeyActivate::PAID && $key->deleted_at && $currentTime > $key->deleted_at) {
-                // Загружаем связь если не загружена
-                if (!$key->relationLoaded('keyActivateUser')) {
-                    $key->load('keyActivateUser.serverUser');
+                if (!$quiet) {
+                    if (!$key->relationLoaded('keyActivateUser')) {
+                        $key->load('keyActivateUser.serverUser');
+                    }
                 }
-                
+
                 $key->status = KeyActivate::EXPIRED;
                 $statusChanged = true;
 
-                $daysOverdue = round(($currentTime - $key->deleted_at) / 86400, 1);
-                $deletedAtDate = date('Y-m-d H:i:s', $key->deleted_at);
-                $currentDate = date('Y-m-d H:i:s', $currentTime);
+                if (!$quiet) {
+                    $daysOverdue = round(($currentTime - $key->deleted_at) / 86400, 1);
+                    $deletedAtDate = date('Y-m-d H:i:s', $key->deleted_at);
+                    $currentDate = date('Y-m-d H:i:s', $currentTime);
 
-                $this->logger->critical("🚫 [KEY: {$key->id}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (истек срок активации для оплаченного ключа) | KEY_ID: {$key->id} | {$key->id}", [
-                    'source' => 'key_activate',
-                    'action' => 'update_status_to_expired',
-                    'key_id' => $key->id,
-                    'search_key' => $key->id, // Для быстрого поиска
-                    'search_tag' => 'KEY_EXPIRED',
-                    'user_tg_id' => $key->user_tg_id,
-                    'old_status' => $originalStatus,
-                    'old_status_text' => $this->getStatusTextByCode($originalStatus),
-                    'new_status' => $key->status,
-                    'new_status_text' => 'EXPIRED',
-                    'reason' => 'Истек срок активации (deleted_at) для оплаченного ключа',
-                    'deleted_at' => $key->deleted_at,
-                    'deleted_at_date' => $deletedAtDate,
-                    'current_time' => $currentTime,
-                    'current_date' => $currentDate,
-                    'days_overdue' => $daysOverdue,
-                    'finish_at' => $key->finish_at,
-                    'finish_at_date' => $key->finish_at ? date('Y-m-d H:i:s', $key->finish_at) : null,
-                    'pack_salesman_id' => $key->pack_salesman_id,
-                    'module_salesman_id' => $key->module_salesman_id,
-                    'traffic_limit' => $key->traffic_limit,
-                    'has_key_activate_user' => $key->keyActivateUser ? true : false,
-                    'key_activate_user_id' => $key->keyActivateUser ? $key->keyActivateUser->id : null,
-                    'key_activate_user_server_user_id' => ($key->keyActivateUser && $key->keyActivateUser->serverUser) ? $key->keyActivateUser->serverUser->id : null,
-                    'key_created_at' => $key->created_at ? $key->created_at->format('Y-m-d H:i:s') : null,
-                    'key_updated_at' => $key->updated_at ? $key->updated_at->format('Y-m-d H:i:s') : null,
-                    'note' => 'Для ключей со статусом PAID связь keyActivateUser может отсутствовать (ключ не был активирован)',
-                    'warning' => '⚠️ ВАЖНО: При смене статуса на EXPIRED связь keyActivateUser НЕ должна удаляться!',
-                    'method' => 'checkAndUpdateStatus',
-                    'file' => __FILE__,
-                    'line' => __LINE__
-                ]);
+                    $this->logger->critical("🚫 [KEY: {$key->id}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (истек срок активации для оплаченного ключа) | KEY_ID: {$key->id} | {$key->id}", [
+                        'source' => 'key_activate',
+                        'action' => 'update_status_to_expired',
+                        'key_id' => $key->id,
+                        'search_key' => $key->id, // Для быстрого поиска
+                        'search_tag' => 'KEY_EXPIRED',
+                        'user_tg_id' => $key->user_tg_id,
+                        'old_status' => $originalStatus,
+                        'old_status_text' => $this->getStatusTextByCode($originalStatus),
+                        'new_status' => $key->status,
+                        'new_status_text' => 'EXPIRED',
+                        'reason' => 'Истек срок активации (deleted_at) для оплаченного ключа',
+                        'deleted_at' => $key->deleted_at,
+                        'deleted_at_date' => $deletedAtDate,
+                        'current_time' => $currentTime,
+                        'current_date' => $currentDate,
+                        'days_overdue' => $daysOverdue,
+                        'finish_at' => $key->finish_at,
+                        'finish_at_date' => $key->finish_at ? date('Y-m-d H:i:s', $key->finish_at) : null,
+                        'pack_salesman_id' => $key->pack_salesman_id,
+                        'module_salesman_id' => $key->module_salesman_id,
+                        'traffic_limit' => $key->traffic_limit,
+                        'has_key_activate_user' => $key->keyActivateUser ? true : false,
+                        'key_activate_user_id' => $key->keyActivateUser ? $key->keyActivateUser->id : null,
+                        'key_activate_user_server_user_id' => ($key->keyActivateUser && $key->keyActivateUser->serverUser) ? $key->keyActivateUser->serverUser->id : null,
+                        'key_created_at' => $key->created_at ? $key->created_at->format('Y-m-d H:i:s') : null,
+                        'key_updated_at' => $key->updated_at ? $key->updated_at->format('Y-m-d H:i:s') : null,
+                        'note' => 'Для ключей со статусом PAID связь keyActivateUser может отсутствовать (ключ не был активирован)',
+                        'warning' => '⚠️ ВАЖНО: При смене статуса на EXPIRED связь keyActivateUser НЕ должна удаляться!',
+                        'method' => 'checkAndUpdateStatus',
+                        'file' => __FILE__,
+                        'line' => __LINE__
+                    ]);
+                }
             }
 
             // Проверяем срок действия для активных ключей (finish_at)
             if ($key->status === KeyActivate::ACTIVE && $key->finish_at && $currentTime > $key->finish_at) {
-                // Загружаем связь если не загружена
-                if (!$key->relationLoaded('keyActivateUser')) {
-                    $key->load('keyActivateUser.serverUser');
+                if (!$quiet) {
+                    if (!$key->relationLoaded('keyActivateUser')) {
+                        $key->load('keyActivateUser.serverUser');
+                    }
                 }
-                
+
                 $key->status = KeyActivate::EXPIRED;
                 $statusChanged = true;
 
-                $daysOverdue = round(($currentTime - $key->finish_at) / 86400, 1);
-                $finishAtDate = date('Y-m-d H:i:s', $key->finish_at);
-                $currentDate = date('Y-m-d H:i:s', $currentTime);
+                if (!$quiet) {
+                    $daysOverdue = round(($currentTime - $key->finish_at) / 86400, 1);
+                    $finishAtDate = date('Y-m-d H:i:s', $key->finish_at);
+                    $currentDate = date('Y-m-d H:i:s', $currentTime);
 
-                $this->logger->critical("🚫 [KEY: {$key->id}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (истек срок действия активного ключа) | KEY_ID: {$key->id} | {$key->id}", [
-                    'source' => 'key_activate',
-                    'action' => 'update_status_to_expired',
-                    'key_id' => $key->id,
-                    'search_key' => $key->id, // Для быстрого поиска
-                    'search_tag' => 'KEY_EXPIRED',
-                    'user_tg_id' => $key->user_tg_id,
-                    'old_status' => $originalStatus,
-                    'old_status_text' => $this->getStatusTextByCode($originalStatus),
-                    'new_status' => $key->status,
-                    'new_status_text' => 'EXPIRED',
-                    'reason' => 'Истек срок действия (finish_at) для активного ключа',
-                    'finish_at' => $key->finish_at,
-                    'finish_at_date' => $finishAtDate,
-                    'current_time' => $currentTime,
-                    'current_date' => $currentDate,
-                    'days_overdue' => $daysOverdue,
-                    'deleted_at' => $key->deleted_at,
-                    'deleted_at_date' => $key->deleted_at ? date('Y-m-d H:i:s', $key->deleted_at) : null,
-                    'pack_salesman_id' => $key->pack_salesman_id,
-                    'module_salesman_id' => $key->module_salesman_id,
-                    'traffic_limit' => $key->traffic_limit,
-                    'has_key_activate_user' => $key->keyActivateUser ? true : false,
-                    'key_activate_user_id' => $key->keyActivateUser ? $key->keyActivateUser->id : null,
-                    'server_user_id' => ($key->keyActivateUser && $key->keyActivateUser->serverUser) ? $key->keyActivateUser->serverUser->id : null,
-                    'panel_id' => ($key->keyActivateUser && $key->keyActivateUser->serverUser) ? $key->keyActivateUser->serverUser->panel_id : null,
-                    'key_created_at' => $key->created_at ? $key->created_at->format('Y-m-d H:i:s') : null,
-                    'key_updated_at' => $key->updated_at ? $key->updated_at->format('Y-m-d H:i:s') : null,
-                    'warning' => '⚠️ ВАЖНО: При смене статуса на EXPIRED связь keyActivateUser НЕ должна удаляться!',
-                    'method' => 'checkAndUpdateStatus',
-                    'file' => __FILE__,
-                    'line' => __LINE__
-                ]);
+                    $this->logger->critical("🚫 [KEY: {$key->id}] СТАТУС КЛЮЧА ИЗМЕНЕН НА EXPIRED (истек срок действия активного ключа) | KEY_ID: {$key->id} | {$key->id}", [
+                        'source' => 'key_activate',
+                        'action' => 'update_status_to_expired',
+                        'key_id' => $key->id,
+                        'search_key' => $key->id, // Для быстрого поиска
+                        'search_tag' => 'KEY_EXPIRED',
+                        'user_tg_id' => $key->user_tg_id,
+                        'old_status' => $originalStatus,
+                        'old_status_text' => $this->getStatusTextByCode($originalStatus),
+                        'new_status' => $key->status,
+                        'new_status_text' => 'EXPIRED',
+                        'reason' => 'Истек срок действия (finish_at) для активного ключа',
+                        'finish_at' => $key->finish_at,
+                        'finish_at_date' => $finishAtDate,
+                        'current_time' => $currentTime,
+                        'current_date' => $currentDate,
+                        'days_overdue' => $daysOverdue,
+                        'deleted_at' => $key->deleted_at,
+                        'deleted_at_date' => $key->deleted_at ? date('Y-m-d H:i:s', $key->deleted_at) : null,
+                        'pack_salesman_id' => $key->pack_salesman_id,
+                        'module_salesman_id' => $key->module_salesman_id,
+                        'traffic_limit' => $key->traffic_limit,
+                        'has_key_activate_user' => $key->keyActivateUser ? true : false,
+                        'key_activate_user_id' => $key->keyActivateUser ? $key->keyActivateUser->id : null,
+                        'server_user_id' => ($key->keyActivateUser && $key->keyActivateUser->serverUser) ? $key->keyActivateUser->serverUser->id : null,
+                        'panel_id' => ($key->keyActivateUser && $key->keyActivateUser->serverUser) ? $key->keyActivateUser->serverUser->panel_id : null,
+                        'key_created_at' => $key->created_at ? $key->created_at->format('Y-m-d H:i:s') : null,
+                        'key_updated_at' => $key->updated_at ? $key->updated_at->format('Y-m-d H:i:s') : null,
+                        'warning' => '⚠️ ВАЖНО: При смене статуса на EXPIRED связь keyActivateUser НЕ должна удаляться!',
+                        'method' => 'checkAndUpdateStatus',
+                        'file' => __FILE__,
+                        'line' => __LINE__
+                    ]);
+                }
             }
 
             // Сохраняем только если статус изменился
@@ -1012,7 +1017,7 @@ class KeyActivateService
 //                    $packSalesman = $this->packSalesmanRepository->findByIdOrFail($key->pack_salesman_id);
 //                    $this->notificationService->sendKeyDeactivatedNotification($packSalesman->salesman->telegram_id, $key->id);
 //                }
-            } else {
+            } elseif (!$quiet) {
                 $this->logger->debug('Статус ключа не требует обновления', [
                     'source' => 'key_activate',
                     'action' => 'check_status',

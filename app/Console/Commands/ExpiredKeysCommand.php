@@ -74,7 +74,8 @@ class ExpiredKeysCommand extends Command
             $processChunk = function ($keys) use (&$updatedCount) {
                 foreach ($keys as $key) {
                     try {
-                        $key = $this->keyActivateService->checkAndUpdateStatus($key);
+                        // quiet: без 100k+ critical() с огромным контекстом — иначе PHP 768M не хватает
+                        $key = $this->keyActivateService->checkAndUpdateStatus($key, true);
 
                         if ($key->status === KeyActivate::EXPIRED) {
                             $updatedCount++;
@@ -89,6 +90,7 @@ class ExpiredKeysCommand extends Command
 
                         $this->error("Error checking key {$key->id}: {$e->getMessage()}");
                     }
+                    unset($key);
                 }
             };
 
