@@ -490,6 +490,9 @@ class KeyActivateController extends Controller
 
             $total = $query->count();
 
+            // Сначала новые покупки (created_at записи ключа ≈ дата покупки/выдачи)
+            $query->orderByDesc('created_at');
+
 //            if ($request->has('limit')) {
 //                $limit = (int)$request->input('limit', 10);
 //                $offset = (int)$request->input('offset', 0);
@@ -504,6 +507,7 @@ class KeyActivateController extends Controller
                         'traffic_limit' => $key->traffic_limit,
                         'traffic_limit_gb' => round($key->traffic_limit / \App\Constants\DataConstants::BYTES_IN_GB, 1),
                         'finish_at' => $key->finish_at,
+                        'created_at' => $key->created_at ? $key->created_at->timestamp : null,
                         'status' => $key->status,
                         'status_text' => $key->getStatusText(),
 //                        'pack_type' => $key->packSalesman->pack->module_key ? 'module' : 'bot'
