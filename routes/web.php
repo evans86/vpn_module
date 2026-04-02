@@ -34,36 +34,36 @@ use Illuminate\Support\Facades\Route;
 Auth::routes(['register' => false]);
 
 /*
-| ЛК: префикс /_lk/ (не /personal/…). У части CDN/прокси POST на /personal/* даёт 405; формы и действия — GET+POST (match).
-| Prefetch GET без _token и без «боевых» query — см. VerifyCsrfToken::isLkPrefetchGet и редиректы в контроллерах.
-| PDF отчёта сети: тело JSON большое — остаётся POST (fetch), GET без токена — редирект на страницу проверки.
+| ЛК: префикс /_lk/ (не /personal/…). Состояние меняем через GET + _token в query (VerifyCsrfToken).
+| Prefetch GET без _token — см. VerifyCsrfToken::isLkPrefetchGet и редиректы в контроллерах.
+| PDF отчёта проверки сети: тело JSON большое — только POST (fetch), не GET.
 */
 Route::middleware([RedirectPersonalToConfigPublicHost::class])->group(function () {
-    Route::match(['get', 'post'], '_lk/auth/email', [SalesmanAuthController::class, 'loginWithEmail'])
+    Route::get('_lk/auth/email', [SalesmanAuthController::class, 'loginWithEmail'])
         ->middleware('throttle:10,1')
         ->name('personal.auth.email');
 });
 
 Route::middleware([RedirectPersonalToConfigPublicHost::class, 'auth.salesman'])->group(function () {
-    Route::match(['get', 'post'], '_lk/cabinet-login/save', [PersonalController::class, 'updateCabinetLoginSettings'])
+    Route::get('_lk/cabinet-login/save', [PersonalController::class, 'updateCabinetLoginSettings'])
         ->name('personal.cabinet-login.update');
-    Route::match(['get', 'post'], '_lk/faq/save', [PersonalController::class, 'updateFaq'])->name('personal.faq.update');
-    Route::match(['get', 'post'], '_lk/faq/reset', [PersonalController::class, 'resetFaq'])->name('personal.faq.reset');
-    Route::match(['get', 'post'], '_lk/faq/vpn-instructions', [PersonalController::class, 'updateVpnInstructions'])->name('personal.faq.vpn-instructions.update');
-    Route::match(['get', 'post'], '_lk/faq/vpn-instructions/reset', [PersonalController::class, 'resetVpnInstructions'])->name('personal.faq.vpn-instructions.reset');
-    Route::match(['get', 'post'], '_lk/activation-message/save', [PersonalController::class, 'updateActivationSuccessMessage'])
+    Route::get('_lk/faq/save', [PersonalController::class, 'updateFaq'])->name('personal.faq.update');
+    Route::get('_lk/faq/reset', [PersonalController::class, 'resetFaq'])->name('personal.faq.reset');
+    Route::get('_lk/faq/vpn-instructions', [PersonalController::class, 'updateVpnInstructions'])->name('personal.faq.vpn-instructions.update');
+    Route::get('_lk/faq/vpn-instructions/reset', [PersonalController::class, 'resetVpnInstructions'])->name('personal.faq.vpn-instructions.reset');
+    Route::get('_lk/activation-message/save', [PersonalController::class, 'updateActivationSuccessMessage'])
         ->name('personal.activation-success.update');
-    Route::match(['get', 'post'], '_lk/activation-message/reset', [PersonalController::class, 'resetActivationSuccessMessage'])
+    Route::get('_lk/activation-message/reset', [PersonalController::class, 'resetActivationSuccessMessage'])
         ->name('personal.activation-success.reset');
-    Route::match(['get', 'post'], '_lk/network-check/report', [NetworkCheckController::class, 'report'])
+    Route::post('_lk/network-check/report', [NetworkCheckController::class, 'report'])
         ->middleware('throttle:120,1')
         ->name('personal.network.report');
 });
 
 Route::middleware([RedirectPersonalToConfigPublicHost::class])->group(function () {
-    Route::match(['get', 'post'], '_lk/logout', function () {
+    Route::get('_lk/logout', function () {
         $request = request();
-        if ($request->isMethod('get') && ! $request->has('_token')) {
+        if (! $request->has('_token')) {
             return redirect()->to(UrlHelper::personalRoute('personal.auth'));
         }
         if (session()->has('impersonation_admin_id')) {

@@ -87,7 +87,7 @@
                         </div>
                     </form>
 
-                    <form id="resetForm" action="{{ \App\Helpers\UrlHelper::personalRoute('personal.faq.reset') }}" method="POST" class="hidden">
+                    <form id="resetForm" action="{{ \App\Helpers\UrlHelper::personalRoute('personal.faq.reset') }}" method="GET" class="hidden">
                         @csrf
                     </form>
 

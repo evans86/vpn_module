@@ -49,7 +49,6 @@ class VerifyCsrfToken extends Middleware
             '_lk/faq/vpn-instructions/reset',
             '_lk/activation-message/save',
             '_lk/activation-message/reset',
-            '_lk/network-check/report',
             '_lk/logout',
         ];
         if (! in_array($request->path(), $paths, true)) {

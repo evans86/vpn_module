@@ -401,7 +401,7 @@ class PersonalController extends Controller
      */
     public function updateVpnInstructions(Request $request)
     {
-        if ($request->isMethod('get') && ! $request->has('_token')) {
+        if (! $request->has('_token')) {
             return redirect()->to(UrlHelper::personalRoute('personal.faq'));
         }
 
@@ -420,7 +420,7 @@ class PersonalController extends Controller
      */
     public function resetVpnInstructions(Request $request)
     {
-        if ($request->isMethod('get') && ! $request->has('_token')) {
+        if (! $request->has('_token')) {
             return redirect()->to(UrlHelper::personalRoute('personal.faq'));
         }
 
@@ -459,7 +459,7 @@ class PersonalController extends Controller
      */
     public function resetFaq(Request $request)
     {
-        if ($request->isMethod('get') && ! $request->has('_token')) {
+        if (! $request->has('_token')) {
             return redirect()->to(UrlHelper::personalRoute('personal.faq'));
         }
 
@@ -484,11 +484,11 @@ class PersonalController extends Controller
     }
 
     /**
-     * Сохранение email/пароля для резервного входа (POST через /_lk/…).
+     * Сохранение email/пароля для резервного входа (GET /_lk/cabinet-login/save + query + _token).
      */
     public function updateCabinetLoginSettings(Request $request): RedirectResponse
     {
-        if ($request->isMethod('get') && ! $request->has('_token')) {
+        if (! $request->has('_token')) {
             return redirect()->to(UrlHelper::personalRoute('personal.cabinet-login'));
         }
 
@@ -579,7 +579,7 @@ class PersonalController extends Controller
 
     public function updateActivationSuccessMessage(Request $request): RedirectResponse
     {
-        if ($request->isMethod('get') && ! $request->has('_token')) {
+        if (! $request->has('_token')) {
             return redirect()->to(UrlHelper::personalRoute('personal.activation-success'));
         }
 
@@ -633,7 +633,7 @@ class PersonalController extends Controller
 
     public function resetActivationSuccessMessage(Request $request): RedirectResponse
     {
-        if ($request->isMethod('get') && ! $request->has('_token')) {
+        if (! $request->has('_token')) {
             return redirect()->to(UrlHelper::personalRoute('personal.activation-success'));
         }
 
