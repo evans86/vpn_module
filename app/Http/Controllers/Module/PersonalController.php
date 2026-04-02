@@ -241,9 +241,21 @@ class PersonalController extends Controller
             $query->where('key_activate.user_tg_id', 'like', '%' . addcslashes((string) $request->telegram_search, '%_\\') . '%');
         }
 
-        // Нельзя использовать empty(): статус EXPIRED = 0, empty('0') === true — фильтр «Просрочен» не применялся
+        // Строковые коды (expired и т.д.), не число 0 — иначе часть стеков/парсеров теряет «нулевой» параметр в query.
+        // Дополнительно: ctype_digit для старых URL вида status_filter=0.
         if ($request->filled('status_filter')) {
-            $query->where('key_activate.status', (int) $request->input('status_filter'));
+            $statusMap = [
+                'paid' => KeyActivate::PAID,
+                'active' => KeyActivate::ACTIVE,
+                'expired' => KeyActivate::EXPIRED,
+                'deleted' => KeyActivate::DELETED,
+            ];
+            $code = (string) $request->input('status_filter');
+            if (isset($statusMap[$code])) {
+                $query->where('key_activate.status', $statusMap[$code]);
+            } elseif ($code !== '' && ctype_digit($code)) {
+                $query->where('key_activate.status', (int) $code);
+            }
         }
 
         if ($request->has('expiry_filter') && !empty($request->expiry_filter)) {
@@ -292,10 +304,10 @@ class PersonalController extends Controller
 
         $statuses = [
             '' => 'Все статусы',
-            KeyActivate::PAID => 'Оплачен',
-            KeyActivate::ACTIVE => 'Активирован',
-            KeyActivate::EXPIRED => 'Просрочен',
-            KeyActivate::DELETED => 'Удален'
+            'paid' => 'Оплачен',
+            'active' => 'Активирован',
+            'expired' => 'Просрочен',
+            'deleted' => 'Удален',
         ];
 
         $sources = [
