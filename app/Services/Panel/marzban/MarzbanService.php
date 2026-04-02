@@ -688,22 +688,24 @@ class MarzbanService
     public function getServerStats(): void
     {
         try {
-            $panels = Panel::query()
+            // По одной порции панелей — иначе при сотнях панелей коллекция + ответы API раздувают память
+            Panel::query()
                 ->where('panel_status', Panel::PANEL_CONFIGURED)
                 ->where('panel', Panel::MARZBAN)
-                ->get();
-
-            $panels->each(function ($panel) {
-                // Обработка каждой панели
-                $panel = $this->updateMarzbanToken($panel->id);
-                $marzbanApi = new MarzbanAPI($panel->api_address);
-                $serverStats = $marzbanApi->getServerStats($panel->auth_token);
-                $statistics = json_encode($serverStats);
-                ServerMonitoring::create([
-                    'panel_id' => $panel->id,
-                    'statistics' => $statistics
-                ]);
-            });
+                ->orderBy('id')
+                ->chunk(30, function ($panels) {
+                    foreach ($panels as $panel) {
+                        $panel = $this->updateMarzbanToken($panel->id);
+                        $marzbanApi = new MarzbanAPI($panel->api_address);
+                        $serverStats = $marzbanApi->getServerStats($panel->auth_token);
+                        $statistics = json_encode($serverStats);
+                        ServerMonitoring::create([
+                            'panel_id' => $panel->id,
+                            'statistics' => $statistics,
+                        ]);
+                        unset($serverStats, $statistics, $marzbanApi);
+                    }
+                });
 
             self::cleanOldStatistics();
 
