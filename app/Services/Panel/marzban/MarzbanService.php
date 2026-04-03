@@ -18,6 +18,7 @@ use App\Models\ServerUser\ServerUser;
 use App\Services\External\BottApi;
 use App\Services\External\MarzbanAPI;
 use App\Services\Key\KeyActivateUserService;
+use App\Services\Panel\PanelStrategy;
 use Carbon\Carbon;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\DB;
@@ -680,6 +681,115 @@ class MarzbanService
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Бесплатный ключ с split_traffic_across_slots: общий пул traffic_limit на всех слотах Marzban.
+     * Остаток поровну делится между слотами; на каждой панели data_limit = used_i + доля_остатка,
+     * чтобы не «отваливались» слоты по очереди при общем лимите 5 ГБ.
+     */
+    public function syncFreeKeySharedTrafficPool(KeyActivate $key): void
+    {
+        if (!$key->isFreeIssuedKey() || !($key->split_traffic_across_slots ?? false)) {
+            return;
+        }
+        if (!$key->relationLoaded('keyActivateUsers')) {
+            $key->load(['keyActivateUsers.serverUser.panel']);
+        }
+        $ordered = $key->keyActivateUsers->sortBy('id')->values();
+        if ($ordered->isEmpty()) {
+            return;
+        }
+        $poolCap = (int) ($key->traffic_limit ?? 0);
+        if ($poolCap <= 0) {
+            return;
+        }
+        $finishAtDb = (int) ($key->finish_at ?? 0);
+
+        $slotRows = [];
+        foreach ($ordered as $kau) {
+            $su = $kau->serverUser;
+            if (!$su || !$su->panel) {
+                continue;
+            }
+            $panel = $su->panel;
+            $panelType = $panel->panel ?? Panel::MARZBAN;
+            if ($panelType === '') {
+                $panelType = Panel::MARZBAN;
+            }
+            try {
+                $panelStrategy = new PanelStrategy($panelType);
+                $info = $panelStrategy->getSubscribeInfo($panel->id, $su->id);
+                $slotRows[] = [
+                    'panel_id' => $panel->id,
+                    'server_user_id' => $su->id,
+                    'used' => (int) ($info['used_traffic'] ?? 0),
+                    'expire' => $info['expire'] ?? null,
+                    'current_data_limit' => (int) ($info['data_limit'] ?? 0),
+                ];
+            } catch (\Throwable $e) {
+                Log::warning('syncFreeKeySharedTrafficPool: getSubscribeInfo failed', [
+                    'key_id' => $key->id,
+                    'server_user_id' => $su->id,
+                    'error' => $e->getMessage(),
+                    'source' => 'panel',
+                ]);
+            }
+        }
+        if ($slotRows === []) {
+            return;
+        }
+
+        $n = count($slotRows);
+        $totalUsed = 0;
+        foreach ($slotRows as $r) {
+            $totalUsed += $r['used'];
+        }
+        $remainingTotal = max(0, $poolCap - $totalUsed);
+        $shares = TrafficLimitHelper::distributeAcrossSlots($remainingTotal, $n);
+
+        foreach ($slotRows as $i => $row) {
+            $newLimit = $row['used'] + (int) ($shares[$i] ?? 0);
+            if ($newLimit === $row['current_data_limit']) {
+                continue;
+            }
+            $expire = $this->normalizeMarzbanExpireForUpdate($row['expire'], $finishAtDb);
+            try {
+                $this->updateUserDataLimitAndExpire((int) $row['panel_id'], (string) $row['server_user_id'], $expire, $newLimit, null);
+            } catch (\Throwable $e) {
+                Log::warning('syncFreeKeySharedTrafficPool: updateUser failed', [
+                    'key_id' => $key->id,
+                    'server_user_id' => $row['server_user_id'],
+                    'error' => $e->getMessage(),
+                    'source' => 'panel',
+                ]);
+            }
+        }
+    }
+
+    public function updateUserDataLimitAndExpire(int $panel_id, string $user_id, int $expire, int $data_limit, ?array $inbounds = null): void
+    {
+        $panel = $this->updateMarzbanToken($panel_id);
+        $marzbanApi = new MarzbanAPI($panel->api_address);
+        $marzbanApi->updateUser($panel->auth_token, $user_id, $expire, $data_limit, $inbounds);
+    }
+
+    private function normalizeMarzbanExpireForUpdate($expire, int $finishAtFromDb): int
+    {
+        if ($expire !== null && $expire !== '') {
+            $exp = (int) $expire;
+            if ($exp > 2147483647) {
+                $exp = (int) ($exp / 1000);
+            }
+            if ($exp > 0) {
+                return $exp;
+            }
+        }
+        if ($finishAtFromDb > 0) {
+            return $finishAtFromDb;
+        }
+
+        return time() + 86400;
     }
 
     /**

@@ -42,17 +42,21 @@ class VpnConfigController extends Controller
      */
     private $keyActivateService;
 
+    private MarzbanService $marzbanService;
+
     public function __construct(
         KeyActivateRepository $keyActivateRepository,
         KeyActivateUserRepository $keyActivateUserRepository,
         ServerUserRepository $serverUserRepository,
-        \App\Services\Key\KeyActivateService $keyActivateService
+        \App\Services\Key\KeyActivateService $keyActivateService,
+        MarzbanService $marzbanService
     )
     {
         $this->keyActivateRepository = $keyActivateRepository;
         $this->keyActivateUserRepository = $keyActivateUserRepository;
         $this->serverUserRepository = $serverUserRepository;
         $this->keyActivateService = $keyActivateService;
+        $this->marzbanService = $marzbanService;
     }
 
     public function show(string $key_activate_id): Response
@@ -689,6 +693,19 @@ class VpnConfigController extends Controller
             $orderedSlots[] = ['kau' => $kau, 'serverUser' => $serverUser];
         }
 
+        if (!empty($orderedSlots) && $keyActivate->isFreeIssuedKey() && ($keyActivate->split_traffic_across_slots ?? false)) {
+            try {
+                $keyActivate->setRelation('keyActivateUsers', $keyActivateUsers->sortBy('id')->values());
+                $this->marzbanService->syncFreeKeySharedTrafficPool($keyActivate);
+            } catch (\Throwable $e) {
+                Log::warning('VpnConfig: sync free key shared traffic pool failed', [
+                    'key_activate_id' => $key_activate_id,
+                    'error' => $e->getMessage(),
+                    'source' => 'vpn',
+                ]);
+            }
+        }
+
         /** @var array<int, Panel|null> $panelTokenCache panel_id => свежий токен (один updateToken на панель) */
         $panelTokenCache = [];
         foreach ($orderedSlots as $slot) {
@@ -1278,6 +1295,18 @@ class VpnConfigController extends Controller
             );
         }
         $users = $keyActivate->keyActivateUsers ?? collect();
+
+        if (!$useStoredOnly && $keyActivate->isFreeIssuedKey() && ($keyActivate->split_traffic_across_slots ?? false)) {
+            try {
+                $this->marzbanService->syncFreeKeySharedTrafficPool($keyActivate);
+            } catch (\Throwable $e) {
+                Log::warning('aggregateTrafficForConfigPage: sync free key shared traffic pool failed', [
+                    'key_activate_id' => $keyActivate->id,
+                    'error' => $e->getMessage(),
+                    'source' => 'vpn',
+                ]);
+            }
+        }
 
         $slotIndex = 0;
         foreach ($users as $kau) {
