@@ -226,17 +226,20 @@
                             <div class="flex items-center justify-between">
                                 <span class="text-gray-600 font-medium">Трафик:</span>
                                 <span class="font-bold text-gray-900 text-right">
-                                    {{ number_format(($displayUserInfo['data_used'] ?? 0) / (1024*1024*1024), 2) }}
-                                    /
-                                    @if(($displayUserInfo['data_limit_tariff'] ?? 0) > 0)
-                                        {{ number_format(($displayUserInfo['data_limit_tariff'] ?? 0) / (1024*1024*1024), 2) }}
+                                    @if(!empty($displayUserInfo['show_traffic_limit']))
+                                        {{ number_format(($displayUserInfo['data_used'] ?? 0) / (1024*1024*1024), 2) }}
+                                        /
+                                        @if(($displayUserInfo['data_limit_tariff'] ?? 0) > 0)
+                                            {{ number_format(($displayUserInfo['data_limit_tariff'] ?? 0) / (1024*1024*1024), 2) }}
+                                        @else
+                                            —
+                                        @endif
+                                        GB
                                     @else
-                                        —
+                                        {{ number_format(($displayUserInfo['data_used'] ?? 0) / (1024*1024*1024), 2) }} GB
                                     @endif
-                                    GB
                                 </span>
                             </div>
-                            <p class="text-xs text-gray-500 leading-snug">Использовано по всем подключениям (слотам). После «Обновить» данные синхронизируются с панелями.</p>
                         </div>
                     </div>
 

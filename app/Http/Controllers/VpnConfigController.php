@@ -1165,7 +1165,8 @@ class VpnConfigController extends Controller
             'data_limit_tariff' => 100 * 1024 * 1024 * 1024,
             'data_used' => 25.5 * 1024 * 1024 * 1024, // 25.5 GB
             'expiration_date' => time() + (30 * 24 * 60 * 60), // 30 дней
-            'days_remaining' => 30
+            'days_remaining' => 30,
+            'show_traffic_limit' => true,
         ];
 
         // Демо-ключи подключения
@@ -1412,7 +1413,8 @@ class VpnConfigController extends Controller
                 'data_limit_tariff' => $trafficAgg['data_limit_tariff'],
                 'data_used' => $trafficAgg['data_used'],
                 'expiration_date' => $finishAt,
-                'days_remaining' => $daysRemaining
+                'days_remaining' => $daysRemaining,
+                'show_traffic_limit' => $keyActivate->isFreeIssuedKey(),
             ];
 
             // Форматируем ключи для отображения (плоский список для обратной совместимости)
@@ -1518,7 +1520,8 @@ class VpnConfigController extends Controller
                                     'data_limit_tariff' => $newTrafficAgg['data_limit_tariff'],
                                     'data_used' => $newTrafficAgg['data_used'],
                                     'expiration_date' => $newFinishAt,
-                                    'days_remaining' => $newDaysRemaining
+                                    'days_remaining' => $newDaysRemaining,
+                                    'show_traffic_limit' => $newKeyActivate->isFreeIssuedKey(),
                                 ];
                             }
                         } catch (Exception $e) {
@@ -1662,6 +1665,7 @@ class VpnConfigController extends Controller
             'days_remaining' => isset($userInfo['days_remaining']) && $userInfo['days_remaining'] !== null
                 ? (int) $userInfo['days_remaining']
                 : null,
+            'show_traffic_limit' => (bool) ($userInfo['show_traffic_limit'] ?? false),
         ];
     }
 

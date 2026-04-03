@@ -119,6 +119,15 @@ class KeyActivate extends Model
             ->orderByDesc('key_replaced_at');
     }
 
+    /**
+     * Ключ выдан без покупки через бота/модуль (оба sales-поля null) — бесплатная квота.
+     * Для таких ключей на странице конфига показываем пару «использовано / лимит».
+     */
+    public function isFreeIssuedKey(): bool
+    {
+        return $this->pack_salesman_id === null && $this->module_salesman_id === null;
+    }
+
     public function getTgStatusText(): string
     {
         switch ($this->status) {

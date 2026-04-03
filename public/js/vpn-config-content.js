@@ -178,6 +178,10 @@
         var dataLimitTariffBytes = displayUserInfo.data_limit_tariff != null ? Number(displayUserInfo.data_limit_tariff) : 0;
         var usedGbStr = (dataUsedBytes / bytesInGb).toFixed(2);
         var limitGbStr = dataLimitTariffBytes > 0 ? (dataLimitTariffBytes / bytesInGb).toFixed(2) : '—';
+        var showTrafficLimit = displayUserInfo.show_traffic_limit === true;
+        var trafficLine = showTrafficLimit
+            ? escapeHtml(usedGbStr) + ' / ' + escapeHtml(limitGbStr) + ' GB'
+            : escapeHtml(usedGbStr) + ' GB';
 
         parts.push(
             '<div class="mb-8">' +
@@ -189,8 +193,7 @@
             '<div class="flex items-center justify-between"><span class="text-gray-600 font-medium">Статус:</span>' +
             '<span class="px-3 py-1.5 rounded-full text-sm font-semibold ' + statusClass + '">' + escapeHtml(statusText) + '</span></div>' +
             '<div class="flex items-center justify-between"><span class="text-gray-600 font-medium">Трафик:</span>' +
-            '<span class="font-bold text-gray-900 text-right">' + escapeHtml(usedGbStr) + ' / ' + escapeHtml(limitGbStr) + ' GB</span></div>' +
-            '<p class="text-xs text-gray-500 leading-snug">Использовано по всем подключениям (слотам). После «Обновить» данные подтягиваются с панелей.</p>' +
+            '<span class="font-bold text-gray-900 text-right">' + trafficLine + '</span></div>' +
             '</div></div>' +
             '<div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200">' +
             '<div class="space-y-4"><div>' +
