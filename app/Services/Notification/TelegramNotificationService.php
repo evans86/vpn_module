@@ -68,6 +68,44 @@ class TelegramNotificationService
     }
 
     /**
+     * Уведомление о перевыпуске ключа: основной канал (модуль / бот пака), при неуспехе — Father Bot.
+     * Обычный sendToUser не дублирует при успехе; при блокировке модуля/бота пака пользователь всё ещё может получить сообщение от Father.
+     */
+    public function sendRenewNotificationToUser(KeyActivate $keyActivate, string $message, array $keyboard = null): void
+    {
+        $result = $this->sendToUserWithResult($keyActivate, $message, $keyboard);
+        if ($result->isSuccess()) {
+            return;
+        }
+
+        Log::warning('Key renew notify: primary channel did not deliver', [
+            'key_id' => $keyActivate->id,
+            'status' => $result->status,
+            'error' => $result->errorMessage,
+            'module_salesman_id' => $keyActivate->module_salesman_id,
+            'pack_salesman_id' => $keyActivate->pack_salesman_id,
+            'source' => 'notification',
+        ]);
+
+        if ($result->status === NotificationResult::STATUS_USER_NOT_FOUND) {
+            return;
+        }
+
+        $fatherToken = config('telegram.father_bot.token');
+        if (!$fatherToken || !$keyActivate->user_tg_id) {
+            return;
+        }
+
+        $ok = $this->sendViaFatherBot($keyActivate->user_tg_id, $message, $keyboard);
+        if ($ok) {
+            Log::info('Key renew notify: delivered via Father bot', [
+                'key_id' => $keyActivate->id,
+                'source' => 'notification',
+            ]);
+        }
+    }
+
+    /**
      * Отправка сообщения продавцу
      */
     public function sendToSalesman(Salesman $salesman, string $message, array $keyboard = null): bool

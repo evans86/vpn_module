@@ -1221,7 +1221,7 @@ class KeyActivateService
                     $msg .= "Ключ: <code>{$keyForUser->id}</code>\n\n";
                     $msg .= \App\Helpers\UrlHelper::telegramConfigLinksHtml($keyForUser->id);
                     $rows = \App\Helpers\UrlHelper::telegramInlineKeyboardConfigRows($keyForUser->id);
-                    app(TelegramNotificationService::class)->sendToUser(
+                    app(TelegramNotificationService::class)->sendRenewNotificationToUser(
                         $keyForUser,
                         $msg,
                         ['inline_keyboard' => $rows]
