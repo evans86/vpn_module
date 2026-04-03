@@ -28,6 +28,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property KeyActivateUser|null $keyActivateUser
  * @property \Illuminate\Database\Eloquent\Collection<int, KeyActivateUser> $keyActivateUsers
  * 
+ * @property bool $split_traffic_across_slots если true — квота traffic_limit делится между слотами Marzban (новые ключи)
+ *
  * ВАЖНО: Реальный остаток трафика (data_limit - used_traffic) хранится на панели Marzban,
  * а НЕ в этом поле! Это поле содержит НАЧАЛЬНОЕ значение лимита.
  */
@@ -50,6 +52,7 @@ class KeyActivate extends Model
         'status' => 'integer',
         'finish_at' => 'integer',
         'deleted_at' => 'integer',
+        'split_traffic_across_slots' => 'boolean',
     ];
 
     /**

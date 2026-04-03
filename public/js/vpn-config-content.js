@@ -173,6 +173,12 @@
             daysLine = '<div class="text-sm text-indigo-600 font-medium mt-2">⏱ Осталось ' + escapeHtml(String(daysRem)) + ' ' + daysWordRu(daysRem) + '</div>';
         }
 
+        var bytesInGb = 1024 * 1024 * 1024;
+        var dataUsedBytes = displayUserInfo.data_used != null ? Number(displayUserInfo.data_used) : 0;
+        var dataLimitTariffBytes = displayUserInfo.data_limit_tariff != null ? Number(displayUserInfo.data_limit_tariff) : 0;
+        var usedGbStr = (dataUsedBytes / bytesInGb).toFixed(2);
+        var limitGbStr = dataLimitTariffBytes > 0 ? (dataLimitTariffBytes / bytesInGb).toFixed(2) : '—';
+
         parts.push(
             '<div class="mb-8">' +
             '<h2 class="text-2xl font-bold mb-6 text-gray-900 flex items-center">' +
@@ -182,6 +188,9 @@
             '<div class="space-y-4">' +
             '<div class="flex items-center justify-between"><span class="text-gray-600 font-medium">Статус:</span>' +
             '<span class="px-3 py-1.5 rounded-full text-sm font-semibold ' + statusClass + '">' + escapeHtml(statusText) + '</span></div>' +
+            '<div class="flex items-center justify-between"><span class="text-gray-600 font-medium">Трафик:</span>' +
+            '<span class="font-bold text-gray-900 text-right">' + escapeHtml(usedGbStr) + ' / ' + escapeHtml(limitGbStr) + ' GB</span></div>' +
+            '<p class="text-xs text-gray-500 leading-snug">Использовано по всем подключениям (слотам). После «Обновить» данные подтягиваются с панелей.</p>' +
             '</div></div>' +
             '<div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200">' +
             '<div class="space-y-4"><div>' +

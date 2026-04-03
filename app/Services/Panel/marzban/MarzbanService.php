@@ -2,6 +2,7 @@
 
 namespace App\Services\Panel\marzban;
 
+use App\Helpers\TrafficLimitHelper;
 use App\Dto\Bot\BotModuleFactory;
 use App\Dto\Server\ServerDto;
 use App\Dto\Server\ServerFactory;
@@ -2556,7 +2557,7 @@ class MarzbanService
      */
     public function transferUserWithoutSourcePanel(int $sourcePanelId, int $targetPanelId, string $keyActivateId): ServerUser
     {
-        $keyActivate = KeyActivate::select('id', 'traffic_limit', 'finish_at', 'user_tg_id', 'module_salesman_id', 'pack_salesman_id')
+        $keyActivate = KeyActivate::select('id', 'traffic_limit', 'finish_at', 'user_tg_id', 'module_salesman_id', 'pack_salesman_id', 'split_traffic_across_slots')
             ->where('id', $keyActivateId)
             ->where('status', KeyActivate::ACTIVE)
             ->firstOrFail();
@@ -2572,6 +2573,16 @@ class MarzbanService
         $marzbanApi = new MarzbanAPI($targetPanel->api_address);
 
         $dataLimit = (int) ($keyActivate->traffic_limit ?? 0);
+        if ($keyActivate->split_traffic_across_slots) {
+            $maxSlots = max(1, (int) config('panel.max_provider_slots', 3));
+            $parts = TrafficLimitHelper::distributeAcrossSlots($dataLimit, $maxSlots);
+            $orderedIds = KeyActivateUser::where('key_activate_id', $keyActivateId)->orderBy('id')->pluck('id');
+            $slotIndex = $orderedIds->search($keyActivateUser->id);
+            if ($slotIndex === false) {
+                $slotIndex = 0;
+            }
+            $dataLimit = (int) ($parts[$slotIndex] ?? 0);
+        }
         // finish_at в БД — Unix timestamp (секунды), Marzban API ожидает то же
         $expire = (int) ($keyActivate->finish_at ?? (time() + 30 * 86400));
         if ($expire <= time()) {

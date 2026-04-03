@@ -911,6 +911,11 @@ class VpnConfigController extends Controller
                 }
             }
 
+            // Обновляем ссылки в БД и расход трафика (для страницы конфига / суммы по слотам)
+            if (array_key_exists('used_traffic', $userData)) {
+                $serverUser->used_traffic = (int) $userData['used_traffic'];
+            }
+
             // Обновляем ссылки в БД
             if (!empty($userData['links'])) {
                 $serverUser->keys = json_encode($userData['links']);
@@ -928,6 +933,9 @@ class VpnConfigController extends Controller
 
             // Если не удалось получить из panel, используем сохраненные ключи
             Log::warning('Using stored keys for user', ['user_id' => $serverUser->id]);
+            if ($serverUser->isDirty()) {
+                $serverUser->save();
+            }
             return json_decode($serverUser->keys, true) ?? [];
 
         } catch (Exception $e) {
@@ -1251,6 +1259,110 @@ class VpnConfigController extends Controller
     }
 
     /**
+     * Суммарный расход трафика по всем слотам Marzban и лимит ключа (key_activate.traffic_limit).
+     *
+     * @return array{data_used: int, data_limit: int, data_limit_tariff: int, status: string}
+     */
+    private function aggregateTrafficForConfigPage(KeyActivate $keyActivate, $firstServerUser, bool $useStoredOnly): array
+    {
+        $tariff = (int) ($keyActivate->traffic_limit ?? 0);
+        $usedTotal = 0;
+        $limitFromPanels = 0;
+        $firstStatus = 'active';
+
+        if (!$keyActivate->relationLoaded('keyActivateUsers')) {
+            $keyActivate->setRelation(
+                'keyActivateUsers',
+                $this->keyActivateUserRepository->findAllByKeyActivateIdForSubscription($keyActivate->id)
+            );
+        }
+        $users = $keyActivate->keyActivateUsers ?? collect();
+
+        $slotIndex = 0;
+        foreach ($users as $kau) {
+            $su = $kau->serverUser;
+            if (!$su) {
+                continue;
+            }
+            $panel = $su->panel;
+            if (!$panel) {
+                $usedTotal += (int) ($su->used_traffic ?? 0);
+                $slotIndex++;
+                continue;
+            }
+            $panel->loadMissing('server');
+            $panelType = $panel->panel ?? Panel::MARZBAN;
+            if ($panelType === '') {
+                $panelType = Panel::MARZBAN;
+            }
+
+            if (!$useStoredOnly) {
+                try {
+                    $panel_strategy = new PanelStrategy($panelType);
+                    $slotInfo = $panel_strategy->getSubscribeInfo($panel->id, $su->id);
+                    $usedTotal += (int) ($slotInfo['used_traffic'] ?? 0);
+                    $limitFromPanels += (int) ($slotInfo['data_limit'] ?? 0);
+                    if ($slotIndex === 0) {
+                        if (isset($slotInfo['key_status_updated']) && $slotInfo['key_status_updated'] === true) {
+                            $keyActivate->refresh();
+                        }
+                        $firstStatus = (string) ($slotInfo['status'] ?? 'active');
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('aggregateTrafficForConfigPage: subscribe info failed for slot', [
+                        'key_activate_id' => $keyActivate->id,
+                        'server_user_id' => $su->id,
+                        'error' => $e->getMessage(),
+                        'source' => 'vpn',
+                    ]);
+                    $usedTotal += (int) ($su->used_traffic ?? 0);
+                }
+            } else {
+                $usedTotal += (int) ($su->used_traffic ?? 0);
+            }
+            $slotIndex++;
+        }
+
+        if ($users->isEmpty() && $firstServerUser && $firstServerUser->panel) {
+            $panel = $firstServerUser->panel;
+            $panelType = $panel->panel ?? Panel::MARZBAN;
+            if ($panelType === '') {
+                $panelType = Panel::MARZBAN;
+            }
+            if (!$useStoredOnly) {
+                try {
+                    $panel_strategy = new PanelStrategy($panelType);
+                    $slotInfo = $panel_strategy->getSubscribeInfo($panel->id, $firstServerUser->id);
+                    $usedTotal = (int) ($slotInfo['used_traffic'] ?? 0);
+                    $limitFromPanels = (int) ($slotInfo['data_limit'] ?? 0);
+                    if (isset($slotInfo['key_status_updated']) && $slotInfo['key_status_updated'] === true) {
+                        $keyActivate->refresh();
+                    }
+                    $firstStatus = (string) ($slotInfo['status'] ?? 'active');
+                } catch (\Throwable $e) {
+                    Log::warning('aggregateTrafficForConfigPage: fallback single slot failed', [
+                        'key_activate_id' => $keyActivate->id,
+                        'error' => $e->getMessage(),
+                        'source' => 'vpn',
+                    ]);
+                    $usedTotal = (int) ($firstServerUser->used_traffic ?? 0);
+                }
+            } else {
+                $usedTotal = (int) ($firstServerUser->used_traffic ?? 0);
+            }
+        }
+
+        $totalLimit = $tariff > 0 ? $tariff : $limitFromPanels;
+
+        return [
+            'data_used' => $usedTotal,
+            'data_limit' => $totalLimit,
+            'data_limit_tariff' => $tariff,
+            'status' => $firstStatus,
+        ];
+    }
+
+    /**
      * Собирает данные для страницы конфига в браузере (те же поля, что раньше передавались в Blade partial).
      *
      * @param array $slotsWithLinks Массив [ ['location_label' => string, 'connection_keys' => array], ... ]
@@ -1284,24 +1396,8 @@ class VpnConfigController extends Controller
                 ]);
             }
 
-            // /content (useStoredOnly=true): только БД. /refresh (useStoredOnly=false): трафик и ссылки с панели Marzban.
-            $info = [];
-            $panelType = $serverUser && $serverUser->panel ? $serverUser->panel->panel : null;
-            if ($panelType !== null && $panelType !== '' && !$useStoredOnly) {
-                try {
-                    $panel_strategy = new PanelStrategy($panelType);
-                    $info = $panel_strategy->getSubscribeInfo($serverUser->panel->id, $serverUser->id);
-                    if (isset($info['key_status_updated']) && $info['key_status_updated'] === true) {
-                        $keyActivate->refresh();
-                    }
-                } catch (Exception $e) {
-                    Log::warning('Error showing browser page: could not fetch subscribe info from panel', [
-                        'error' => $e->getMessage(),
-                        'key_activate_id' => $keyActivate->id,
-                        'source' => 'vpn'
-                    ]);
-                }
-            }
+            // Трафик: сумма used по всем слотам (Marzban); лимит — traffic_limit ключа (тариф).
+            $trafficAgg = $this->aggregateTrafficForConfigPage($keyActivate, $serverUser, $useStoredOnly);
 
             $finishAt = $keyActivate->finish_at ?? null;
             $daysRemaining = null;
@@ -1311,10 +1407,10 @@ class VpnConfigController extends Controller
 
             $userInfo = [
                 'username' => $serverUser ? $serverUser->id : '',
-                'status' => $info['status'] ?? 'active',
-                'data_limit' => $info['data_limit'] ?? ($keyActivate->traffic_limit ?? 0),
-                'data_limit_tariff' => $keyActivate->traffic_limit ?? 0,
-                'data_used' => $info['used_traffic'] ?? 0,
+                'status' => $trafficAgg['status'],
+                'data_limit' => $trafficAgg['data_limit'],
+                'data_limit_tariff' => $trafficAgg['data_limit_tariff'],
+                'data_used' => $trafficAgg['data_used'],
                 'expiration_date' => $finishAt,
                 'days_remaining' => $daysRemaining
             ];
@@ -1403,14 +1499,11 @@ class VpnConfigController extends Controller
                                 }
                                 $newKeyFormattedKeys = $this->formatConnectionKeys($newConnectionKeys, $newLocationLabel);
 
-                                // Получаем информацию о подписке для нового ключа
-                                $panel_strategy = new PanelStrategy($newServerUser->panel->panel);
-                                $newInfo = $panel_strategy->getSubscribeInfo($newServerUser->panel->id, $newServerUser->id);
-
-                                // Если статус нового ключа был обновлен в getUserSubscribeInfo, перезагружаем модель
-                                if (isset($newInfo['key_status_updated']) && $newInfo['key_status_updated'] === true) {
-                                    $newKeyActivate->refresh();
-                                }
+                                $newKeyActivate->setRelation(
+                                    'keyActivateUsers',
+                                    $this->keyActivateUserRepository->findAllByKeyActivateIdForSubscription($newKeyActivate->id)
+                                );
+                                $newTrafficAgg = $this->aggregateTrafficForConfigPage($newKeyActivate, $newServerUser, $useStoredOnly);
 
                                 $newFinishAt = $newKeyActivate->finish_at ?? null;
                                 $newDaysRemaining = null;
@@ -1420,10 +1513,10 @@ class VpnConfigController extends Controller
 
                                 $newKeyUserInfo = [
                                     'username' => $newServerUser->id,
-                                    'status' => $newInfo['status'] ?? 'unknown',
-                                    'data_limit' => $newInfo['data_limit'] ?? 0,
-                                    'data_limit_tariff' => $newKeyActivate->traffic_limit ?? 0,
-                                    'data_used' => $newInfo['used_traffic'] ?? 0,
+                                    'status' => $newTrafficAgg['status'],
+                                    'data_limit' => $newTrafficAgg['data_limit'],
+                                    'data_limit_tariff' => $newTrafficAgg['data_limit_tariff'],
+                                    'data_used' => $newTrafficAgg['data_used'],
                                     'expiration_date' => $newFinishAt,
                                     'days_remaining' => $newDaysRemaining
                                 ];

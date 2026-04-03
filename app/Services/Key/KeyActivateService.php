@@ -3,6 +3,7 @@
 namespace App\Services\Key;
 
 use App\Dto\Bot\BotModuleDto;
+use App\Helpers\TrafficLimitHelper;
 use App\Helpers\OrderHelper;
 use App\Models\Bot\BotModule;
 use App\Models\KeyActivate\KeyActivate;
@@ -159,6 +160,11 @@ class KeyActivateService
         }
 
         $wouldAdd = 0;
+        $maxSlotsNorm = max(1, $maxSlots);
+        $splitLimits = ($key->split_traffic_across_slots ?? false)
+            ? TrafficLimitHelper::distributeAcrossSlots((int) ($key->traffic_limit ?? 0), $maxSlotsNorm)
+            : null;
+        $nextSlotIndex = $key->keyActivateUsers->count();
         foreach ($slots as $provider) {
             $provider = trim((string) $provider);
             if ($provider === '') {
@@ -195,7 +201,9 @@ class KeyActivateService
             if ($expire <= time()) {
                 $expire = time() + 86400;
             }
-            $dataLimit = (int) ($key->traffic_limit ?? 0);
+            $dataLimit = $splitLimits !== null
+                ? (int) ($splitLimits[$nextSlotIndex] ?? 0)
+                : (int) ($key->traffic_limit ?? 0);
             $userTgId = (int) $key->user_tg_id;
             try {
                 $panelStrategy = new PanelStrategy($panel->panel ?? Panel::MARZBAN);
@@ -208,6 +216,9 @@ class KeyActivateService
                     ['max_connections' => config('panel.max_connections', 4)]
                 );
                 $wouldAdd++;
+                if ($splitLimits !== null) {
+                    $nextSlotIndex++;
+                }
                 $existingProviders[$providerKey] = true;
                 $existingPanelIds[$panel->id] = true;
             } catch (Exception $e) {
@@ -243,6 +254,7 @@ class KeyActivateService
             $keyData = [
                 'id' => Str::uuid()->toString(),
                 'traffic_limit' => $traffic_limit,
+                'split_traffic_across_slots' => true,
                 'pack_salesman_id' => $pack_salesman_id,
                 'finish_at' => $finish_at,
                 'deleted_at' => $deleted_at,
@@ -630,13 +642,20 @@ class KeyActivateService
 
             $tMarzbanStart = microtime(true);
             $lastError = null;
-            foreach ($panels as $panel) {
+            $slotCount = max(1, count($panels));
+            $slotTrafficLimits = ($keyLocked->split_traffic_across_slots ?? false)
+                ? TrafficLimitHelper::distributeAcrossSlots((int) ($keyLocked->traffic_limit ?? 0), $slotCount)
+                : null;
+            foreach ($panels as $i => $panel) {
                 try {
+                    $dataLimit = $slotTrafficLimits !== null
+                        ? (int) ($slotTrafficLimits[$i] ?? 0)
+                        : (int) ($keyLocked->traffic_limit ?? 0);
                     $panelStrategy = new PanelStrategy($panel->panel ?? Panel::MARZBAN);
                     $serverUser = $panelStrategy->addServerUser(
                         $panel->id,
                         $userTgId,
-                        $keyLocked->traffic_limit,
+                        $dataLimit,
                         $finishAt,
                         $keyLocked->id,
                         ['max_connections' => config('panel.max_connections', 4)]
@@ -1125,13 +1144,20 @@ class KeyActivateService
 
             $serverUsers = [];
             $lastError = null;
-            foreach ($panels as $panel) {
+            $slotCount = max(1, count($panels));
+            $slotTrafficLimits = ($key->split_traffic_across_slots ?? false)
+                ? TrafficLimitHelper::distributeAcrossSlots((int) ($trafficLimit ?? 0), $slotCount)
+                : null;
+            foreach ($panels as $i => $panel) {
                 try {
+                    $dataLimit = $slotTrafficLimits !== null
+                        ? (int) ($slotTrafficLimits[$i] ?? 0)
+                        : (int) ($trafficLimit ?? 0);
                     $panelStrategy = new PanelStrategy($panel->panel ?? Panel::MARZBAN);
                     $serverUser = $panelStrategy->addServerUser(
                         $panel->id,
                         $key->user_tg_id,
-                        $trafficLimit,
+                        $dataLimit,
                         $finishAt,
                         $key->id,
                         ['max_connections' => config('panel.max_connections', 4)]

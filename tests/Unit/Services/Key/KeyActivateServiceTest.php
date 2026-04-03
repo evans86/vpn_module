@@ -66,6 +66,7 @@ class KeyActivateServiceTest extends TestCase
         $this->keyActivateRepo->expects('createKey')
             ->with(Mockery::on(function ($data) use ($trafficLimit, $finishAt) {
                 return $data['traffic_limit'] === $trafficLimit
+                    && ($data['split_traffic_across_slots'] ?? false) === true
                     && $data['finish_at'] === $finishAt
                     && $data['status'] === KeyActivate::PAID;
             }))
@@ -112,6 +113,7 @@ class KeyActivateServiceTest extends TestCase
         $this->keyActivateRepo->allows('createKey')
             ->with(Mockery::on(function ($data) use ($trafficLimit, $finishAt, $packSalesmanId) {
                 return $data['traffic_limit'] == $trafficLimit
+                    && ($data['split_traffic_across_slots'] ?? false) === true
                     && $data['pack_salesman_id'] == $packSalesmanId
                     && $data['finish_at'] == $finishAt
                     && $data['status'] == KeyActivate::PAID;
