@@ -18,6 +18,7 @@ use App\Models\Log\ApplicationLog;
 use App\Services\External\BottApi;
 use App\Services\Panel\PanelStrategy;
 use App\Services\Notification\NotificationService;
+use App\Services\Notification\TelegramNotificationService;
 use App\Services\Server\ServerStrategy;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -1209,6 +1210,29 @@ class KeyActivateService
             if ($key->pack_salesman_id) {
                 $packSalesman = $this->packSalesmanRepository->findByIdOrFail($key->pack_salesman_id);
                 $this->notificationService->sendKeyActivatedNotification($packSalesman->salesman->telegram_id, $key->id);
+            }
+
+            try {
+                $keyForUser = KeyActivate::with(['moduleSalesman.botModule', 'packSalesman.salesman'])
+                    ->find($activatedKey->id);
+                if ($keyForUser && $keyForUser->user_tg_id) {
+                    $msg = "🔔 <b>Ключ перевыпущен</b>\n\n";
+                    $msg .= "Конфигурация VPN на серверах обновлена. Обновите подписку в клиенте или заново вставьте ссылку-подключение.\n\n";
+                    $msg .= "Ключ: <code>{$keyForUser->id}</code>\n\n";
+                    $msg .= \App\Helpers\UrlHelper::telegramConfigLinksHtml($keyForUser->id);
+                    $rows = \App\Helpers\UrlHelper::telegramInlineKeyboardConfigRows($keyForUser->id);
+                    app(TelegramNotificationService::class)->sendToUser(
+                        $keyForUser,
+                        $msg,
+                        ['inline_keyboard' => $rows]
+                    );
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Не удалось отправить пользователю уведомление о перевыпуске ключа', [
+                    'key_id' => $activatedKey->id,
+                    'error' => $e->getMessage(),
+                    'source' => 'key_activate',
+                ]);
             }
 
             $this->scheduleWarmConfigAfterActivation((string) $activatedKey->id);

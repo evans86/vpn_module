@@ -150,6 +150,10 @@ class ViolationManualService
                     $oldKey->finish_at,
                     null
                 );
+                if ($oldKey->module_salesman_id) {
+                    $newKey->module_salesman_id = $oldKey->module_salesman_id;
+                    $newKey->save();
+                }
 
                 // Активируем новый ключ
                 $activatedKey = $this->keyActivateService->activate($newKey, $userTgId);
@@ -205,7 +209,9 @@ class ViolationManualService
                     'admin_action' => true
                 ]);
 
-                return $newKey;
+                $this->sendKeyReplacementNotification($violation, $activatedKey);
+
+                return $activatedKey;
             });
         } catch (\Exception $e) {
             Log::error('Ошибка замены ключа', [
@@ -475,6 +481,10 @@ class ViolationManualService
                     $newFinishAt,
                     null
                 );
+                if ($oldKey->module_salesman_id) {
+                    $newKey->module_salesman_id = $oldKey->module_salesman_id;
+                    $newKey->save();
+                }
 
                 // Активируем новый ключ (передаем finish_at чтобы не пересчитывался)
                 $activatedKey = $this->keyActivateService->activateWithFinishAt($newKey, $userTgId, $newFinishAt);
@@ -657,9 +667,9 @@ class ViolationManualService
                 ]);
 
                 // Отправляем уведомление о новом ключе
-                $this->sendKeyReplacementNotification($violation, $newKey);
+                $this->sendKeyReplacementNotification($violation, $activatedKey);
 
-                return $newKey;
+                return $activatedKey;
             });
         } catch (\Exception $e) {
             // Проверяем, существует ли нарушение в БД
@@ -689,32 +699,37 @@ class ViolationManualService
     private function sendKeyReplacementNotification(ConnectionLimitViolation $violation, KeyActivate $newKey): bool
     {
         try {
+            $key = KeyActivate::with(['moduleSalesman.botModule', 'packSalesman.salesman'])->find($newKey->id);
+            if (!$key) {
+                return false;
+            }
+
             // Используем форматирование из ConnectionLimitMonitorService, но с новым ключом
             $message = "🔴 <b>Ключ заменен за нарушения</b>\n\n";
             $message .= "Превышен лимит нарушений правил использования.\n";
             $message .= "Ваш ключ доступа был автоматически заменен.\n\n";
-            $message .= "Новый ключ: <code>{$newKey->id}</code>\n";
-            $message .= "\n" . \App\Helpers\UrlHelper::telegramConfigLinksHtml($newKey->id);
+            $message .= "Новый ключ: <code>{$key->id}</code>\n";
+            $message .= "\n" . \App\Helpers\UrlHelper::telegramConfigLinksHtml($key->id);
 
-            $rows = \App\Helpers\UrlHelper::telegramInlineKeyboardConfigRows($newKey->id);
+            $rows = \App\Helpers\UrlHelper::telegramInlineKeyboardConfigRows($key->id);
             $rows[] = [
                 [
                     'text' => '🆕 Новый ключ',
-                    'url' => \App\Helpers\UrlHelper::configUrl($newKey->id),
+                    'url' => \App\Helpers\UrlHelper::configUrl($key->id),
                 ],
             ];
             $keyboard = ['inline_keyboard' => $rows];
 
             // Отправляем уведомление напрямую через notificationService
             $notificationService = app(\App\Services\Notification\TelegramNotificationService::class);
-            $result = $notificationService->sendToUser($newKey, $message, $keyboard);
+            $result = $notificationService->sendToUser($key, $message, $keyboard);
 
             if ($result) {
                 $this->logger->info('Уведомление о замене ключа отправлено', [
                     'violation_id' => $violation->id,
                     'old_key_id' => $violation->key_activate_id,
-                    'new_key_id' => $newKey->id,
-                    'user_tg_id' => $newKey->user_tg_id
+                    'new_key_id' => $key->id,
+                    'user_tg_id' => $key->user_tg_id
                 ]);
             }
 
@@ -723,7 +738,7 @@ class ViolationManualService
             Log::error('Ошибка отправки уведомления о замене ключа', [
                 'violation_id' => $violation->id,
                 'source' => 'vpn',
-                'new_key_id' => $newKey->id,
+                'new_key_id' => $newKey->id ?? null,
                 'error' => $e->getMessage()
             ]);
             return false;
