@@ -3,20 +3,16 @@
 namespace App\Services\Panel\marzban;
 
 use App\Helpers\TrafficLimitHelper;
-use App\Dto\Bot\BotModuleFactory;
 use App\Dto\Server\ServerDto;
 use App\Dto\Server\ServerFactory;
-use App\Models\Bot\BotModule;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\KeyActivateUser\KeyActivateUser;
-use App\Models\PackSalesman\PackSalesman;
 use App\Models\Panel\Panel;
-use App\Models\Salesman\Salesman;
 use App\Models\Server\Server;
 use App\Models\ServerMonitoring\ServerMonitoring;
 use App\Models\ServerUser\ServerUser;
-use App\Services\External\BottApi;
 use App\Services\External\MarzbanAPI;
+use App\Services\Notification\TelegramNotificationService;
 use App\Services\Key\KeyActivateUserService;
 use App\Services\Panel\PanelStrategy;
 use Carbon\Carbon;
@@ -27,7 +23,6 @@ use Illuminate\Support\Str;
 use Exception;
 use phpseclib3\Net\SSH2;
 use RuntimeException;
-use Telegram\Bot\Api;
 
 class MarzbanService
 {
@@ -2573,7 +2568,7 @@ class MarzbanService
 
                 DB::commit();
 
-                // Отправляем сообщение через FatherBot (только если найден ключ key_activate)
+                // Уведомление пользователю (модуль Bot-T или бот продавца) — та же логика, что в TelegramNotificationService
                 if ($key_activate) {
                     $message = "⚠️ Ваш ключ доступа: " . "<code>{$key_activate->id}</code> " . "был перемещен на новый сервер!\n\n";
                     $message .= "🔗 Для продолжения работы:\n";
@@ -2582,48 +2577,16 @@ class MarzbanService
                     $message .= "\n" . \App\Helpers\UrlHelper::telegramConfigLinksHtml($key_activate->id);
 
                     try {
-                        if (!is_null($key_activate->module_salesman_id)) {
-                            // Загружаем только необходимые поля для модульного продавца
-                            // module_salesman_id ссылается на Salesman, у которого есть botModule через module_bot_id
-                            $salesman = Salesman::select('id', 'module_bot_id')
-                                ->where('id', $key_activate->module_salesman_id)
-                                ->first();
-                            
-                            if ($salesman && $salesman->module_bot_id) {
-                                $botModule = BotModule::select('id', 'token', 'username')
-                                    ->where('id', $salesman->module_bot_id)
-                                    ->first();
-                                
-                                if ($botModule) {
-                                    BottApi::senModuleMessage(BotModuleFactory::fromEntity($botModule), $key_activate->user_tg_id, $message);
-                                }
-                            }
-                        } else {
-                            // Загружаем только необходимые поля для продавца пакетов
-                            $packSalesman = PackSalesman::select('salesman_id')
-                                ->where('id', $key_activate->pack_salesman_id)
-                                ->first();
-
-                            if ($packSalesman) {
-                                $salesman = Salesman::select('id', 'token', 'telegram_id')
-                                    ->where('id', $packSalesman->salesman_id)
-                                    ->first();
-
-                                if ($salesman) {
-                                    $telegram = new Api($salesman->token);
-                                    $telegram->sendMessage([
-                                        'chat_id' => $key_activate->user_tg_id,
-                                        'text' => $message,
-                                        'parse_mode' => 'HTML'
-                                    ]);
-                                }
-                            }
+                        $keyActivateFull = KeyActivate::with(['moduleSalesman.botModule', 'packSalesman.salesman'])
+                            ->find($key_activate->id);
+                        if ($keyActivateFull) {
+                            app(TelegramNotificationService::class)->sendToUser($keyActivateFull, $message);
                         }
                     } catch (Exception $e) {
-                        Log::error('Ошибка при отправке сообщения через FatherBot', [
+                        Log::error('Ошибка при отправке уведомления о переносе ключа на другой сервер', [
                             'error' => $e->getMessage(),
                             'key_id' => $key_activate->id,
-                            'source' => 'panel'
+                            'source' => 'panel',
                         ]);
                     }
                 }
