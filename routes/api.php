@@ -25,7 +25,10 @@ Route::middleware('auth:api')->get('/user', function (Request $request) {
 });
 
 Route::prefix('servers')->group(function () {
+    //New GET
     Route::post('create', [ServerController::class, 'store']);
+    Route::get('create', [ServerController::class, 'store']);
+
     Route::get('{server}/status', [ServerController::class, 'getStatus']);
     Route::delete('{server}', [ServerController::class, 'destroy']);
 });
@@ -42,24 +45,33 @@ Route::prefix('v1/bot-module')->group(function () {
     Route::get('create', [BotModuleController::class, 'create']);
     Route::get('get', [BotModuleController::class, 'get']);
     Route::get('settings', [BotModuleController::class, 'getSettings']);
+    //New GET
     Route::post('update', [BotModuleController::class, 'update']);
+    Route::get('update', [BotModuleController::class, 'update']);
+
     Route::get('delete', [BotModuleController::class, 'delete']);
 });
 
 // Key Activate API Routes
 Route::prefix('v1/key-activate')->group(function () {
-    Route::post('buy-key', [KeyActivateController::class, 'buyKey']); // ?
-    Route::post('free-key', [KeyActivateController::class, 'getFreeKey']); // ?
-    Route::get('user-key', [KeyActivateController::class, 'getUserKey']); // +-
-    Route::get('user-keys', [KeyActivateController::class, 'getUserKeys']); // +-
-    Route::get('vpn-instructions', [KeyActivateController::class, 'getVpnInstructions']); // +-
+    //New GET
+    Route::post('buy-key', [KeyActivateController::class, 'buyKey']);
+    Route::get('buy-key', [KeyActivateController::class, 'buyKey']);
+
+    //New GET
+    Route::post('free-key', [KeyActivateController::class, 'getFreeKey']);
+    Route::get('free-key', [KeyActivateController::class, 'getFreeKey']);
+
+    Route::get('user-key', [KeyActivateController::class, 'getUserKey']);
+    Route::get('user-keys', [KeyActivateController::class, 'getUserKeys']);
+    Route::get('vpn-instructions', [KeyActivateController::class, 'getVpnInstructions']);
 });
 
 // BOT-T Webhook Routes
 Route::prefix('v1/bott')->group(function () {
     // URL вебхука (уведомление после оплаты заказа)
     Route::post('webhook/order-payment', [BotTWebhookController::class, 'handleOrderPayment']);
-    
+
     // URL вебхука (проверка товара перед выдачей клиенту)
     Route::post('webhook/validate-product', [BotTWebhookController::class, 'validateProduct']);
 });
