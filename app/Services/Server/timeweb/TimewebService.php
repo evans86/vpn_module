@@ -379,6 +379,7 @@ class TimewebService
             $server->name = $serverName;
             $server->host = $host->name;
             $server->dns_record_id = $host->id;
+            $server->cloudflare_zone_id = $host->cloudflare_zone_id ?? null;
             $server->server_status = Server::SERVER_CONFIGURED;
             $server->save();
 
@@ -670,7 +671,7 @@ class TimewebService
             if ($server->dns_record_id) {
                 try {
                     $cloudflare = new CloudflareService();
-                    $cloudflare->deleteSubdomain($server->dns_record_id);
+                    $cloudflare->deleteSubdomain($server->dns_record_id, $server->cloudflare_zone_id);
                     Log::info('DNS record deleted from Cloudflare', [
                         'source' => 'server',
                         'server_id' => $server->id,

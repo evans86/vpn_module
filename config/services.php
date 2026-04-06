@@ -44,7 +44,29 @@ return [
     'cloudflare' => [
         'email' => env('CLOUDFLARE_EMAIL', 'support@bot-t.ru'),
         'api_key' => env('CLOUDFLARE_API_KEY', '1697f393d7d2fceb7866b0c7062d025b8cfe6'),
+        /** @deprecated Используйте legacy_zone_id; оставлено для совместимости */
         'zone_id' => env('CLOUDFLARE_ZONE_ID', 'ecd4115fa760df3dd0a5f9c0e2caee2d'),
+        /**
+         * Зона vpn-telegram.com: только для удаления старых DNS-записей, если у сервера не задан cloudflare_zone_id.
+         * Новые A-записи создаются только в dns_zones (случайная зона из пула).
+         */
+        'legacy_zone_id' => env('CLOUDFLARE_LEGACY_ZONE_ID', env('CLOUDFLARE_ZONE_ID', 'ecd4115fa760df3dd0a5f9c0e2caee2d')),
+        /**
+         * Пул зон для новых поддоменов (случайный выбор). Не включайте vpn-telegram.com, если не хотите светить домен.
+         * zone_id — из Cloudflare (обзор домена), domain — корневой домен зоны (для сопоставления имён записей).
+         */
+        'dns_zones' => array_values(array_filter([
+            [
+                'zone_id' => env('CLOUDFLARE_DNS_ZONE_KVN_FREE', '23ccc49cc28d56e1c2efb0e65f7592df'),
+                'domain' => env('CLOUDFLARE_DNS_DOMAIN_KVN_FREE', 'kvnfreetest.uk'),
+            ],
+            [
+                'zone_id' => env('CLOUDFLARE_DNS_ZONE_KVN_COCO', '14e5935e8704782977a1c330fa33795d'),
+                'domain' => env('CLOUDFLARE_DNS_DOMAIN_KVN_COCO', 'kvncococ.org'),
+            ],
+        ], static function ($z) {
+            return !empty($z['zone_id']) && !empty($z['domain']);
+        })),
     ],
 
     'telegram' => [

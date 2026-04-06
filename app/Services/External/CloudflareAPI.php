@@ -12,7 +12,6 @@ use stdClass;
 
 class CloudflareAPI
 {
-    private const ZONE_ID = 'ecd4115fa760df3dd0a5f9c0e2caee2d';
     private const RECORD_TYPE = 'A';
 
     /**
@@ -36,24 +35,23 @@ class CloudflareAPI
         } catch (Exception $e) {
             Log::error('Failed to create Cloudflare adapter', [
                 'error' => $e->getMessage(),
-                'source' => 'api'
+                'source' => 'api',
             ]);
             throw new RuntimeException('Failed to initialize Cloudflare API: ' . $e->getMessage());
         }
     }
 
     /**
-     * Cоздать DNS запись
+     * Cоздать DNS запись в указанной зоне
      *
-     * @param string $name
-     * @param string $ip
-     * @return stdClass Объект с информацией о созданной DNS записи
-     * @throws RuntimeException
+     * @param string $zoneId ID зоны Cloudflare
+     * @param string $name Имя записи (поддомен без зоны или FQDN — как в API Cloudflare)
+     * @param string $ip IPv4
      */
-    public function createDNSRecord(string $name, string $ip): stdClass
+    public function createDNSRecord(string $zoneId, string $name, string $ip): stdClass
     {
-        if (empty($name) || empty($ip)) {
-            throw new RuntimeException('Name and IP are required for DNS record creation');
+        if (empty($zoneId) || empty($name) || empty($ip)) {
+            throw new RuntimeException('Zone ID, name and IP are required for DNS record creation');
         }
 
         if (!filter_var($ip, FILTER_VALIDATE_IP)) {
@@ -65,13 +63,13 @@ class CloudflareAPI
                 'name' => $name,
                 'ip' => $ip,
                 'type' => self::RECORD_TYPE,
-                'zone_id' => self::ZONE_ID,
-                'source' => 'api'
+                'zone_id' => $zoneId,
+                'source' => 'api',
             ]);
 
             $DNSRecord = new DNS(self::getAdapter());
             /** @var stdClass|bool $result */
-            $result = $DNSRecord->addRecord(self::ZONE_ID, self::RECORD_TYPE, $name, $ip, 0, false);
+            $result = $DNSRecord->addRecord($zoneId, self::RECORD_TYPE, $name, $ip, 0, false);
 
             if (!is_object($result) || !isset($result->id) || !isset($result->name)) {
                 throw new RuntimeException('Invalid response from Cloudflare API: missing id or name');
@@ -81,7 +79,7 @@ class CloudflareAPI
                 'name' => $name,
                 'ip' => $ip,
                 'record_id' => $result->id,
-                'source' => 'api'
+                'source' => 'api',
             ]);
 
             return $result;
@@ -91,27 +89,19 @@ class CloudflareAPI
                 'ip' => $ip,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'source' => 'api'
+                'source' => 'api',
             ]);
             throw new RuntimeException('Failed to create DNS record: ' . $e->getMessage());
         }
     }
 
     /**
-     * @TODO
-     *
-     * Обновить существующую DNS запись
-     *
-     * @param string $record_id
-     * @param string $name
-     * @param string $ip
-     * @return stdClass Объект с информацией об обновленной DNS записи
-     * @throws RuntimeException
+     * Обновить существующую DNS запись (удаление + создание в той же зоне)
      */
-    public function updateDNSRecord(string $record_id, string $name, string $ip): stdClass
+    public function updateDNSRecord(string $zoneId, string $record_id, string $name, string $ip): stdClass
     {
-        if (empty($record_id) || empty($name) || empty($ip)) {
-            throw new RuntimeException('Record ID, name and IP are required for DNS record update');
+        if (empty($zoneId) || empty($record_id) || empty($name) || empty($ip)) {
+            throw new RuntimeException('Zone ID, record ID, name and IP are required for DNS record update');
         }
 
         if (!filter_var($ip, FILTER_VALIDATE_IP)) {
@@ -120,21 +110,18 @@ class CloudflareAPI
 
         try {
             Log::info('Updating DNS record', [
+                'zone_id' => $zoneId,
                 'record_id' => $record_id,
                 'name' => $name,
                 'ip' => $ip,
-                'source' => 'api'
+                'source' => 'api',
             ]);
 
-            // Cloudflare API не имеет прямого метода updateRecord, поэтому удаляем и создаем заново
             $DNSRecord = new DNS(self::getAdapter());
-            
-            // Удаляем старую запись
-            $DNSRecord->deleteRecord(self::ZONE_ID, $record_id);
-            
-            // Создаем новую запись с обновленными данными
+            $DNSRecord->deleteRecord($zoneId, $record_id);
+
             /** @var stdClass|bool $result */
-            $result = $DNSRecord->addRecord(self::ZONE_ID, self::RECORD_TYPE, $name, $ip, 0, false);
+            $result = $DNSRecord->addRecord($zoneId, self::RECORD_TYPE, $name, $ip, 0, false);
 
             if (!is_object($result) || !isset($result->id) || !isset($result->name)) {
                 throw new RuntimeException('Invalid response from Cloudflare API: missing id or name');
@@ -144,7 +131,7 @@ class CloudflareAPI
                 'record_id' => $record_id,
                 'name' => $name,
                 'ip' => $ip,
-                'source' => 'api'
+                'source' => 'api',
             ]);
 
             return $result;
@@ -155,7 +142,7 @@ class CloudflareAPI
                 'ip' => $ip,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'source' => 'api'
+                'source' => 'api',
             ]);
             throw new RuntimeException('Failed to update DNS record: ' . $e->getMessage());
         }
@@ -163,29 +150,26 @@ class CloudflareAPI
 
     /**
      * Удалить DNS запись
-     *
-     * @param string $dns_record_id
-     * @return bool
-     * @throws RuntimeException
      */
-    public function deleteDNSRecord(string $dns_record_id): bool
+    public function deleteDNSRecord(string $zoneId, string $dns_record_id): bool
     {
-        if (empty($dns_record_id)) {
-            throw new RuntimeException('Record ID is required for DNS record deletion');
+        if (empty($zoneId) || empty($dns_record_id)) {
+            throw new RuntimeException('Zone ID and record ID are required for DNS record deletion');
         }
 
         try {
             Log::info('Deleting DNS record', [
+                'zone_id' => $zoneId,
                 'record_id' => $dns_record_id,
-                'source' => 'api'
+                'source' => 'api',
             ]);
 
             $DNSRecord = new DNS(self::getAdapter());
-            $result = $DNSRecord->deleteRecord(self::ZONE_ID, $dns_record_id);
+            $result = $DNSRecord->deleteRecord($zoneId, $dns_record_id);
 
             Log::info('DNS record deleted successfully', [
                 'record_id' => $dns_record_id,
-                'source' => 'api'
+                'source' => 'api',
             ]);
 
             return $result;
@@ -194,37 +178,42 @@ class CloudflareAPI
                 'record_id' => $dns_record_id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'source' => 'api'
+                'source' => 'api',
             ]);
             throw new RuntimeException('Failed to delete DNS record: ' . $e->getMessage());
         }
     }
 
     /**
-     * Получить список всех DNS записей
+     * Получить список DNS записей зоны
      *
-     * @return array
-     * @throws RuntimeException
+     * @return array<int, stdClass>
      */
-    public function getRecords(): array
+    public function getRecords(string $zoneId): array
     {
+        if (empty($zoneId)) {
+            throw new RuntimeException('Zone ID is required');
+        }
+
         try {
-            Log::info('Getting DNS records list', ['source' => 'api']);
+            Log::info('Getting DNS records list', ['zone_id' => $zoneId, 'source' => 'api']);
 
             $DNSRecord = new DNS(self::getAdapter());
-            $result = $DNSRecord->listRecords(self::ZONE_ID)->result;
+            $result = $DNSRecord->listRecords($zoneId)->result;
 
             Log::info('DNS records retrieved successfully', [
+                'zone_id' => $zoneId,
                 'count' => count($result),
-                'source' => 'api'
+                'source' => 'api',
             ]);
 
             return $result;
         } catch (Exception $e) {
             Log::error('Failed to get DNS records', [
+                'zone_id' => $zoneId,
                 'error' => $e->getMessage(),
                 'source' => 'api',
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
             throw new RuntimeException('Failed to get DNS records: ' . $e->getMessage());
         }

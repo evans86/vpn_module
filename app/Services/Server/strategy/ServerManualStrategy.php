@@ -130,7 +130,7 @@ class ServerManualStrategy extends ServerMainStrategy
         if (!empty($server->dns_record_id)) {
             try {
                 $cloudflare = new CloudflareService();
-                $cloudflare->deleteSubdomain($server->dns_record_id);
+                $cloudflare->deleteSubdomain($server->dns_record_id, $server->cloudflare_zone_id);
                 Log::info('DNS record deleted for manual server', [
                     'server_id' => $server->id,
                     'dns_record_id' => $server->dns_record_id,

@@ -566,6 +566,7 @@ class ServerController extends Controller
 
             $server->host = $host->name;
             $server->dns_record_id = $host->id;
+            $server->cloudflare_zone_id = $host->cloudflare_zone_id ?? null;
             $server->save();
 
             $this->logger->info('DNS configured for manual server', [

@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $password
  * @property string|null $name
  * @property string|null $dns_record_id
+ * @property string|null $cloudflare_zone_id ID зоны Cloudflare для DNS-записи (удаление)
  * @property string|null $host
  * @property int|null $ssh_port
  * @property string|null $provider
@@ -49,7 +50,9 @@ class Server extends Model
         'is_free',
         'tariff_tier',
         'timeweb_api_profile',
-        'logs_upload_enabled'
+        'logs_upload_enabled',
+        'dns_record_id',
+        'cloudflare_zone_id',
     ];
 
     /**
