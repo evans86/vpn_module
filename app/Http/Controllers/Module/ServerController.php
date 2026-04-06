@@ -7,8 +7,10 @@ use App\Models\Server\Server;
 use App\Services\Server\ServerStrategy;
 use App\Services\Server\LogUploadService;
 use App\Services\Cloudflare\CloudflareService;
+use App\Repositories\Panel\PanelRepository;
 use App\Repositories\Server\ServerRepository;
 use App\Logging\DatabaseLogger;
+use App\Support\ServerProviderCode;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Contracts\Foundation\Application;
@@ -17,6 +19,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use InvalidArgumentException;
 use RuntimeException;
 
 class ServerController extends Controller
@@ -34,15 +37,22 @@ class ServerController extends Controller
      */
     private LogUploadService $logUploadService;
 
+    /**
+     * @var PanelRepository
+     */
+    private PanelRepository $panelRepository;
+
     public function __construct(
         ServerRepository $serverRepository,
         DatabaseLogger   $logger,
-        LogUploadService $logUploadService
+        LogUploadService $logUploadService,
+        PanelRepository $panelRepository
     )
     {
         $this->serverRepository = $serverRepository;
         $this->logger = $logger;
         $this->logUploadService = $logUploadService;
+        $this->panelRepository = $panelRepository;
     }
 
     /**
@@ -88,8 +98,8 @@ class ServerController extends Controller
                 }
 
                 if ($request->filled('provider')) {
-                    $p = strtolower((string) $request->input('provider'));
-                    if (in_array($p, [Server::VDSINA, Server::TIMEWEB, Server::MANUAL], true)) {
+                    $p = (string) $request->input('provider');
+                    if (strlen($p) <= 64) {
                         $query->where('provider', $p);
                     }
                 }
@@ -111,7 +121,25 @@ class ServerController extends Controller
             // Получаем список локаций для формы создания сервера
             $locations = \App\Models\Location\Location::all();
 
-            return view('module.server.index', compact('servers', 'showDeleted', 'locations'));
+            $providerFilterOptions = $this->buildProviderFilterOptions();
+
+            $manualProviderSuggestions = Server::query()
+                ->where('server_status', '!=', Server::SERVER_DELETED)
+                ->whereNotNull('provider')
+                ->whereNotIn('provider', [Server::VDSINA, Server::TIMEWEB])
+                ->distinct()
+                ->orderBy('provider')
+                ->pluck('provider')
+                ->values()
+                ->all();
+
+            return view('module.server.index', compact(
+                'servers',
+                'showDeleted',
+                'locations',
+                'providerFilterOptions',
+                'manualProviderSuggestions'
+            ));
         } catch (Exception $e) {
             $this->logger->error('Ошибка при просмотре списка серверов', [
                 'source' => 'server',
@@ -122,6 +150,31 @@ class ServerController extends Controller
 
             return redirect()->back()->with('error', 'Ошибка при загрузке списка серверов');
         }
+    }
+
+    /**
+     * Подписи для фильтра по провайдеру (все уникальные коды из БД + известные алиасы).
+     *
+     * @return array<string, string> код => подпись
+     */
+    private function buildProviderFilterOptions(): array
+    {
+        $codes = Server::query()
+            ->where('server_status', '!=', Server::SERVER_DELETED)
+            ->whereNotNull('provider')
+            ->where('provider', '!=', '')
+            ->distinct()
+            ->orderBy('provider')
+            ->pluck('provider');
+
+        $out = [];
+        foreach ($codes as $code) {
+            $s = new Server(['provider' => $code]);
+
+            $out[(string) $code] = $s->getProviderLabel();
+        }
+
+        return $out;
     }
 
     /**
@@ -224,6 +277,7 @@ class ServerController extends Controller
         try {
             $validated = $request->validate([
                 'location_id' => 'required|integer|exists:location,id',
+                'provider_name' => 'required|string|max:80',
                 'name' => 'required|string|max:255',
                 'ip' => 'required|string|max:45',
                 'host' => 'nullable|string|max:255',
@@ -231,6 +285,8 @@ class ServerController extends Controller
                 'login' => 'nullable|string|max:255',
                 'password' => 'nullable|string|max:500',
             ]);
+
+            $providerCode = ServerProviderCode::fromLabel($validated['provider_name']);
 
             $server = new Server();
             $server->location_id = $validated['location_id'];
@@ -240,7 +296,7 @@ class ServerController extends Controller
             $server->ssh_port = $validated['ssh_port'] ?? null;
             $server->login = $validated['login'] ?? null;
             $server->password = $validated['password'] ?? null;
-            $server->provider = Server::MANUAL;
+            $server->provider = $providerCode;
             $server->provider_id = null;
             $server->server_status = Server::SERVER_CREATED;
             $server->is_free = false;
@@ -251,13 +307,21 @@ class ServerController extends Controller
                 'user_id' => auth()->id(),
                 'server_id' => $server->id,
                 'location_id' => $server->location_id,
+                'provider' => $server->provider,
             ]);
+
+            $this->panelRepository->forgetRotationSelectionCache($providerCode);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Сервер добавлен',
                 'data' => $server,
             ]);
+        } catch (InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
@@ -281,25 +345,43 @@ class ServerController extends Controller
     /**
      * @param Request $request
      * @param Server $server
-     * @return RedirectResponse
+     * @return RedirectResponse|JsonResponse
      */
-    public function update(Request $request, Server $server): RedirectResponse
+    public function update(Request $request, Server $server)
     {
         try {
-            // Валидация входных данных
             $validated = $request->validate([
                 'name' => 'sometimes|string|max:255',
                 'ip' => 'sometimes|ip',
                 'host' => 'sometimes|string|max:255',
                 'ssh_port' => 'sometimes|nullable|integer|min:1|max:65535',
                 'location_id' => 'sometimes|integer|exists:location,id',
+                'provider_name' => 'sometimes|nullable|string|max:80',
             ]);
+
+            if (array_key_exists('provider_name', $validated)) {
+                if (!$server->usesManualStrategy()) {
+                    throw new InvalidArgumentException('Код провайдера можно менять только для серверов без API.');
+                }
+                $raw = trim((string) ($validated['provider_name'] ?? ''));
+                if ($raw === '') {
+                    throw new InvalidArgumentException('Укажите название провайдера.');
+                }
+                $newCode = ServerProviderCode::fromLabel($raw);
+                $oldCode = (string) $server->provider;
+                if ($newCode !== $oldCode) {
+                    $server->provider = $newCode;
+                    $this->panelRepository->forgetRotationSelectionCache($oldCode);
+                    $this->panelRepository->forgetRotationSelectionCache($newCode);
+                }
+                unset($validated['provider_name']);
+            }
 
             $this->logger->info('Updating server', [
                 'source' => 'server',
                 'user_id' => auth()->id(),
                 'server_id' => $server->id,
-                'data' => $validated
+                'data' => $validated,
             ]);
 
             $server = $this->serverRepository->updateConfiguration($server, $validated);
@@ -307,11 +389,29 @@ class ServerController extends Controller
             $this->logger->info('Server updated successfully', [
                 'source' => 'server',
                 'user_id' => auth()->id(),
-                'server_id' => $server->id
+                'server_id' => $server->id,
             ]);
 
-            return redirect()->route('module.server.index')
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Сохранено',
+                    'data' => $server->fresh(),
+                ]);
+            }
+
+            return redirect()->route('admin.module.server.index')
                 ->with('success', 'Server updated successfully');
+        } catch (InvalidArgumentException $e) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+
+            return redirect()->route('admin.module.server.index')
+                ->with('error', $e->getMessage());
         } catch (Exception $e) {
             $this->logger->error('Error updating server', [
                 'source' => 'server',
@@ -319,10 +419,17 @@ class ServerController extends Controller
                 'trace' => $e->getTraceAsString(),
                 'user_id' => auth()->id(),
                 'server_id' => $server->id,
-                'data' => $request->all()
+                'data' => $request->all(),
             ]);
 
-            return redirect()->route('module.server.index')
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error updating server: ' . $e->getMessage(),
+                ], 500);
+            }
+
+            return redirect()->route('admin.module.server.index')
                 ->withErrors('Error updating server: ' . $e->getMessage());
         }
     }
@@ -385,7 +492,7 @@ class ServerController extends Controller
         }
 
         $provider = strtolower((string) $server->provider);
-        if (in_array($provider, [Server::VDSINA, Server::TIMEWEB], true) && empty($server->provider_id)) {
+        if (Server::isApiProvider($provider) && empty($server->provider_id)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Нет provider_id — перезагрузка через API недоступна',
@@ -403,7 +510,7 @@ class ServerController extends Controller
                 'provider' => $server->provider,
             ]);
 
-            $msg = $provider === Server::MANUAL
+            $msg = $server->usesManualStrategy()
                 ? 'Перезагрузка запланирована примерно через 1 минуту (SSH)'
                 : 'Запрос на перезагрузку отправлен провайдеру';
 
@@ -434,7 +541,7 @@ class ServerController extends Controller
      */
     public function setupDns(Server $server): JsonResponse
     {
-        if (strtolower((string)$server->provider) !== Server::MANUAL) {
+        if (!$server->usesManualStrategy()) {
             return response()->json(['success' => false, 'message' => 'Только для серверов, добавленных вручную'], 400);
         }
         if ((int)$server->server_status !== (int)Server::SERVER_CREATED) {
@@ -495,7 +602,7 @@ class ServerController extends Controller
      */
     public function pingAndConfigure(Request $request, Server $server): JsonResponse
     {
-        if (strtolower((string)$server->provider) !== Server::MANUAL) {
+        if (!$server->usesManualStrategy()) {
             return response()->json(['success' => false, 'message' => 'Только для серверов, добавленных вручную'], 400);
         }
         if ((int)$server->server_status !== (int)Server::SERVER_CREATED) {

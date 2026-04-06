@@ -129,6 +129,46 @@ class Server extends Model
     public const MANUAL = 'manual';
 
     /**
+     * Провайдеры с API (VDSina / Timeweb). Любой другой код в server.provider — ручной сервер (стратегия manual).
+     */
+    public static function isApiProvider(?string $provider): bool
+    {
+        if ($provider === null || $provider === '') {
+            return false;
+        }
+        $p = strtolower(trim($provider));
+
+        return $p === self::VDSINA || $p === self::TIMEWEB;
+    }
+
+    /**
+     * Ручная стратегия (SSH, без API): в т.ч. legacy provider=manual и произвольные slug.
+     */
+    public function usesManualStrategy(): bool
+    {
+        return !self::isApiProvider($this->provider);
+    }
+
+    /**
+     * Подпись провайдера для админки и фильтров.
+     */
+    public function getProviderLabel(): string
+    {
+        $p = strtolower((string) $this->provider);
+        if ($p === self::VDSINA) {
+            return 'VDSina';
+        }
+        if ($p === self::TIMEWEB) {
+            return 'Timeweb Cloud';
+        }
+        if ($p === self::MANUAL) {
+            return 'Без API (код не задан)';
+        }
+
+        return (string) $this->provider;
+    }
+
+    /**
      * Bearer-токен Timeweb Cloud для этого сервера (основной или legacy-аккаунт).
      */
     public function getTimewebBearerToken(): string

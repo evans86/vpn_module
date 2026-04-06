@@ -51,7 +51,7 @@ class PanelSelectionScopeService
             }
             $limitTb = $limitBytes > 0 ? $limitBytes / (1024 ** 4) : 0.0;
             $usedTb = $usedBytes / (1024 ** 4);
-        } elseif ($panel->server && $panel->server->provider === Server::MANUAL) {
+        } elseif ($panel->server && $panel->server->usesManualStrategy()) {
             $limitTb = $nominalLimitBytes / (1024 ** 4);
             $usedTb = 0.0;
             $limitSubstitute = true;
