@@ -170,8 +170,8 @@
                                         class="text-xs rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 max-w-[10rem]"
                                         title="Какой пул серверов использовать при выборе панели для ключей"
                                         onchange="updateServerTariffTier({{ $server->id }}, this.value)">
-                                        @foreach (TariffTier::all() as $tier)
-                                            <option value="{{ $tier }}" title="Код: {{ $tier }}" @selected($currentActivationTier === $tier)>{{ TariffTier::label($tier) }}</option>
+                                        @foreach (TariffTier::forAdminSelect() as $tier)
+                                            <option value="{{ $tier }}" title="Код: {{ $tier }}" @if($currentActivationTier === $tier) selected @endif>{{ TariffTier::label($tier) }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -367,8 +367,8 @@
             <div class="mb-4">
                 <label for="createServerTariffTier" class="block text-sm font-medium text-gray-700 mb-1">Тариф для выдачи ключей</label>
                 <select id="createServerTariffTier" name="tariff_tier" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm">
-                    @foreach (TariffTier::all() as $tier)
-                        <option value="{{ $tier }}" title="Код: {{ $tier }}" @selected($tier === TariffTier::FULL)>{{ TariffTier::label($tier) }}</option>
+                    @foreach (TariffTier::forAdminSelect() as $tier)
+                        <option value="{{ $tier }}" title="Код: {{ $tier }}" @if($tier === TariffTier::FULL) selected @endif>{{ TariffTier::label($tier) }}</option>
                     @endforeach
                 </select>
                 <p class="mt-1 text-xs text-gray-500">Тот же пул, что и у ручных серверов. Подсказка при наведении на пункт — внутренний код.</p>
@@ -436,8 +436,8 @@
             <div class="mb-4">
                 <label for="manualServerTariffTier" class="block text-sm font-medium text-gray-700 mb-1">Тариф для выдачи ключей</label>
                 <select id="manualServerTariffTier" name="tariff_tier" class="mt-1 block w-full max-w-md rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm">
-                    @foreach (TariffTier::all() as $tier)
-                        <option value="{{ $tier }}" title="Код: {{ $tier }}" @selected($tier === TariffTier::FULL)>{{ TariffTier::label($tier) }}</option>
+                    @foreach (TariffTier::forAdminSelect() as $tier)
+                        <option value="{{ $tier }}" title="Код: {{ $tier }}" @if($tier === TariffTier::FULL) selected @endif>{{ TariffTier::label($tier) }}</option>
                     @endforeach
                 </select>
                 <p class="mt-1 text-xs text-gray-500">Кому выдавать ключи с этого сервера при ротации. Подсказка при наведении — внутренний код.</p>

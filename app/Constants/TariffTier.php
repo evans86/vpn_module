@@ -20,13 +20,31 @@ final class TariffTier
     }
 
     /**
-     * Нормализация значения из БД: null, пустая строка и неизвестный код → full (как в миграции по умолчанию).
-     * Нужна в т.ч. для селекта в админке: иначе при '' ни один option не selected, браузер показывает первый (free).
+     * Порядок опций в селектах админки: сначала full — если браузер не применит selected, не покажется «Бесплатный пул».
+     *
+     * @return string[]
      */
-    public static function normalize(?string $tier): string
+    public static function forAdminSelect(): array
     {
-        if ($tier === null || $tier === '') {
+        return [self::FULL, self::FREE, self::WHITELIST];
+    }
+
+    /**
+     * Нормализация значения из БД: null, пустая строка и неизвестный код → full (как в миграции по умолчанию).
+     * Нужна в т.ч. для селекта в админке: иначе при '' ни один option не selected, браузер показывает первый пункт списка.
+     *
+     * @param mixed $tier
+     */
+    public static function normalize($tier): string
+    {
+        if ($tier === null) {
             return self::FULL;
+        }
+        if (is_string($tier) && $tier === '') {
+            return self::FULL;
+        }
+        if (! is_string($tier)) {
+            $tier = (string) $tier;
         }
 
         $t = strtolower(trim($tier));
