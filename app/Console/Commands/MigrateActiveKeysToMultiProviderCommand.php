@@ -36,10 +36,8 @@ class MigrateActiveKeysToMultiProviderCommand extends Command
         $limit = $this->option('limit') !== null && $this->option('limit') !== '' ? (int) $this->option('limit') : 0;
         $keyId = $this->option('key-id');
 
-        $slots = config('panel.multi_provider_slots', []);
-        $slots = is_array($slots) ? $slots : [];
-        if (empty($slots)) {
-            $msg = 'Мульти-провайдер отключён: panel.multi_provider_slots пуст. Задайте PANEL_MULTI_PROVIDER_SLOTS в .env.';
+        if (! filter_var(config('panel.multi_provider_enabled', false), FILTER_VALIDATE_BOOLEAN)) {
+            $msg = 'Мульти-провайдер отключён: задайте PANEL_MULTI_PROVIDER_SLOTS (или * при v2+greedy) в .env.';
             $this->warn($msg);
             $telegramLog->send("[Миграция] " . $msg);
             return 1;

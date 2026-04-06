@@ -80,9 +80,7 @@ class KeyActivateService
     public function addMissingProviderSlots(KeyActivate $key, bool $dryRun = false): int
     {
         $maxSlots = (int) config('panel.max_provider_slots', 3);
-        $slots = config('panel.multi_provider_slots', []);
-        $slots = is_array($slots) ? $slots : [];
-        if (empty($slots)) {
+        if (! filter_var(config('panel.multi_provider_enabled', false), FILTER_VALIDATE_BOOLEAN)) {
             return 0;
         }
 
@@ -98,6 +96,15 @@ class KeyActivateService
         }
 
         $activationTier = $this->activationTariffResolver->resolve($key);
+
+        $slots = config('panel.multi_provider_slots', []);
+        $slots = is_array($slots) ? $slots : [];
+        if (empty($slots) && filter_var(config('panel.multi_provider_allow_all', false), FILTER_VALIDATE_BOOLEAN)) {
+            $slots = $this->panelRepository->getDistinctRotationProviderCodes($activationTier);
+        }
+        if (empty($slots)) {
+            return 0;
+        }
 
         // Не добавляем слотов сверх лимита (у всех ключей макс. max_provider_slots)
         if ($maxSlots > 0 && $key->keyActivateUsers->count() >= $maxSlots) {

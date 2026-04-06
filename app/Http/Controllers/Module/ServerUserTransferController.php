@@ -9,6 +9,7 @@ use App\Models\Panel\Panel;
 use App\Models\ServerUser\ServerUser;
 use App\Repositories\Panel\PanelRepository;
 use App\Jobs\MultiProviderMigrationBatchJob;
+use App\Services\Key\ActivationTariffResolver;
 use App\Services\Key\KeyActivateService;
 use App\Services\Key\MultiProviderMigrationService;
 use App\Services\Panel\marzban\MarzbanService;
@@ -708,15 +709,17 @@ class ServerUserTransferController extends Controller
             ]);
             $keyId = trim($validated['key_id']);
 
-            $slots = config('panel.multi_provider_slots', []);
-            $slots = is_array($slots) ? $slots : [];
-            if (empty($slots)) {
+            if (! filter_var(config('panel.multi_provider_enabled', false), FILTER_VALIDATE_BOOLEAN)) {
                 return response()->json([
                     'success' => false,
                     'valid' => false,
-                    'message' => 'Мульти-провайдер отключён. Задайте PANEL_MULTI_PROVIDER_SLOTS в .env.',
+                    'message' => 'Мульти-провайдер отключён. Задайте PANEL_MULTI_PROVIDER_SLOTS или * (при v2+greedy) в .env.',
                 ], 400);
             }
+
+            $slots = config('panel.multi_provider_slots', []);
+            $slots = is_array($slots) ? $slots : [];
+            $allowAll = filter_var(config('panel.multi_provider_allow_all', false), FILTER_VALIDATE_BOOLEAN);
 
             $key = KeyActivate::query()
                 ->where('id', $keyId)
@@ -748,6 +751,11 @@ class ServerUserTransferController extends Controller
                     'key_id' => $keyId,
                     'message' => 'У ключа нет user_tg_id (не активирован пользователем).',
                 ]);
+            }
+
+            if (empty($slots) && $allowAll) {
+                $tier = app(ActivationTariffResolver::class)->resolve($key);
+                $slots = app(PanelRepository::class)->getDistinctRotationProviderCodes($tier);
             }
 
             $existingProviders = [];
@@ -803,12 +811,10 @@ class ServerUserTransferController extends Controller
             $keyId = trim($validated['key_id']);
             $dryRun = !empty($validated['dry_run']);
 
-            $slots = config('panel.multi_provider_slots', []);
-            $slots = is_array($slots) ? $slots : [];
-            if (empty($slots)) {
+            if (! filter_var(config('panel.multi_provider_enabled', false), FILTER_VALIDATE_BOOLEAN)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Мульти-провайдер отключён. Задайте PANEL_MULTI_PROVIDER_SLOTS в .env.',
+                    'message' => 'Мульти-провайдер отключён. Задайте PANEL_MULTI_PROVIDER_SLOTS или * (при v2+greedy) в .env.',
                     'added' => 0,
                 ], 400);
             }
@@ -861,16 +867,19 @@ class ServerUserTransferController extends Controller
     public function multiProviderMigrationCount(Request $request): JsonResponse
     {
         try {
-            $slots = config('panel.multi_provider_slots', []);
-            $slots = is_array($slots) ? $slots : [];
-            if (empty($slots)) {
+            if (! filter_var(config('panel.multi_provider_enabled', false), FILTER_VALIDATE_BOOLEAN)) {
                 return response()->json([
                     'success' => true,
                     'count' => 0,
                     'slots' => [],
-                    'message' => 'Мульти-провайдер отключён (panel.multi_provider_slots пуст).',
+                    'allow_all' => false,
+                    'message' => 'Мульти-провайдер отключён.',
                 ]);
             }
+
+            $slots = config('panel.multi_provider_slots', []);
+            $slots = is_array($slots) ? $slots : [];
+            $allowAll = filter_var(config('panel.multi_provider_allow_all', false), FILTER_VALIDATE_BOOLEAN);
 
             $count = KeyActivate::query()
                 ->where('status', KeyActivate::ACTIVE)
@@ -882,6 +891,7 @@ class ServerUserTransferController extends Controller
                 'success' => true,
                 'count' => $count,
                 'slots' => $slots,
+                'allow_all' => $allowAll,
             ]);
         } catch (\Throwable $e) {
             Log::error('multiProviderMigrationCount failed', [
@@ -914,12 +924,10 @@ class ServerUserTransferController extends Controller
                 'dry_run' => 'nullable|boolean',
             ]);
 
-            $slots = config('panel.multi_provider_slots', []);
-            $slots = is_array($slots) ? $slots : [];
-            if (empty($slots)) {
+            if (! filter_var(config('panel.multi_provider_enabled', false), FILTER_VALIDATE_BOOLEAN)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Мульти-провайдер отключён. Задайте PANEL_MULTI_PROVIDER_SLOTS в .env.',
+                    'message' => 'Мульти-провайдер отключён. Задайте PANEL_MULTI_PROVIDER_SLOTS или * (при v2+greedy) в .env.',
                     'done' => true,
                     'added_total' => 0,
                     'processed' => 0,
@@ -986,12 +994,10 @@ class ServerUserTransferController extends Controller
             $batchSize = (int) ($validated['batch_size'] ?? 50);
             $dryRun = !empty($validated['dry_run']);
 
-            $slots = config('panel.multi_provider_slots', []);
-            $slots = is_array($slots) ? $slots : [];
-            if (empty($slots)) {
+            if (! filter_var(config('panel.multi_provider_enabled', false), FILTER_VALIDATE_BOOLEAN)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Мульти-провайдер отключён. Задайте PANEL_MULTI_PROVIDER_SLOTS в .env.',
+                    'message' => 'Мульти-провайдер отключён. Задайте PANEL_MULTI_PROVIDER_SLOTS или * (при v2+greedy) в .env.',
                 ], 400);
             }
 

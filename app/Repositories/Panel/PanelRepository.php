@@ -111,8 +111,14 @@ class PanelRepository extends BaseRepository
 
                 continue;
             }
-            foreach (config('panel.multi_provider_slots', []) as $p) {
-                $p = trim((string) $p);
+            $slotProviders = config('panel.multi_provider_slots', []);
+            $slotProviders = is_array($slotProviders) ? $slotProviders : [];
+            if (filter_var(config('panel.multi_provider_allow_all', false), FILTER_VALIDATE_BOOLEAN)) {
+                $slotProviders = array_merge($slotProviders, $this->getDistinctRotationProviderCodes(null));
+            }
+            foreach (array_unique(array_map(function ($p) {
+                return strtolower(trim((string) $p));
+            }, $slotProviders)) as $p) {
                 if ($p !== '') {
                     Cache::forget($this->rotationPanelCacheKey($panelType, $p, $tier));
                 }
@@ -206,6 +212,26 @@ class PanelRepository extends BaseRepository
         $panels = $this->buildCandidatePanelsQuery($panelType, $provider, $activationTier)->get();
 
         return $this->applyExclusionRulesToPanels($panels);
+    }
+
+    /**
+     * Уникальные коды провайдеров (server.provider) среди кандидатов ротации для данного тира.
+     *
+     * @return array<int, string>
+     */
+    public function getDistinctRotationProviderCodes(?string $activationTier = null): array
+    {
+        $panelType = Panel::MARZBAN;
+        $candidates = $this->getCandidatePanelsForRotation($panelType, null, $activationTier);
+        $seen = [];
+        foreach ($candidates as $panel) {
+            $p = strtolower(trim((string) ($panel->server->provider ?? '')));
+            if ($p !== '') {
+                $seen[$p] = true;
+            }
+        }
+
+        return array_keys($seen);
     }
 
     /**
@@ -583,23 +609,29 @@ class PanelRepository extends BaseRepository
     {
         $slots = config('panel.multi_provider_slots', []);
         $slots = is_array($slots) ? $slots : [];
+        $allowAll = filter_var(config('panel.multi_provider_allow_all', false), FILTER_VALIDATE_BOOLEAN);
+        $multiEnabled = filter_var(config('panel.multi_provider_enabled', false), FILTER_VALIDATE_BOOLEAN);
+
+        if (! $multiEnabled) {
+            return $this->resolveSinglePanelForKeyActivation($key, $activationTier, $useCacheOnly);
+        }
+
+        if ($allowAll && $slots === [] && ! $this->isMultiProviderGreedyEnabled()) {
+            Log::warning('panel.multi_provider_allow_all требует PANEL_SELECTION_V2 и жадный режим; используется одна панель.', [
+                'key_id' => $key->id,
+            ]);
+
+            return $this->resolveSinglePanelForKeyActivation($key, $activationTier, $useCacheOnly);
+        }
 
         $key->loadMissing(['packSalesman.salesman.panel.server']);
 
-        if ($slots === []) {
-            $panel = null;
-            if ($key->packSalesman && $key->packSalesman->salesman && $key->packSalesman->salesman->panel_id) {
-                $panel = $key->packSalesman->salesman->panel;
-            }
-            if (! $panel) {
-                $panel = $this->getOptimizedMarzbanPanel(null, $useCacheOnly, $activationTier);
-            }
-
-            return $panel ? [$panel] : [];
-        }
-
         if ($this->isMultiProviderGreedyEnabled()) {
             return $this->buildGreedyMultiProviderPanelsList($key, $activationTier);
+        }
+
+        if ($slots === []) {
+            return $this->resolveSinglePanelForKeyActivation($key, $activationTier, $useCacheOnly);
         }
 
         $panels = [];
@@ -642,15 +674,33 @@ class PanelRepository extends BaseRepository
         return $list;
     }
 
+    /**
+     * @return Panel[]
+     */
+    private function resolveSinglePanelForKeyActivation(KeyActivate $key, string $activationTier, bool $useCacheOnly): array
+    {
+        $key->loadMissing(['packSalesman.salesman.panel.server']);
+        $panel = null;
+        if ($key->packSalesman && $key->packSalesman->salesman && $key->packSalesman->salesman->panel_id) {
+            $panel = $key->packSalesman->salesman->panel;
+        }
+        if (! $panel) {
+            $panel = $this->getOptimizedMarzbanPanel(null, $useCacheOnly, $activationTier);
+        }
+
+        return $panel ? [$panel] : [];
+    }
+
     private function isMultiProviderGreedyEnabled(): bool
     {
-        return filter_var(config('panel.multi_provider_greedy', false), FILTER_VALIDATE_BOOLEAN)
+        return filter_var(config('panel.multi_provider_greedy', true), FILTER_VALIDATE_BOOLEAN)
             && $this->isSelectionV2Enabled();
     }
 
     /**
-     * Жадный выбор: глобальная сортировка по selection_scope_score, не более одной панели на провайдера,
-     * только провайдеры из PANEL_MULTI_PROVIDER_SLOTS, порядок выдачи как в конфиге.
+     * Жадный выбор: сортировка по selection_scope_score, не более одной панели на провайдера,
+     * до max_provider_slots. При PANEL_MULTI_PROVIDER_SLOTS=* — все провайдеры пула для тарифа;
+     * иначе — только перечисленные в .env. Порядок слотов — по score (не порядок в .env).
      *
      * @return Panel[]
      */
@@ -658,10 +708,13 @@ class PanelRepository extends BaseRepository
     {
         $slots = config('panel.multi_provider_slots', []);
         $slots = is_array($slots) ? $slots : [];
+        $allowAll = filter_var(config('panel.multi_provider_allow_all', false), FILTER_VALIDATE_BOOLEAN);
         $maxSlots = (int) config('panel.max_provider_slots', 3);
+        if ($maxSlots <= 0) {
+            $maxSlots = 3;
+        }
         $panelType = Panel::MARZBAN;
 
-        $key->loadMissing(['packSalesman.salesman.panel.server']);
         $salesmanPanel = ($key->packSalesman && $key->packSalesman->salesman && $key->packSalesman->salesman->panel_id)
             ? $key->packSalesman->salesman->panel
             : null;
@@ -669,17 +722,25 @@ class PanelRepository extends BaseRepository
             ? strtolower(trim((string) $salesmanPanel->server->provider))
             : null;
 
-        $slotsLower = array_values(array_filter(array_map(function ($s) {
-            return strtolower(trim((string) $s));
-        }, $slots), fn ($s) => $s !== ''));
-
-        $allowedSet = array_flip($slotsLower);
+        $allowedSet = [];
+        foreach ($slots as $p) {
+            $pk = strtolower(trim((string) $p));
+            if ($pk !== '') {
+                $allowedSet[$pk] = true;
+            }
+        }
 
         $candidates = $this->getCandidatePanelsForRotation($panelType, null, $activationTier);
-        $filtered = $candidates->filter(function ($panel) use ($allowedSet) {
+        $filtered = $candidates->filter(function ($panel) use ($allowAll, $allowedSet) {
             $p = strtolower(trim((string) ($panel->server->provider ?? '')));
+            if ($p === '') {
+                return false;
+            }
+            if ($allowAll && $allowedSet === []) {
+                return true;
+            }
 
-            return $p !== '' && isset($allowedSet[$p]);
+            return isset($allowedSet[$p]);
         });
 
         $sorted = $filtered->sort(function ($a, $b) {
@@ -692,46 +753,32 @@ class PanelRepository extends BaseRepository
             return $a->id <=> $b->id;
         })->values();
 
-        $byProvider = [];
-        if ($salesmanProvider !== null && $salesmanPanel !== null) {
-            foreach ($slotsLower as $slotProv) {
-                if ($slotProv === $salesmanProvider) {
-                    $byProvider[$salesmanProvider] = $salesmanPanel;
-                    break;
-                }
-            }
+        $list = [];
+        $seenProv = [];
+
+        $salesmanAllowed = $salesmanProvider !== null && $salesmanPanel !== null
+            && (($allowAll && $allowedSet === []) || isset($allowedSet[$salesmanProvider]));
+        if ($salesmanAllowed) {
+            $list[] = $salesmanPanel;
+            $seenProv[$salesmanProvider] = true;
         }
 
         foreach ($sorted as $panel) {
-            if ($maxSlots > 0 && count($byProvider) >= $maxSlots) {
-                break;
-            }
-            $prov = strtolower(trim((string) ($panel->server->provider ?? '')));
-            if ($prov === '' || ! isset($allowedSet[$prov])) {
-                continue;
-            }
-            if (isset($byProvider[$prov])) {
-                continue;
-            }
-            $byProvider[$prov] = $panel;
-        }
-
-        $list = [];
-        $seenPanelIds = [];
-        foreach ($slots as $want) {
-            $wk = strtolower(trim((string) $want));
-            if ($wk === '' || ! isset($byProvider[$wk])) {
-                continue;
-            }
-            $p = $byProvider[$wk];
-            if (isset($seenPanelIds[$p->id])) {
-                continue;
-            }
-            $seenPanelIds[$p->id] = true;
-            $list[] = $p;
             if ($maxSlots > 0 && count($list) >= $maxSlots) {
                 break;
             }
+            $prov = strtolower(trim((string) ($panel->server->provider ?? '')));
+            if ($prov === '' || isset($seenProv[$prov])) {
+                continue;
+            }
+            if ($allowAll && $allowedSet !== [] && ! isset($allowedSet[$prov])) {
+                continue;
+            }
+            if (! $allowAll && ! isset($allowedSet[$prov])) {
+                continue;
+            }
+            $list[] = $panel;
+            $seenProv[$prov] = true;
         }
 
         return $list;

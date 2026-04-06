@@ -20,12 +20,16 @@ class WarmPanelSelectionCacheCommand extends Command
     public function handle(PanelRepository $panelRepository): int
     {
         $providers = [];
-        $slots = config('panel.multi_provider_slots', []);
-        if (is_array($slots)) {
-            foreach ($slots as $p) {
-                $p = trim((string) $p);
-                if ($p !== '') {
-                    $providers[] = $p;
+        if (filter_var(config('panel.multi_provider_allow_all', false), FILTER_VALIDATE_BOOLEAN)) {
+            $providers = $panelRepository->getDistinctRotationProviderCodes(null);
+        } else {
+            $slots = config('panel.multi_provider_slots', []);
+            if (is_array($slots)) {
+                foreach ($slots as $p) {
+                    $p = trim((string) $p);
+                    if ($p !== '') {
+                        $providers[] = $p;
+                    }
                 }
             }
         }

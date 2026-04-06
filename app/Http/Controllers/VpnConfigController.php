@@ -606,10 +606,18 @@ class VpnConfigController extends Controller
         $keyActivateUsers = $this->keyActivateUserRepository->findAllByKeyActivateId($key_activate_id);
 
         $multiProviderSlots = config('panel.multi_provider_slots', []);
-        if (!empty($multiProviderSlots) && is_array($multiProviderSlots) && $keyActivate->status === KeyActivate::ACTIVE) {
+        $multiProviderAllowAll = filter_var(config('panel.multi_provider_allow_all', false), FILTER_VALIDATE_BOOLEAN);
+        $multiProviderEnabled = filter_var(config('panel.multi_provider_enabled', false), FILTER_VALIDATE_BOOLEAN);
+        if ($multiProviderEnabled && is_array($multiProviderSlots) && $keyActivate->status === KeyActivate::ACTIVE) {
             $slotCount = $keyActivateUsers->count();
-            $providerCount = count($multiProviderSlots);
-            if ($providerCount > 0 && $slotCount < $providerCount) {
+            $maxSlots = (int) config('panel.max_provider_slots', 3);
+            if ($multiProviderAllowAll) {
+                $targetSlots = $maxSlots > 0 ? $maxSlots : PHP_INT_MAX;
+            } else {
+                $n = count($multiProviderSlots);
+                $targetSlots = $maxSlots > 0 ? min($n, $maxSlots) : $n;
+            }
+            if ($targetSlots > 0 && $slotCount < $targetSlots) {
                 $cacheKey = 'vpn_config_multi_provider_checked_' . $key_activate_id;
                 $doAdd = $syncMultiProvider || !Cache::has($cacheKey);
                 if ($doAdd) {

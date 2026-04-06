@@ -17,8 +17,7 @@ class MultiProviderMigrationService
      */
     public function getTotalCount(): int
     {
-        $slots = config('panel.multi_provider_slots', []);
-        if (empty($slots) || !is_array($slots)) {
+        if (! filter_var(config('panel.multi_provider_enabled', false), FILTER_VALIDATE_BOOLEAN)) {
             return 0;
         }
         return (int) DB::table('key_activate as ka')
@@ -34,9 +33,7 @@ class MultiProviderMigrationService
 
     public function runOneBatch(int $offset, int $batchSize, bool $dryRun, ?int $maxTotal = null): array
     {
-        $slots = config('panel.multi_provider_slots', []);
-        $slots = is_array($slots) ? $slots : [];
-        if (empty($slots)) {
+        if (! filter_var(config('panel.multi_provider_enabled', false), FILTER_VALIDATE_BOOLEAN)) {
             return [
                 'success' => false,
                 'done' => true,

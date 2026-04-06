@@ -1,5 +1,26 @@
 <?php
 
+$multiProviderParts = array_values(array_filter(array_map('trim', explode(',', (string) env('PANEL_MULTI_PROVIDER_SLOTS', ''))), function ($p) {
+    return (string) $p !== '';
+}));
+$multiProviderAllowAll = false;
+foreach ($multiProviderParts as $p) {
+    $pLower = strtolower((string) $p);
+    if ($p === '*' || $pLower === 'all') {
+        $multiProviderAllowAll = true;
+        break;
+    }
+}
+$multiProviderSlotsFiltered = array_values(array_filter($multiProviderParts, function ($p) {
+    $pLower = strtolower((string) $p);
+
+    return $p !== '*' && $pLower !== 'all';
+}));
+if ($multiProviderAllowAll) {
+    $multiProviderSlotsFiltered = [];
+}
+$multiProviderEnabled = $multiProviderAllowAll || $multiProviderSlotsFiltered !== [];
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -175,17 +196,21 @@ return [
     |
     | Пустой = старый режим (один провайдер на ключ). Чтобы включить: в .env задать
     | PANEL_MULTI_PROVIDER_SLOTS=vdsina,timeweb (через запятую, без пробелов или с пробелами).
+    | Специальное значение * или all — все провайдеры из пула ротации для данного тарифа (tier),
+    | до max_provider_slots слотов без повторения провайдера; порядок по selection_scope_score (см. greedy).
     | Для ручных серверов указывайте латинский код провайдера (server.provider), тот же,
     | что получается из поля «Название провайдера» при добавлении сервера вручную.
     |
-    | max_provider_slots — максимум слотов на ключ (по умолчанию 3). Если провайдеров в списке
-    | больше, берутся только первые N панелей. Так у всех ключей будет не больше 3 слотов.
+    | max_provider_slots — максимум слотов на ключ (по умолчанию 3). Участвуют до N лучших панелей
+    | по score с разными провайдерами (не «первые N строк» из .env при жадном режиме).
     |
     */
 
-    'multi_provider_slots' => array_filter(
-        array_map('trim', explode(',', env('PANEL_MULTI_PROVIDER_SLOTS', '')))
-    ),
+    'multi_provider_slots' => $multiProviderSlotsFiltered,
+
+    'multi_provider_allow_all' => $multiProviderAllowAll,
+
+    'multi_provider_enabled' => $multiProviderEnabled,
 
     'max_provider_slots' => (int) env('PANEL_MAX_PROVIDER_SLOTS', 3),
 
@@ -195,12 +220,13 @@ return [
     |--------------------------------------------------------------------------
     |
     | Если true — среди кандидатов с нужным tariff_tier берутся лучшие панели по score без повторения
-    | провайдера (до max_provider_slots), порядок слотов как в PANEL_MULTI_PROVIDER_SLOTS.
-    | Если false — для каждого провайдера из списка выбирается лучшая панель независимо (прежняя логика).
+    | провайдера (до max_provider_slots). Порядок слотов — по убыванию score (не порядок в .env).
+    | Режим * / all требует greedy + v2; иначе используется одиночная панель.
+    | Если false — для каждого провайдера из списка выбирается лучшая панель; порядок слотов как в .env.
     |
     */
 
-    'multi_provider_greedy' => filter_var(env('PANEL_MULTI_PROVIDER_GREEDY', false), FILTER_VALIDATE_BOOLEAN),
+    'multi_provider_greedy' => filter_var(env('PANEL_MULTI_PROVIDER_GREEDY', true), FILTER_VALIDATE_BOOLEAN),
 
     /*
     |--------------------------------------------------------------------------
