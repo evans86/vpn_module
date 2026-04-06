@@ -35,7 +35,7 @@ final class TariffTier
             case self::FULL:
                 return 'Основная выдача';
             case self::WHITELIST:
-                return 'Отдельный список (whitelist)';
+                return 'Белый список';
             default:
                 return $tier;
         }
