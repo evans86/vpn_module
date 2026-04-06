@@ -1,5 +1,9 @@
 @extends('layouts.admin')
 
+@php
+    use App\Constants\TariffTier;
+@endphp
+
 @section('title', 'Распределение (scope v2)')
 @section('page-title', 'Распределение панелей — scope v2')
 
@@ -57,7 +61,7 @@
                                 <td class="px-4 py-2 text-sm text-gray-900">{{ $panel->id }}</td>
                                 <td class="px-4 py-2 text-sm text-gray-800">{{ $server->name ?? '—' }}</td>
                                 <td class="px-4 py-2 text-sm text-gray-600">{{ $server->provider ?? '—' }}</td>
-                                <td class="px-4 py-2 text-sm text-gray-600">{{ $server->tariff_tier ?? '—' }}</td>
+                                <td class="px-4 py-2 text-sm text-gray-600">{{ TariffTier::label($server->tariff_tier) }}</td>
                                 <td class="px-4 py-2 text-sm text-right font-mono font-medium">
                                     {{ number_format((float) $panel->selection_scope_score, 2, '.', ' ') }}
                                 </td>

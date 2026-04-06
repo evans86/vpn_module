@@ -158,7 +158,10 @@
                                     </span>
                                 </div>
 
-                                <!-- Tariff tier (активация) -->
+                                {{-- Тариф активации: переменная ниже — из-за ограничения разбора Blade нельзя писать сложное условие внутри @selected(...) в одну строку --}}
+                                @php
+                                    $currentActivationTier = $server->tariff_tier ?? TariffTier::FULL;
+                                @endphp
                                 <div class="flex items-center justify-between gap-2">
                                     <span class="text-sm font-medium text-gray-700 shrink-0">Тариф активации:</span>
                                     <select
@@ -166,7 +169,7 @@
                                         title="Какой пул серверов использовать при выборе панели для ключей"
                                         onchange="updateServerTariffTier({{ $server->id }}, this.value)">
                                         @foreach (TariffTier::all() as $tier)
-                                            <option value="{{ $tier }}" @selected(($server->tariff_tier ?? TariffTier::FULL) === $tier)>{{ strtoupper($tier) }}</option>
+                                            <option value="{{ $tier }}" title="Код: {{ $tier }}" @selected($currentActivationTier === $tier)>{{ TariffTier::label($tier) }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -359,6 +362,15 @@
                     @endforeach
                 </select>
             </div>
+            <div class="mb-4">
+                <label for="createServerTariffTier" class="block text-sm font-medium text-gray-700 mb-1">Тариф для выдачи ключей</label>
+                <select id="createServerTariffTier" name="tariff_tier" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm">
+                    @foreach (TariffTier::all() as $tier)
+                        <option value="{{ $tier }}" title="Код: {{ $tier }}" @selected($tier === TariffTier::FULL)>{{ TariffTier::label($tier) }}</option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs text-gray-500">Тот же пул, что и у ручных серверов. Подсказка при наведении на пункт — внутренний код.</p>
+            </div>
         </form>
         <x-slot name="footer">
             <button type="button" 
@@ -423,10 +435,10 @@
                 <label for="manualServerTariffTier" class="block text-sm font-medium text-gray-700 mb-1">Тариф для выдачи ключей</label>
                 <select id="manualServerTariffTier" name="tariff_tier" class="mt-1 block w-full max-w-md rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm">
                     @foreach (TariffTier::all() as $tier)
-                        <option value="{{ $tier }}" @selected($tier === TariffTier::FULL)>{{ strtoupper($tier) }}</option>
+                        <option value="{{ $tier }}" title="Код: {{ $tier }}" @selected($tier === TariffTier::FULL)>{{ TariffTier::label($tier) }}</option>
                     @endforeach
                 </select>
-                <p class="mt-1 text-xs text-gray-500">Пул серверов при ротации: FULL — основная выдача, FREE — бесплатные ключи, WHITELIST — отдельный список.</p>
+                <p class="mt-1 text-xs text-gray-500">Кому выдавать ключи с этого сервера при ротации. Подсказка при наведении — внутренний код.</p>
             </div>
         </form>
         <x-slot name="footer">
@@ -683,6 +695,7 @@
                     const btn = $(this);
                     const provider = $('#createServerProvider').val();
                     const location_id = $('#createServerLocation').val();
+                    const tariff_tier = $('#createServerTariffTier').val();
 
                     if (!provider || !location_id) {
                         toastr.error('Пожалуйста, выберите провайдера и локацию');
@@ -703,7 +716,8 @@
                         data: {
                             _token: '{{ csrf_token() }}',
                             provider: provider,
-                            location_id: location_id
+                            location_id: location_id,
+                            tariff_tier: tariff_tier || 'full'
                         },
                         success: function (response) {
                             if (response.success) {

@@ -18,4 +18,26 @@ final class TariffTier
     {
         return [self::FREE, self::FULL, self::WHITELIST];
     }
+
+    /**
+     * Подпись для админки (в БД и конфиге по-прежнему латинские значения).
+     */
+    public static function label(?string $tier): string
+    {
+        if ($tier === null || $tier === '') {
+            return '—';
+        }
+
+        $t = strtolower(trim($tier));
+        switch ($t) {
+            case self::FREE:
+                return 'Бесплатный пул';
+            case self::FULL:
+                return 'Основная выдача';
+            case self::WHITELIST:
+                return 'Отдельный список (whitelist)';
+            default:
+                return $tier;
+        }
+    }
 }

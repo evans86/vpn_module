@@ -206,11 +206,17 @@ class ServerController extends Controller
             // Валидация входных данных
             $validated = $request->validate([
                 'location_id' => 'required|integer|exists:location,id',
-                'provider' => 'required|string|in:' . implode(',', $availableProviders)
+                'provider' => 'required|string|in:' . implode(',', $availableProviders),
+                'tariff_tier' => 'nullable|string|in:' . implode(',', TariffTier::all()),
             ]);
 
             $strategy = new ServerStrategy($validated['provider']);
             $server = $strategy->configure($validated['location_id'], $validated['provider'], false);
+
+            $server->tariff_tier = $validated['tariff_tier'] ?? TariffTier::FULL;
+            $server->save();
+
+            $this->panelRepository->forgetRotationSelectionCache($server->provider);
 
             $this->logger->info('Server created successfully', [
                 'source' => 'server',
