@@ -53,6 +53,8 @@ class TimewebService
             $locationMapping = [
                 Location::NL => ['id' => 'nl-1', 'availability_zone' => 'ams-1'], // Амстердам
                 Location::RU => ['id' => 'ru-1', 'availability_zone' => 'spb-1'],
+                // Турция: в Timeweb Cloud нет площадки в TR — временно создание в NL (как у FI без отдельного маппинга)
+                Location::TR => ['id' => 'nl-1', 'availability_zone' => 'ams-1'],
             ];
             $timewebLocation = $locationMapping[$location_id] ?? $locationMapping[Location::NL];
             Log::info('Timeweb location mapping', [
