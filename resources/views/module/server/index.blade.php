@@ -71,6 +71,8 @@
                         'id_desc' => 'Сначала новые (по ID)',
                         'provider_asc' => 'По провайдеру (А → Я)',
                         'provider_desc' => 'По провайдеру (Я → А)',
+                        'tariff_asc' => 'По тарифу активации (возр.)',
+                        'tariff_desc' => 'По тарифу активации (убыв.)',
                     ]"
                     value="{{ request('sort', 'id_desc') }}" />
             </x-admin.filter-form>

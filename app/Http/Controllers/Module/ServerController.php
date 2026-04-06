@@ -111,6 +111,10 @@ class ServerController extends Controller
                 $query->orderBy('provider', 'asc')->orderBy('id', 'desc');
             } elseif ($sort === 'provider_desc') {
                 $query->orderBy('provider', 'desc')->orderBy('id', 'desc');
+            } elseif ($sort === 'tariff_asc') {
+                $query->orderBy('tariff_tier', 'asc')->orderBy('id', 'desc');
+            } elseif ($sort === 'tariff_desc') {
+                $query->orderBy('tariff_tier', 'desc')->orderBy('id', 'desc');
             } else {
                 $query->orderBy('id', 'desc');
             }
