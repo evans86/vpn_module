@@ -1936,6 +1936,7 @@ class VpnConfigController extends Controller
             'FR' => 'Франция',
             'GB' => 'Великобритания',
             'FI' => 'Финляндия',
+            'TR' => 'Турция',
             'SG' => 'Сингапур',
         ];
         return $names[$code] ?? '';
