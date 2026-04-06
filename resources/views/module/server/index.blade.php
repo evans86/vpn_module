@@ -160,9 +160,9 @@
                                     </span>
                                 </div>
 
-                                {{-- Тариф активации: переменная ниже — из-за ограничения разбора Blade нельзя писать сложное условие внутри @selected(...) в одну строку --}}
+                                {{-- Тариф активации: TariffTier::normalize — пустая строка в БД не заменяется через ?? и ломала selected (показывался первый option = free) --}}
                                 @php
-                                    $currentActivationTier = $server->tariff_tier ?? TariffTier::FULL;
+                                    $currentActivationTier = TariffTier::normalize($server->tariff_tier);
                                 @endphp
                                 <div class="flex items-center justify-between gap-2">
                                     <span class="text-sm font-medium text-gray-700 shrink-0">Тариф активации:</span>
