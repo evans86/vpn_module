@@ -277,7 +277,7 @@
                                             <span>Пользователи</span>
                                         </a>
                                         @if($server->usesManualStrategy())
-                                            <button type="button" onclick="openEditProviderModal({{ $server->id }}, @json($server->provider))"
+                                            <button type="button" onclick='openEditProviderModal({{ $server->id }}, @json($server->provider))'
                                                     class="inline-flex flex-1 min-w-[min(100%,10rem)] basis-[calc(50%-0.25rem)] max-w-full items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors">
                                                 <i class="fas fa-tag mr-2"></i>
                                                 <span>Код провайдера</span>
