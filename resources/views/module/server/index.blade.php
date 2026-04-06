@@ -5,6 +5,7 @@
 
 @php
     use App\Models\Server\Server;
+    use App\Constants\TariffTier;
 @endphp
 
 @section('content')
@@ -155,6 +156,19 @@
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                         {{ $server->getProviderLabel() }}
                                     </span>
+                                </div>
+
+                                <!-- Tariff tier (активация) -->
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="text-sm font-medium text-gray-700 shrink-0">Тариф активации:</span>
+                                    <select
+                                        class="text-xs rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 max-w-[10rem]"
+                                        title="Какой пул серверов использовать при выборе панели для ключей"
+                                        onchange="updateServerTariffTier({{ $server->id }}, this.value)">
+                                        @foreach (TariffTier::all() as $tier)
+                                            <option value="{{ $tier }}" @selected(($server->tariff_tier ?? TariffTier::FULL) === $tier)>{{ strtoupper($tier) }}</option>
+                                        @endforeach
+                                    </select>
                                 </div>
 
                                 <!-- Location -->
@@ -405,6 +419,15 @@
                 <p class="mt-3 text-sm text-gray-600 mb-1">Порт SSH (для проверки «Пинг»)</p>
                 <input type="number" min="1" max="65535" id="manualServerSshPort" name="ssh_port" class="mt-1 block w-full max-w-xs rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm" placeholder="22 — по умолчанию; у части хостеров — 3333 и др.">
             </div>
+            <div class="mb-4">
+                <label for="manualServerTariffTier" class="block text-sm font-medium text-gray-700 mb-1">Тариф для выдачи ключей</label>
+                <select id="manualServerTariffTier" name="tariff_tier" class="mt-1 block w-full max-w-md rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 sm:text-sm">
+                    @foreach (TariffTier::all() as $tier)
+                        <option value="{{ $tier }}" @selected($tier === TariffTier::FULL)>{{ strtoupper($tier) }}</option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs text-gray-500">Пул серверов при ротации: FULL — основная выдача, FREE — бесплатные ключи, WHITELIST — отдельный список.</p>
+            </div>
         </form>
         <x-slot name="footer">
             <button type="button" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" id="createManualServerBtn">
@@ -460,6 +483,33 @@
                         });
                     }
                     document.body.removeChild(textArea);
+                });
+            }
+
+            function updateServerTariffTier(serverId, tariffTier) {
+                $.ajax({
+                    url: '{{ url('/admin/module/server') }}/' + serverId,
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        _method: 'PUT',
+                        tariff_tier: tariffTier
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            toastr.success(response.message || 'Тариф сохранён');
+                        } else {
+                            toastr.error(response.message || 'Ошибка');
+                        }
+                    },
+                    error: function (xhr) {
+                        var msg = 'Ошибка сохранения';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            msg = xhr.responseJSON.message;
+                        }
+                        toastr.error(msg);
+                    }
                 });
             }
 
@@ -694,6 +744,7 @@
                     const host = $('#manualServerHost').val().trim();
                     const login = $('#manualServerLogin').val().trim();
                     const password = $('#manualServerPassword').val();
+                    const tariff_tier = $('#manualServerTariffTier').val();
                     const sshPortRaw = $('#manualServerSshPort').val();
                     const sshPortTrim = (sshPortRaw != null && String(sshPortRaw).trim() !== '') ? String(sshPortRaw).trim() : '';
                     let ssh_port = null;
@@ -723,7 +774,8 @@
                         ip: ip,
                         host: host || null,
                         login: login || null,
-                        password: password || null
+                        password: password || null,
+                        tariff_tier: tariff_tier || 'full'
                     };
                     if (ssh_port !== null) {
                         manualServerPost.ssh_port = ssh_port;

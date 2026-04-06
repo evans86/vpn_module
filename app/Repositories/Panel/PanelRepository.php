@@ -70,15 +70,29 @@ class PanelRepository extends BaseRepository
     }
 
     /**
-     * Ключ кэша выбора панели (полный цикл: кандидаты + интеллектуальный score).
+     * Тир для фильтра server.tariff_tier: явный аргумент или fallback из конфига.
      */
-    private function rotationPanelCacheKey(string $panelType, ?string $provider): string
+    private function normalizeActivationTier(?string $activationTier): string
     {
+        $tier = $activationTier !== null && $activationTier !== ''
+            ? strtolower(trim($activationTier))
+            : strtolower(trim((string) config('panel.activation_tariff_tier', TariffTier::FULL)));
+
+        return $tier;
+    }
+
+    /**
+     * Ключ кэша выбора панели (полный цикл: кандидаты + интеллектуальный score).
+     * Учитывает тир активации, чтобы кэш free/full/whitelist не смешивался.
+     */
+    private function rotationPanelCacheKey(string $panelType, ?string $provider, ?string $activationTier = null): string
+    {
+        $tierSuffix = ':t:' . md5($this->normalizeActivationTier($activationTier));
         if ($provider === null || $provider === '') {
-            return 'panel_rotation:' . $panelType;
+            return 'panel_rotation:' . $panelType . $tierSuffix;
         }
 
-        return 'panel_rotation:' . $panelType . ':p:' . md5(strtolower(trim($provider)));
+        return 'panel_rotation:' . $panelType . ':p:' . md5(strtolower(trim($provider))) . $tierSuffix;
     }
 
     /**
@@ -87,16 +101,21 @@ class PanelRepository extends BaseRepository
     public function forgetRotationSelectionCache(?string $provider = null): void
     {
         $panelType = Panel::MARZBAN;
-        Cache::forget($this->rotationPanelCacheKey($panelType, null));
-        if ($provider !== null && $provider !== '') {
-            Cache::forget($this->rotationPanelCacheKey($panelType, $provider));
+        $tiers = array_values(array_unique(array_merge(TariffTier::all(), [
+            $this->normalizeActivationTier(null),
+        ])));
+        foreach ($tiers as $tier) {
+            Cache::forget($this->rotationPanelCacheKey($panelType, null, $tier));
+            if ($provider !== null && $provider !== '') {
+                Cache::forget($this->rotationPanelCacheKey($panelType, $provider, $tier));
 
-            return;
-        }
-        foreach (config('panel.multi_provider_slots', []) as $p) {
-            $p = trim((string) $p);
-            if ($p !== '') {
-                Cache::forget($this->rotationPanelCacheKey($panelType, $p));
+                continue;
+            }
+            foreach (config('panel.multi_provider_slots', []) as $p) {
+                $p = trim((string) $p);
+                if ($p !== '') {
+                    Cache::forget($this->rotationPanelCacheKey($panelType, $p, $tier));
+                }
             }
         }
     }
@@ -104,7 +123,7 @@ class PanelRepository extends BaseRepository
     /**
      * Базовый запрос кандидатов в ротацию (без исключений по локации/IP в PHP).
      */
-    private function buildCandidatePanelsQuery(string $panelType, ?string $provider = null)
+    private function buildCandidatePanelsQuery(string $panelType, ?string $provider = null, ?string $activationTier = null)
     {
         $q = $this->applyExcludeSalesmanAssignedPanels(
             $this->query()
@@ -119,7 +138,7 @@ class PanelRepository extends BaseRepository
             $q->whereHas('server', fn ($sub) => $sub->where('provider', $provider));
         }
 
-        $tier = strtolower(trim((string) config('panel.activation_tariff_tier', TariffTier::FULL)));
+        $tier = $this->normalizeActivationTier($activationTier);
         if ($tier !== '') {
             $q->whereHas('server', fn ($sub) => $sub->where('tariff_tier', $tier));
         }
@@ -182,9 +201,9 @@ class PanelRepository extends BaseRepository
     /**
      * Панели, участвующие в ротации (запрос + фильтры исключений).
      */
-    private function getCandidatePanelsForRotation(string $panelType, ?string $provider = null): Collection
+    private function getCandidatePanelsForRotation(string $panelType, ?string $provider = null, ?string $activationTier = null): Collection
     {
-        $panels = $this->buildCandidatePanelsQuery($panelType, $provider)->get();
+        $panels = $this->buildCandidatePanelsQuery($panelType, $provider, $activationTier)->get();
 
         return $this->applyExclusionRulesToPanels($panels);
     }
@@ -195,7 +214,7 @@ class PanelRepository extends BaseRepository
      * @param array<int, string> $providers
      * @return array<string, Collection> ключ — строка из конфига (как в multi_provider_slots)
      */
-    private function getCandidatePanelsForRotationBatch(string $panelType, array $providers): array
+    private function getCandidatePanelsForRotationBatch(string $panelType, array $providers, ?string $activationTier = null): array
     {
         $providers = array_values(array_unique(array_filter(array_map('trim', $providers), function ($p) {
             return (string) $p !== '';
@@ -212,6 +231,8 @@ class PanelRepository extends BaseRepository
 
         $limit = min(3000, 1000 * count($providers));
 
+        $tier = $this->normalizeActivationTier($activationTier);
+
         $rows = $this->applyExcludeSalesmanAssignedPanels(
             $this->query()
                 ->where('panel_status', Panel::PANEL_CONFIGURED)
@@ -219,8 +240,11 @@ class PanelRepository extends BaseRepository
                 ->where('has_error', false)
                 ->where('excluded_from_rotation', false)
         )
-            ->whereHas('server', function ($sub) use ($providers) {
+            ->whereHas('server', function ($sub) use ($providers, $tier) {
                 $sub->whereIn('provider', $providers);
+                if ($tier !== '') {
+                    $sub->where('tariff_tier', $tier);
+                }
             })
             ->with('server.location')
             ->limit($limit)
@@ -440,14 +464,15 @@ class PanelRepository extends BaseRepository
      * Кэшируется весь цикл: загрузка кандидатов + расчёт score (без «тяжёлого» SELECT на каждый miss только по стратегии).
      *
      * @param bool $useCacheOnly зарезервировано (совместимость вызовов)
+     * @param string|null $activationTier тир server.tariff_tier (null = из конфига panel.activation_tariff_tier)
      */
-    public function getOptimizedMarzbanPanel(?string $panelType = null, bool $useCacheOnly = false): ?Panel
+    public function getOptimizedMarzbanPanel(?string $panelType = null, bool $useCacheOnly = false, ?string $activationTier = null): ?Panel
     {
         $panelType = $panelType ?? Panel::MARZBAN;
-        $cacheKey = $this->rotationPanelCacheKey($panelType, null);
+        $cacheKey = $this->rotationPanelCacheKey($panelType, null, $activationTier);
 
-        $resolve = function () use ($panelType, $useCacheOnly) {
-            $panels = $this->getCandidatePanelsForRotation($panelType, null);
+        $resolve = function () use ($panelType, $useCacheOnly, $activationTier) {
+            $panels = $this->getCandidatePanelsForRotation($panelType, null, $activationTier);
             if ($panels->isEmpty()) {
                 Log::warning('PANEL_SELECTION: No available panels after filtering', ['source' => 'panel']);
 
@@ -486,9 +511,9 @@ class PanelRepository extends BaseRepository
      *
      * @param bool $useCacheOnly зарезервировано
      */
-    public function getOptimizedMarzbanPanelForProvider(string $provider, ?string $panelType = null, bool $useCacheOnly = false): ?Panel
+    public function getOptimizedMarzbanPanelForProvider(string $provider, ?string $panelType = null, bool $useCacheOnly = false, ?string $activationTier = null): ?Panel
     {
-        $map = $this->getOptimizedMarzbanPanelsForProviders([$provider], $panelType, $useCacheOnly);
+        $map = $this->getOptimizedMarzbanPanelsForProviders([$provider], $panelType, $useCacheOnly, $activationTier);
 
         return $map[$provider] ?? null;
     }
@@ -498,7 +523,7 @@ class PanelRepository extends BaseRepository
      *
      * @return array<string, Panel|null> ключ — строка провайдера из конфига
      */
-    public function getOptimizedMarzbanPanelsForProviders(array $providers, ?string $panelType = null, bool $useCacheOnly = false): array
+    public function getOptimizedMarzbanPanelsForProviders(array $providers, ?string $panelType = null, bool $useCacheOnly = false, ?string $activationTier = null): array
     {
         $panelType = $panelType ?? Panel::MARZBAN;
         $providers = array_values(array_unique(array_filter(array_map('trim', $providers), function ($p) {
@@ -506,7 +531,7 @@ class PanelRepository extends BaseRepository
         })));
 
         if ($this->isSelectionV2Enabled() && (int) config('panel.selection_v2_cache_ttl', 0) <= 0) {
-            $resolved = $this->resolveMarzbanPanelsForProvidersUncached($providers, $panelType);
+            $resolved = $this->resolveMarzbanPanelsForProvidersUncached($providers, $panelType, $activationTier);
             $ordered = [];
             foreach ($providers as $provider) {
                 $ordered[$provider] = $resolved[$provider] ?? null;
@@ -523,7 +548,7 @@ class PanelRepository extends BaseRepository
         $missing = [];
 
         foreach ($providers as $provider) {
-            $cacheKey = $this->rotationPanelCacheKey($panelType, $provider);
+            $cacheKey = $this->rotationPanelCacheKey($panelType, $provider, $activationTier);
             if (Cache::has($cacheKey)) {
                 $result[$provider] = Cache::get($cacheKey);
 
@@ -533,9 +558,9 @@ class PanelRepository extends BaseRepository
         }
 
         if ($missing !== []) {
-            $resolved = $this->resolveMarzbanPanelsForProvidersUncached($missing, $panelType);
+            $resolved = $this->resolveMarzbanPanelsForProvidersUncached($missing, $panelType, $activationTier);
             foreach ($resolved as $provider => $panel) {
-                $cacheKey = $this->rotationPanelCacheKey($panelType, $provider);
+                $cacheKey = $this->rotationPanelCacheKey($panelType, $provider, $activationTier);
                 Cache::put($cacheKey, $panel, $ttl);
                 $result[$provider] = $panel;
             }
@@ -550,16 +575,179 @@ class PanelRepository extends BaseRepository
     }
 
     /**
+     * Панели для активации ключа: один слот или мульти-провайдер с учётом тира и (опционально) жадного выбора.
+     *
+     * @return Panel[]
+     */
+    public function getPanelsForKeyActivation(KeyActivate $key, string $activationTier, bool $useCacheOnly = true): array
+    {
+        $slots = config('panel.multi_provider_slots', []);
+        $slots = is_array($slots) ? $slots : [];
+
+        $key->loadMissing(['packSalesman.salesman.panel.server']);
+
+        if ($slots === []) {
+            $panel = null;
+            if ($key->packSalesman && $key->packSalesman->salesman && $key->packSalesman->salesman->panel_id) {
+                $panel = $key->packSalesman->salesman->panel;
+            }
+            if (! $panel) {
+                $panel = $this->getOptimizedMarzbanPanel(null, $useCacheOnly, $activationTier);
+            }
+
+            return $panel ? [$panel] : [];
+        }
+
+        if ($this->isMultiProviderGreedyEnabled()) {
+            return $this->buildGreedyMultiProviderPanelsList($key, $activationTier);
+        }
+
+        $panels = [];
+        $salesmanPanel = ($key->packSalesman && $key->packSalesman->salesman && $key->packSalesman->salesman->panel_id)
+            ? $key->packSalesman->salesman->panel
+            : null;
+        $salesmanProvider = $salesmanPanel && $salesmanPanel->server ? $salesmanPanel->server->provider : null;
+
+        $providersToResolve = [];
+        foreach ($slots as $provider) {
+            $provider = (string) $provider;
+            if (! ($salesmanProvider === $provider && $salesmanPanel)) {
+                $providersToResolve[] = $provider;
+            }
+        }
+        $providersToResolve = array_values(array_unique($providersToResolve));
+        $fetchedByProvider = $providersToResolve !== []
+            ? $this->getOptimizedMarzbanPanelsForProviders($providersToResolve, null, $useCacheOnly, $activationTier)
+            : [];
+
+        foreach ($slots as $provider) {
+            $provider = (string) $provider;
+            $panel = null;
+            if ($salesmanProvider === $provider && $salesmanPanel) {
+                $panel = $salesmanPanel;
+            }
+            if (! $panel) {
+                $panel = $fetchedByProvider[$provider] ?? null;
+            }
+            if ($panel && ! isset($panels[$panel->id])) {
+                $panels[$panel->id] = $panel;
+            }
+        }
+        $list = array_values($panels);
+        $maxSlots = (int) config('panel.max_provider_slots', 3);
+        if ($maxSlots > 0 && count($list) > $maxSlots) {
+            $list = array_slice($list, 0, $maxSlots);
+        }
+
+        return $list;
+    }
+
+    private function isMultiProviderGreedyEnabled(): bool
+    {
+        return filter_var(config('panel.multi_provider_greedy', false), FILTER_VALIDATE_BOOLEAN)
+            && $this->isSelectionV2Enabled();
+    }
+
+    /**
+     * Жадный выбор: глобальная сортировка по selection_scope_score, не более одной панели на провайдера,
+     * только провайдеры из PANEL_MULTI_PROVIDER_SLOTS, порядок выдачи как в конфиге.
+     *
+     * @return Panel[]
+     */
+    private function buildGreedyMultiProviderPanelsList(KeyActivate $key, string $activationTier): array
+    {
+        $slots = config('panel.multi_provider_slots', []);
+        $slots = is_array($slots) ? $slots : [];
+        $maxSlots = (int) config('panel.max_provider_slots', 3);
+        $panelType = Panel::MARZBAN;
+
+        $key->loadMissing(['packSalesman.salesman.panel.server']);
+        $salesmanPanel = ($key->packSalesman && $key->packSalesman->salesman && $key->packSalesman->salesman->panel_id)
+            ? $key->packSalesman->salesman->panel
+            : null;
+        $salesmanProvider = $salesmanPanel && $salesmanPanel->server
+            ? strtolower(trim((string) $salesmanPanel->server->provider))
+            : null;
+
+        $slotsLower = array_values(array_filter(array_map(function ($s) {
+            return strtolower(trim((string) $s));
+        }, $slots), fn ($s) => $s !== ''));
+
+        $allowedSet = array_flip($slotsLower);
+
+        $candidates = $this->getCandidatePanelsForRotation($panelType, null, $activationTier);
+        $filtered = $candidates->filter(function ($panel) use ($allowedSet) {
+            $p = strtolower(trim((string) ($panel->server->provider ?? '')));
+
+            return $p !== '' && isset($allowedSet[$p]);
+        });
+
+        $sorted = $filtered->sort(function ($a, $b) {
+            $sa = (float) ($a->selection_scope_score ?? 0);
+            $sb = (float) ($b->selection_scope_score ?? 0);
+            if ($sa !== $sb) {
+                return $sb <=> $sa;
+            }
+
+            return $a->id <=> $b->id;
+        })->values();
+
+        $byProvider = [];
+        if ($salesmanProvider !== null && $salesmanPanel !== null) {
+            foreach ($slotsLower as $slotProv) {
+                if ($slotProv === $salesmanProvider) {
+                    $byProvider[$salesmanProvider] = $salesmanPanel;
+                    break;
+                }
+            }
+        }
+
+        foreach ($sorted as $panel) {
+            if ($maxSlots > 0 && count($byProvider) >= $maxSlots) {
+                break;
+            }
+            $prov = strtolower(trim((string) ($panel->server->provider ?? '')));
+            if ($prov === '' || ! isset($allowedSet[$prov])) {
+                continue;
+            }
+            if (isset($byProvider[$prov])) {
+                continue;
+            }
+            $byProvider[$prov] = $panel;
+        }
+
+        $list = [];
+        $seenPanelIds = [];
+        foreach ($slots as $want) {
+            $wk = strtolower(trim((string) $want));
+            if ($wk === '' || ! isset($byProvider[$wk])) {
+                continue;
+            }
+            $p = $byProvider[$wk];
+            if (isset($seenPanelIds[$p->id])) {
+                continue;
+            }
+            $seenPanelIds[$p->id] = true;
+            $list[] = $p;
+            if ($maxSlots > 0 && count($list) >= $maxSlots) {
+                break;
+            }
+        }
+
+        return $list;
+    }
+
+    /**
      * Резолв панелей для списка провайдеров без чтения кэша (тяжёлая часть — один батч по метрикам).
      *
      * @param array<int, string> $missing
      * @return array<string, Panel|null>
      */
-    private function resolveMarzbanPanelsForProvidersUncached(array $missing, string $panelType): array
+    private function resolveMarzbanPanelsForProvidersUncached(array $missing, string $panelType, ?string $activationTier = null): array
     {
         $t0 = microtime(true);
         $out = [];
-        $collectByProvider = $this->getCandidatePanelsForRotationBatch($panelType, $missing);
+        $collectByProvider = $this->getCandidatePanelsForRotationBatch($panelType, $missing, $activationTier);
         $tAfterCandidates = microtime(true);
 
         $allIds = [];

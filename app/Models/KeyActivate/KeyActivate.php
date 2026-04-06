@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property \Illuminate\Database\Eloquent\Collection<int, KeyActivateUser> $keyActivateUsers
  * 
  * @property bool $split_traffic_across_slots если true — квота traffic_limit делится между слотами Marzban (новые ключи)
+ * @property string|null $activation_tariff_tier переопределение тира (free|full|whitelist) для выбора панелей
  *
  * ВАЖНО: Реальный остаток трафика (data_limit - used_traffic) хранится на панели Marzban,
  * а НЕ в этом поле! Это поле содержит НАЧАЛЬНОЕ значение лимита.

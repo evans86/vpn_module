@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int|null $count количество ключей
  * @property int|null $activate_time время за которое надо активировать ключи
  * @property boolean|null $status
+ * @property string|null $activation_tariff_tier free|full|whitelist — тир серверов при активации (null = по умолчанию)
  */
 class Pack extends Model
 {
@@ -42,7 +43,8 @@ class Pack extends Model
         'count',
         'activate_time',
         'status',
-        'api_id'
+        'api_id',
+        'activation_tariff_tier',
     ];
 
     /**

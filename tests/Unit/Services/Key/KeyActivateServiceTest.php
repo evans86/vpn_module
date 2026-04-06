@@ -7,6 +7,7 @@ use App\Models\KeyActivate\KeyActivate;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Repositories\PackSalesman\PackSalesmanRepository;
 use App\Repositories\Panel\PanelRepository;
+use App\Services\Key\ActivationTariffResolver;
 use App\Services\Key\KeyActivateService;
 use App\Services\Notification\NotificationService;
 use App\Logging\DatabaseLogger;
@@ -22,6 +23,7 @@ class KeyActivateServiceTest extends TestCase
     private Mockery\MockInterface $panelRepo;
     private Mockery\MockInterface $logger;
     private Mockery\MockInterface $notificationService;
+    private Mockery\MockInterface $activationTariffResolver;
 
     protected function setUp(): void
     {
@@ -33,13 +35,16 @@ class KeyActivateServiceTest extends TestCase
         $this->panelRepo = Mockery::mock(PanelRepository::class);
         $this->logger = Mockery::mock(DatabaseLogger::class);
         $this->notificationService = Mockery::mock(NotificationService::class);
+        $this->activationTariffResolver = Mockery::mock(ActivationTariffResolver::class);
+        $this->activationTariffResolver->allows('resolve')->andReturn('full');
 
         $this->service = new KeyActivateService(
             $this->keyActivateRepo,
             $this->packSalesmanRepo,
             $this->panelRepo,
             $this->logger,
-            $this->notificationService
+            $this->notificationService,
+            $this->activationTariffResolver
         );
     }
 

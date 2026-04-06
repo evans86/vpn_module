@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
+use App\Constants\TariffTier;
 use App\Models\Server\Server;
 use App\Services\Server\ServerStrategy;
 use App\Services\Server\LogUploadService;
@@ -284,6 +285,7 @@ class ServerController extends Controller
                 'ssh_port' => 'nullable|integer|min:1|max:65535',
                 'login' => 'nullable|string|max:255',
                 'password' => 'nullable|string|max:500',
+                'tariff_tier' => 'nullable|string|in:' . implode(',', TariffTier::all()),
             ]);
 
             $providerCode = ServerProviderCode::fromLabel($validated['provider_name']);
@@ -300,6 +302,7 @@ class ServerController extends Controller
             $server->provider_id = null;
             $server->server_status = Server::SERVER_CREATED;
             $server->is_free = false;
+            $server->tariff_tier = $validated['tariff_tier'] ?? TariffTier::FULL;
             $server->save();
 
             $this->logger->info('Manual server created', [
@@ -357,7 +360,10 @@ class ServerController extends Controller
                 'ssh_port' => 'sometimes|nullable|integer|min:1|max:65535',
                 'location_id' => 'sometimes|integer|exists:location,id',
                 'provider_name' => 'sometimes|nullable|string|max:80',
+                'tariff_tier' => 'sometimes|string|in:' . implode(',', TariffTier::all()),
             ]);
+
+            $oldTariffTier = $server->tariff_tier;
 
             if (array_key_exists('provider_name', $validated)) {
                 if (!$server->usesManualStrategy()) {
@@ -385,6 +391,10 @@ class ServerController extends Controller
             ]);
 
             $server = $this->serverRepository->updateConfiguration($server, $validated);
+
+            if (array_key_exists('tariff_tier', $validated) && (string) $oldTariffTier !== (string) $validated['tariff_tier']) {
+                $this->panelRepository->forgetRotationSelectionCache(null);
+            }
 
             $this->logger->info('Server updated successfully', [
                 'source' => 'server',

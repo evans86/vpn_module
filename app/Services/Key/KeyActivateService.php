@@ -37,13 +37,15 @@ class KeyActivateService
     private DatabaseLogger $logger;
     private PanelRepository $panelRepository;
     private NotificationService $notificationService;
+    private ActivationTariffResolver $activationTariffResolver;
 
     public function __construct(
         KeyActivateRepository  $keyActivateRepository,
         PackSalesmanRepository $packSalesmanRepository,
         PanelRepository        $panelRepository,
         DatabaseLogger         $logger,
-        NotificationService    $notificationService
+        NotificationService    $notificationService,
+        ActivationTariffResolver $activationTariffResolver
     )
     {
         $this->keyActivateRepository = $keyActivateRepository;
@@ -51,6 +53,7 @@ class KeyActivateService
         $this->panelRepository = $panelRepository;
         $this->logger = $logger;
         $this->notificationService = $notificationService;
+        $this->activationTariffResolver = $activationTariffResolver;
     }
 
     /**
@@ -60,57 +63,10 @@ class KeyActivateService
      */
     private function getPanelsForActivation(KeyActivate $key, bool $useCacheOnly = true): array
     {
-        $slots = config('panel.multi_provider_slots', []);
-        $slots = is_array($slots) ? $slots : [];
+        $key->loadMissing(['packSalesman.salesman.panel.server', 'packSalesman.pack']);
+        $tier = $this->activationTariffResolver->resolve($key);
 
-        if (empty($slots)) {
-            $panel = null;
-            if ($key->packSalesman && $key->packSalesman->salesman && $key->packSalesman->salesman->panel_id) {
-                $panel = $key->packSalesman->salesman->panel;
-            }
-            if (!$panel) {
-                $panel = $this->panelRepository->getOptimizedMarzbanPanel(null, $useCacheOnly);
-            }
-            return $panel ? [$panel] : [];
-        }
-
-        $panels = [];
-        $salesmanPanel = ($key->packSalesman && $key->packSalesman->salesman && $key->packSalesman->salesman->panel_id)
-            ? $key->packSalesman->salesman->panel
-            : null;
-        $salesmanProvider = $salesmanPanel && $salesmanPanel->server ? $salesmanPanel->server->provider : null;
-
-        $providersToResolve = [];
-        foreach ($slots as $provider) {
-            $provider = (string) $provider;
-            if (! ($salesmanProvider === $provider && $salesmanPanel)) {
-                $providersToResolve[] = $provider;
-            }
-        }
-        $providersToResolve = array_values(array_unique($providersToResolve));
-        $fetchedByProvider = $providersToResolve !== []
-            ? $this->panelRepository->getOptimizedMarzbanPanelsForProviders($providersToResolve, null, $useCacheOnly)
-            : [];
-
-        foreach ($slots as $provider) {
-            $provider = (string) $provider;
-            $panel = null;
-            if ($salesmanProvider === $provider && $salesmanPanel) {
-                $panel = $salesmanPanel;
-            }
-            if (! $panel) {
-                $panel = $fetchedByProvider[$provider] ?? null;
-            }
-            if ($panel && !isset($panels[$panel->id])) {
-                $panels[$panel->id] = $panel;
-            }
-        }
-        $list = array_values($panels);
-        $maxSlots = (int) config('panel.max_provider_slots', 3);
-        if ($maxSlots > 0 && count($list) > $maxSlots) {
-            $list = array_slice($list, 0, $maxSlots);
-        }
-        return $list;
+        return $this->panelRepository->getPanelsForKeyActivation($key, $tier, $useCacheOnly);
     }
 
     /**
@@ -135,11 +91,13 @@ class KeyActivateService
             return 0;
         }
 
-        $key->load(['keyActivateUsers.serverUser.panel.server']);
+        $key->load(['keyActivateUsers.serverUser.panel.server', 'packSalesman.pack']);
         if ($key->keyActivateUsers->isEmpty()) {
             Log::warning('addMissingProviderSlots: key has no KeyActivateUser (no slots)', ['key_id' => $key->id]);
             return 0;
         }
+
+        $activationTier = $this->activationTariffResolver->resolve($key);
 
         // Не добавляем слотов сверх лимита (у всех ключей макс. max_provider_slots)
         if ($maxSlots > 0 && $key->keyActivateUsers->count() >= $maxSlots) {
@@ -174,7 +132,7 @@ class KeyActivateService
             if (isset($existingProviders[$providerKey])) {
                 continue;
             }
-            $panel = $this->panelRepository->getOptimizedMarzbanPanelForProvider($provider, null, true);
+            $panel = $this->panelRepository->getOptimizedMarzbanPanelForProvider($provider, null, true, $activationTier);
             if (!$panel) {
                 Log::warning('addMissingProviderSlots: no panel for provider', [
                     'key_id' => $key->id,
