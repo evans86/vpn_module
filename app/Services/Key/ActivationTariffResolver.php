@@ -8,8 +8,8 @@ use App\Models\KeyActivate\KeyActivate;
 /**
  * Определяет server.tariff_tier для выбора панелей при активации.
  *
- * Бесплатные ключи (без pack/module sales) пока идут в тот же пул, что и платные (full),
- * пока нет отдельной инфраструктуры под TariffTier::FREE.
+ * Бесплатные ключи (без pack/module sales) используют пул TariffTier::FREE — только серверы
+ * с tariff_tier «бесплатный пул» в админке (мульти-слоты — по провайдерам с тем же тиром).
  */
 class ActivationTariffResolver
 {
@@ -24,7 +24,7 @@ class ActivationTariffResolver
         }
 
         if ($key->isFreeIssuedKey()) {
-            return TariffTier::FULL;
+            return TariffTier::FREE;
         }
 
         $key->loadMissing(['packSalesman.pack']);
