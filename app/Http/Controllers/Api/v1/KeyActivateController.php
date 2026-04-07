@@ -7,6 +7,7 @@ use App\Helpers\ApiHelpers;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\BotModule\BotModuleInstructionsRequest;
 use App\Http\Requests\KeyActivate\KeyActivateRequest;
+use App\Http\Requests\PackSalesman\PackSalesmanActivateKeyRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanBuyKeyRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanFreeKeyRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanUserKeysRequest;
@@ -141,6 +142,92 @@ class KeyActivateController extends Controller
                 'public_key' => $request->public_key ?? null
             ]);
             return ApiHelpers::error('Произошла ошибка при покупке ключа');
+        }
+    }
+
+    /**
+     * Активация ключа без покупки в этом запросе (двухшаговый сценарий: сначала оплата/выдача id, потом активация).
+     * Авторизация через Bott API; ключ должен принадлежать модулю (как в user-key).
+     *
+     * @throws GuzzleException
+     */
+    public function activateKey(PackSalesmanActivateKeyRequest $request)
+    {
+        try {
+            $this->dbLogger->info('Запрос активации ключа (модуль)', [
+                'source' => 'key_activate',
+                'action' => 'activate_key_request',
+                'user_tg_id' => $request->user_tg_id,
+                'key_id' => $request->key,
+                'public_key_prefix' => substr((string) $request->public_key, 0, 12),
+            ]);
+
+            $botModule = BotModule::where('public_key', $request->public_key)->first();
+            if (!$botModule) {
+                throw new RuntimeException('Модуль бота не найден');
+            }
+
+            $userCheck = BottApi::checkUser(
+                $request->user_tg_id,
+                $request->user_secret_key,
+                $botModule->public_key,
+                $botModule->private_key
+            );
+            if (!$userCheck['result']) {
+                throw new RuntimeException($userCheck['message'] ?? 'Ошибка авторизации пользователя');
+            }
+
+            $key = KeyActivate::with(['packSalesman.pack', 'packSalesman.salesman', 'moduleSalesman'])
+                ->where('id', $request->key)
+                ->first();
+
+            if (!$key instanceof KeyActivate) {
+                return ApiHelpers::error('Ключ не найден');
+            }
+
+            $salesman = Salesman::where('module_bot_id', $botModule->id)->first();
+            if (!$salesman) {
+                throw new RuntimeException('Продавец не найден для данного модуля');
+            }
+
+            $keyBelongsToModule = false;
+            if ($key->pack_salesman_id) {
+                $keyBelongsToModule = $key->packSalesman
+                    && (int) $key->packSalesman->salesman_id === (int) $salesman->id
+                    && $key->packSalesman->pack
+                    && $key->packSalesman->pack->module_key == true;
+            }
+            if (!$keyBelongsToModule && $key->module_salesman_id) {
+                $keyBelongsToModule = (int) $key->module_salesman_id === (int) $salesman->id;
+            }
+
+            if (!$keyBelongsToModule) {
+                return ApiHelpers::error('Доступ запрещен');
+            }
+
+            $activatedKey = $this->keyActivateService->activateModuleKey($key, (int) $request->user_tg_id);
+
+            return ApiHelpers::success(array_merge([
+                'key' => $activatedKey->id,
+                'traffic_limit' => $activatedKey->traffic_limit,
+                'traffic_limit_gb' => round($activatedKey->traffic_limit / 1024 / 1024 / 1024, 1),
+                'finish_at' => $activatedKey->finish_at,
+                'status' => $activatedKey->status,
+                'status_text' => $activatedKey->getStatusText(),
+            ], \App\Helpers\UrlHelper::configUrlsPayload($activatedKey->id)));
+        } catch (RuntimeException $r) {
+            return ApiHelpers::error($r->getMessage());
+        } catch (Exception $e) {
+            Log::error('Ошибка при активации ключа (API)', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_tg_id' => $request->user_tg_id ?? null,
+                'key' => $request->key ?? null,
+                'public_key' => $request->public_key ?? null,
+            ]);
+
+            return ApiHelpers::error('Произошла ошибка при активации ключа');
         }
     }
 

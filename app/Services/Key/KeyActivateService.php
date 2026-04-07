@@ -373,7 +373,9 @@ class KeyActivateService
     public function activateModuleKey(KeyActivate $key, int $userTgId): KeyActivate
     {
         try {
-            if (!$key->packSalesman || !$key->packSalesman->salesman) {
+            $key->loadMissing(['packSalesman.salesman', 'moduleSalesman']);
+            $hasPackSalesman = $key->packSalesman && $key->packSalesman->salesman;
+            if (!$hasPackSalesman && !$key->moduleSalesman) {
                 throw new RuntimeException('Не найдена связь ключа с продавцом');
             }
 
@@ -383,7 +385,7 @@ class KeyActivateService
             }
 
             /** @var KeyActivate $keyLocked */
-            $keyLocked = KeyActivate::with(['packSalesman.pack'])->findOrFail($keyId);
+            $keyLocked = KeyActivate::with(['packSalesman.pack', 'moduleSalesman'])->findOrFail($keyId);
 
             return $this->runActivationAfterClaim($keyLocked, $userTgId, null, 'activate_module_key');
         } catch (Exception $e) {
@@ -681,10 +683,15 @@ class KeyActivateService
             ]);
 
             if ($logAction === 'activate_module_key') {
-                $refreshed = KeyActivate::with('packSalesman.salesman')->find($activatedKey->id);
+                $refreshed = KeyActivate::with(['packSalesman.salesman', 'moduleSalesman'])->find($activatedKey->id);
                 if ($refreshed && $refreshed->packSalesman && $refreshed->packSalesman->salesman) {
                     $this->notificationService->sendKeyActivatedNotification(
                         $refreshed->packSalesman->salesman->telegram_id,
+                        $refreshed->id
+                    );
+                } elseif ($refreshed && $refreshed->moduleSalesman) {
+                    $this->notificationService->sendKeyActivatedNotification(
+                        $refreshed->moduleSalesman->telegram_id,
                         $refreshed->id
                     );
                 }

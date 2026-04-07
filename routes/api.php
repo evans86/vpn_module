@@ -58,6 +58,10 @@ Route::prefix('v1/key-activate')->group(function () {
     Route::post('buy-key', [KeyActivateController::class, 'buyKey']);
     Route::get('buy-key', [KeyActivateController::class, 'buyKey']);
 
+    /** Активация ключа без покупки (ключ уже PAID / выдан заказом Bott) */
+    Route::post('activate-key', [KeyActivateController::class, 'activateKey']);
+    Route::get('activate-key', [KeyActivateController::class, 'activateKey']);
+
     //New GET
     Route::post('free-key', [KeyActivateController::class, 'getFreeKey']);
     Route::get('free-key', [KeyActivateController::class, 'getFreeKey']);
