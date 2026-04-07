@@ -18,6 +18,7 @@ class Location extends Model
     const RU = 2;
     const FI = 3;
     const TR = 4;
+    const CZ = 5;
 
     protected $guarded = false;
     protected $table = 'location';

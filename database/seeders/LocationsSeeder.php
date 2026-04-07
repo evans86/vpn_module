@@ -29,6 +29,11 @@ class LocationsSeeder extends Seeder
             'code' => 'TR',
             'emoji' => ':tr:'
         ];
+        $data[] = [
+            'id' => 5,
+            'code' => 'CZ',
+            'emoji' => ':cz:'
+        ];
         DB::table('location')->insert($data);
     }
 }
