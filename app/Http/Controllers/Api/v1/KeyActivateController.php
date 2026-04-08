@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\BotModule\BotModuleInstructionsRequest;
 use App\Http\Requests\KeyActivate\KeyActivateRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanActivateKeyRequest;
+use App\Http\Requests\PackSalesman\PackSalesmanActivateKeyQueryRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanBuyKeyRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanFreeKeyRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanUserKeysRequest;
@@ -153,23 +154,61 @@ class KeyActivateController extends Controller
      */
     public function activateKey(PackSalesmanActivateKeyRequest $request)
     {
+        return $this->runActivatePurchasedKey(
+            $request->key,
+            (string) $request->public_key,
+            $request->user_tg_id,
+            (string) $request->user_secret_key,
+            'activate_key_request'
+        );
+    }
+
+    /**
+     * То же, что activate-key, но отдельный GET с нормализацией query (UUID, «+» в base64).
+     * Рекомендуемый URL для вызова из браузера и простых GET-клиентов.
+     *
+     * GET /api/v1/key-activate/activate?key=...&public_key=...&user_tg_id=...&user_secret_key=...
+     */
+    public function activateKeyQuery(PackSalesmanActivateKeyQueryRequest $request)
+    {
+        return $this->runActivatePurchasedKey(
+            $request->key,
+            (string) $request->public_key,
+            $request->user_tg_id,
+            (string) $request->user_secret_key,
+            'activate_key_get'
+        );
+    }
+
+    /**
+     * Общая логика активации уже выданного ключа (POST activate-key и GET activate).
+     *
+     * @return array|string
+     */
+    private function runActivatePurchasedKey(
+        string $keyId,
+        string $publicKey,
+        $userTgId,
+        string $userSecretKey,
+        string $logAction
+    ) {
         try {
             $this->dbLogger->info('Запрос активации ключа (модуль)', [
                 'source' => 'key_activate',
-                'action' => 'activate_key_request',
-                'user_tg_id' => $request->user_tg_id,
-                'key_id' => $request->key,
-                'public_key_prefix' => substr((string) $request->public_key, 0, 12),
+                'action' => $logAction,
+                'user_tg_id' => $userTgId,
+                'key_id' => $keyId,
+                'public_key_prefix' => substr($publicKey, 0, 12),
             ]);
 
-            $botModule = BotModule::where('public_key', $request->public_key)->first();
+            $botModule = BotModule::where('public_key', $publicKey)->first();
             if (!$botModule) {
                 throw new RuntimeException('Модуль бота не найден');
             }
 
             $userCheck = BottApi::checkUser(
-                $request->user_tg_id,
-                $request->user_secret_key,
+                $userTgId,
+                $userSecretKey,
                 $botModule->public_key,
                 $botModule->private_key
             );
@@ -178,15 +217,15 @@ class KeyActivateController extends Controller
             }
 
             $key = KeyActivate::with(['packSalesman.pack', 'packSalesman.salesman', 'moduleSalesman'])
-                ->where('id', $request->key)
+                ->where('id', $keyId)
                 ->first();
 
             if (!$key instanceof KeyActivate) {
                 return ApiHelpers::error('Ключ не найден');
             }
 
-            $salesman = Salesman::where('module_bot_id', $botModule->id)->first();
-            if (!$salesman) {
+            $salesman = $this->resolveSalesmanForModuleActivation($botModule, $key);
+            if (!$salesman instanceof Salesman) {
                 throw new RuntimeException('Продавец не найден для данного модуля');
             }
 
@@ -205,7 +244,7 @@ class KeyActivateController extends Controller
                 return ApiHelpers::error('Доступ запрещен');
             }
 
-            $activatedKey = $this->keyActivateService->activateModuleKey($key, (int) $request->user_tg_id);
+            $activatedKey = $this->keyActivateService->activateModuleKey($key, (int) $userTgId);
 
             return ApiHelpers::success(array_merge([
                 'key' => $activatedKey->id,
@@ -222,13 +261,45 @@ class KeyActivateController extends Controller
                 'exception' => get_class($e),
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'user_tg_id' => $request->user_tg_id ?? null,
-                'key' => $request->key ?? null,
-                'public_key' => $request->public_key ?? null,
+                'user_tg_id' => $userTgId ?? null,
+                'key' => $keyId ?? null,
+                'public_key' => $publicKey ?? null,
             ]);
 
             return ApiHelpers::error('Произошла ошибка при активации ключа');
         }
+    }
+
+    /**
+     * Продавец для проверки принадлежности ключа модулю: сначала по module_bot_id, иначе — по связям ключа
+     * при совпадении module_bot_id у Salesman с текущим BotModule.
+     */
+    private function resolveSalesmanForModuleActivation(BotModule $botModule, KeyActivate $key): ?Salesman
+    {
+        $moduleId = (int) $botModule->id;
+
+        $salesman = Salesman::where('module_bot_id', $moduleId)->first();
+        if ($salesman) {
+            return $salesman;
+        }
+
+        if ($key->module_salesman_id) {
+            $candidate = Salesman::find($key->module_salesman_id);
+            if ($candidate instanceof Salesman && (int) $candidate->module_bot_id === $moduleId) {
+                return $candidate;
+            }
+        }
+
+        if ($key->pack_salesman_id) {
+            $key->loadMissing('packSalesman.salesman');
+            $packSalesman = $key->packSalesman;
+            $candidate = $packSalesman !== null ? $packSalesman->salesman : null;
+            if ($candidate instanceof Salesman && (int) $candidate->module_bot_id === $moduleId) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     /**

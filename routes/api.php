@@ -62,6 +62,9 @@ Route::prefix('v1/key-activate')->group(function () {
     Route::post('activate-key', [KeyActivateController::class, 'activateKey']);
     Route::get('activate-key', [KeyActivateController::class, 'activateKey']);
 
+    /** GET-активация с нормализацией query (рекомендуемый вариант для GET) */
+    Route::get('activate', [KeyActivateController::class, 'activateKeyQuery']);
+
     //New GET
     Route::post('free-key', [KeyActivateController::class, 'getFreeKey']);
     Route::get('free-key', [KeyActivateController::class, 'getFreeKey']);
