@@ -1,4 +1,4 @@
-@php
+﻿@php
     use Illuminate\Support\Str;
     $hasMarzban = isset($comparison) && !isset($comparison['error']) && count($comparison['panels'] ?? []) > 0;
     $tierAccent = [
@@ -99,7 +99,7 @@
                                         </div>
                                         <p class="font-semibold text-slate-900 truncate" title="{{ $sName }}">{{ $sName }}</p>
                                         <div class="mt-2">
-                                            <span class="inline-flex max-w-full items-center px-2.5 py-1 rounded-lg text-xs font-extrabold uppercase tracking-wide bg-slate-900 text-white shadow-md ring-2 ring-slate-700/30 truncate" title="{{ $prov }}">
+                                            <span class="inline-flex max-w-full items-center px-2 py-0.5 rounded-md text-[11px] font-medium text-slate-600 bg-slate-100/90 border border-slate-200/80 truncate" title="{{ $prov }}">
                                                 {{ $prov }}
                                             </span>
                                         </div>
