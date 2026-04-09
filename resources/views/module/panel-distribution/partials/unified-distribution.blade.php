@@ -1,6 +1,8 @@
-﻿@php
+@php
+    use App\Helpers\CountryFlagHelper;
     use Illuminate\Support\Str;
     $hasMarzban = isset($comparison) && !isset($comparison['error']) && count($comparison['panels'] ?? []) > 0;
+    $scopeTopSlots = (int) config('panel.max_provider_slots', 3);
     $tierAccent = [
         'free' => ['bar' => 'from-amber-400 to-orange-300', 'ring' => 'ring-amber-400/30', 'badge' => 'bg-amber-500/15 text-amber-950 border-amber-400/40'],
         'full' => ['bar' => 'from-indigo-500 to-violet-400', 'ring' => 'ring-indigo-400/35', 'badge' => 'bg-indigo-500/15 text-indigo-950 border-indigo-400/40'],
@@ -11,7 +13,10 @@
 <div class="rounded-2xl border border-slate-200/90 bg-slate-50/40 shadow-xl shadow-slate-300/20 overflow-hidden" id="panel-distribution-unified">
     <div class="px-4 sm:px-6 py-4 border-b border-slate-200/80 bg-white/90 backdrop-blur-sm">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <h2 class="text-lg font-bold text-slate-900 tracking-tight">Панели в ротации</h2>
+            <div>
+                <h2 class="text-lg font-bold text-slate-900 tracking-tight">Панели в ротации</h2>
+                <p class="text-[11px] text-slate-500 mt-1 max-w-xl leading-snug">Флаги — страна локации сервера. Зелёная подсветка: первые {{ $scopeTopSlots }} панелей по Scope в тарифе (как слоты у ключа).</p>
+            </div>
             <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full lg:w-auto">
                 <label class="relative flex-1 min-w-0 sm:min-w-[220px]">
                     <span class="sr-only">Поиск</span>
@@ -71,7 +76,7 @@
                     <div class="rounded-xl border border-dashed border-slate-200 bg-white/60 px-4 py-6 text-center text-sm text-slate-500">Нет панелей</div>
                 @else
                     <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                        @foreach($block['rows'] as $row)
+                        @foreach($block['rows'] as $idx => $row)
                             @php
                                 $panel = $row['panel'];
                                 $snap = $row['snapshot'];
@@ -83,9 +88,13 @@
                                 $sName = $server->name ?? '—';
                                 $prov = $server->provider ?? '—';
                                 $score = (float) $panel->selection_scope_score;
-                                $searchBlob = Str::lower($block['label'].' '.$tier.' '.$panel->id.' '.$sName.' '.$prov);
+                                $loc = $server->location ?? null;
+                                $locCode = $loc && $loc->code ? (string) $loc->code : '';
+                                $flagEmoji = CountryFlagHelper::emojiFromAlpha2($locCode !== '' ? $locCode : null);
+                                $isTopScope = $idx < $scopeTopSlots;
+                                $searchBlob = Str::lower($block['label'].' '.$tier.' '.$panel->id.' '.$sName.' '.$prov.' '.$locCode);
                             @endphp
-                            <article class="panel-dist-card group relative flex flex-col rounded-2xl border border-slate-200/90 bg-white shadow-md shadow-slate-200/40 ring-1 {{ $acc['ring'] }} transition-all hover:shadow-lg hover:border-slate-300/90"
+                            <article class="panel-dist-card group relative flex flex-col rounded-2xl border transition-all hover:shadow-lg {{ $isTopScope ? 'border-emerald-300/50 bg-gradient-to-br from-emerald-50/95 via-white to-teal-50/50 shadow-md shadow-emerald-500/15 ring-2 ring-emerald-400/20 hover:border-emerald-400/45 hover:shadow-emerald-500/20' : 'border-slate-200/90 bg-white shadow-md shadow-slate-200/40 ring-1 '.$acc['ring'].' hover:border-slate-300/90' }}"
                                      data-panel-card
                                      data-search="{{ $searchBlob }}">
                                 <div class="flex items-start justify-between gap-3 p-4 pb-3 border-b border-slate-100/90">
@@ -97,7 +106,14 @@
                                                 #{{ $panel->id }}
                                             </a>
                                         </div>
-                                        <p class="font-semibold text-slate-900 truncate" title="{{ $sName }}">{{ $sName }}</p>
+                                        <p class="font-semibold text-slate-900 truncate flex items-center gap-2 min-w-0" title="{{ $sName }}">
+                                            @if($flagEmoji !== '')
+                                                <span class="shrink-0 text-xl leading-none" title="{{ $locCode }}" aria-hidden="true">{{ $flagEmoji }}</span>
+                                            @else
+                                                <span class="shrink-0 inline-flex h-6 w-6 items-center justify-center rounded-md bg-slate-100 text-slate-400 text-[10px]" title="Локация не задана"><i class="fas fa-globe"></i></span>
+                                            @endif
+                                            <span class="truncate">{{ $sName }}</span>
+                                        </p>
                                         <div class="mt-2">
                                             <span class="inline-flex max-w-full items-center px-2 py-0.5 rounded-md text-[11px] font-medium text-slate-600 bg-slate-100/90 border border-slate-200/80 truncate" title="{{ $prov }}">
                                                 {{ $prov }}

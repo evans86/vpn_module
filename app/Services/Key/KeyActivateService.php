@@ -17,6 +17,7 @@ use App\Logging\DatabaseLogger;
 use App\Models\Log\ApplicationLog;
 use App\Services\External\BottApi;
 use App\Services\Panel\PanelStrategy;
+use App\Events\KeyActivation\KeyActivated;
 use App\Services\Notification\NotificationService;
 use App\Services\Server\ServerStrategy;
 use Carbon\Carbon;
@@ -551,6 +552,8 @@ class KeyActivateService
 
         $this->scheduleWarmConfigAfterActivation((string) $activated->id);
 
+        $this->dispatchKeyActivatedEvent($activated, 'finalize_stuck_activation');
+
         return $activated;
     }
 
@@ -701,6 +704,8 @@ class KeyActivateService
             }
 
             $this->scheduleWarmConfigAfterActivation((string) $activatedKey->id);
+
+            $this->dispatchKeyActivatedEvent($activatedKey, $logAction);
 
             return $activatedKey;
         } catch (\Throwable $e) {
@@ -1185,6 +1190,8 @@ class KeyActivateService
 
             $this->scheduleWarmConfigAfterActivation((string) $activatedKey->id);
 
+            $this->dispatchKeyActivatedEvent($activatedKey, 'renew');
+
             return $activatedKey;
         } catch (\Throwable $e) {
             $msg = 'Перевыпуск ключа — ОШИБКА: ' . $e->getMessage();
@@ -1275,5 +1282,14 @@ class KeyActivateService
             default:
                 return "Unknown ({$statusCode})";
         }
+    }
+
+    private function dispatchKeyActivatedEvent(KeyActivate $key, string $source): void
+    {
+        if (! config('key_activation.events.enabled', true)) {
+            return;
+        }
+
+        event(new KeyActivated($key, $source));
     }
 }

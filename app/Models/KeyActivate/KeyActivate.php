@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property int|null $module_salesman_id кто продавец ключа из модуля
  * @property int|null $finish_at дата окончания
  * @property int|null $user_tg_id кто активировал ключ (наличие означает активацию)
+ * @property string|null $email почта для уведомления об активации (опционально)
  * @property int|null $deleted_at срок, до которого нужно активировать
  * @property int|null $status статус
  * @property PackSalesman|null $packSalesman
