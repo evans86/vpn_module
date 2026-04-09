@@ -1,199 +1,110 @@
 <div id="rotation" class="scroll-mt-24 space-y-6">
-    <div class="bg-white shadow rounded-lg p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-2">Ротация и сравнение стратегий (кэш)</h3>
-        <p class="text-sm text-gray-600">
-            Активация новых ключей: <code class="text-xs bg-gray-100 px-1 rounded">PANEL_SELECTION_STRATEGY</code> —
-            <strong>simple</strong> или <strong>intelligent</strong> (статистика Marzban + score);
-            при включённом <code class="text-xs">PANEL_SELECTION_V2</code> выбор панели по <strong>scope</strong> (см. блок выше).
-            Таблица ниже: кэш <code class="text-xs">panel:warm-rotation-settings</code> (cron, <code class="text-xs">PANEL_ROTATION_SETTINGS_WARM_*</code>).
-        </p>
-    </div>
-
-    @if(isset($comparison) && !isset($comparison['error']))
-        <div class="bg-white shadow rounded-lg p-6">
-            <div class="flex items-center justify-between mb-6">
-                <h3 class="text-lg font-semibold text-gray-900">Сравнение simple / intelligent</h3>
-                <button type="button" onclick="location.reload()" class="text-sm text-blue-600 hover:text-blue-800 flex items-center">
-                    <i class="fas fa-sync-alt mr-2"></i> Обновить данные
+    @if(isset($comparison['error']))
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-5 shadow-sm">
+            <h3 class="text-base font-semibold text-amber-900 mb-2">Снимок Marzban недоступен</h3>
+            <p class="text-sm text-amber-800">{{ $comparison['error'] }}</p>
+        </div>
+    @elseif(isset($comparison) && !isset($comparison['error']))
+        <div class="rounded-xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3 bg-white/80">
+                <div>
+                    <h3 class="text-lg font-semibold text-slate-900">Нагрузка панелей</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Данные из кэша <code class="text-[11px] bg-slate-100 px-1 rounded">panel:warm-rotation-settings</code>
+                        (Marzban). Выбор панели при активации — по scope v2, не по «интеллектуальной» ротации.
+                    </p>
+                </div>
+                <button type="button" onclick="location.reload()" class="shrink-0 inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors">
+                    <i class="fas fa-sync-alt text-xs"></i>
+                    Обновить страницу
                 </button>
             </div>
 
-            @php
-                $activeStrategy = $comparison['active_strategy'] ?? 'simple';
-                $simpleInfo = $comparison['strategies']['simple'] ?? null;
-                $intelligentInfo = $comparison['strategies']['intelligent'] ?? null;
-                $simplePanelInfo = $simpleInfo['selected_panel_info'] ?? null;
-                $selectedPanel = $intelligentInfo['selected_panel_info'] ?? null;
-            @endphp
-            <p class="text-xs text-gray-500 mb-4">Сейчас в проде для активации: <strong>{{ $activeStrategy }}</strong></p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div class="border rounded-lg p-4 border-green-500 bg-green-50">
-                    <div class="flex items-center mb-2">
-                        <span class="text-2xl mr-2">⚖️</span>
-                        <span class="font-semibold text-sm">Простая ротация (min активных)</span>
-                    </div>
-                    @if($simplePanelInfo)
-                        <div class="space-y-1 text-sm">
-                            <div><strong>Панель ID:</strong> {{ $simplePanelInfo['id'] }}</div>
-                            <div><strong>Сервер:</strong> {{ $simplePanelInfo['server_name'] ?? 'N/A' }}</div>
-                            <div><strong>Активных (по БД):</strong> {{ $simplePanelInfo['active_users'] }}</div>
-                            <div class="text-xs text-gray-600">Всего server_user: {{ $simplePanelInfo['total_users'] }}</div>
-                        </div>
-                    @else
-                        <p class="text-sm text-gray-500">Не выбрана</p>
-                    @endif
+            <div class="px-5 py-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm border-b border-slate-100 bg-slate-50/50">
+                <div class="rounded-lg bg-white border border-slate-100 px-3 py-2">
+                    <div class="text-xs text-slate-500">Всего панелей</div>
+                    <div class="text-lg font-semibold text-slate-900 tabular-nums">{{ $comparison['summary']['total_panels'] }}</div>
                 </div>
-                <div class="border rounded-lg p-4 border-blue-500 bg-blue-50">
-                    <div class="flex items-center mb-2">
-                        <span class="text-2xl mr-2">🧠</span>
-                        <span class="font-semibold text-sm">Интеллектуальная ротация (сравнение)</span>
-                    </div>
-                    @if($selectedPanel)
-                        <div class="space-y-1 text-sm">
-                            <div><strong>Панель ID:</strong> {{ $selectedPanel['id'] }}</div>
-                            <div><strong>Сервер:</strong> {{ $selectedPanel['server_name'] ?? 'N/A' }}</div>
-                            <div><strong>Пользователи:</strong> {{ $selectedPanel['total_users'] }} (активных: {{ $selectedPanel['active_users'] }})</div>
-                            @if($selectedPanel['traffic_used_percent'] !== null)
-                                <div class="flex items-center gap-2">
-                                    <strong>Трафик:</strong>
-                                    <span class="px-2 py-0.5 rounded text-xs font-medium
-                                        {{ $selectedPanel['traffic_used_percent'] > 80 ? 'bg-red-100 text-red-800' : ($selectedPanel['traffic_used_percent'] > 60 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800') }}">
-                                        {{ number_format($selectedPanel['traffic_used_percent'], 1) }}%
-                                    </span>
-                                    @if($selectedPanel['traffic_used_gb'])
-                                        <span class="text-gray-500 text-xs">({{ number_format($selectedPanel['traffic_used_gb'], 0) }} GB)</span>
-                                    @endif
-                                </div>
-                            @else
-                                <div class="text-gray-400 text-xs">Трафик: нет данных</div>
-                            @endif
-                            @if($selectedPanel['cpu_usage'] > 0)
-                                <div><strong>CPU:</strong> {{ $selectedPanel['cpu_usage'] }}%</div>
-                            @endif
-                            @if($selectedPanel['memory_usage'] > 0)
-                                <div><strong>Память:</strong> {{ $selectedPanel['memory_usage'] }}%</div>
-                            @endif
-                            @if($selectedPanel['intelligent_score'] > 0)
-                                <div><strong>Score:</strong> {{ $selectedPanel['intelligent_score'] }}</div>
-                            @endif
-                        </div>
-                    @else
-                        <p class="text-sm text-gray-500">Не выбрана</p>
-                    @endif
+                <div class="rounded-lg bg-white border border-slate-100 px-3 py-2">
+                    <div class="text-xs text-slate-500">Со статистикой</div>
+                    <div class="text-lg font-semibold text-slate-900 tabular-nums">{{ $comparison['summary']['panels_with_stats'] }}</div>
                 </div>
-            </div>
-
-            <div class="bg-gray-50 rounded-lg p-4 mb-6">
-                <h4 class="text-md font-semibold text-gray-900 mb-3">Общая статистика</h4>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                        <div class="text-gray-600">Всего панелей</div>
-                        <div class="text-lg font-semibold">{{ $comparison['summary']['total_panels'] }}</div>
-                    </div>
-                    <div>
-                        <div class="text-gray-600">С актуальной статистикой</div>
-                        <div class="text-lg font-semibold">{{ $comparison['summary']['panels_with_stats'] }}</div>
-                    </div>
-                    <div>
-                        <div class="text-gray-600">С данными о трафике</div>
-                        <div class="text-lg font-semibold">{{ $comparison['summary']['panels_with_traffic'] }}</div>
-                    </div>
-                    <div>
-                        <div class="text-gray-600">Средний трафик</div>
-                        <div class="text-lg font-semibold">{{ number_format($comparison['summary']['avg_traffic'], 1) }}%</div>
-                    </div>
+                <div class="rounded-lg bg-white border border-slate-100 px-3 py-2">
+                    <div class="text-xs text-slate-500">С данными о трафике</div>
+                    <div class="text-lg font-semibold text-slate-900 tabular-nums">{{ $comparison['summary']['panels_with_traffic'] }}</div>
+                </div>
+                <div class="rounded-lg bg-white border border-slate-100 px-3 py-2">
+                    <div class="text-xs text-slate-500">Средний трафик</div>
+                    <div class="text-lg font-semibold text-slate-900 tabular-nums">{{ number_format($comparison['summary']['avg_traffic'], 1) }}%</div>
                 </div>
             </div>
 
             <div class="overflow-x-auto">
-                <h4 class="text-md font-semibold text-gray-900 mb-3">Детальная информация по панелям</h4>
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-slate-100/90 sticky top-0 z-10">
                         <tr>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Сервер</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Пользователи</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Трафик</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CPU</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Память</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ротация</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Simple</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">ID</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Сервер</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Пользователи</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Трафик</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">CPU</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Память</th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                    <tbody class="divide-y divide-slate-100 bg-white">
                         @foreach($comparison['panels'] as $panel)
-                            <tr class="hover:bg-gray-50 {{ ($panel['excluded_from_rotation'] ?? false) ? 'bg-yellow-50' : '' }}">
-                                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    {{ $panel['id'] }}
-                                    @if($panel['excluded_from_rotation'] ?? false)
-                                        <span class="ml-2 px-2 py-0.5 text-xs font-semibold bg-yellow-500 text-white rounded" title="Исключена из ротации">🚫</span>
-                                    @endif
+                            <tr class="transition-colors hover:bg-indigo-50/40 {{ ($panel['excluded_from_rotation'] ?? false) ? 'bg-amber-50/60' : '' }}">
+                                <td class="px-4 py-3 whitespace-nowrap font-medium text-slate-900">
+                                    <span class="inline-flex items-center gap-2">
+                                        {{ $panel['id'] }}
+                                        @if($panel['excluded_from_rotation'] ?? false)
+                                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-200 text-amber-900 text-xs font-bold" title="Исключена из ротации">!</span>
+                                        @endif
+                                    </span>
                                 </td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{{ $panel['server_name'] }}</td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                                    <div>{{ $panel['total_users'] }} всего</div>
-                                    <div class="text-xs text-gray-500">{{ $panel['active_users'] }} активных</div>
+                                <td class="px-4 py-3 whitespace-nowrap text-slate-700">{{ $panel['server_name'] }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-slate-600">
+                                    <div class="tabular-nums">{{ $panel['total_users'] }} всего</div>
+                                    <div class="text-xs text-slate-500 tabular-nums">{{ $panel['active_users'] }} активных</div>
                                 </td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm">
+                                <td class="px-4 py-3 whitespace-nowrap min-w-[140px]">
                                     @if($panel['traffic_used_percent'] !== null)
-                                        <div class="flex items-center">
-                                            <div class="flex-1">
-                                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                                    <div class="bg-{{ $panel['traffic_used_percent'] > 80 ? 'red' : ($panel['traffic_used_percent'] > 60 ? 'yellow' : 'green') }}-600 h-2 rounded-full"
+                                        <div class="flex items-center gap-2">
+                                            <div class="flex-1 min-w-[72px]">
+                                                <div class="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                                                    <div class="h-full rounded-full transition-all duration-300 {{ $panel['traffic_used_percent'] > 80 ? 'bg-rose-500' : ($panel['traffic_used_percent'] > 60 ? 'bg-amber-400' : 'bg-emerald-500') }}"
                                                          style="width: {{ min(100, $panel['traffic_used_percent']) }}%"></div>
                                                 </div>
-                                                <div class="text-xs text-gray-600 mt-1">
+                                                <div class="text-xs text-slate-600 mt-1 tabular-nums">
                                                     {{ number_format($panel['traffic_used_percent'], 1) }}%
                                                     @if($panel['traffic_used_gb'])
-                                                        ({{ number_format($panel['traffic_used_gb'], 0) }} GB)
+                                                        <span class="text-slate-400">({{ number_format($panel['traffic_used_gb'], 0) }} GB)</span>
                                                     @endif
                                                 </div>
                                             </div>
                                         </div>
                                     @else
-                                        <span class="text-gray-400">Нет данных</span>
+                                        <span class="text-slate-400">Нет данных</span>
                                     @endif
                                 </td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm">
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     @if($panel['cpu_usage'] > 0)
-                                        <span class="px-2 py-1 rounded text-xs font-medium
-                                            {{ $panel['cpu_usage'] > 80 ? 'bg-red-100 text-red-800' : ($panel['cpu_usage'] > 60 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800') }}">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold tabular-nums
+                                            {{ $panel['cpu_usage'] > 80 ? 'bg-rose-100 text-rose-800' : ($panel['cpu_usage'] > 60 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800') }}">
                                             {{ $panel['cpu_usage'] }}%
                                         </span>
                                     @else
-                                        <span class="text-gray-400">—</span>
+                                        <span class="text-slate-400">—</span>
                                     @endif
                                 </td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm">
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     @if($panel['memory_usage'] > 0)
-                                        <span class="px-2 py-1 rounded text-xs font-medium
-                                            {{ $panel['memory_usage'] > 80 ? 'bg-red-100 text-red-800' : ($panel['memory_usage'] > 60 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800') }}">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold tabular-nums
+                                            {{ $panel['memory_usage'] > 80 ? 'bg-rose-100 text-rose-800' : ($panel['memory_usage'] > 60 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800') }}">
                                             {{ $panel['memory_usage'] }}%
                                         </span>
                                     @else
-                                        <span class="text-gray-400">—</span>
-                                    @endif
-                                </td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm">
-                                    @if($panel['intelligent_score'] > 0)
-                                        <span class="font-semibold text-gray-900">{{ $panel['intelligent_score'] }}</span>
-                                    @else
-                                        <span class="text-gray-400">—</span>
-                                    @endif
-                                </td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm">
-                                    @if(!empty($panel['is_intelligent_selected']))
-                                        <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">🧠</span>
-                                    @else
-                                        <span class="text-gray-400">—</span>
-                                    @endif
-                                </td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm">
-                                    @if(!empty($panel['is_simple_selected']))
-                                        <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">⚖️</span>
-                                    @else
-                                        <span class="text-gray-400">—</span>
+                                        <span class="text-slate-400">—</span>
                                     @endif
                                 </td>
                             </tr>
@@ -202,13 +113,9 @@
                 </table>
             </div>
 
-            <div class="mt-4 text-xs text-gray-500">
-                <p>Обновлено: {{ $comparison['timestamp'] }}</p>
+            <div class="px-5 py-3 border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500">
+                Обновлено: {{ $comparison['timestamp'] }}
             </div>
-        </div>
-    @elseif(isset($comparison['error']))
-        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p class="text-yellow-800">{{ $comparison['error'] }}</p>
         </div>
     @endif
 

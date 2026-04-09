@@ -145,7 +145,6 @@
                         'admin.module.panel.*',
                         'admin.module.panel-settings.*',
                         'admin.module.panel-distribution.*',
-                        'admin.module.panel-statistics.*',
                         'admin.module.server-users.*',
                         'admin.module.server-monitoring.*',
                         'admin.module.connection-limit-violations.*',
@@ -168,12 +167,6 @@
                             'icon' => 'fa-gauge-high',
                             'label' => 'Панели и распределение',
                             'routes' => ['admin.module.panel-distribution.*', 'admin.module.panel-settings.*'],
-                        ],
-                        [
-                            'route' => 'admin.module.panel-statistics.index',
-                            'icon' => 'fa-chart-bar',
-                            'label' => 'Статистика панелей',
-                            'routes' => ['admin.module.panel-statistics.*'],
                         ],
                         [
                             'route' => 'admin.module.server-users.index',

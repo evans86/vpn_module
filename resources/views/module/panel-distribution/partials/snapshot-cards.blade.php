@@ -1,13 +1,8 @@
-{{-- Горизонтальная лента: ~4 карточки во viewport, мини-сводка по трафику за текущий месяц (данные как в «Статистика панелей»). --}}
+{{-- Горизонтальная лента: мини-сводка по трафику за текущий месяц (Marzban / API). --}}
 <div class="bg-white shadow rounded-lg p-4 md:p-6">
-    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <div>
-            <h3 class="text-lg font-semibold text-gray-900">Сводка по панелям</h3>
-            <p class="text-xs text-gray-500 mt-0.5">Провайдер, тариф сервера, лимит и трафик за период (Marzban / API). Листайте вправо.</p>
-        </div>
-        <a href="{{ route('admin.module.panel-statistics.index') }}" class="text-sm text-indigo-600 hover:text-indigo-800 whitespace-nowrap">
-            Подробная статистика панелей →
-        </a>
+    <div class="mb-4">
+        <h3 class="text-lg font-semibold text-gray-900">Сводка по панелям</h3>
+        <p class="text-xs text-gray-500 mt-0.5">Провайдер, тариф сервера, лимит и трафик за период. Листайте вправо.</p>
     </div>
     @if(empty($snapshotPanels))
         <p class="text-sm text-gray-500">Нет данных для сводки.</p>

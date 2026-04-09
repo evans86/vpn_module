@@ -20,42 +20,7 @@
             </div>
         @endif
 
-        <div class="bg-white shadow rounded-lg p-6 border-l-4 border-indigo-500">
-            <p class="text-sm text-gray-700">
-                Здесь объединены: <strong>сводка по трафику</strong> (мини-карточки),
-                <strong>ротация панелей по scope v2</strong> (по тарифам сервера),
-                и блок <strong>ротации simple/intelligent, ошибок и исключений</strong> (раньше — «Настройки распределения»).
-            </p>
-            <p class="text-xs text-gray-500 mt-2">
-                <a href="{{ route('admin.module.server-monitoring.index') }}" class="text-indigo-600 hover:underline">Статистика нагрузки (графики CPU/RAM)</a>
-                ·
-                <a href="{{ route('admin.module.panel-statistics.index') }}" class="text-indigo-600 hover:underline">Детальная статистика панелей (месяц к месяцу)</a>
-            </p>
-        </div>
-
         @include('module.panel-distribution.partials.snapshot-cards', ['snapshotPanels' => $snapshotPanels])
-
-        <div id="scope-v2" class="scroll-mt-24 bg-white shadow rounded-lg p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">Распределение по scope v2</h3>
-            <p class="text-sm text-gray-600 mb-3">
-                <strong>scope</strong> в <code class="text-xs bg-gray-100 px-1 rounded">panel.selection_scope_score</code>,
-                пересчёт: <code class="text-xs bg-gray-100 px-1 rounded">php artisan panel:recalculate-selection-scope</code>
-                и cron (<code class="text-xs">PANEL_SCOPE_RECALC_ENABLED</code>).
-                Формула: <code class="text-xs">100 × max(0, 1 − T_forecast/T_limit) × max(0, 1 − CPU%)</code>.
-            </p>
-            <p class="text-sm mb-2">
-                @if($v2Enabled)
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">PANEL_SELECTION_V2 включён</span>
-                @else
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-800">PANEL_SELECTION_V2 выключен</span>
-                @endif
-                <span class="text-gray-600 text-sm ml-2">Кэш: <code class="text-xs">PANEL_SELECTION_V2_CACHE_TTL={{ $v2CacheTtl }}</code></span>
-            </p>
-            <p class="text-xs text-gray-500">
-                Отдельная таблица на каждый <code>server.tariff_tier</code>. Раньше в списке был только тариф из
-                <code>PANEL_ACTIVATION_TARIFF_TIER={{ $tariffTier }}</code>.
-            </p>
-        </div>
 
         @foreach($panelsByTier as $tier => $panels)
             <div class="bg-white shadow rounded-lg overflow-hidden">

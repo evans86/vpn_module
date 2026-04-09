@@ -93,9 +93,6 @@ class PanelDistributionController extends Controller
 
         return view('module.panel-distribution.index', [
             'panelsByTier' => $panelsByTier,
-            'v2Enabled' => (bool) config('panel.selection_v2_enabled', false),
-            'v2CacheTtl' => (int) config('panel.selection_v2_cache_ttl', 0),
-            'tariffTier' => (string) config('panel.activation_tariff_tier', 'full'),
             'comparison' => $comparison,
             'panelsWithErrors' => $panelsWithErrors,
             'errorHistory' => $errorHistory,

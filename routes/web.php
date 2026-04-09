@@ -231,11 +231,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::get('/{panel}/test-connection', [PanelController::class, 'testConnection'])->name('test-connection');
             });
 
-            // Настройки распределения панелей
-            Route::prefix('panel-statistics')->name('panel-statistics.')->group(function () {
-                Route::get('/', [\App\Http\Controllers\Module\PanelStatisticsController::class, 'index'])->name('index');
-                Route::get('/export-pdf', [\App\Http\Controllers\Module\PanelStatisticsController::class, 'exportPdf'])->name('export-pdf');
-            });
+            // Было: «Статистика панелей» — редирект на единую страницу распределения
+            Route::redirect('panel-statistics', 'panel-distribution', 301);
+            Route::redirect('panel-statistics/export-pdf', 'panel-distribution', 301);
 
             Route::prefix('panel-settings')->name('panel-settings.')->group(function () {
                 Route::get('/', [\App\Http\Controllers\Module\PanelSettingsController::class, 'index'])->name('index');
