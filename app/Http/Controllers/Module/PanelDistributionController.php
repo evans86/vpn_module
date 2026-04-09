@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 
 /**
- * Единая страница: снимок по панелям, scope v2, ротация/ошибки (раньше было на «Настройки распределения»).
+ * Единая страница: сводная таблица (scope v2, месячный учёт, Marzban), ошибки и исключения.
  */
 class PanelDistributionController extends Controller
 {
@@ -40,7 +40,7 @@ class PanelDistributionController extends Controller
         $comparison = Cache::get($cacheKey);
         if ($comparison === null) {
             $comparison = [
-                'error' => 'Данные для таблицы ещё не собраны или кэш истёк. На сервере выполните один раз: php artisan panel:warm-rotation-settings — затем обновите страницу. Для автообновления включите cron (команда в расписании Laravel, см. PANEL_ROTATION_SETTINGS_WARM_* в .env).',
+                'error' => 'Данные Marzban ещё не собраны или кэш истёк. Выполните: php artisan panel:warm-rotation-settings и обновите страницу (cron, PANEL_ROTATION_SETTINGS_WARM_* в .env).',
             ];
         }
 
@@ -75,29 +75,70 @@ class PanelDistributionController extends Controller
             ->get()
             ->keyBy('id');
 
-        $snapshotPanels = [];
+        $snapshotByPanelId = [];
         foreach ($monthlyStats as $row) {
-            $p = $panelModels->get($row['panel_id']);
+            $pid = (int) $row['panel_id'];
+            $p = $panelModels->get($pid);
             $traffic = $row['current_month']['traffic'] ?? null;
-            $snapshotPanels[] = [
-                'panel_id' => $row['panel_id'],
+            $snapshotByPanelId[$pid] = [
+                'panel_id' => $pid,
                 'server_name' => $row['server_name'],
                 'provider' => $p && $p->server ? ($p->server->provider ?? '—') : '—',
                 'tariff_label' => $p && $p->server ? TariffTier::label($p->server->tariff_tier ?? '') : '—',
-                'period_label' => ($row['period']['current']['name'] ?? 'Месяц') . ' ' . ($row['period']['current']['year'] ?? ''),
+                'period_label' => ($row['period']['current']['name'] ?? 'Месяц').' '.($row['period']['current']['year'] ?? ''),
                 'used_tb' => is_array($traffic) ? ($traffic['used_tb'] ?? null) : null,
                 'limit_tb' => is_array($traffic) ? ($traffic['limit_tb'] ?? null) : null,
                 'used_percent' => is_array($traffic) ? ($traffic['used_percent'] ?? null) : null,
             ];
         }
 
+        $marzbanByPanelId = $this->marzbanByPanelId($comparison);
+
+        /** @var list<array{tier: string, label: string, rows: list<array{panel: Panel, snapshot: ?array, marzban: ?array}>}> $distributionTiers */
+        $distributionTiers = [];
+        foreach (TariffTier::all() as $tier) {
+            $rows = [];
+            foreach ($panelsByTier[$tier] as $panel) {
+                $id = (int) $panel->id;
+                $rows[] = [
+                    'panel' => $panel,
+                    'snapshot' => $snapshotByPanelId[$id] ?? null,
+                    'marzban' => $marzbanByPanelId[$id] ?? null,
+                ];
+            }
+            $distributionTiers[] = [
+                'tier' => $tier,
+                'label' => TariffTier::label($tier),
+                'rows' => $rows,
+            ];
+        }
+
         return view('module.panel-distribution.index', [
-            'panelsByTier' => $panelsByTier,
+            'distributionTiers' => $distributionTiers,
             'comparison' => $comparison,
             'panelsWithErrors' => $panelsWithErrors,
             'errorHistory' => $errorHistory,
             'excludedPanels' => $excludedPanels,
-            'snapshotPanels' => $snapshotPanels,
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $comparison
+     * @return array<int, array<string, mixed>>
+     */
+    private function marzbanByPanelId(?array $comparison): array
+    {
+        if ($comparison === null || isset($comparison['error']) || empty($comparison['panels']) || ! is_array($comparison['panels'])) {
+            return [];
+        }
+        $out = [];
+        foreach ($comparison['panels'] as $p) {
+            if (! is_array($p) || ! isset($p['id'])) {
+                continue;
+            }
+            $out[(int) $p['id']] = $p;
+        }
+
+        return $out;
     }
 }
