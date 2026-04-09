@@ -19,6 +19,7 @@
         @include('module.panel-distribution.partials.unified-distribution', [
             'distributionTiers' => $distributionTiers,
             'comparison' => $comparison,
+            'panelDistributionPageCacheTtl' => $panelDistributionPageCacheTtl ?? 600,
         ])
 
         @include('module.panel-distribution.partials.rotation-block')

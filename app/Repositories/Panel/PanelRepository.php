@@ -1470,6 +1470,54 @@ class PanelRepository extends BaseRepository
     }
 
     /**
+     * Снимок трафика хостинга только из кэша (без HTTP к API).
+     * Для страницы «Панели и распределение»: не вызывать getMonthlyStatistics() в HTTP —
+     * там цикл по всем настроенным панелям, запросы к server_monitoring и риск живых запросов Timeweb.
+     *
+     * @param  Collection<int, Panel>  $panels  Панели с подгруженным server
+     * @return array<int, array<string, mixed>>  Ключ — panel_id
+     */
+    public function getHostingTrafficSnapshotForPanels(Collection $panels): array
+    {
+        $now = Carbon::now();
+        $periodLabel = $now->locale('ru')->translatedFormat('F Y');
+        $out = [];
+
+        foreach ($panels as $panel) {
+            if (! $panel->server) {
+                continue;
+            }
+
+            $pid = (int) $panel->id;
+            $trafficData = $this->getServerTrafficDataFromCache($panel);
+
+            $currentTraffic = null;
+            if ($trafficData && array_key_exists('current_month', $trafficData) && $trafficData['current_month'] !== null) {
+                $limitBytes = (int) ($trafficData['limit'] ?? 0);
+                $currentTrafficBytes = (int) $trafficData['current_month'];
+                $currentTraffic = [
+                    'used_tb' => round($currentTrafficBytes / (1024 ** 4), 2),
+                    'limit_tb' => $limitBytes > 0 ? round($limitBytes / (1024 ** 4), 2) : 0,
+                    'used_percent' => $limitBytes > 0 ? round(($currentTrafficBytes / $limitBytes) * 100, 2) : 0,
+                ];
+            }
+
+            $out[$pid] = [
+                'panel_id' => $pid,
+                'server_name' => $panel->server->name ?? 'N/A',
+                'provider' => $panel->server->provider ?? '—',
+                'tariff_label' => TariffTier::label($panel->server->tariff_tier ?? ''),
+                'period_label' => $periodLabel,
+                'used_tb' => $currentTraffic['used_tb'] ?? null,
+                'limit_tb' => $currentTraffic['limit_tb'] ?? null,
+                'used_percent' => $currentTraffic['used_percent'] ?? null,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Ключ кэша трафика: для Timeweb учитываем аккаунт API (основной / legacy).
      */
     private function serverTrafficCacheKey(Server $server, string $provider): string

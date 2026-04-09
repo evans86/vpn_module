@@ -1,7 +1,7 @@
 @php
     use Illuminate\Support\Str;
     $hasMarzban = isset($comparison) && !isset($comparison['error']) && !empty($comparison['panels']);
-    $refLimitTb = round((int) config('panel.server_traffic_limit', 32 * 1024 * 1024 * 1024 * 1024) / (1024 ** 4));
+    $pageTtlSec = (int) ($panelDistributionPageCacheTtl ?? 600);
     $tierAccent = [
         'free' => ['bar' => 'from-amber-400 to-orange-300', 'ring' => 'ring-amber-400/30', 'badge' => 'bg-amber-500/15 text-amber-950 border-amber-400/40'],
         'full' => ['bar' => 'from-indigo-500 to-violet-400', 'ring' => 'ring-indigo-400/35', 'badge' => 'bg-indigo-500/15 text-indigo-950 border-indigo-400/40'],
@@ -14,7 +14,7 @@
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
                 <h2 class="text-lg font-bold text-slate-900 tracking-tight">Панели в ротации</h2>
-                <p class="text-xs text-slate-500 mt-1">Группировка по <code class="text-[11px] bg-slate-100 px-1 rounded">server.tariff_tier</code>. Scope — очередность выдачи (0–100).</p>
+                <p class="text-xs text-slate-500 mt-1">Тариф сервера → группа. Scope — приоритет выдачи. Сводка трафика на странице кэшируется ~{{ max(1, (int) round($pageTtlSec / 60)) }} мин.</p>
             </div>
             <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full lg:w-auto">
                 <label class="relative flex-1 min-w-0 sm:min-w-[220px]">
@@ -86,10 +86,6 @@
                                 $mb = $row['marzban'];
                                 $keysBytes = (int) ($row['traffic_keys_sum_bytes'] ?? 0);
                                 $keysTb = $keysBytes > 0 ? $keysBytes / (1024 ** 4) : 0;
-                                $refLimitBytes = (int) config('panel.server_traffic_limit', 32 * 1024 * 1024 * 1024 * 1024);
-                                $keysVsRefPct = $refLimitBytes > 0 && $keysBytes > 0
-                                    ? min(100, round(($keysBytes / $refLimitBytes) * 100, 1))
-                                    : null;
                                 $meta = $panel->selection_scope_meta ?? [];
                                 $server = $panel->server;
                                 $sName = $server->name ?? '—';
@@ -144,26 +140,21 @@
                                     </div>
 
                                     <div class="rounded-xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50/90 to-white px-3 py-2.5 flex-1">
-                                        <div class="text-[10px] font-bold uppercase tracking-wide text-emerald-900/90 mb-2">Трафик</div>
+                                        <div class="text-[10px] font-bold uppercase tracking-wide text-emerald-900/90 mb-1">Трафик</div>
+                                        <p class="text-[10px] text-emerald-900/70 mb-2 leading-snug">Сумма <code class="text-[9px] bg-white/80 px-0.5 rounded">used_traffic</code> по ключам в БД (синхронизация с Marzban). Для «безлимитных» VPS без API хостинга — основной показатель.</p>
                                         <ol class="space-y-2.5 text-xs list-decimal list-inside text-slate-700 marker:text-emerald-600 marker:font-semibold">
                                             <li class="pl-0.5">
                                                 <span class="inline font-medium text-slate-800">По ключам (БД)</span>
                                                 @if($keysBytes > 0)
-                                                    <span class="block mt-1 ml-4 font-mono tabular-nums text-slate-900">
-                                                        {{ number_format($keysTb, 2, '.', ' ') }} ТиБ
-                                                        @if($keysVsRefPct !== null)
-                                                            <span class="text-slate-500 font-sans text-[11px] font-normal" title="Для сравнения панелей между собой; не лимит хостинга">
-                                                                — {{ $keysVsRefPct }}% от условных {{ $refLimitTb }} ТиБ
-                                                            </span>
-                                                        @endif
-                                                    </span>
+                                                    <span class="block mt-1 ml-4 font-mono tabular-nums text-slate-900">{{ number_format($keysTb, 2, '.', ' ') }} ТиБ</span>
                                                 @else
                                                     <span class="block mt-1 ml-4 text-slate-400">нет суммы по ключам</span>
                                                 @endif
                                             </li>
                                             @if($snap && ($snap['used_tb'] !== null || $snap['limit_tb'] !== null))
                                                 <li class="pl-0.5">
-                                                    <span class="inline font-medium text-slate-800">Лимит у хостинга (API)</span>
+                                                    <span class="inline font-medium text-slate-800">Учёт у хостинга</span>
+                                                    <span class="block mt-0.5 ml-4 text-[10px] text-slate-500">Есть только для интеграций (VDSina, Timeweb и т.д.) — лимит и расход по биллингу VPS.</span>
                                                     <span class="block mt-1 ml-4 font-mono tabular-nums text-slate-900">
                                                         {{ $snap['used_tb'] !== null ? number_format((float) $snap['used_tb'], 2, '.', ' ') : '—' }}
                                                         / {{ $snap['limit_tb'] !== null ? number_format((float) $snap['limit_tb'], 2, '.', ' ') : '—' }} ТиБ
@@ -176,23 +167,12 @@
                                                     @endif
                                                 </li>
                                             @endif
-                                            @if($mb && $mb['traffic_used_percent'] !== null)
-                                                <li class="pl-0.5">
-                                                    <span class="inline font-medium text-slate-800">То же в кэше прогрева</span>
-                                                    <span class="block mt-1 ml-4 flex items-center gap-2 flex-wrap">
-                                                        <span class="h-1.5 w-20 rounded-full bg-slate-200 overflow-hidden shrink-0">
-                                                            <span class="block h-full rounded-full {{ $mb['traffic_used_percent'] > 80 ? 'bg-rose-500' : ($mb['traffic_used_percent'] > 60 ? 'bg-amber-400' : 'bg-emerald-500') }}" style="width: {{ min(100, (float) $mb['traffic_used_percent']) }}%"></span>
-                                                        </span>
-                                                        <span class="font-mono tabular-nums font-semibold">{{ number_format((float) $mb['traffic_used_percent'], 1) }}%</span>
-                                                        <span class="text-[10px] text-slate-500">доля от лимита API в кэше</span>
-                                                    </span>
-                                                </li>
-                                            @endif
                                         </ol>
                                     </div>
 
                                     <div class="rounded-lg bg-sky-50/80 border border-sky-100 px-3 py-2">
-                                        <div class="text-[10px] font-bold uppercase tracking-wide text-sky-900/80 mb-2">Нагрузка (Marzban)</div>
+                                        <div class="text-[10px] font-bold uppercase tracking-wide text-sky-900/80 mb-1">Состояние панели Marzban</div>
+                                        <p class="text-[10px] text-sky-800/80 mb-2 leading-snug">CPU, RAM и пользователи — снимок из кэша <code class="text-[9px] bg-white px-0.5 rounded">panel:warm-rotation-settings</code>. Это не тарифный трафик VPS и не расход по ключам выше.</p>
                                         @if($mb)
                                             <div class="flex flex-wrap gap-2">
                                                 <span class="inline-flex items-center gap-1.5 rounded-md bg-white border border-sky-100 px-2 py-1 text-[11px] font-medium text-sky-950">
@@ -223,11 +203,12 @@
         @endforeach
     </div>
 
-    @if($hasMarzban && isset($comparison['timestamp']))
-        <div class="px-4 sm:px-6 py-2 border-t border-slate-200/80 bg-slate-50/90 text-right text-[11px] text-slate-400 tabular-nums">
-            Снимок кэша: {{ $comparison['timestamp'] }}
-        </div>
-    @endif
+    <div class="px-4 sm:px-6 py-2.5 border-t border-slate-200/80 bg-slate-50/90 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+        <span>Трафик «по ключам» и блок «учёт хостинга» на странице — из кэша {{ max(1, (int) round($pageTtlSec / 60)) }} мин (env <code class="text-[10px] bg-white px-1 rounded">PANEL_DISTRIBUTION_PAGE_CACHE_TTL</code>).</span>
+        @if($hasMarzban && isset($comparison['timestamp']))
+            <span class="tabular-nums text-slate-400 shrink-0">Снимок Marzban: {{ $comparison['timestamp'] }}</span>
+        @endif
+    </div>
 </div>
 
 @push('scripts')

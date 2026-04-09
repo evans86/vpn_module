@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 
 /**
- * Единая страница: сводная таблица (scope v2, месячный учёт, Marzban), ошибки и исключения.
+ * Единая страница: карточки панелей (scope v2, трафик, снимок Marzban), ошибки и исключения.
  */
 class PanelDistributionController extends Controller
 {
@@ -36,6 +36,32 @@ class PanelDistributionController extends Controller
                 ->limit(500)
                 ->get();
         }
+
+        $allRotationPanels = collect($panelsByTier)->flatten()->unique('id');
+        $rotationIdsSorted = $allRotationPanels->pluck('id')->sort()->values()->all();
+        $pageCacheTtl = (int) config('panel.panel_distribution_page_cache_ttl', 600);
+        $pageCacheKey = 'panel_distribution_page_v2:'.md5(implode(',', $rotationIdsSorted));
+
+        $cachedPageData = Cache::remember($pageCacheKey, $pageCacheTtl, function () use ($panelRepository, $allRotationPanels, $rotationIdsSorted) {
+            $snapshotByPanelId = $panelRepository->getHostingTrafficSnapshotForPanels($allRotationPanels);
+
+            $trafficSumBytesByPanelId = collect();
+            if ($rotationIdsSorted !== []) {
+                $trafficSumBytesByPanelId = ServerUser::query()
+                    ->whereIn('panel_id', $rotationIdsSorted)
+                    ->selectRaw('panel_id, COALESCE(SUM(COALESCE(used_traffic, 0)), 0) as sum_bytes')
+                    ->groupBy('panel_id')
+                    ->pluck('sum_bytes', 'panel_id');
+            }
+
+            return [
+                'snapshot' => $snapshotByPanelId,
+                'traffic_sums' => $trafficSumBytesByPanelId,
+            ];
+        });
+
+        $snapshotByPanelId = $cachedPageData['snapshot'];
+        $trafficSumBytesByPanelId = $cachedPageData['traffic_sums'];
 
         $cacheKey = (string) config('panel.rotation_settings_cache_key', 'panel_rotation_settings_comparison_v2');
         $comparison = Cache::get($cacheKey);
@@ -69,38 +95,7 @@ class PanelDistributionController extends Controller
             ->with('server')
             ->get();
 
-        $monthlyStats = $panelRepository->getMonthlyStatistics();
-        $panelModels = Panel::query()
-            ->whereIn('id', array_column($monthlyStats, 'panel_id'))
-            ->with('server')
-            ->get()
-            ->keyBy('id');
-
-        $snapshotByPanelId = [];
-        foreach ($monthlyStats as $row) {
-            $pid = (int) $row['panel_id'];
-            $p = $panelModels->get($pid);
-            $traffic = $row['current_month']['traffic'] ?? null;
-            $snapshotByPanelId[$pid] = [
-                'panel_id' => $pid,
-                'server_name' => $row['server_name'],
-                'provider' => $p && $p->server ? ($p->server->provider ?? '—') : '—',
-                'tariff_label' => $p && $p->server ? TariffTier::label($p->server->tariff_tier ?? '') : '—',
-                'period_label' => ($row['period']['current']['name'] ?? 'Месяц').' '.($row['period']['current']['year'] ?? ''),
-                'used_tb' => is_array($traffic) ? ($traffic['used_tb'] ?? null) : null,
-                'limit_tb' => is_array($traffic) ? ($traffic['limit_tb'] ?? null) : null,
-                'used_percent' => is_array($traffic) ? ($traffic['used_percent'] ?? null) : null,
-            ];
-        }
-
         $marzbanByPanelId = $this->marzbanByPanelId($comparison);
-
-        /** Сумма used_traffic по всем ключам панели (данные из БД, синхронизируются с Marzban) — доступна даже без API хостинга. */
-        $trafficSumBytesByPanelId = ServerUser::query()
-            ->whereNotNull('panel_id')
-            ->selectRaw('panel_id, COALESCE(SUM(COALESCE(used_traffic, 0)), 0) as sum_bytes')
-            ->groupBy('panel_id')
-            ->pluck('sum_bytes', 'panel_id');
 
         /** @var list<array{tier: string, label: string, rows: list<array{panel: Panel, snapshot: ?array, marzban: ?array, traffic_keys_sum_bytes: int}>}> $distributionTiers */
         $distributionTiers = [];
@@ -112,7 +107,7 @@ class PanelDistributionController extends Controller
                     'panel' => $panel,
                     'snapshot' => $snapshotByPanelId[$id] ?? null,
                     'marzban' => $marzbanByPanelId[$id] ?? null,
-                    'traffic_keys_sum_bytes' => (int) ($trafficSumBytesByPanelId[$id] ?? 0),
+                    'traffic_keys_sum_bytes' => (int) ($trafficSumBytesByPanelId[$id] ?? $trafficSumBytesByPanelId[(string) $id] ?? 0),
                 ];
             }
             $distributionTiers[] = [
@@ -128,6 +123,7 @@ class PanelDistributionController extends Controller
             'panelsWithErrors' => $panelsWithErrors,
             'errorHistory' => $errorHistory,
             'excludedPanels' => $excludedPanels,
+            'panelDistributionPageCacheTtl' => $pageCacheTtl,
         ]);
     }
 

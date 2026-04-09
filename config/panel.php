@@ -99,6 +99,18 @@ return [
 
     'rotation_settings_cache_ttl' => max(60, (int) env('PANEL_ROTATION_SETTINGS_CACHE_TTL', 900)),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Кэш страницы «Панели и распределение» (снимок трафика API только из кэша, без HTTP)
+    |--------------------------------------------------------------------------
+    |
+    | Раньше вызывался getMonthlyStatistics() на каждый запрос — цикл по всем панелям
+    | и возможные запросы к API Timeweb. Сейчас: только панели в ротации + только кэш.
+    |
+    */
+
+    'panel_distribution_page_cache_ttl' => max(60, (int) env('PANEL_DISTRIBUTION_PAGE_CACHE_TTL', 600)),
+
     'rotation_settings_warm_enabled' => filter_var(env('PANEL_ROTATION_SETTINGS_WARM_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
 
     'rotation_settings_warm_every_minutes' => max(1, min(59, (int) env('PANEL_ROTATION_SETTINGS_WARM_EVERY_MINUTES', 5))),
