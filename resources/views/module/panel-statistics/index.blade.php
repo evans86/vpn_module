@@ -5,6 +5,11 @@
 
 @section('content')
     <div class="space-y-6">
+        <div class="bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-3 text-sm text-indigo-900">
+            Сводка по панелям и ротация — на странице
+            <a href="{{ route('admin.module.panel-distribution.index') }}" class="font-medium underline hover:no-underline">Панели и распределение</a>.
+            Здесь — детализация по месяцам и экспорт PDF.
+        </div>
         <!-- Информация о периоде -->
         <div class="bg-white shadow rounded-lg p-6">
             <div class="flex items-center justify-between">

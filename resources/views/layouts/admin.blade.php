@@ -164,16 +164,10 @@
                             'routes' => ['admin.module.panel.*'],
                         ],
                         [
-                            'route' => 'admin.module.panel-settings.index',
-                            'icon' => 'fa-cog',
-                            'label' => 'Настройки распределения',
-                            'routes' => ['admin.module.panel-settings.*'],
-                        ],
-                        [
                             'route' => 'admin.module.panel-distribution.index',
                             'icon' => 'fa-gauge-high',
-                            'label' => 'Распределение (scope v2)',
-                            'routes' => ['admin.module.panel-distribution.*'],
+                            'label' => 'Панели и распределение',
+                            'routes' => ['admin.module.panel-distribution.*', 'admin.module.panel-settings.*'],
                         ],
                         [
                             'route' => 'admin.module.panel-statistics.index',

@@ -5,6 +5,13 @@
 
 @section('content')
     <div class="space-y-6">
+        <div class="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-800">
+            Эта страница — <strong>графики нагрузки</strong> (CPU, RAM, пользователи) по снимкам <code class="text-xs bg-white px-1 rounded">server_monitoring</code>.
+            Сводка трафика и ротация — в
+            <a href="{{ route('admin.module.panel-distribution.index') }}" class="text-indigo-600 font-medium underline hover:no-underline">Панели и распределение</a>,
+            помесячная статистика — в
+            <a href="{{ route('admin.module.panel-statistics.index') }}" class="text-indigo-600 font-medium underline hover:no-underline">Статистика панелей</a>.
+        </div>
         <!-- Фильтры -->
         <x-admin.card>
             <x-slot name="title">

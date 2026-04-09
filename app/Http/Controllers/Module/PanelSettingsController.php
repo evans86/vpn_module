@@ -12,47 +12,11 @@ use Illuminate\Support\Facades\Log;
 class PanelSettingsController extends Controller
 {
     /**
-     * Страница настроек ротации панелей (интеллектуальный выбор без переключения стратегий).
+     * @deprecated Используйте «Панели и распределение» (panel-distribution.index).
      */
-    public function index()
+    public function index(): RedirectResponse
     {
-        $panelRepository = app(PanelRepository::class);
-
-        // Только чтение кэша: compareAllStrategies() на больших БД занимает минуты и рвёт таймаут HTTP.
-        // Прогрев: `php artisan panel:warm-rotation-settings` и cron (panel.rotation_settings_warm_*).
-        $cacheKey = (string) config('panel.rotation_settings_cache_key', 'panel_rotation_settings_comparison_v2');
-        $comparison = Cache::get($cacheKey);
-        if ($comparison === null) {
-            $comparison = [
-                'error' => 'Данные для таблицы ещё не собраны или кэш истёк. На сервере выполните один раз: php artisan panel:warm-rotation-settings — затем обновите страницу. Для автообновления включите cron (команда в расписании Laravel, см. PANEL_ROTATION_SETTINGS_WARM_* в .env).',
-            ];
-        }
-
-        $panelsWithErrors = $panelRepository->getPanelsWithErrors();
-
-        $errorHistory = [];
-        if ($panelsWithErrors->isNotEmpty()) {
-            $panelIds = $panelsWithErrors->pluck('id')->toArray();
-            $histories = \App\Models\Panel\PanelErrorHistory::whereIn('panel_id', $panelIds)
-                ->orderBy('error_occurred_at', 'desc')
-                ->get();
-            foreach ($histories->groupBy('panel_id') as $panelId => $items) {
-                $errorHistory[$panelId] = $items->sortByDesc('error_occurred_at')->take(10)->values();
-            }
-            foreach ($panelIds as $id) {
-                if (! isset($errorHistory[$id])) {
-                    $errorHistory[$id] = collect();
-                }
-            }
-        }
-
-        $excludedPanels = \App\Models\Panel\Panel::where('excluded_from_rotation', true)
-            ->where('panel_status', \App\Models\Panel\Panel::PANEL_CONFIGURED)
-            ->where('has_error', false)
-            ->with('server')
-            ->get();
-
-        return view('module.panel-settings.index', compact('comparison', 'panelsWithErrors', 'errorHistory', 'excludedPanels'));
+        return redirect()->route('admin.module.panel-distribution.index');
     }
 
     /**
@@ -76,7 +40,7 @@ class PanelSettingsController extends Controller
                 'source' => 'panel',
             ]);
 
-            return redirect()->route('admin.module.panel-settings.index')
+            return redirect()->route('admin.module.panel-distribution.index')
                 ->with('success', 'Ошибка с панели снята. Панель возвращена в ротацию.');
 
         } catch (\Exception $e) {
@@ -87,7 +51,7 @@ class PanelSettingsController extends Controller
                 'source' => 'panel',
             ]);
 
-            return redirect()->route('admin.module.panel-settings.index')
+            return redirect()->route('admin.module.panel-distribution.index')
                 ->with('error', 'Ошибка при снятии пометки: ' . $e->getMessage());
         }
     }
