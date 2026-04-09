@@ -1,7 +1,6 @@
 @php
     use Illuminate\Support\Str;
     $hasMarzban = isset($comparison) && !isset($comparison['error']) && !empty($comparison['panels']);
-    $pageTtlSec = (int) ($panelDistributionPageCacheTtl ?? 600);
     $tierAccent = [
         'free' => ['bar' => 'from-amber-400 to-orange-300', 'ring' => 'ring-amber-400/30', 'badge' => 'bg-amber-500/15 text-amber-950 border-amber-400/40'],
         'full' => ['bar' => 'from-indigo-500 to-violet-400', 'ring' => 'ring-indigo-400/35', 'badge' => 'bg-indigo-500/15 text-indigo-950 border-indigo-400/40'],
@@ -12,15 +11,12 @@
 <div class="rounded-2xl border border-slate-200/90 bg-slate-50/40 shadow-xl shadow-slate-300/20 overflow-hidden" id="panel-distribution-unified">
     <div class="px-4 sm:px-6 py-4 border-b border-slate-200/80 bg-white/90 backdrop-blur-sm">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-                <h2 class="text-lg font-bold text-slate-900 tracking-tight">Панели в ротации</h2>
-                <p class="text-xs text-slate-500 mt-1">Тариф сервера → группа. Scope — приоритет выдачи. Сводка трафика на странице кэшируется ~{{ max(1, (int) round($pageTtlSec / 60)) }} мин.</p>
-            </div>
+            <h2 class="text-lg font-bold text-slate-900 tracking-tight">Панели в ротации</h2>
             <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full lg:w-auto">
                 <label class="relative flex-1 min-w-0 sm:min-w-[220px]">
                     <span class="sr-only">Поиск</span>
                     <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
-                    <input type="search" id="panel-distribution-filter" autocomplete="off" placeholder="ID, сервер, провайдер…"
+                    <input type="search" id="panel-distribution-filter" autocomplete="off" placeholder="Поиск…"
                            class="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-400 outline-none" />
                 </label>
                 <button type="button" onclick="location.reload()" class="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-slate-800 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shrink-0">
@@ -31,25 +27,23 @@
         </div>
 
         @if(isset($comparison['error']))
-            <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                <span class="font-medium">Снимок Marzban недоступен.</span> {{ $comparison['error'] }}
-            </div>
+            <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">{{ $comparison['error'] }}</div>
         @elseif($hasMarzban)
             <div class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                <div class="rounded-lg border border-slate-100 bg-white px-3 py-2 shadow-sm" title="Все панели в кэше команды panel:warm-rotation-settings">
-                    <div class="text-[10px] font-semibold text-slate-500 leading-tight">Панелей в снимке</div>
+                <div class="rounded-lg border border-slate-100 bg-white px-3 py-2 shadow-sm">
+                    <div class="text-[10px] font-semibold text-slate-500 leading-tight">В снимке</div>
                     <div class="text-xl font-bold tabular-nums text-slate-900">{{ $comparison['summary']['total_panels'] ?? '—' }}</div>
                 </div>
-                <div class="rounded-lg border border-slate-100 bg-white px-3 py-2 shadow-sm" title="Есть свежие данные Marzban (CPU/RAM/пользователи)">
-                    <div class="text-[10px] font-semibold text-slate-500 leading-tight">Со статистикой Marzban</div>
+                <div class="rounded-lg border border-slate-100 bg-white px-3 py-2 shadow-sm">
+                    <div class="text-[10px] font-semibold text-slate-500 leading-tight">Статистика</div>
                     <div class="text-xl font-bold tabular-nums text-slate-900">{{ $comparison['summary']['panels_with_stats'] ?? '—' }}</div>
                 </div>
-                <div class="rounded-lg border border-slate-100 bg-white px-3 py-2 shadow-sm" title="Панели, для которых в кэше есть данные API хостинга о трафике">
-                    <div class="text-[10px] font-semibold text-slate-500 leading-tight">Трафик из API хостинга</div>
+                <div class="rounded-lg border border-slate-100 bg-white px-3 py-2 shadow-sm">
+                    <div class="text-[10px] font-semibold text-slate-500 leading-tight">Трафик API</div>
                     <div class="text-xl font-bold tabular-nums text-slate-900">{{ $comparison['summary']['panels_with_traffic'] ?? '—' }}</div>
                 </div>
-                <div class="rounded-lg border border-slate-100 bg-white px-3 py-2 shadow-sm" title="Средний процент использования лимита по API (только панели с данными API)">
-                    <div class="text-[10px] font-semibold text-slate-500 leading-tight">Средний % лимита (API)</div>
+                <div class="rounded-lg border border-slate-100 bg-white px-3 py-2 shadow-sm">
+                    <div class="text-[10px] font-semibold text-slate-500 leading-tight">Ø % API</div>
                     <div class="text-xl font-bold tabular-nums text-slate-900">{{ isset($comparison['summary']['avg_traffic']) ? number_format((float) $comparison['summary']['avg_traffic'], 1) : '—' }}</div>
                 </div>
             </div>
@@ -68,15 +62,13 @@
                         <span class="inline-flex h-8 w-1 rounded-full bg-gradient-to-b {{ $acc['bar'] }}"></span>
                         <div>
                             <h3 class="text-base font-bold text-slate-900">{{ $block['label'] }}</h3>
-                            <p class="text-xs text-slate-500"><code class="text-[11px] bg-slate-200/60 px-1 rounded">{{ $tier }}</code> · {{ count($block['rows']) }} панелей</p>
+                            <p class="text-xs text-slate-500">{{ count($block['rows']) }} пан.</p>
                         </div>
                     </div>
                 </div>
 
                 @if(empty($block['rows']))
-                    <div class="rounded-xl border border-dashed border-slate-200 bg-white/60 px-4 py-8 text-center text-sm text-slate-500">
-                        Нет панелей в ротации для этого тарифа.
-                    </div>
+                    <div class="rounded-xl border border-dashed border-slate-200 bg-white/60 px-4 py-6 text-center text-sm text-slate-500">Нет панелей</div>
                 @else
                     <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                         @foreach($block['rows'] as $row)
@@ -106,78 +98,74 @@
                                         <p class="text-xs text-slate-500 truncate" title="{{ $prov }}">{{ $prov }}</p>
                                     </div>
                                     <div class="shrink-0 text-right">
-                                        <div class="text-[10px] font-semibold text-slate-500 leading-none mb-0.5">Scope v2</div>
+                                        <div class="text-[10px] font-semibold text-slate-500 leading-none mb-0.5">Scope</div>
                                         <div class="text-2xl font-black tabular-nums leading-none text-transparent bg-clip-text bg-gradient-to-br {{ $acc['bar'] }}">{{ number_format($score, 1, '.', '') }}</div>
-                                        <div class="text-[10px] text-slate-400 mt-0.5">выше — приоритетнее</div>
                                     </div>
                                 </div>
 
                                 <div class="px-4 py-3 space-y-3 flex-1 flex flex-col">
                                     <div class="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
-                                        <div class="text-[10px] font-bold uppercase tracking-wide text-slate-600 mb-2">Данные для ранжирования</div>
-                                        <dl class="grid grid-cols-1 gap-y-2 text-xs">
+                                        <div class="text-[10px] font-bold uppercase tracking-wide text-slate-600 mb-2">Scope</div>
+                                        <dl class="grid grid-cols-1 gap-y-1.5 text-xs">
                                             <div class="flex justify-between gap-2">
                                                 <dt class="text-slate-500 shrink-0">Прогноз / лимит</dt>
                                                 <dd class="font-mono tabular-nums text-slate-900 text-right">
                                                     @if(!empty($meta))
                                                         {{ $meta['forecast_tb'] ?? '?' }} / {{ $meta['limit_tb'] ?? '?' }} ТиБ
                                                     @else
-                                                        <span class="text-slate-400">нет метаданных</span>
+                                                        —
                                                     @endif
                                                 </dd>
                                             </div>
                                             <div class="flex justify-between gap-2">
-                                                <dt class="text-slate-500 shrink-0" title="Участвует в формуле scope">CPU панели</dt>
-                                                <dd class="tabular-nums text-slate-900 text-right font-semibold">
-                                                    {{ isset($meta['cpu_percent']) ? $meta['cpu_percent'].'%' : '—' }}
-                                                </dd>
+                                                <dt class="text-slate-500 shrink-0">CPU</dt>
+                                                <dd class="tabular-nums text-slate-900 text-right font-semibold">{{ isset($meta['cpu_percent']) ? $meta['cpu_percent'].'%' : '—' }}</dd>
                                             </div>
                                             <div class="flex justify-between gap-2">
-                                                <dt class="text-slate-500 shrink-0">Пересчёт scope</dt>
+                                                <dt class="text-slate-500 shrink-0">Обновлено</dt>
                                                 <dd class="text-slate-600 text-right">{{ optional($panel->selection_scope_computed_at)->format('d.m.Y H:i') ?? '—' }}</dd>
                                             </div>
                                         </dl>
                                     </div>
 
                                     <div class="rounded-xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50/90 to-white px-3 py-2.5 flex-1">
-                                        <div class="text-[10px] font-bold uppercase tracking-wide text-emerald-900/90 mb-1">Трафик</div>
-                                        <p class="text-[10px] text-emerald-900/70 mb-2 leading-snug">Сумма <code class="text-[9px] bg-white/80 px-0.5 rounded">used_traffic</code> по ключам в БД (синхронизация с Marzban). Для «безлимитных» VPS без API хостинга — основной показатель.</p>
-                                        <ol class="space-y-2.5 text-xs list-decimal list-inside text-slate-700 marker:text-emerald-600 marker:font-semibold">
-                                            <li class="pl-0.5">
-                                                <span class="inline font-medium text-slate-800">По ключам (БД)</span>
-                                                @if($keysBytes > 0)
-                                                    <span class="block mt-1 ml-4 font-mono tabular-nums text-slate-900">{{ number_format($keysTb, 2, '.', ' ') }} ТиБ</span>
-                                                @else
-                                                    <span class="block mt-1 ml-4 text-slate-400">нет суммы по ключам</span>
-                                                @endif
-                                            </li>
+                                        <div class="text-[10px] font-bold uppercase tracking-wide text-emerald-900/90 mb-2">Трафик</div>
+                                        <dl class="space-y-1.5 text-xs">
+                                            <div class="flex justify-between gap-2">
+                                                <dt class="text-slate-500 shrink-0">Ключи (БД)</dt>
+                                                <dd class="font-mono tabular-nums text-slate-900 text-right">
+                                                    @if($keysBytes > 0)
+                                                        {{ number_format($keysTb, 2, '.', ' ') }} ТиБ
+                                                    @else
+                                                        <span class="text-slate-400">нет данных</span>
+                                                    @endif
+                                                </dd>
+                                            </div>
                                             @if($snap && ($snap['used_tb'] !== null || $snap['limit_tb'] !== null))
-                                                <li class="pl-0.5">
-                                                    <span class="inline font-medium text-slate-800">Учёт у хостинга</span>
-                                                    <span class="block mt-0.5 ml-4 text-[10px] text-slate-500">Есть только для интеграций (VDSina, Timeweb и т.д.) — лимит и расход по биллингу VPS.</span>
-                                                    <span class="block mt-1 ml-4 font-mono tabular-nums text-slate-900">
+                                                <div class="flex justify-between gap-2">
+                                                    <dt class="text-slate-500 shrink-0">Хостинг</dt>
+                                                    <dd class="font-mono tabular-nums text-slate-900 text-right">
                                                         {{ $snap['used_tb'] !== null ? number_format((float) $snap['used_tb'], 2, '.', ' ') : '—' }}
                                                         / {{ $snap['limit_tb'] !== null ? number_format((float) $snap['limit_tb'], 2, '.', ' ') : '—' }} ТиБ
                                                         @if($snap['used_percent'] !== null)
-                                                            <span class="text-emerald-800 font-semibold"> ({{ number_format((float) $snap['used_percent'], 1) }}%)</span>
+                                                            <span class="text-emerald-800 font-semibold"> · {{ number_format((float) $snap['used_percent'], 1) }}%</span>
                                                         @endif
-                                                    </span>
-                                                    @if(!empty($snap['period_label']))
-                                                        <span class="block ml-4 text-[10px] text-slate-500 mt-0.5">{{ $snap['period_label'] }}</span>
-                                                    @endif
-                                                </li>
+                                                    </dd>
+                                                </div>
+                                                @if(!empty($snap['period_label']))
+                                                    <div class="text-[10px] text-slate-500 text-right">{{ $snap['period_label'] }}</div>
+                                                @endif
                                             @endif
-                                        </ol>
+                                        </dl>
                                     </div>
 
                                     <div class="rounded-lg bg-sky-50/80 border border-sky-100 px-3 py-2">
-                                        <div class="text-[10px] font-bold uppercase tracking-wide text-sky-900/80 mb-1">Состояние панели Marzban</div>
-                                        <p class="text-[10px] text-sky-800/80 mb-2 leading-snug">CPU, RAM и пользователи — снимок из кэша <code class="text-[9px] bg-white px-0.5 rounded">panel:warm-rotation-settings</code>. Это не тарифный трафик VPS и не расход по ключам выше.</p>
+                                        <div class="text-[10px] font-bold uppercase tracking-wide text-sky-900/80 mb-2">Marzban</div>
                                         @if($mb)
                                             <div class="flex flex-wrap gap-2">
                                                 <span class="inline-flex items-center gap-1.5 rounded-md bg-white border border-sky-100 px-2 py-1 text-[11px] font-medium text-sky-950">
                                                     <i class="fas fa-users text-sky-500"></i>
-                                                    актив. {{ $mb['active_users'] ?? 0 }} · всего {{ $mb['total_users'] ?? 0 }}
+                                                    {{ $mb['active_users'] ?? 0 }}/{{ $mb['total_users'] ?? 0 }}
                                                 </span>
                                                 @if(($mb['cpu_usage'] ?? 0) > 0)
                                                     <span class="inline-flex items-center rounded-md px-2 py-1 text-[11px] font-bold tabular-nums {{ $mb['cpu_usage'] > 80 ? 'bg-rose-100 text-rose-800' : ($mb['cpu_usage'] > 60 ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-900') }}">
@@ -191,7 +179,7 @@
                                                 @endif
                                             </div>
                                         @else
-                                            <p class="text-[11px] text-slate-500">Нет строки в кэше — выполните <code class="text-[10px] bg-white px-1 rounded">panel:warm-rotation-settings</code></p>
+                                            <p class="text-[11px] text-slate-400">нет данных</p>
                                         @endif
                                     </div>
                                 </div>
@@ -203,12 +191,11 @@
         @endforeach
     </div>
 
-    <div class="px-4 sm:px-6 py-2.5 border-t border-slate-200/80 bg-slate-50/90 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
-        <span>Трафик «по ключам» и блок «учёт хостинга» на странице — из кэша {{ max(1, (int) round($pageTtlSec / 60)) }} мин (env <code class="text-[10px] bg-white px-1 rounded">PANEL_DISTRIBUTION_PAGE_CACHE_TTL</code>).</span>
-        @if($hasMarzban && isset($comparison['timestamp']))
-            <span class="tabular-nums text-slate-400 shrink-0">Снимок Marzban: {{ $comparison['timestamp'] }}</span>
-        @endif
-    </div>
+    @if($hasMarzban && isset($comparison['timestamp']))
+        <div class="px-4 sm:px-6 py-2 border-t border-slate-200/80 bg-slate-50/90 text-right text-[11px] text-slate-400 tabular-nums">
+            {{ $comparison['timestamp'] }}
+        </div>
+    @endif
 </div>
 
 @push('scripts')

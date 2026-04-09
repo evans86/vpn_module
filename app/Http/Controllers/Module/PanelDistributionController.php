@@ -123,7 +123,6 @@ class PanelDistributionController extends Controller
             'panelsWithErrors' => $panelsWithErrors,
             'errorHistory' => $errorHistory,
             'excludedPanels' => $excludedPanels,
-            'panelDistributionPageCacheTtl' => $pageCacheTtl,
         ]);
     }
 
