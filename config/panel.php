@@ -100,6 +100,12 @@ return [
     'rotation_settings_cache_ttl' => max(60, (int) env('PANEL_ROTATION_SETTINGS_CACHE_TTL', 900)),
 
     /*
+    | Сколько панелей попадает в кэш panel:warm-rotation-settings (раньше было 150 — у больших id
+    | не было строки Marzban на странице «Панели и распределение»).
+    */
+    'rotation_comparison_panels_limit' => max(50, min(5000, (int) env('PANEL_ROTATION_COMPARISON_PANELS_LIMIT', 2000))),
+
+    /*
     |--------------------------------------------------------------------------
     | Кэш страницы «Панели и распределение» (снимок трафика API только из кэша, без HTTP)
     |--------------------------------------------------------------------------

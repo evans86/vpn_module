@@ -67,8 +67,10 @@ class PanelDistributionController extends Controller
         $comparison = Cache::get($cacheKey);
         if ($comparison === null) {
             $comparison = [
-                'error' => 'Данные Marzban ещё не собраны или кэш истёк. Выполните: php artisan panel:warm-rotation-settings и обновите страницу (cron, PANEL_ROTATION_SETTINGS_WARM_* в .env).',
+                'error' => 'Кэш пуст (CLI и сайт должны использовать один CACHE_DRIVER и один .env). Выполните: php artisan panel:warm-rotation-settings',
             ];
+        } elseif (is_array($comparison) && isset($comparison['panels']) && $comparison['panels'] instanceof \Illuminate\Support\Collection) {
+            $comparison['panels'] = $comparison['panels']->values()->all();
         }
 
         $panelsWithErrors = $panelRepository->getPanelsWithErrors();

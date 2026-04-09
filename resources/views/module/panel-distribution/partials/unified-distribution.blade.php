@@ -1,6 +1,6 @@
 @php
     use Illuminate\Support\Str;
-    $hasMarzban = isset($comparison) && !isset($comparison['error']) && !empty($comparison['panels']);
+    $hasMarzban = isset($comparison) && !isset($comparison['error']) && count($comparison['panels'] ?? []) > 0;
     $tierAccent = [
         'free' => ['bar' => 'from-amber-400 to-orange-300', 'ring' => 'ring-amber-400/30', 'badge' => 'bg-amber-500/15 text-amber-950 border-amber-400/40'],
         'full' => ['bar' => 'from-indigo-500 to-violet-400', 'ring' => 'ring-indigo-400/35', 'badge' => 'bg-indigo-500/15 text-indigo-950 border-indigo-400/40'],

@@ -25,7 +25,11 @@ class WarmPanelRotationSettingsCommand extends Command
         try {
             $data = $panelRepository->compareAllStrategies();
             Cache::put($key, $data, $ttl);
-            $this->info("{$key}: ok, ttl={$ttl}s");
+            $panels = $data['panels'] ?? null;
+            $count = $panels instanceof \Illuminate\Support\Collection
+                ? $panels->count()
+                : (is_array($panels) ? count($panels) : 0);
+            $this->info("{$key}: ok, ttl={$ttl}s, panels={$count}");
 
             return 0;
         } catch (Throwable $e) {

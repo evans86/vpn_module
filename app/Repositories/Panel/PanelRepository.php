@@ -914,7 +914,10 @@ class PanelRepository extends BaseRepository
      *
      * @param string|null $panelType по умолчанию Panel::MARZBAN
      */
-    private const COMPARISON_PANELS_LIMIT = 150;
+    private function rotationComparisonPanelsLimit(): int
+    {
+        return max(50, min(5000, (int) config('panel.rotation_comparison_panels_limit', 2000)));
+    }
 
     public function compareAllStrategies(?string $panelType = null): array
     {
@@ -930,7 +933,7 @@ class PanelRepository extends BaseRepository
             )
                 ->with('server.location')
                 ->orderBy('id')
-                ->limit(self::COMPARISON_PANELS_LIMIT)
+                ->limit($this->rotationComparisonPanelsLimit())
                 ->get();
 
             if ($allPanels->isEmpty()) {
