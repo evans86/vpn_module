@@ -1,5 +1,4 @@
 @php
-    use App\Helpers\CountryFlagHelper;
     use Illuminate\Support\Str;
     $hasMarzban = isset($comparison) && !isset($comparison['error']) && count($comparison['panels'] ?? []) > 0;
     $scopeTopSlots = (int) config('panel.max_provider_slots', 3);
@@ -90,7 +89,9 @@
                                 $score = (float) $panel->selection_scope_score;
                                 $loc = $server->location ?? null;
                                 $locCode = $loc && $loc->code ? (string) $loc->code : '';
-                                $flagEmoji = CountryFlagHelper::emojiFromAlpha2($locCode !== '' ? $locCode : null);
+                                $fiCode = $locCode !== ''
+                                    ? strtolower(substr(preg_replace('/[^A-Za-z]/', '', $locCode), 0, 2))
+                                    : '';
                                 $isTopScope = $idx < $scopeTopSlots;
                                 $searchBlob = Str::lower($block['label'].' '.$tier.' '.$panel->id.' '.$sName.' '.$prov.' '.$locCode);
                             @endphp
@@ -107,8 +108,10 @@
                                             </a>
                                         </div>
                                         <p class="font-semibold text-slate-900 truncate flex items-center gap-2 min-w-0" title="{{ $sName }}">
-                                            @if($flagEmoji !== '')
-                                                <span class="shrink-0 text-xl leading-none" title="{{ $locCode }}" aria-hidden="true">{{ $flagEmoji }}</span>
+                                            @if(strlen($fiCode) === 2)
+                                                <span class="shrink-0 inline-flex items-center justify-center overflow-hidden rounded-[3px] shadow-sm ring-1 ring-slate-300/70 bg-white p-[1px]" title="{{ strtoupper($fiCode) }}" aria-hidden="true">
+                                                    <span class="fi fi-{{ $fiCode }} text-[1.35rem] leading-none"></span>
+                                                </span>
                                             @else
                                                 <span class="shrink-0 inline-flex h-6 w-6 items-center justify-center rounded-md bg-slate-100 text-slate-400 text-[10px]" title="Локация не задана"><i class="fas fa-globe"></i></span>
                                             @endif
@@ -227,6 +230,10 @@
         </div>
     @endif
 </div>
+
+@push('styles')
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons@7.2.3/css/flag-icons.min.css" crossorigin="anonymous">
+@endpush
 
 @push('scripts')
 <script>
