@@ -90,16 +90,30 @@
                                      data-search="{{ $searchBlob }}">
                                 <div class="flex items-start justify-between gap-3 p-4 pb-3 border-b border-slate-100/90">
                                     <div class="min-w-0 flex-1">
-                                        <div class="flex flex-wrap items-center gap-2 mb-1">
+                                        <div class="flex flex-wrap items-center gap-2 mb-1.5">
                                             <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border {{ $acc['badge'] }}">{{ $tier }}</span>
-                                            <span class="font-mono text-sm font-bold text-slate-900">#{{ $panel->id }}</span>
+                                            <a href="{{ route('admin.module.panel.show', $panel) }}"
+                                               class="font-mono text-sm font-bold text-indigo-700 hover:text-indigo-900 hover:underline decoration-2 underline-offset-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 rounded">
+                                                #{{ $panel->id }}
+                                            </a>
                                         </div>
                                         <p class="font-semibold text-slate-900 truncate" title="{{ $sName }}">{{ $sName }}</p>
-                                        <p class="text-xs text-slate-500 truncate" title="{{ $prov }}">{{ $prov }}</p>
+                                        <div class="mt-2">
+                                            <span class="inline-flex max-w-full items-center px-2.5 py-1 rounded-lg text-xs font-extrabold uppercase tracking-wide bg-slate-900 text-white shadow-md ring-2 ring-slate-700/30 truncate" title="{{ $prov }}">
+                                                {{ $prov }}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div class="shrink-0 text-right">
-                                        <div class="text-[10px] font-semibold text-slate-500 leading-none mb-0.5">Scope</div>
-                                        <div class="text-2xl font-black tabular-nums leading-none text-transparent bg-clip-text bg-gradient-to-br {{ $acc['bar'] }}">{{ number_format($score, 1, '.', '') }}</div>
+                                    <div class="shrink-0 flex flex-col items-end gap-2 text-right">
+                                        <a href="{{ route('admin.module.panel.show', $panel) }}"
+                                           class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-800 hover:bg-indigo-100 hover:border-indigo-300 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1">
+                                            <span>К панели</span>
+                                            <i class="fas fa-arrow-right text-[10px] opacity-80"></i>
+                                        </a>
+                                        <div>
+                                            <div class="text-[10px] font-semibold text-slate-500 leading-none mb-0.5">Scope</div>
+                                            <div class="text-2xl font-black tabular-nums leading-none text-transparent bg-clip-text bg-gradient-to-br {{ $acc['bar'] }}">{{ number_format($score, 1, '.', '') }}</div>
+                                        </div>
                                     </div>
                                 </div>
 
