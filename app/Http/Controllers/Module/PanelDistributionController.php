@@ -6,6 +6,7 @@ use App\Constants\TariffTier;
 use App\Http\Controllers\Controller;
 use App\Models\Panel\Panel;
 use App\Models\Panel\PanelErrorHistory;
+use App\Models\ServerUser\ServerUser;
 use App\Repositories\Panel\PanelRepository;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -94,7 +95,14 @@ class PanelDistributionController extends Controller
 
         $marzbanByPanelId = $this->marzbanByPanelId($comparison);
 
-        /** @var list<array{tier: string, label: string, rows: list<array{panel: Panel, snapshot: ?array, marzban: ?array}>}> $distributionTiers */
+        /** Сумма used_traffic по всем ключам панели (данные из БД, синхронизируются с Marzban) — доступна даже без API хостинга. */
+        $trafficSumBytesByPanelId = ServerUser::query()
+            ->whereNotNull('panel_id')
+            ->selectRaw('panel_id, COALESCE(SUM(COALESCE(used_traffic, 0)), 0) as sum_bytes')
+            ->groupBy('panel_id')
+            ->pluck('sum_bytes', 'panel_id');
+
+        /** @var list<array{tier: string, label: string, rows: list<array{panel: Panel, snapshot: ?array, marzban: ?array, traffic_keys_sum_bytes: int}>}> $distributionTiers */
         $distributionTiers = [];
         foreach (TariffTier::all() as $tier) {
             $rows = [];
@@ -104,6 +112,7 @@ class PanelDistributionController extends Controller
                     'panel' => $panel,
                     'snapshot' => $snapshotByPanelId[$id] ?? null,
                     'marzban' => $marzbanByPanelId[$id] ?? null,
+                    'traffic_keys_sum_bytes' => (int) ($trafficSumBytesByPanelId[$id] ?? 0),
                 ];
             }
             $distributionTiers[] = [
