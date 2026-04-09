@@ -92,7 +92,7 @@
                                     <div class="min-w-0 flex-1">
                                         <div class="flex flex-wrap items-center gap-2 mb-1.5">
                                             <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border {{ $acc['badge'] }}">{{ $tier }}</span>
-                                            <a href="{{ route('admin.module.panel.show', $panel) }}"
+                                            <a href="{{ route('admin.module.panel.index', ['panel_id' => $panel->id]) }}"
                                                class="font-mono text-sm font-bold text-indigo-700 hover:text-indigo-900 hover:underline decoration-2 underline-offset-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 rounded">
                                                 #{{ $panel->id }}
                                             </a>
@@ -105,7 +105,7 @@
                                         </div>
                                     </div>
                                     <div class="shrink-0 flex flex-col items-end gap-2 text-right">
-                                        <a href="{{ route('admin.module.panel.show', $panel) }}"
+                                        <a href="{{ route('admin.module.panel.index', ['panel_id' => $panel->id]) }}"
                                            class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-800 hover:bg-indigo-100 hover:border-indigo-300 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1">
                                             <span>К панели</span>
                                             <i class="fas fa-arrow-right text-[10px] opacity-80"></i>

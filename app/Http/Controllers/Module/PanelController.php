@@ -105,6 +105,14 @@ class PanelController extends Controller
     }
 
     /**
+     * Детальная страница не используется — ведём на список с фильтром по панели.
+     */
+    public function show(Request $request, Panel $panel): RedirectResponse
+    {
+        return redirect()->route('admin.module.panel.index', ['panel_id' => $panel->id]);
+    }
+
+    /**
      * Store a newly created panel.
      *
      * @param Request $request

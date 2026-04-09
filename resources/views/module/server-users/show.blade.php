@@ -58,7 +58,7 @@
                         <div class="flex justify-between">
                             <dt class="text-gray-600">Панель:</dt>
                             <dd>
-                                <a href="{{ route('admin.module.panel.show', $serverUser->server->panel) }}" 
+                                <a href="{{ route('admin.module.panel.index', ['panel_id' => $serverUser->server->panel->id]) }}" 
                                    class="text-blue-600 hover:text-blue-800">
                                     {{ $serverUser->server->panel->name }}
                                 </a>
