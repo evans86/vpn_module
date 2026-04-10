@@ -13,19 +13,26 @@ class KeyActivationEmailNotificationStub
 {
     public function handle(KeyActivated $event): void
     {
-        $email = trim((string) ($event->key->email ?? ''));
-        if ($email === '') {
-            return;
-        }
+        try {
+            $email = trim((string) ($event->key->email ?? ''));
+            if ($email === '') {
+                return;
+            }
 
-        if (! (bool) config('key_activation.email.stub_log', false)) {
-            return;
-        }
+            if (! (bool) config('key_activation.email.stub_log', false)) {
+                return;
+            }
 
-        Log::debug('Key activation email notification (stub, отправка не выполняется)', [
-            'key_id' => $event->key->id,
-            'email' => $email,
-            'source' => $event->source,
-        ]);
+            Log::debug('Key activation email notification (stub, отправка не выполняется)', [
+                'key_id' => $event->key->id,
+                'email' => $email,
+                'source' => $event->source,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('KeyActivationEmailNotificationStub: пропуск после ошибки (не влияет на активацию)', [
+                'error' => $e->getMessage(),
+                'key_id' => $event->key->id ?? null,
+            ]);
+        }
     }
 }

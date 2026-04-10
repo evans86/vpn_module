@@ -121,7 +121,6 @@ class PackSalesmanService
                         $pack->traffic_limit,
                         $pack_salesman->id,
                         null,
-                        null,
                         null
                     );
                 } catch (Exception $e) {
