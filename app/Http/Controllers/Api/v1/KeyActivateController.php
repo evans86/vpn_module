@@ -18,6 +18,7 @@ use App\Models\Salesman\Salesman;
 use App\Logging\DatabaseLogger;
 use App\Services\External\BottApi;
 use App\Services\Key\KeyActivateService;
+use App\Services\Salesman\SalesmanService;
 use Carbon\Carbon;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
@@ -285,8 +286,22 @@ class KeyActivateController extends Controller
 
         if ($key->module_salesman_id) {
             $candidate = Salesman::find($key->module_salesman_id);
-            if ($candidate instanceof Salesman && (int) $candidate->module_bot_id === $moduleId) {
-                return $candidate;
+            if ($candidate instanceof Salesman) {
+                if ((int) $candidate->module_bot_id === $moduleId) {
+                    return $candidate;
+                }
+                // buyKey уже привязал ключ к продавцу, но строка Salesman без module_bot_id (старые данные / ручные правки)
+                if ($candidate->module_bot_id === null || (int) $candidate->module_bot_id === 0) {
+                    $candidate->module_bot_id = $moduleId;
+                    $candidate->save();
+                    Log::info('Восстановлена связь продавца с модулем по module_salesman_id ключа', [
+                        'salesman_id' => $candidate->id,
+                        'module_id' => $moduleId,
+                        'key_id' => $key->id,
+                    ]);
+
+                    return $candidate;
+                }
             }
         }
 
@@ -299,7 +314,67 @@ class KeyActivateController extends Controller
             }
         }
 
+        $fromCreator = $this->tryLinkSalesmanFromBottModuleCreator($botModule);
+        if ($fromCreator) {
+            return $fromCreator;
+        }
+
         return null;
+    }
+
+    /**
+     * Как в getUserKey: создатель модуля в Bott → Salesman.module_bot_id (если в БД ещё не привязали).
+     */
+    private function tryLinkSalesmanFromBottModuleCreator(BotModule $botModule): ?Salesman
+    {
+        $moduleId = (int) $botModule->id;
+
+        try {
+            $creator = BottApi::getCreator($botModule->public_key, $botModule->private_key);
+
+            if (!isset($creator['data']['user']['telegram_id'])) {
+                return null;
+            }
+
+            $telegramId = $creator['data']['user']['telegram_id'];
+            $username = $creator['data']['user']['username'] ?? null;
+
+            $salesman = Salesman::where('telegram_id', $telegramId)->first();
+
+            if (!$salesman) {
+                try {
+                    app(SalesmanService::class)->create($telegramId, $username);
+                    $salesman = Salesman::where('telegram_id', $telegramId)->first();
+                } catch (Exception $e) {
+                    if (str_contains($e->getMessage(), 'already exists')) {
+                        $salesman = Salesman::where('telegram_id', $telegramId)->first();
+                    } else {
+                        Log::error('Ошибка при создании продавца (activate-key)', [
+                            'telegram_id' => $telegramId,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+
+            if ($salesman && ($salesman->module_bot_id === null || (int) $salesman->module_bot_id === 0)) {
+                $salesman->module_bot_id = $moduleId;
+                $salesman->save();
+
+                Log::info('Автоматически установлена связь продавца с модулем (activate-key)', [
+                    'salesman_id' => $salesman->id,
+                    'module_id' => $moduleId,
+                    'telegram_id' => $telegramId,
+                ]);
+            }
+        } catch (Exception $e) {
+            Log::error('Ошибка при автопривязке продавца к модулю (activate-key)', [
+                'module_id' => $moduleId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return Salesman::where('module_bot_id', $moduleId)->first();
     }
 
     /**
