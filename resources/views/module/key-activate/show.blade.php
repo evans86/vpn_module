@@ -60,8 +60,8 @@
                                     </div>
 
                                     <div class="mb-3">
-                                        <label class="form-label">Владелец пакета (склад / опт)</label>
-                                        <p class="text-muted small mb-1">Кому в БД принадлежит пакет ключей (часто технический аккаунт опта).</p>
+                                        <label class="form-label">Владелец пакета</label>
+                                        <p class="text-muted small mb-1">Кому в БД принадлежит пакет ключей.</p>
                                         <div>
                                             <a href="{{ route('admin.module.salesman.show', $key->packSalesman->salesman) }}"
                                                class="text-primary">
@@ -74,8 +74,8 @@
 
                                 @if($key->module_salesman_id && $key->moduleSalesman)
                                     <div class="mb-3">
-                                        <label class="form-label">Продавец витрины (модуль)</label>
-                                        <p class="text-muted small mb-1">Через чей веб‑модуль продан ключ; <code>module_salesman_id</code> = {{ $key->module_salesman_id }}.</p>
+                                        <label class="form-label">Модуль продавца</label>
+                                        <p class="text-muted small mb-1">Продавец веб‑модуля, через который продан ключ; <code>module_salesman_id</code> = {{ $key->module_salesman_id }}.</p>
                                         <div>
                                             <a href="{{ route('admin.module.salesman.show', $key->moduleSalesman) }}"
                                                class="text-primary">
