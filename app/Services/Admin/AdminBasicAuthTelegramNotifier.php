@@ -16,6 +16,8 @@ class AdminBasicAuthTelegramNotifier
         $lines = [
             '<b>✅ HTTP Basic: успех</b>',
             '',
+            $this->projectLine(),
+            '',
             '<b>Логин:</b> '.e($basicUsername),
         ];
         $this->appendCommonLines($lines, $request);
@@ -31,6 +33,8 @@ class AdminBasicAuthTelegramNotifier
     {
         $lines = [
             '<b>❌ HTTP Basic: отказ</b>',
+            '',
+            $this->projectLine(),
             '',
         ];
         if ($reason === 'missing') {
@@ -49,6 +53,13 @@ class AdminBasicAuthTelegramNotifier
     /**
      * @param  array<int, string>  $lines
      */
+    private function projectLine(): string
+    {
+        $name = trim((string) config('app.name', ''));
+
+        return '<b>Проект:</b> '.e($name !== '' ? $name : '—');
+    }
+
     private function appendCommonLines(array &$lines, Request $request): void
     {
         $ip = $request->ip();
