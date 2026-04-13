@@ -12,7 +12,9 @@ use App\Http\Controllers\Module\KeyActivateController;
 use App\Http\Controllers\Module\BotController;
 use App\Http\Controllers\Module\ServerMonitoringController;
 use App\Http\Controllers\Module\TelegramUserController;
+use App\Http\Controllers\Module\VpnDirectDomainController;
 use App\Http\Controllers\VpnConfigController;
+use App\Http\Controllers\VpnDirectDomainsPublicController;
 use App\Http\Controllers\LogController;
 use App\Http\Controllers\Module\ServerUserController;
 use App\Http\Controllers\Module\ServerUserTransferController;
@@ -31,7 +33,10 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-Auth::routes(['register' => false]);
+// HTTP Basic до формы Laravel: иначе при открытии /login сначала видна БД-форма, а Basic только на /admin.
+Route::middleware(['admin.http_basic'])->group(function () {
+    Auth::routes(['register' => false]);
+});
 
 /*
 | ЛК: префикс /_lk/ (не /personal/…). Состояние меняем через GET + _token в query (VerifyCsrfToken).
@@ -170,6 +175,11 @@ Route::prefix('netcheck')->name('netcheck.')->group(function () {
         ->withoutMiddleware([VerifyCsrfToken::class])
         ->middleware('throttle:240,1');
 });
+
+// Публичный JSON: домены «без VPN» (централизованный список из админки)
+Route::get('/vpn/routing/direct-domains.json', [VpnDirectDomainsPublicController::class, 'json'])
+    ->middleware('throttle:120,1')
+    ->name('public.vpn.direct-domains');
 
 // Admin Routes (опционально: ADMIN_HTTP_BASIC_USER + ADMIN_HTTP_BASIC_PASSWORD в .env)
 Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(function () {
@@ -366,6 +376,16 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
                 Route::post('/{broadcast}/start', [\App\Http\Controllers\Module\BroadcastController::class, 'start'])->name('start');
                 Route::post('/{broadcast}/cancel', [\App\Http\Controllers\Module\BroadcastController::class, 'cancel'])->name('cancel');
                 Route::post('/{broadcast}/test-send', [\App\Http\Controllers\Module\BroadcastController::class, 'testSend'])->name('test-send');
+            });
+
+            // Домены без VPN (Direct) — список для клиентов с remote rules
+            Route::prefix('vpn-direct-domains')->name('vpn-direct-domains.')->group(function () {
+                Route::get('/', [VpnDirectDomainController::class, 'index'])->name('index');
+                Route::post('/', [VpnDirectDomainController::class, 'store'])->name('store');
+                Route::get('/{vpnDirectDomain}/edit', [VpnDirectDomainController::class, 'edit'])->name('edit');
+                Route::put('/{vpnDirectDomain}', [VpnDirectDomainController::class, 'update'])->name('update');
+                Route::delete('/{vpnDirectDomain}', [VpnDirectDomainController::class, 'destroy'])->name('destroy');
+                Route::post('/{vpnDirectDomain}/toggle', [VpnDirectDomainController::class, 'toggle'])->name('toggle');
             });
 
             // Очередь заданий (перевыпуск ключей, рассылки, миграции)
