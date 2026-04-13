@@ -2,8 +2,10 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Admin\AdminBasicAuthTelegramNotifier;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\App;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class AdminHttpBasicAuth
@@ -31,11 +33,25 @@ class AdminHttpBasicAuth
             || ! hash_equals($user, $givenUser)
             || ! hash_equals($password, $givenPassword)
         ) {
+            $reason = ($givenUser === null || $givenPassword === null) ? 'missing' : 'invalid';
+            $attempted = $givenUser !== null ? (string) $givenUser : null;
+
+            App::terminating(function () use ($request, $attempted, $reason): void {
+                app(AdminBasicAuthTelegramNotifier::class)->notifyFailure($request, $attempted, $reason);
+            });
+
             return response('Unauthorized', 401, [
                 'WWW-Authenticate' => 'Basic realm="Admin"',
             ]);
         }
 
-        return $next($request);
+        $basicUsername = (string) $givenUser;
+        $response = $next($request);
+
+        App::terminating(function () use ($request, $basicUsername): void {
+            app(AdminBasicAuthTelegramNotifier::class)->notifySuccess($request, $basicUsername);
+        });
+
+        return $response;
     }
 }
