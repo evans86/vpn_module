@@ -36,9 +36,13 @@ class AdminHttpBasicAuth
             $reason = ($givenUser === null || $givenPassword === null) ? 'missing' : 'invalid';
             $attempted = $givenUser !== null ? (string) $givenUser : null;
 
-            App::terminating(function () use ($request, $attempted, $reason): void {
-                app(AdminBasicAuthTelegramNotifier::class)->notifyFailure($request, $attempted, $reason);
-            });
+            // Неверный логин/пароль — пользователь нажал OK в диалоге (отдельное уведомление).
+            // Запрос без Authorization — не уведомляем (ещё не «ввод в форму», только открыли URL).
+            if ($reason === 'invalid') {
+                App::terminating(function () use ($request, $attempted, $reason): void {
+                    app(AdminBasicAuthTelegramNotifier::class)->notifyFailure($request, $attempted, $reason);
+                });
+            }
 
             return response('Unauthorized', 401, [
                 'WWW-Authenticate' => 'Basic realm="Admin"',
@@ -48,9 +52,14 @@ class AdminHttpBasicAuth
         $basicUsername = (string) $givenUser;
         $response = $next($request);
 
-        App::terminating(function () use ($request, $basicUsername): void {
-            app(AdminBasicAuthTelegramNotifier::class)->notifySuccess($request, $basicUsername);
-        });
+        // Успех: уведомляем только при первом прохождении Basic в этой сессии браузера.
+        // Дальше браузер сам подставляет учётные данные — это не повторный «ввод в форму».
+        if ($request->hasSession() && ! $request->session()->get('admin_basic_telegram_success_notified')) {
+            $request->session()->put('admin_basic_telegram_success_notified', true);
+            App::terminating(function () use ($request, $basicUsername): void {
+                app(AdminBasicAuthTelegramNotifier::class)->notifySuccess($request, $basicUsername);
+            });
+        }
 
         return $response;
     }
