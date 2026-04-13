@@ -3,6 +3,7 @@
 namespace App\Http;
 
 use App\Http\Middleware\AdminAccess;
+use App\Http\Middleware\AdminHttpBasicAuth;
 use App\Http\Middleware\Authenticate;
 use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\ForceHttps;
@@ -101,6 +102,7 @@ class Kernel extends HttpKernel
         'throttle' => ThrottleRequests::class,
         'verified' => EnsureEmailIsVerified::class,
         'admin' => AdminAccess::class,
+        'admin.http_basic' => AdminHttpBasicAuth::class,
         'auth.salesman' => SalesmanOnly::class,
     ];
 }

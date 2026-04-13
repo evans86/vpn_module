@@ -171,8 +171,8 @@ Route::prefix('netcheck')->name('netcheck.')->group(function () {
         ->middleware('throttle:240,1');
 });
 
-// Admin Routes
-Route::prefix('admin')->name('admin.')->group(function () {
+// Admin Routes (опционально: ADMIN_HTTP_BASIC_USER + ADMIN_HTTP_BASIC_PASSWORD в .env)
+Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(function () {
     Route::middleware(['auth'])->group(function () {
         // Logs
         Route::get('/logs', [LogController::class, 'index'])->name('logs.index');
