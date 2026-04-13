@@ -42,7 +42,7 @@ class SalesmanRepository extends BaseRepository
     /**
      * Get paginated salesmen list with filters
      *
-     * @param  array<string, mixed>  $filters  ключ «q»: поиск по никнейму, email, bot_link, при строке из цифр — id и telegram_id
+     * @param  array<string, mixed>  $filters  ключ «q»: поиск по никнейму, email, bot_link, public_key связанного bot_module, при строке из цифр — id и telegram_id
      */
     public function getPaginated(int $perPage = 20, array $filters = []): LengthAwarePaginator
     {
@@ -93,6 +93,11 @@ class SalesmanRepository extends BaseRepository
                 $q->orWhere('id', (int) $term)
                     ->orWhere('telegram_id', $term);
             }
+
+            $q->orWhereHas('botModule', function (Builder $bm) use ($like, $term) {
+                $bm->where('public_key', 'like', $like)
+                    ->orWhere('public_key', $term);
+            });
         });
     }
 

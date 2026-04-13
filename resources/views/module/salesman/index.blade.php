@@ -16,10 +16,10 @@
                            id="salesman-search-q"
                            name="q"
                            value="{{ request('q') }}"
-                           placeholder="Никнейм, @username, email, часть ссылки на бота, ID или Telegram ID"
+                           placeholder="Никнейм, @username, email, public_key модуля, ссылка на бота, ID или Telegram ID"
                            class="form-control" />
                     <p class="mt-1.5 text-xs text-gray-500">
-                        По никнейму (с <span class="font-mono">@</span> или без), почте ЛК, фрагменту ссылки на бота; строка только из цифр — также по внутреннему ID и Telegram ID. Пустое поле — весь список.
+                        По никнейму (с <span class="font-mono">@</span> или без), почте ЛК, фрагменту ссылки на бота, <span class="font-mono">public_key</span> веб-модуля (полностью или часть); строка только из цифр — также по внутреннему ID и Telegram ID. Пустое поле — весь список.
                     </p>
                 </div>
             </x-admin.filter-form>

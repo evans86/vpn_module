@@ -47,16 +47,16 @@
                 
                 <x-admin.filter-input 
                     name="user_tg_id" 
-                    label="Telegram ID покупателя" 
+                    label="Покупатель VPN (Telegram)" 
                     value="{{ request('user_tg_id') }}" 
-                    placeholder="Введите Telegram ID"
+                    placeholder="Telegram ID покупателя"
                     type="number" />
                 
                 <x-admin.filter-input 
                     name="telegram_id" 
-                    label="Telegram ID продавца" 
+                    label="Telegram: владелец пакета или модуль продавца" 
                     value="{{ request('telegram_id') }}" 
-                    placeholder="Введите Telegram ID" />
+                    placeholder="Telegram ID" />
             </x-admin.filter-form>
 
             <!-- Table -->
@@ -66,7 +66,7 @@
                     title="Ключи не найдены"
                     description="Попробуйте изменить параметры фильтрации" />
             @else
-                <x-admin.table :headers="['ID', 'Трафик', 'Пакет продавца', 'Пакет модуля', 'Продавец', 'Дата окончания', 'Telegram ID', 'Пользователь сервера', 'Статус', 'Лимит подключений', 'Действия']">
+                <x-admin.table :headers="['ID', 'Трафик', 'Пакет продавца', 'Пакет модуля', 'Владелец пакета', 'Модуль продавца', 'Дата окончания', 'Покупатель VPN', 'Пользователь сервера', 'Статус', 'Лимит подключений', 'Действия']">
                     @php
                         $totalKeys = $activate_keys->count();
                         $currentIndex = 0;
@@ -118,8 +118,27 @@
                                        class="text-indigo-600 hover:text-indigo-800">
                                         {{ $key->packSalesman->salesman->telegram_id }}
                                     </a>
+                                    @if($key->packSalesman->salesman->username)
+                                        <span class="block text-xs text-gray-500">{{ '@'.$key->packSalesman->salesman->username }}</span>
+                                    @endif
                                 @else
-                                    <span class="text-gray-400">Не указан</span>
+                                    <span class="text-gray-400">—</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                @if($key->module_salesman_id && $key->moduleSalesman)
+                                    <a href="{{ url('/admin/module/salesman?telegram_id=' . $key->moduleSalesman->telegram_id) }}"
+                                       class="text-indigo-600 hover:text-indigo-800">
+                                        {{ $key->moduleSalesman->telegram_id }}
+                                    </a>
+                                    @if($key->moduleSalesman->username)
+                                        <span class="block text-xs text-gray-500">{{ '@'.$key->moduleSalesman->username }}</span>
+                                    @endif
+                                    @if($key->moduleSalesman->module_bot_id)
+                                        <span class="block text-xs text-gray-400" title="ID модуля в БД">модуль #{{ $key->moduleSalesman->module_bot_id }}</span>
+                                    @endif
+                                @else
+                                    <span class="text-gray-400">—</span>
                                 @endif
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

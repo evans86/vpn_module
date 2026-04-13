@@ -31,6 +31,7 @@ class KeyActivateRepository extends BaseRepository
             ->with([
                 'packSalesman.pack',
                 'packSalesman.salesman',
+                'moduleSalesman',
                 'replacedViolation',
                 'replacementSourceViolation',
             ])
@@ -52,9 +53,14 @@ class KeyActivateRepository extends BaseRepository
         }
 
         if (!empty($filters['telegram_id'])) {
-            $query->whereHas('packSalesman', function ($q) use ($filters) {
-                $q->whereHas('salesman', function ($sq) use ($filters) {
-                    $sq->where('telegram_id', $filters['telegram_id']);
+            $tg = $filters['telegram_id'];
+            $query->where(function ($q) use ($tg) {
+                $q->whereHas('packSalesman', function ($q2) use ($tg) {
+                    $q2->whereHas('salesman', function ($sq) use ($tg) {
+                        $sq->where('telegram_id', $tg);
+                    });
+                })->orWhereHas('moduleSalesman', function ($mq) use ($tg) {
+                    $mq->where('telegram_id', $tg);
                 });
             });
         }

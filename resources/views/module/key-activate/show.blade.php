@@ -60,11 +60,41 @@
                                     </div>
 
                                     <div class="mb-3">
-                                        <label class="form-label">Продавец</label>
+                                        <label class="form-label">Владелец пакета</label>
+                                        <p class="text-muted small mb-1">Кому в БД принадлежит пакет ключей.</p>
                                         <div>
                                             <a href="{{ route('admin.module.salesman.show', $key->packSalesman->salesman) }}"
                                                class="text-primary">
-                                                {{ $key->packSalesman->salesman->name }}
+                                                {{ $key->packSalesman->salesman->username ?? ('#'.$key->packSalesman->salesman->id) }}
+                                                <span class="text-muted">— tg {{ $key->packSalesman->salesman->telegram_id }}</span>
+                                            </a>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                @if($key->module_salesman_id && $key->moduleSalesman)
+                                    <div class="mb-3">
+                                        <label class="form-label">Модуль продавца</label>
+                                        <p class="text-muted small mb-1">Продавец веб‑модуля, через который продан ключ; <code>module_salesman_id</code> = {{ $key->module_salesman_id }}.</p>
+                                        <div>
+                                            <a href="{{ route('admin.module.salesman.show', $key->moduleSalesman) }}"
+                                               class="text-primary">
+                                                {{ $key->moduleSalesman->username ?? ('#'.$key->moduleSalesman->id) }}
+                                                <span class="text-muted">— tg {{ $key->moduleSalesman->telegram_id }}</span>
+                                            </a>
+                                            @if($key->moduleSalesman->module_bot_id)
+                                                <div class="small text-muted mt-1">Модуль в БД: <code>bot_module.id = {{ $key->moduleSalesman->module_bot_id }}</code></div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endif
+
+                                @if($key->user_tg_id)
+                                    <div class="mb-3">
+                                        <label class="form-label">Покупатель VPN (конечный пользователь)</label>
+                                        <div>
+                                            <a href="https://t.me/{{ $key->user_tg_id }}" target="_blank" rel="noopener" class="text-primary">
+                                                Telegram ID {{ $key->user_tg_id }}
                                             </a>
                                         </div>
                                     </div>
