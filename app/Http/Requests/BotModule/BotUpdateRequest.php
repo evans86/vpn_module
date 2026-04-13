@@ -49,6 +49,8 @@ class BotUpdateRequest extends FormRequest
                 },
             ],
             'bot_user_id' => 'required|integer',
+            'heading' => 'nullable|string|max:12',
+            'color' => 'nullable|integer|min:1|max:5',
         ];
     }
 
@@ -69,6 +71,8 @@ class BotUpdateRequest extends FormRequest
         $dto->secret_user_key = $this->secret_user_key;
         $dto->tariff_cost = $this->tariff_cost;
         $dto->bot_user_id = intval($this->bot_user_id);
+        $dto->heading = $this->exists('heading') ? $this->input('heading') : null;
+        $dto->color = $this->exists('color') ? (int) $this->input('color') : null;
 
         return $dto;
     }

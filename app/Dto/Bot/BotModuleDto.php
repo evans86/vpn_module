@@ -17,6 +17,12 @@ class BotModuleDto
     public ?string $vpn_instructions;
     public ?int $bot_user_id;
 
+    /** Текст заголовка для веб-модуля (фронт), до 12 символов; null в update = поле не передавали — не менять в БД */
+    public ?string $heading = null;
+
+    /** Тема оформления 1–5; null в update = не передавали */
+    public ?int $color = null;
+
     public function getArray(): array
     {
         return [
@@ -31,6 +37,8 @@ class BotModuleDto
 //            'vpn_instructions' => $this->vpn_instructions,
             'bot_user_id' => $this->bot_user_id,
             'free_show' => $this->free_show,
+            'heading' => $this->heading ?? 'VPN',
+            'color' => $this->color ?? 1,
         ];
     }
 
@@ -39,7 +47,9 @@ class BotModuleDto
         return [
             'tariff_cost' => $this->tariff_cost,
             'is_paid' => $this->is_paid,
-            'free_show' => $this->free_show
+            'free_show' => $this->free_show,
+            'heading' => $this->heading ?? 'VPN',
+            'color' => $this->color ?? 1,
         ];
     }
 }

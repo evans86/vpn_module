@@ -21,6 +21,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $vpn_instructions
  * @property int|null $bot_user_id
  * @property string|null $username Telegram @ бота модуля (если задано в БД)
+ * @property string|null $heading Заголовок веб-модуля (фронт), макс. 12 символов, по умолчанию «VPN»
+ * @property int $color Тема оформления 1–5
  */
 class BotModule extends Model
 

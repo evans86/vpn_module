@@ -44,6 +44,8 @@ class BotModuleService
         $bot->bot_user_id = 0;
         $bot->tariff_cost = '1-150,3-400,6-600,12-1100';
         $bot->vpn_instructions = self::getDefaultVpnInstructions();
+        $bot->heading = 'VPN';
+        $bot->color = 1;
         if (!$bot->save())
             throw new RuntimeException('bot dont save');
         return $bot;
@@ -68,6 +70,14 @@ class BotModuleService
         $bot->tariff_cost = $dto->tariff_cost;
         $bot->free_show = $dto->free_show;
         $bot->bot_user_id = $dto->bot_user_id;
+
+        if ($dto->heading !== null) {
+            $bot->heading = mb_substr($dto->heading, 0, 12);
+        }
+        if ($dto->color !== null) {
+            $c = (int) $dto->color;
+            $bot->color = $c >= 1 && $c <= 5 ? $c : 1;
+        }
 
         // Имя Telegram-бота модуля (для Profile-Title VPN / ссылок), как в PersonalController::dashboard
         try {

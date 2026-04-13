@@ -25,6 +25,10 @@ class BotModuleFactory
         $dto->tariff_cost = $bot_module->tariff_cost;
         $dto->vpn_instructions = $bot_module->vpn_instructions;
         $dto->bot_user_id = $bot_module->bot_user_id;
+        $dto->heading = ($bot_module->heading !== null && $bot_module->heading !== '')
+            ? $bot_module->heading
+            : 'VPN';
+        $dto->color = (int) ($bot_module->color ?? 1);
 
         return $dto;
     }
