@@ -17,9 +17,10 @@ class SubscriptionClashProfileBuilder
             'format' => 'raw',
         ], true);
 
-        $yaml = "# VPN subscription + split (DIRECT)\n";
-        $yaml .= "# Nodes: format=raw\n";
-        $yaml .= "mixed-port: 7890\n";
+        // Первая строка — валидный ключ Clash (часть клиентов иначе не распознаёт YAML);
+        // комментарии ниже, не в начале файла.
+        $yaml = "mixed-port: 7890\n";
+        $yaml .= "# VPN subscription + split (DIRECT); узлы: ?format=raw\n";
         $yaml .= "allow-lan: false\n";
         $yaml .= "mode: rule\n";
         $yaml .= "log-level: info\n";

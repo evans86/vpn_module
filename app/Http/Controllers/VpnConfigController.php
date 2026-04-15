@@ -190,7 +190,7 @@ class VpnConfigController extends Controller
                     ]);
                     $profileTitle = $this->buildSubscriptionProfileTitle($keyActivate, $key_activate_id);
                     $response = response($yaml)
-                        ->header('Content-Type', 'text/yaml; charset=utf-8');
+                        ->header('Content-Type', 'application/yaml; charset=utf-8');
                     if (! $this->hasVersionedBrowserInUserAgent($userAgent) || $this->isVpnClient($userAgent)) {
                         $response->header('Profile-Title', $profileTitle);
                     }

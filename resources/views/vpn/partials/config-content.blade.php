@@ -89,7 +89,6 @@
 
         <div class="bg-white rounded-2xl shadow-lg p-6 md:p-8" id="config-content-wrapper" data-all-config-links="{{ !empty($allConfigLinks) ? base64_encode(json_encode($allConfigLinks)) : '' }}">
             <!-- Action Buttons -->
-            <p class="text-xs text-gray-500 mb-3">Clash / Mihomo / Karing: кнопка «Ссылка для Clash» — подписка YAML с правилами DIRECT.</p>
             <div class="mb-8 flex flex-col sm:flex-row gap-3 flex-wrap">
                 <button onclick="copyCurrentUrl()"
                         class="inline-flex items-center justify-center px-4 py-3 border-2 border-indigo-200 text-indigo-700 rounded-xl font-medium bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all shadow-sm hover:shadow">
