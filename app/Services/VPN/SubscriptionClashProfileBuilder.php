@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Vpn;
+namespace App\Services\VPN;
 
 /**
  * Профиль Clash / Clash Meta / Stash: узлы подтягиваются с ?format=raw, правила DIRECT — из БД.

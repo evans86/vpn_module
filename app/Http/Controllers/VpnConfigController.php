@@ -9,7 +9,7 @@ use App\Models\Panel\Panel;
 use App\Models\ServerUser\ServerUser;
 use App\Models\VPN\ConnectionLimitViolation;
 use App\Models\VPN\VpnDirectDomain;
-use App\Services\Vpn\SubscriptionClashProfileBuilder;
+use App\Services\VPN\SubscriptionClashProfileBuilder;
 use App\Jobs\AddMissingSlotsForKeyJob;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Repositories\KeyActivateUser\KeyActivateUserRepository;
