@@ -7,8 +7,9 @@
     <div class="space-y-6">
         <x-admin.card title="Как это работает">
             <p class="text-sm text-gray-700 mb-3">
-                Здесь задаётся <strong>единый список</strong> доменов, для которых клиенты должны ходить в интернет
-                <strong>напрямую</strong>, минуя VPN. Список отдаётся публичным JSON — его могут подхватывать приложения
+                Здесь задаётся <strong>единый список</strong> доменов и <strong>зон</strong> (например <code class="bg-gray-100 px-1 rounded">.ru</code>,
+                <code class="bg-gray-100 px-1 rounded">ru</code> или <code class="bg-gray-100 px-1 rounded">*.nl</code>), для которых клиенты должны ходить
+                в интернет <strong>напрямую</strong>, минуя VPN. Список отдаётся публичным JSON — его могут подхватывать приложения
                 с поддержкой удалённых правил (sing-box, Clash Meta, кастомные клиенты).
             </p>
             <p class="text-sm text-gray-600 mb-2">
@@ -31,10 +32,10 @@
                 @csrf
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                     <div class="md:col-span-5">
-                        <label for="domain" class="block text-sm font-medium text-gray-700 mb-1">Домен или ссылка</label>
+                        <label for="domain" class="block text-sm font-medium text-gray-700 mb-1">Домен, зона или ссылка</label>
                         <input type="text" name="domain" id="domain" value="{{ old('domain') }}"
                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                               placeholder="bank.ru или https://bank.ru/..."
+                               placeholder="bank.ru, .ru, *.com или https://…"
                                required>
                         @error('domain')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>

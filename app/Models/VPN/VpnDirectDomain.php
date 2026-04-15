@@ -50,6 +50,18 @@ class VpnDirectDomain extends Model
         }
         $raw = preg_replace('#^//+#', '', $raw);
 
-        return rtrim($raw, '/');
+        $raw = rtrim($raw, '/');
+
+        // Зона верхнего уровня: ".ru" → "ru" (для DOMAIN-SUFFIX в Clash / sing-box)
+        if (preg_match('/^\.+([a-z0-9][a-z0-9.-]*)$/i', $raw, $m)) {
+            return $m[1];
+        }
+
+        // *.ru → ru (одна метка зоны; иначе оставляем *.sub.domain.tld)
+        if (preg_match('/^\*\.(.+)$/i', $raw, $m) && strpos($m[1], '.') === false) {
+            return $m[1];
+        }
+
+        return $raw;
     }
 }

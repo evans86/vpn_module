@@ -10,10 +10,12 @@
                 @csrf
                 @method('PUT')
                 <div>
-                    <label for="domain" class="block text-sm font-medium text-gray-700 mb-1">Домен</label>
+                    <label for="domain" class="block text-sm font-medium text-gray-700 mb-1">Домен или зона</label>
                     <input type="text" name="domain" id="domain" value="{{ old('domain', $item->domain) }}"
                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm font-mono"
+                           placeholder="bank.ru, .ru, *.com"
                            required>
+                    <p class="mt-1 text-xs text-gray-500">Зона целиком: <span class="font-mono">ru</span>, <span class="font-mono">.ru</span> или <span class="font-mono">*.ru</span> (весь <span class="font-mono">.ru</span>).</p>
                     @error('domain')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror

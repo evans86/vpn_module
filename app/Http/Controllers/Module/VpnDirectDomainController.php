@@ -48,7 +48,7 @@ class VpnDirectDomainController extends Controller
                 return;
             }
             if (! self::isValidDomainPattern($normalized)) {
-                $validator->errors()->add('domain', 'Недопустимый формат. Пример: bank.ru, *.gosuslugi.ru');
+                $validator->errors()->add('domain', 'Недопустимый формат. Пример: bank.ru, .ru, *.com, *.gosuslugi.ru');
 
                 return;
             }
@@ -96,7 +96,7 @@ class VpnDirectDomainController extends Controller
                 return;
             }
             if (! self::isValidDomainPattern($normalized)) {
-                $validator->errors()->add('domain', 'Недопустимый формат. Пример: bank.ru, *.gosuslugi.ru');
+                $validator->errors()->add('domain', 'Недопустимый формат. Пример: bank.ru, .ru, *.com, *.gosuslugi.ru');
 
                 return;
             }
@@ -159,9 +159,36 @@ class VpnDirectDomainController extends Controller
         }
 
         if (strpos($domain, '*.') === 0) {
+            $suffix = substr($domain, 2);
+            if ($suffix === '') {
+                return false;
+            }
+            // Вся зона: *.ru, *.com (одна метка после *.)
+            if (strpos($suffix, '.') === false) {
+                return self::isValidPublicSuffixLabel($suffix);
+            }
+
             return substr_count($domain, '.') >= 2;
         }
 
-        return strpos($domain, '.') !== false;
+        // TLD / публичная зона одной меткой: ru, com, xn--p1ai
+        if (strpos($domain, '.') === false) {
+            return self::isValidPublicSuffixLabel($domain);
+        }
+
+        return true;
+    }
+
+    /**
+     * Одна метка зоны (ccTLD/gTLD/punycode), 2–63 символа.
+     */
+    private static function isValidPublicSuffixLabel(string $label): bool
+    {
+        $len = strlen($label);
+        if ($len < 2 || $len > 63) {
+            return false;
+        }
+
+        return (bool) preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/i', $label);
     }
 }
