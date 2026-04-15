@@ -58,12 +58,13 @@ Route::prefix('v1/key-activate')->group(function () {
     Route::post('buy-key', [KeyActivateController::class, 'buyKey']);
     Route::get('buy-key', [KeyActivateController::class, 'buyKey']);
 
-    /** Активация ключа без покупки (ключ уже PAID / выдан заказом Bott) */
-    Route::post('activate-key', [KeyActivateController::class, 'activateKey']);
-    Route::get('activate-key', [KeyActivateController::class, 'activateKey']);
-
-    /** GET-активация с нормализацией query (рекомендуемый вариант для GET) */
-    Route::get('activate', [KeyActivateController::class, 'activateKeyQuery']);
+    /**
+     * Синонимы buy-key: покупка ключа через Bott (product_id) и активация в одном запросе.
+     * Раньше принимали UUID key — убрано, используйте те же поля, что и для POST/GET buy-key.
+     */
+    Route::post('activate-key', [KeyActivateController::class, 'buyKey']);
+    Route::get('activate-key', [KeyActivateController::class, 'buyKey']);
+    Route::get('activate', [KeyActivateController::class, 'buyKey']);
 
     //New GET
     Route::post('free-key', [KeyActivateController::class, 'getFreeKey']);

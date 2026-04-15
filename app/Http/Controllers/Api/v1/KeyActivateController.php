@@ -7,8 +7,6 @@ use App\Helpers\ApiHelpers;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\BotModule\BotModuleInstructionsRequest;
 use App\Http\Requests\KeyActivate\KeyActivateRequest;
-use App\Http\Requests\PackSalesman\PackSalesmanActivateKeyRequest;
-use App\Http\Requests\PackSalesman\PackSalesmanActivateKeyQueryRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanBuyKeyRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanFreeKeyRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanUserKeysRequest;
@@ -42,7 +40,8 @@ class KeyActivateController extends Controller
     }
 
     /**
-     * Покупка и активация ключа в боте продаж (активация ключа в системе)
+     * Покупка и активация ключа в боте продаж (активация ключа в системе).
+     * Используется также маршрутами activate-key и activate (без передачи UUID ключа — ключ выдаёт Bott по заказу).
      *
      * @param PackSalesmanBuyKeyRequest $request
      * @return array|string
@@ -71,19 +70,13 @@ class KeyActivateController extends Controller
             $botModuleDto = BotModuleFactory::fromEntity($botModule);
 
             $tBeforeCheckUser = microtime(true);
-            $userCheck = BottApi::checkUser(
+            $userBottData = $this->assertBottUserForWebModule(
+                $botModule,
                 $request->user_tg_id,
-                $request->user_secret_key,
-                $botModule->public_key,
-                $botModule->private_key
+                (string) $request->user_secret_key,
+                true
             );
             $tAfterCheckUser = microtime(true);
-            if (!$userCheck['result']) {
-                throw new RuntimeException($userCheck['message']);
-            }
-            if ($userCheck['data']['money'] == 0) {
-                throw new RuntimeException('Пополните баланс в боте');
-            }
 
             $this->dbLogger->info('Покупка (модуль): тайминг до buyKey', [
                 'source' => 'key_activate',
@@ -97,7 +90,7 @@ class KeyActivateController extends Controller
 
             // Покупка ключа в боте продаж
             $tBeforeBuyKey = microtime(true);
-            $key = $this->keyActivateService->buyKey($botModuleDto, $request->product_id, $userCheck['data']);
+            $key = $this->keyActivateService->buyKey($botModuleDto, $request->product_id, $userBottData);
             $tAfterBuyKey = microtime(true);
 
             $this->dbLogger->info('Покупка (модуль): тайминг buyKey (Bott + ключ в БД)', [
@@ -123,15 +116,7 @@ class KeyActivateController extends Controller
                 'ms_total_request' => (int) round(($tAfterActivate - $t0) * 1000),
             ]);
 
-            return ApiHelpers::success(array_merge([
-                'key' => $activatedKey->id,
-                'traffic_limit' => $activatedKey->traffic_limit,
-                'traffic_limit_gb' => round($activatedKey->traffic_limit / 1024 / 1024 / 1024, 1),
-                'finish_at' => $activatedKey->finish_at,
-                // 'activated_at' => $activatedKey->activated_at, // поле не существует в БД
-                'status' => $activatedKey->status,
-                'status_text' => $activatedKey->getStatusText(),
-            ], \App\Helpers\UrlHelper::configUrlsPayload($activatedKey->id)));
+            return ApiHelpers::success($this->webModuleActivationSuccessPayload($activatedKey));
         } catch (RuntimeException $r) {
             return ApiHelpers::error($r->getMessage());
         } catch (Exception $e) {
@@ -148,134 +133,58 @@ class KeyActivateController extends Controller
     }
 
     /**
-     * Активация ключа без покупки в этом запросе (двухшаговый сценарий: сначала оплата/выдача id, потом активация).
-     * Авторизация через Bott API; ключ должен принадлежать модулю (как в user-key).
-     *
-     * @throws GuzzleException
+     * Тело успешного ответа после {@see KeyActivateService::activateModuleKey}.
      */
-    public function activateKey(PackSalesmanActivateKeyRequest $request)
+    private function webModuleActivationSuccessPayload(KeyActivate $activatedKey): array
     {
-        return $this->runActivatePurchasedKey(
-            $request->key,
-            (string) $request->public_key,
-            $request->user_tg_id,
-            (string) $request->user_secret_key,
-            'activate_key_request'
-        );
+        return array_merge([
+            'key' => $activatedKey->id,
+            'traffic_limit' => $activatedKey->traffic_limit,
+            'traffic_limit_gb' => round($activatedKey->traffic_limit / 1024 / 1024 / 1024, 1),
+            'finish_at' => $activatedKey->finish_at,
+            'status' => $activatedKey->status,
+            'status_text' => $activatedKey->getStatusText(),
+        ], \App\Helpers\UrlHelper::configUrlsPayload($activatedKey->id));
     }
 
     /**
-     * То же, что activate-key, но отдельный GET с нормализацией query (UUID, «+» в base64).
-     * Рекомендуемый URL для вызова из браузера и простых GET-клиентов.
+     * Проверка пользователя Bott для веб-модуля (как buyKey, без дублирования кода).
      *
-     * GET /api/v1/key-activate/activate?key=...&public_key=...&user_tg_id=...&user_secret_key=...
+     * @return array Данные пользователя Bott для {@see KeyActivateService::buyKey}
      */
-    public function activateKeyQuery(PackSalesmanActivateKeyQueryRequest $request)
-    {
-        return $this->runActivatePurchasedKey(
-            $request->key,
-            (string) $request->public_key,
-            $request->user_tg_id,
-            (string) $request->user_secret_key,
-            'activate_key_get'
-        );
-    }
-
-    /**
-     * Общая логика активации уже выданного ключа (POST activate-key и GET activate).
-     *
-     * @return array|string
-     */
-    private function runActivatePurchasedKey(
-        string $keyId,
-        string $publicKey,
+    private function assertBottUserForWebModule(
+        BotModule $botModule,
         $userTgId,
         string $userSecretKey,
-        string $logAction
-    ) {
-        try {
-            $this->dbLogger->info('Запрос активации ключа (модуль)', [
-                'source' => 'key_activate',
-                'action' => $logAction,
-                'user_tg_id' => $userTgId,
-                'key_id' => $keyId,
-                'public_key_prefix' => substr($publicKey, 0, 12),
-            ]);
-
-            $botModule = BotModule::where('public_key', $publicKey)->first();
-            if (!$botModule) {
-                throw new RuntimeException('Модуль бота не найден');
-            }
-
-            $userCheck = BottApi::checkUser(
-                $userTgId,
-                $userSecretKey,
-                $botModule->public_key,
-                $botModule->private_key
-            );
-            if (!$userCheck['result']) {
-                throw new RuntimeException($userCheck['message'] ?? 'Ошибка авторизации пользователя');
-            }
-
-            $key = KeyActivate::with(['packSalesman.pack', 'packSalesman.salesman', 'moduleSalesman'])
-                ->where('id', $keyId)
-                ->first();
-
-            if (!$key instanceof KeyActivate) {
-                return ApiHelpers::error('Ключ не найден');
-            }
-
-            $salesman = $this->resolveSalesmanForModuleActivation($botModule, $key);
-            if (!$salesman instanceof Salesman) {
-                throw new RuntimeException('Продавец не найден для данного модуля');
-            }
-
-            $keyBelongsToModule = false;
-            if ($key->pack_salesman_id) {
-                $keyBelongsToModule = $key->packSalesman
-                    && (int) $key->packSalesman->salesman_id === (int) $salesman->id
-                    && $key->packSalesman->pack
-                    && $key->packSalesman->pack->module_key == true;
-            }
-            if (!$keyBelongsToModule && $key->module_salesman_id) {
-                $keyBelongsToModule = (int) $key->module_salesman_id === (int) $salesman->id;
-            }
-
-            if (!$keyBelongsToModule) {
-                return ApiHelpers::error('Доступ запрещен');
-            }
-
-            $activatedKey = $this->keyActivateService->activateModuleKey($key, (int) $userTgId);
-
-            return ApiHelpers::success(array_merge([
-                'key' => $activatedKey->id,
-                'traffic_limit' => $activatedKey->traffic_limit,
-                'traffic_limit_gb' => round($activatedKey->traffic_limit / 1024 / 1024 / 1024, 1),
-                'finish_at' => $activatedKey->finish_at,
-                'status' => $activatedKey->status,
-                'status_text' => $activatedKey->getStatusText(),
-            ], \App\Helpers\UrlHelper::configUrlsPayload($activatedKey->id)));
-        } catch (RuntimeException $r) {
-            return ApiHelpers::error($r->getMessage());
-        } catch (Exception $e) {
-            Log::error('Ошибка при активации ключа (API)', [
-                'exception' => get_class($e),
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user_tg_id' => $userTgId ?? null,
-                'key' => $keyId ?? null,
-                'public_key' => $publicKey ?? null,
-            ]);
-
-            return ApiHelpers::error('Произошла ошибка при активации ключа');
+        bool $requirePositiveBalance
+    ): array {
+        $userCheck = BottApi::checkUser(
+            $userTgId,
+            $userSecretKey,
+            $botModule->public_key,
+            $botModule->private_key
+        );
+        if (!$userCheck['result']) {
+            throw new RuntimeException($userCheck['message'] ?? 'Ошибка авторизации пользователя');
         }
+        $data = $userCheck['data'] ?? [];
+        if (! is_array($data)) {
+            $data = [];
+        }
+        if ($requirePositiveBalance && (($data['money'] ?? 0) == 0)) {
+            throw new RuntimeException('Пополните баланс в боте');
+        }
+
+        return $data;
     }
 
     /**
-     * Продавец для проверки принадлежности ключа модулю: сначала по module_bot_id, иначе — по связям ключа
-     * при совпадении module_bot_id у Salesman с текущим BotModule.
+     * Продавец веб-модуля: как buyKey ({@see Salesman::where('module_bot_id')}),
+     * затем создатель Bott; при переданном ключе — прежние fallback по ключу (без смены правил принадлежности).
+     *
+     * @param KeyActivate|null $key Если задан — доп. разрешение продавца по module_salesman_id / pack (как было в resolveSalesmanForModuleActivation).
      */
-    private function resolveSalesmanForModuleActivation(BotModule $botModule, KeyActivate $key): ?Salesman
+    private function resolveSalesmanForWebModule(BotModule $botModule, ?KeyActivate $key = null): ?Salesman
     {
         $moduleId = (int) $botModule->id;
 
@@ -284,13 +193,17 @@ class KeyActivateController extends Controller
             return $salesman;
         }
 
-        if ($key->module_salesman_id) {
+        $fromCreator = $this->tryLinkSalesmanFromBottModuleCreator($botModule);
+        if ($fromCreator) {
+            return $fromCreator;
+        }
+
+        if ($key instanceof KeyActivate && $key->module_salesman_id) {
             $candidate = Salesman::find($key->module_salesman_id);
             if ($candidate instanceof Salesman) {
                 if ((int) $candidate->module_bot_id === $moduleId) {
                     return $candidate;
                 }
-                // buyKey уже привязал ключ к продавцу, но строка Salesman без module_bot_id (старые данные / ручные правки)
                 if ($candidate->module_bot_id === null || (int) $candidate->module_bot_id === 0) {
                     $candidate->module_bot_id = $moduleId;
                     $candidate->save();
@@ -305,7 +218,7 @@ class KeyActivateController extends Controller
             }
         }
 
-        if ($key->pack_salesman_id) {
+        if ($key instanceof KeyActivate && $key->pack_salesman_id) {
             $key->loadMissing('packSalesman.salesman');
             $packSalesman = $key->packSalesman;
             $candidate = $packSalesman !== null ? $packSalesman->salesman : null;
@@ -314,12 +227,26 @@ class KeyActivateController extends Controller
             }
         }
 
-        $fromCreator = $this->tryLinkSalesmanFromBottModuleCreator($botModule);
-        if ($fromCreator) {
-            return $fromCreator;
+        return null;
+    }
+
+    /**
+     * Ключ принадлежит модулю продавца (та же логика, что getUserKey).
+     */
+    private function keyBelongsToWebModule(KeyActivate $key, Salesman $salesman): bool
+    {
+        $keyBelongsToModule = false;
+        if ($key->pack_salesman_id) {
+            $keyBelongsToModule = $key->packSalesman
+                && (int) $key->packSalesman->salesman_id === (int) $salesman->id
+                && $key->packSalesman->pack
+                && $key->packSalesman->pack->module_key == true;
+        }
+        if (! $keyBelongsToModule && $key->module_salesman_id) {
+            $keyBelongsToModule = (int) $key->module_salesman_id === (int) $salesman->id;
         }
 
-        return null;
+        return $keyBelongsToModule;
     }
 
     /**
@@ -512,8 +439,7 @@ class KeyActivateController extends Controller
                 ->where('id', $request->key)
                 ->first();
 
-            // Если ключ не найден
-            if (!$key) {
+            if (! $key instanceof KeyActivate) {
                 return ApiHelpers::error('Ключ не найден');
             }
 
@@ -523,32 +449,12 @@ class KeyActivateController extends Controller
                 return ApiHelpers::error('Доступ запрещен');
             }
 
-            // Получаем salesman, связанный с этим модулем (при необходимости — создатель модуля в Bott)
-            $salesman = Salesman::where('module_bot_id', $botModule->id)->first();
-            if (!$salesman) {
-                $salesman = $this->tryLinkSalesmanFromBottModuleCreator($botModule);
-            }
+            $salesman = $this->resolveSalesmanForWebModule($botModule, $key);
             if (!$salesman) {
                 throw new RuntimeException('Продавец не найден для данного модуля');
             }
 
-            // Проверяем, что ключ принадлежит этому модулю
-            $keyBelongsToModule = false;
-
-            // Проверка через packSalesman
-            if ($key->pack_salesman_id) {
-                $keyBelongsToModule = $key->packSalesman
-                    && $key->packSalesman->salesman_id == $salesman->id
-                    && $key->packSalesman->pack
-                    && $key->packSalesman->pack->module_key == true;
-            }
-
-            // Проверка через moduleSalesman
-            if (!$keyBelongsToModule && $key->module_salesman_id) {
-                $keyBelongsToModule = $key->module_salesman_id == $salesman->id;
-            }
-
-            if (!$keyBelongsToModule) {
+            if (!$this->keyBelongsToWebModule($key, $salesman)) {
                 return ApiHelpers::error('Доступ запрещен');
             }
 
@@ -608,12 +514,8 @@ class KeyActivateController extends Controller
                 throw new RuntimeException($userCheck['message'] ?? 'Ошибка авторизации пользователя');
             }
 
-            // Получаем salesman, связанный с этим модулем (при необходимости — создатель модуля в Bott)
-            $salesman = Salesman::where('module_bot_id', $botModule->id)->first();
-            if (!$salesman) {
-                $salesman = $this->tryLinkSalesmanFromBottModuleCreator($botModule);
-            }
-            if (!$salesman) {
+            $salesman = $this->resolveSalesmanForWebModule($botModule);
+            if (! $salesman) {
                 throw new RuntimeException('Продавец не найден для данного модуля');
             }
 
