@@ -180,7 +180,9 @@ class VpnConfigController extends Controller
                         ->pluck('domain')
                         ->all();
                     $builder = new SubscriptionClashProfileBuilder();
-                    $yaml = $builder->build($key_activate_id, $directDomains);
+                    $yaml = $this->wantsInlineClashForHiddify($userAgent)
+                        ? $builder->buildInline($key_activate_id, $connectionKeys, $directDomains)
+                        : $builder->build($key_activate_id, $directDomains);
                     $keyActivate->loadMissing([
                         'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
                         'packSalesman.pack' => fn ($q) => $q->select('id', 'module_key'),
@@ -1194,8 +1196,18 @@ class VpnConfigController extends Controller
     }
 
     /**
-     * Профиль Clash / Mihomo / Stash: YAML с proxy-providers и правилами DIRECT из админки.
+     * Hiddify не принимает YAML только с proxy-providers — отдаём профиль со встроенными proxies:.
      */
+    private function wantsInlineClashForHiddify(string $userAgent): bool
+    {
+        $q = strtolower((string) request()->query('inline', ''));
+        if (in_array($q, ['1', 'true', 'yes', 'hiddify'], true)) {
+            return true;
+        }
+
+        return str_contains(strtolower($userAgent), 'hiddify');
+    }
+
     private function wantsClashSubscriptionProfile(string $userAgent): bool
     {
         $f = strtolower((string) request()->query('format', ''));
@@ -1207,7 +1219,7 @@ class VpnConfigController extends Controller
         }
 
         $u = strtolower($userAgent);
-        if (str_contains($u, 'sing-box') || str_contains($u, 'singbox') || str_contains($u, 'hiddify')) {
+        if (str_contains($u, 'sing-box') || str_contains($u, 'singbox')) {
             return false;
         }
 
@@ -1227,6 +1239,10 @@ class VpnConfigController extends Controller
     private function withPlainSubscriptionDirectRoutingHints(string $body): string
     {
         if (! config('vpn.subscription_direct_routing_hints', true)) {
+            return $body;
+        }
+        $ua = strtolower((string) request()->header('User-Agent', ''));
+        if (str_contains($ua, 'hiddify')) {
             return $body;
         }
 
