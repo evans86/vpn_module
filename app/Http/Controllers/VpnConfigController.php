@@ -8,6 +8,8 @@ use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Models\Panel\Panel;
 use App\Models\ServerUser\ServerUser;
 use App\Models\VPN\ConnectionLimitViolation;
+use App\Models\VPN\VpnDirectDomain;
+use App\Services\Vpn\SubscriptionClashProfileBuilder;
 use App\Jobs\AddMissingSlotsForKeyJob;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Repositories\KeyActivateUser\KeyActivateUserRepository;
@@ -94,11 +96,14 @@ class VpnConfigController extends Controller
             }
 
             $userAgent = request()->header('User-Agent') ?? 'Unknown';
+            // Вложенная загрузка узлов (Clash proxy-providers) — только plain text, без профиля
+            $forceRawSubscription = request()->query('format') === 'raw';
             // Явный параметр (обратная совместимость): ?format=subscription или ?sub=1
             $forceSubscription = in_array(request()->query('format'), ['subscription', 'sub', 'txt'], true)
                 || request()->query('sub') === '1';
             // Подписка plain text по тому же URL без query — для VPN/HTTP-клиентов; в обычном браузере — HTML-страница.
-            $isSubscriptionRequest = $forceSubscription
+            $isSubscriptionRequest = $forceRawSubscription
+                || $forceSubscription
                 || $this->isVpnClient($userAgent)
                 || $this->isLikelyHttpClientLibrary($userAgent)
                 || !$this->requestAcceptsHtml()
@@ -140,6 +145,53 @@ class VpnConfigController extends Controller
                 $connectionKeys = $this->collectConnectionKeysFromKeyActivateUsers($keyActivateUsers);
                 $bodyPreview = implode("\n", $connectionKeys);
 
+                // Только список ссылок (для proxy-providers в Clash) — иначе рекурсия
+                if ($forceRawSubscription) {
+                    $keyActivate->loadMissing([
+                        'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
+                        'packSalesman.pack' => fn ($q) => $q->select('id', 'module_key'),
+                        'packSalesman.salesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
+                        'moduleSalesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
+                        'moduleSalesman.botModule' => fn ($q) => $q->select('id', 'username', 'public_key'),
+                    ]);
+                    $profileTitle = $this->buildSubscriptionProfileTitle($keyActivate, $key_activate_id);
+                    $response = response($bodyPreview)
+                        ->header('Content-Type', 'text/plain; charset=utf-8');
+                    $looksLikeDesktopBrowser = $this->hasVersionedBrowserInUserAgent($userAgent)
+                        && ! $this->isVpnClient($userAgent);
+                    if (! $looksLikeDesktopBrowser) {
+                        $response->header('Profile-Title', $profileTitle);
+                    }
+
+                    return $response;
+                }
+
+                if ($this->wantsClashSubscriptionProfile($userAgent)) {
+                    $directDomains = VpnDirectDomain::query()
+                        ->where('is_enabled', true)
+                        ->orderBy('sort_order')
+                        ->orderBy('id')
+                        ->pluck('domain')
+                        ->all();
+                    $builder = new SubscriptionClashProfileBuilder();
+                    $yaml = $builder->build($key_activate_id, $directDomains);
+                    $keyActivate->loadMissing([
+                        'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
+                        'packSalesman.pack' => fn ($q) => $q->select('id', 'module_key'),
+                        'packSalesman.salesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
+                        'moduleSalesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
+                        'moduleSalesman.botModule' => fn ($q) => $q->select('id', 'username', 'public_key'),
+                    ]);
+                    $profileTitle = $this->buildSubscriptionProfileTitle($keyActivate, $key_activate_id);
+                    $response = response($yaml)
+                        ->header('Content-Type', 'text/yaml; charset=utf-8');
+                    if (! $this->hasVersionedBrowserInUserAgent($userAgent) || $this->isVpnClient($userAgent)) {
+                        $response->header('Profile-Title', $profileTitle);
+                    }
+
+                    return $response;
+                }
+
                 $keyActivate->loadMissing([
                     'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
                     'packSalesman.pack' => fn ($q) => $q->select('id', 'module_key'),
@@ -149,7 +201,9 @@ class VpnConfigController extends Controller
                 ]);
                 $profileTitle = $this->buildSubscriptionProfileTitle($keyActivate, $key_activate_id);
 
-                $response = response($bodyPreview)
+                $plainBody = $this->withPlainSubscriptionDirectRoutingHints($bodyPreview);
+
+                $response = response($plainBody)
                     ->header('Content-Type', 'text/plain; charset=utf-8');
 
                 // Заголовок для VPN-клиентов; не дублируем для обычного браузерного User-Agent без признаков клиента.
@@ -1131,6 +1185,53 @@ class VpnConfigController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * Профиль Clash / Mihomo / Stash: YAML с proxy-providers и правилами DIRECT из админки.
+     */
+    private function wantsClashSubscriptionProfile(string $userAgent): bool
+    {
+        $f = strtolower((string) request()->query('format', ''));
+        if (in_array($f, ['clash', 'mihomo', 'yaml', 'yml'], true)) {
+            return true;
+        }
+        if (in_array($f, ['sing-box', 'singbox', 'json'], true)) {
+            return false;
+        }
+
+        $u = strtolower($userAgent);
+        if (str_contains($u, 'sing-box') || str_contains($u, 'singbox') || str_contains($u, 'hiddify')) {
+            return false;
+        }
+
+        return str_contains($u, 'clash')
+            || str_contains($u, 'stash')
+            || str_contains($u, 'mihomo')
+            || str_contains($u, 'flclash')
+            || str_contains($u, 'verge')
+            || str_contains($u, 'clashx')
+            || str_contains($u, 'clash.meta')
+            || str_contains($u, 'clashmeta');
+    }
+
+    /**
+     * Строки с # в начале plain text подписки: подсказки по split-routing (не для ?format=raw).
+     */
+    private function withPlainSubscriptionDirectRoutingHints(string $body): string
+    {
+        if (! config('vpn.subscription_direct_routing_hints', true)) {
+            return $body;
+        }
+
+        $lines = [
+            '# VPN split-routing (Direct):',
+            '# - Clash / Mihomo / Stash — полный профиль с правилами: добавьте к URL подписки ?format=clash',
+            '# - sing-box — remote rule-set (source): '.route('public.vpn.direct-domains-rule-set', [], true),
+            '# - JSON списка доменов: '.route('public.vpn.direct-domains', [], true),
+        ];
+
+        return implode("\n", $lines)."\n\n".$body;
     }
 
     /**

@@ -258,6 +258,22 @@
             var url = window.getVpnCleanConfigCanonicalUrl();
             navigator.clipboard.writeText(url).then(function() { showCopyNotification('✓ Ссылка скопирована в буфер обмена!'); }).catch(function() { alert('Не удалось скопировать ссылку.'); });
         };
+        /** Подписка в формате Clash / Mihomo / Karing (?format=clash) с правилами DIRECT. */
+        window.getVpnClashSubscriptionUrl = function() {
+            try {
+                var u = new URL(window.getVpnCleanConfigCanonicalUrl());
+                u.searchParams.set('format', 'clash');
+                return u.toString();
+            } catch (e) {
+                return window.location.href.split('?')[0] + '?format=clash';
+            }
+        };
+        window.copyClashSubscriptionUrl = function() {
+            var url = window.getVpnClashSubscriptionUrl();
+            navigator.clipboard.writeText(url).then(function() {
+                showCopyNotification('✓ Ссылка для Clash скопирована!');
+            }).catch(function() { alert('Не удалось скопировать ссылку.'); });
+        };
         window.__vpnConfigPage = null;
         window.getVpnConfigAllLinks = function() {
             var p = window.__vpnConfigPage;

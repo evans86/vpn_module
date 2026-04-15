@@ -277,9 +277,16 @@
                     'label' => 'Служебное',
                     'activeRoutes' => [
                         'admin.module.queue.*',
+                        'admin.module.vpn-direct-domains.*',
                         'admin.logs.*',
                     ],
                     'items' => [
+                        [
+                            'route' => 'admin.module.vpn-direct-domains.index',
+                            'icon' => 'fa-route',
+                            'label' => 'Домены без VPN',
+                            'routes' => ['admin.module.vpn-direct-domains.*'],
+                        ],
                         [
                             'route' => 'admin.module.queue.index',
                             'icon' => 'fa-tasks',

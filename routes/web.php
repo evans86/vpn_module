@@ -181,6 +181,11 @@ Route::get('/vpn/routing/direct-domains.json', [VpnDirectDomainsPublicController
     ->middleware('throttle:120,1')
     ->name('public.vpn.direct-domains');
 
+// sing-box remote rule-set (source), см. https://sing-box.sagernet.org/configuration/rule-set/source-format/
+Route::get('/vpn/routing/direct-domains-rule-set.json', [VpnDirectDomainsPublicController::class, 'ruleSetSource'])
+    ->middleware('throttle:120,1')
+    ->name('public.vpn.direct-domains-rule-set');
+
 // Admin Routes (опционально: ADMIN_HTTP_BASIC_USER + ADMIN_HTTP_BASIC_PASSWORD в .env)
 Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(function () {
     Route::middleware(['auth'])->group(function () {

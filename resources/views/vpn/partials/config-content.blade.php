@@ -89,6 +89,7 @@
 
         <div class="bg-white rounded-2xl shadow-lg p-6 md:p-8" id="config-content-wrapper" data-all-config-links="{{ !empty($allConfigLinks) ? base64_encode(json_encode($allConfigLinks)) : '' }}">
             <!-- Action Buttons -->
+            <p class="text-xs text-gray-500 mb-3">Clash / Mihomo / Karing: кнопка «Ссылка для Clash» — подписка YAML с правилами DIRECT.</p>
             <div class="mb-8 flex flex-col sm:flex-row gap-3 flex-wrap">
                 <button onclick="copyCurrentUrl()"
                         class="inline-flex items-center justify-center px-4 py-3 border-2 border-indigo-200 text-indigo-700 rounded-xl font-medium bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all shadow-sm hover:shadow">
@@ -97,6 +98,14 @@
                               d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
                     </svg>
                     Скопировать ссылку
+                </button>
+                <button type="button" onclick="copyClashSubscriptionUrl()"
+                        title="YAML с узлами и правилами DIRECT (?format=clash)"
+                        class="inline-flex items-center justify-center px-4 py-3 border-2 border-amber-200 text-amber-900 rounded-xl font-medium bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-all shadow-sm hover:shadow">
+                    <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h10M4 18h16"/>
+                    </svg>
+                    Ссылка для Clash
                 </button>
                 @if(!empty($allConfigLinks))
                 <button onclick="copyAllConfigurations()"
@@ -472,13 +481,38 @@
                 }, 3000);
             }
 
+            function getVpnCleanConfigCanonicalUrl() {
+                try {
+                    const u = new URL(window.location.href);
+                    u.searchParams.delete('format');
+                    u.searchParams.delete('sub');
+                    return u.toString();
+                } catch (e) {
+                    return window.location.href;
+                }
+            }
+
             function copyCurrentUrl() {
-                const url = window.location.href;
+                const url = getVpnCleanConfigCanonicalUrl();
                 navigator.clipboard.writeText(url).then(() => {
                     showCopyNotification('✓ Ссылка скопирована в буфер обмена!');
                 }).catch(() => {
                     alert('Не удалось скопировать ссылку.');
                 });
+            }
+
+            function copyClashSubscriptionUrl() {
+                try {
+                    const u = new URL(getVpnCleanConfigCanonicalUrl());
+                    u.searchParams.set('format', 'clash');
+                    navigator.clipboard.writeText(u.toString()).then(() => {
+                        showCopyNotification('✓ Ссылка для Clash скопирована!');
+                    }).catch(() => {
+                        alert('Не удалось скопировать ссылку.');
+                    });
+                } catch (e) {
+                    alert('Не удалось скопировать ссылку.');
+                }
             }
 
             function copyToClipboard(text, protocol) {
