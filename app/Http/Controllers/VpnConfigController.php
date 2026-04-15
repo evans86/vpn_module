@@ -96,14 +96,20 @@ class VpnConfigController extends Controller
             }
 
             $userAgent = request()->header('User-Agent') ?? 'Unknown';
+            $formatQuery = strtolower((string) request()->query('format', ''));
             // Вложенная загрузка узлов (Clash proxy-providers) — только plain text, без профиля
-            $forceRawSubscription = request()->query('format') === 'raw';
+            $forceRawSubscription = $formatQuery === 'raw';
             // Явный параметр (обратная совместимость): ?format=subscription или ?sub=1
-            $forceSubscription = in_array(request()->query('format'), ['subscription', 'sub', 'txt'], true)
+            $forceSubscription = in_array($formatQuery, ['subscription', 'sub', 'txt'], true)
                 || request()->query('sub') === '1';
+            // Явный профиль/подписка по format= — иначе в браузере открывается HTML-оболочка вместо YAML/JSON
+            $forceExplicitProfileFormat = in_array($formatQuery, [
+                'clash', 'mihomo', 'yaml', 'yml', 'sing-box', 'singbox', 'json',
+            ], true);
             // Подписка plain text по тому же URL без query — для VPN/HTTP-клиентов; в обычном браузере — HTML-страница.
             $isSubscriptionRequest = $forceRawSubscription
                 || $forceSubscription
+                || $forceExplicitProfileFormat
                 || $this->isVpnClient($userAgent)
                 || $this->isLikelyHttpClientLibrary($userAgent)
                 || !$this->requestAcceptsHtml()
