@@ -98,6 +98,7 @@
                     </svg>
                     Скопировать ссылку
                 </button>
+                {{-- Временно скрыто: «Ссылка для Clash»
                 <button type="button" onclick="copyClashSubscriptionUrl()"
                         title="YAML с узлами и правилами DIRECT (?format=clash)"
                         class="inline-flex items-center justify-center px-4 py-3 border-2 border-amber-200 text-amber-900 rounded-xl font-medium bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-all shadow-sm hover:shadow">
@@ -106,6 +107,7 @@
                     </svg>
                     Ссылка для Clash
                 </button>
+                --}}
                 @if(!empty($allConfigLinks))
                 <button onclick="copyAllConfigurations()"
                         class="inline-flex items-center justify-center px-4 py-3 border-2 border-green-200 text-green-700 rounded-xl font-medium bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all shadow-sm hover:shadow"
