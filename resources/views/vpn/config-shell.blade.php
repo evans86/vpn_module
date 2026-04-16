@@ -392,6 +392,8 @@
         window.__vpnConfigDebug = @json((bool) config('app.debug'));
         var contentUrl = @json($contentUrl);
         var refreshUrl = @json($refreshUrl);
+        /** База URL страницы конфига (для ссылки на новый ключ после перевыпуска) */
+        var vpnConfigPublicBase = @json(rtrim(url('/config'), '/'));
         var contentEl = document.getElementById('config-content');
         var refreshBar = document.getElementById('config-refresh-bar');
         var progressBar = document.getElementById('config-progress-bar');
@@ -443,9 +445,36 @@
             setRefreshErrorMessage('');
         }
 
+        function escapeHtmlVpnShell(s) {
+            if (s == null || s === '') return '';
+            var d = document.createElement('div');
+            d.textContent = String(s);
+            return d.innerHTML;
+        }
+
+        /** Ключ перевыпущен: показать ссылку на новый конфиг (ответ /content или /refresh с 404 и replacedKeyId). */
+        function setContentKeyReplaced(message, replacedKeyId) {
+            if (!contentEl || !replacedKeyId) return;
+            var href = vpnConfigPublicBase + '/' + encodeURIComponent(String(replacedKeyId));
+            var msg = message || 'Ваш ключ доступа был заменен из-за нарушения лимита подключений. Пожалуйста, используйте новый ключ.';
+            contentEl.innerHTML =
+                '<div class="container mx-auto px-4 py-8 max-w-6xl">' +
+                '<div class="bg-gradient-to-r from-green-600 to-emerald-700 rounded-2xl shadow-xl p-6 md:p-8 mb-6 text-white">' +
+                '<div class="flex items-start">' +
+                '<div class="flex-shrink-0"><svg class="h-6 w-6 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg></div>' +
+                '<div class="ml-4 flex-1">' +
+                '<h3 class="text-xl font-bold mb-2">Ключ был перевыпущен</h3>' +
+                '<p class="text-white/90 mb-4 text-sm">Используйте новую ссылку конфигурации ниже.</p>' +
+                '<a href="' + href.replace(/"/g, '&quot;') + '" class="inline-flex items-center px-4 py-2 bg-white text-emerald-700 rounded-lg font-semibold hover:bg-green-50 transition-colors shadow-lg">' +
+                '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>Перейти к новому ключу</a>' +
+                '</div></div></div>' +
+                '<div class="bg-rose-50 border border-rose-200 rounded-xl p-6"><p class="text-rose-800 text-sm leading-relaxed">' + escapeHtmlVpnShell(msg) + '</p></div>' +
+                '</div>';
+        }
+
         function setContentError(msg) {
             if (!contentEl) return;
-            contentEl.innerHTML = '<div class="container mx-auto px-4 py-8 max-w-6xl"><div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center"><p class="text-red-700">' + (msg || 'Не удалось загрузить конфигурацию.') + '</p></div></div>';
+            contentEl.innerHTML = '<div class="container mx-auto px-4 py-8 max-w-6xl"><div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center"><p class="text-red-700">' + escapeHtmlVpnShell(msg || 'Не удалось загрузить конфигурацию.') + '</p></div></div>';
         }
 
         function parseJsonResponse(r) {
@@ -497,7 +526,12 @@
                     if (res.data.lastUpdated) window.__vpnLastConfigUpdatedLabel = res.data.lastUpdated;
                     if (typeof res.data.lastUpdatedEpoch === 'number') window.__vpnLastConfigEpoch = res.data.lastUpdatedEpoch;
                 } else {
-                    setContentError(res.data && res.data.message ? res.data.message : null);
+                    var rk = res.data && res.data.replacedKeyId;
+                    if (rk) {
+                        setContentKeyReplaced(res.data.message || '', rk);
+                    } else {
+                        setContentError(res.data && res.data.message ? res.data.message : null);
+                    }
                 }
             })
             .catch(function() { setContentError(); });
@@ -692,9 +726,21 @@
                         pollOnce();
                         _vpnSyncPollTimer = setInterval(pollOnce, POLL_INTERVAL_MS);
                     } else {
-                        var errMsg = (res.data && res.data.message) ? String(res.data.message) : '';
-                        if (!errMsg && !res.ok) errMsg = '';
-                        onRefreshHttpError(errMsg, res.status);
+                        var rkRefresh = res.data && res.data.replacedKeyId;
+                        if (rkRefresh) {
+                            stopStatusRotation();
+                            clearVpnSyncPolling();
+                            refreshSessionClosed = true;
+                            if (btnRefresh) btnRefresh.disabled = false;
+                            if (spinnerBlock) spinnerBlock.setAttribute('aria-busy', 'false');
+                            if (progressBar) progressBar.classList.add('hidden');
+                            if (refreshBar) refreshBar.classList.remove('hidden');
+                            setContentKeyReplaced((res.data && res.data.message) ? String(res.data.message) : '', rkRefresh);
+                        } else {
+                            var errMsg = (res.data && res.data.message) ? String(res.data.message) : '';
+                            if (!errMsg && !res.ok) errMsg = '';
+                            onRefreshHttpError(errMsg, res.status);
+                        }
                     }
                 })
                 .catch(function() {

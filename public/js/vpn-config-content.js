@@ -108,10 +108,17 @@
 
         var parts = [];
 
-        if (replacedViolation && newKeyActivate && newKeyFormattedKeys && newKeyFormattedKeys.length) {
+        var replacedKeyId = replacedViolation && replacedViolation.replaced_key_id ? String(replacedViolation.replaced_key_id) : '';
+        if (replacedKeyId) {
             var repTime = replacedViolation.key_replaced_at
                 ? fmtDateTime(replacedViolation.key_replaced_at)
                 : '';
+            var pathBase = window.location.pathname.replace(/\/[^/]+\/?$/, '') || '/config';
+            var newKeyHref = pathBase + '/' + encodeURIComponent(replacedKeyId);
+            var hasKeysBelow = newKeyActivate && newKeyFormattedKeys && newKeyFormattedKeys.length;
+            var subtext = hasKeysBelow
+                ? 'Ваш ключ доступа был автоматически перевыпущен из-за превышения лимита подключений. Ниже отображается новый ключ.'
+                : 'Ваш ключ доступа был автоматически перевыпущен. Перейдите по ссылке на новый ключ.';
             parts.push(
                 '<div class="bg-gradient-to-r from-green-600 to-emerald-700 rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">' +
                 '<div class="flex items-start justify-between">' +
@@ -119,7 +126,9 @@
                 '<div class="flex-shrink-0"><svg class="h-6 w-6 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg></div>' +
                 '<div class="ml-4 flex-1">' +
                 '<h3 class="text-xl font-bold mb-2">✅ Ключ был перевыпущен</h3>' +
-                '<p class="text-white/90 mb-3">Ваш ключ доступа был автоматически перевыпущен из-за превышения лимита подключений. Ниже отображается новый ключ.</p>' +
+                '<p class="text-white/90 mb-3">' + escapeHtml(subtext) + '</p>' +
+                '<a href="' + escapeAttr(newKeyHref) + '" class="inline-flex items-center px-4 py-2 bg-white text-emerald-700 rounded-lg font-semibold hover:bg-green-50 transition-colors shadow-lg mb-3">' +
+                '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>Перейти к новому ключу</a>' +
                 (repTime ? '<div class="text-sm text-white/80">Перевыпущен: ' + escapeHtml(repTime) + '</div>' : '') +
                 '</div></div></div></div>'
             );
