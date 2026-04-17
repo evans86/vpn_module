@@ -24,7 +24,10 @@ class SubscriptionSingBoxProfileBuilder
     public function build(array $directDomains, array $subscriptionUris): string
     {
         $suffixes = $this->normalizeDomainSuffixes($directDomains);
-        $route = $this->buildRoute($suffixes, $directDomains);
+        $dottedSuffixes = $this->toSingBoxDottedSuffixes($suffixes, $directDomains);
+
+        $route = $this->buildRoute($dottedSuffixes, $directDomains);
+        $dns = $this->buildDns($dottedSuffixes);
 
         $proxyOutbounds = [];
         $proxyTags = [];
@@ -65,6 +68,7 @@ class SubscriptionSingBoxProfileBuilder
                 'level' => 'info',
                 'timestamp' => true,
             ],
+            'dns' => $dns,
             'outbounds' => $outbounds,
             'route' => $route,
         ];
@@ -399,21 +403,27 @@ class SubscriptionSingBoxProfileBuilder
      * @param  array<int, string>  $directDomains
      * @return array<int, string>
      */
+    /**
+     * Как в админке / VpnDirectDomain::normalizeDomain (URL → хост, .ru → ru).
+     *
+     * @param  array<int, string>  $directDomains
+     * @return array<int, string>
+     */
     private function normalizeDomainSuffixes(array $directDomains): array
     {
         $out = [];
         foreach ($directDomains as $d) {
-            $d = trim((string) $d);
-            if ($d === '') {
+            $n = VpnDirectDomain::normalizeDomain(trim((string) $d));
+            if ($n === '') {
                 continue;
             }
-            if (strpos($d, '*.') === 0) {
-                $s = substr($d, 2);
+            if (str_starts_with($n, '*.')) {
+                $s = substr($n, 2);
                 if ($s !== '') {
                     $out[] = $s;
                 }
             } else {
-                $out[] = $d;
+                $out[] = $n;
             }
         }
 
@@ -421,17 +431,97 @@ class SubscriptionSingBoxProfileBuilder
     }
 
     /**
+     * sing-box ожидает domain_suffix с ведущей точкой (см. документацию); более длинные суффиксы — раньше.
+     *
      * @param  array<int, string>  $suffixes
+     * @param  array<int, string>  $directDomains
+     * @return array<int, string>
+     */
+    private function toSingBoxDottedSuffixes(array $suffixes, array $directDomains): array
+    {
+        $dotted = [];
+        foreach ($suffixes as $s) {
+            $d = $this->singBoxDomainSuffix((string) $s);
+            if ($d !== '') {
+                $dotted[] = $d;
+            }
+        }
+        if ($this->includesRuZone($directDomains)) {
+            $dotted[] = '.xn--p1ai';
+        }
+        $dotted = array_values(array_unique($dotted));
+        usort($dotted, fn (string $a, string $b): int => strlen($b) <=> strlen($a));
+
+        return $dotted;
+    }
+
+    private function singBoxDomainSuffix(string $suffixWithoutLeadingDot): string
+    {
+        $suffixWithoutLeadingDot = trim($suffixWithoutLeadingDot);
+        if ($suffixWithoutLeadingDot === '') {
+            return '';
+        }
+        if (str_starts_with($suffixWithoutLeadingDot, '.')) {
+            return $suffixWithoutLeadingDot;
+        }
+
+        return '.'.$suffixWithoutLeadingDot;
+    }
+
+    /**
+     * DNS через direct для тех же суффиксов — иначе запросы к .ru резолвятся через VPN и маршрут/DIRECT ломается.
+     *
+     * @param  array<int, string>  $dottedSuffixes
+     * @return array<string, mixed>
+     */
+    private function buildDns(array $dottedSuffixes): array
+    {
+        $servers = [
+            [
+                'type' => 'udp',
+                'tag' => 'dns-direct',
+                'server' => '77.88.8.8',
+                'server_port' => 53,
+                'detour' => 'direct',
+            ],
+            [
+                'type' => 'udp',
+                'tag' => 'dns-default',
+                'server' => '8.8.8.8',
+                'server_port' => 53,
+                'detour' => 'vpn-sub',
+            ],
+        ];
+
+        $rules = [];
+        if ($dottedSuffixes !== []) {
+            $rules[] = [
+                'domain_suffix' => $dottedSuffixes,
+                'server' => 'dns-direct',
+            ];
+        }
+
+        return [
+            'servers' => $servers,
+            'rules' => $rules,
+            'final' => 'dns-default',
+            'strategy' => 'prefer_ipv4',
+            'reverse_mapping' => true,
+        ];
+    }
+
+    /**
+     * @param  array<int, string>  $dottedSuffixes  Уже с ведущей точкой
      * @param  array<int, string>  $directDomains
      * @return array<string, mixed>
      */
-    private function buildRoute(array $suffixes, array $directDomains): array
+    private function buildRoute(array $dottedSuffixes, array $directDomains): array
     {
         $rules = [];
 
-        if ($suffixes !== []) {
+        if ($dottedSuffixes !== []) {
             $rules[] = [
-                'domain_suffix' => $suffixes,
+                'domain_suffix' => $dottedSuffixes,
                 'action' => 'route',
                 'outbound' => 'direct',
             ];
@@ -454,6 +544,8 @@ class SubscriptionSingBoxProfileBuilder
         return [
             'rules' => $rules,
             'final' => 'vpn-sub',
+            'auto_detect_interface' => true,
+            'default_domain_strategy' => 'prefer_ipv4',
         ];
     }
 
