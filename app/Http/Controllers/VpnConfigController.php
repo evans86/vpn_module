@@ -10,6 +10,7 @@ use App\Models\ServerUser\ServerUser;
 use App\Models\VPN\ConnectionLimitViolation;
 use App\Models\VPN\VpnDirectDomain;
 use App\Services\VPN\SubscriptionClashProfileBuilder;
+use App\Services\VPN\SubscriptionSingBoxProfileBuilder;
 use App\Jobs\AddMissingSlotsForKeyJob;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Repositories\KeyActivateUser\KeyActivateUserRepository;
@@ -196,6 +197,43 @@ class VpnConfigController extends Controller
                     }
 
                     return $response;
+                }
+
+                if (config('vpn.sing_box_subscription_profile', true)
+                    && $this->wantsSingBoxSubscriptionProfile($userAgent, $formatQuery)) {
+                    $directDomains = VpnDirectDomain::query()
+                        ->where('is_enabled', true)
+                        ->orderBy('sort_order')
+                        ->orderBy('id')
+                        ->pluck('domain')
+                        ->all();
+                    try {
+                        $builder = new SubscriptionSingBoxProfileBuilder();
+                        $json = $builder->build($directDomains, $connectionKeys);
+                    } catch (\Throwable $e) {
+                        Log::warning('sing-box subscription profile skipped', [
+                            'key_activate_id' => $key_activate_id,
+                            'message' => $e->getMessage(),
+                        ]);
+                        $json = null;
+                    }
+                    if ($json !== null) {
+                        $keyActivate->loadMissing([
+                            'packSalesman' => fn ($q) => $q->select('id', 'salesman_id', 'pack_id'),
+                            'packSalesman.pack' => fn ($q) => $q->select('id', 'module_key'),
+                            'packSalesman.salesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
+                            'moduleSalesman' => fn ($q) => $q->select('id', 'telegram_id', 'bot_link', 'panel_id', 'module_bot_id'),
+                            'moduleSalesman.botModule' => fn ($q) => $q->select('id', 'username', 'public_key'),
+                        ]);
+                        $profileTitle = $this->buildSubscriptionProfileTitle($keyActivate, $key_activate_id);
+                        $response = response($json)
+                            ->header('Content-Type', 'application/json; charset=utf-8');
+                        if (! $this->hasVersionedBrowserInUserAgent($userAgent) || $this->isVpnClient($userAgent)) {
+                            $response->header('Profile-Title', $profileTitle);
+                        }
+
+                        return $response;
+                    }
                 }
 
                 $keyActivate->loadMissing([
@@ -1181,7 +1219,7 @@ class VpnConfigController extends Controller
             'hexasoftware', 'v2rayg', 'anxray', 'kitsunebi', 'potatso', 'rocket',
             'pharos', 'stash', 'mellow', 'leaf', 'hysteria', 'tuic', 'naive', 'brook',
             'vnet', 'http injector', 'anonym', 'proxy', 'vpn', 'sub', 'subscribe',
-            'subscription', 'hiddifynext'
+            'subscription', 'hiddifynext', 'karing',
         ];
 
         foreach ($vpnPatterns as $pattern) {
@@ -1204,7 +1242,7 @@ class VpnConfigController extends Controller
         }
 
         $u = strtolower($userAgent);
-        if (str_contains($u, 'sing-box') || str_contains($u, 'singbox') || str_contains($u, 'hiddify')) {
+        if (str_contains($u, 'sing-box') || str_contains($u, 'singbox')) {
             return false;
         }
 
@@ -1215,7 +1253,32 @@ class VpnConfigController extends Controller
             || str_contains($u, 'verge')
             || str_contains($u, 'clashx')
             || str_contains($u, 'clash.meta')
-            || str_contains($u, 'clashmeta');
+            || str_contains($u, 'clashmeta')
+            || str_contains($u, 'hiddify')
+            || str_contains($u, 'hiddifynext')
+            || str_contains($u, 'karing');
+    }
+
+    /**
+     * Полный JSON sing-box (Hiddify, Karing и др.): outbound subscription + route с DIRECT по списку из админки.
+     * Не пересекается с Clash: явный ?format=clash остаётся YAML.
+     */
+    private function wantsSingBoxSubscriptionProfile(string $userAgent, string $formatQuery): bool
+    {
+        $f = strtolower($formatQuery);
+        if (in_array($f, ['clash', 'mihomo', 'yaml', 'yml'], true)) {
+            return false;
+        }
+        if (in_array($f, ['sing-box', 'singbox', 'json'], true)) {
+            return true;
+        }
+
+        $u = strtolower($userAgent);
+        if (str_contains($u, 'hiddify') || str_contains($u, 'karing')) {
+            return false;
+        }
+
+        return str_contains($u, 'sing-box') || str_contains($u, 'singbox');
     }
 
     /**
@@ -1229,8 +1292,10 @@ class VpnConfigController extends Controller
 
         $lines = [
             '# VPN split-routing (Direct):',
-            '# - Clash / Mihomo / Stash — полный профиль с правилами: добавьте к URL подписки ?format=clash',
-            '# - sing-box — remote rule-set (source): '.route('public.vpn.direct-domains-rule-set', [], true),
+            '# - Hiddify / Karing — Clash YAML с rules (по User-Agent); при сбое: ?format=clash',
+            '# - sing-box / SFA — ?format=sing-box (JSON из URI узлов)',
+            '# - Clash / Mihomo / Stash — ?format=clash',
+            '# - Отдельно rule-set (source) для ручной склейки: '.route('public.vpn.direct-domains-rule-set', [], true),
             '# - JSON списка доменов: '.route('public.vpn.direct-domains', [], true),
         ];
 

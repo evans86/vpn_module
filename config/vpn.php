@@ -20,4 +20,16 @@ return [
         env('VPN_SUBSCRIPTION_DIRECT_ROUTING_HINTS', true),
         FILTER_VALIDATE_BOOL
     ),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Профиль sing-box (JSON) для подписки: явный ?format=sing-box или UA sing-box (не Hiddify/Karing).
+    |--------------------------------------------------------------------------
+    | Узлы разбираются из URI подписки (vless/vmess/trojan/ss) + selector + route (DIRECT по списку из админки).
+    | Отключите, если не нужен: VPN_SING_BOX_SUBSCRIPTION_PROFILE=false
+    */
+    'sing_box_subscription_profile' => filter_var(
+        env('VPN_SING_BOX_SUBSCRIPTION_PROFILE', true),
+        FILTER_VALIDATE_BOOL
+    ),
 ];
