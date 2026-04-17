@@ -1231,17 +1231,32 @@ class VpnConfigController extends Controller
         return false;
     }
 
+    /**
+     * Hiddify/Karing не импортируют полный Clash YAML с proxy-providers (см. hiddify-app#1938) — им отдаём sing-box JSON.
+     */
+    private function isHiddifyOrKaringUserAgent(string $userAgentLower): bool
+    {
+        return str_contains($userAgentLower, 'hiddify')
+            || str_contains($userAgentLower, 'hiddifynext')
+            || str_contains($userAgentLower, 'karing');
+    }
+
     private function wantsClashSubscriptionProfile(string $userAgent): bool
     {
         $f = strtolower((string) request()->query('format', ''));
-        if (in_array($f, ['clash', 'mihomo', 'yaml', 'yml'], true)) {
-            return true;
-        }
         if (in_array($f, ['sing-box', 'singbox', 'json'], true)) {
             return false;
         }
 
         $u = strtolower($userAgent);
+        if ($this->isHiddifyOrKaringUserAgent($u)) {
+            return false;
+        }
+
+        if (in_array($f, ['clash', 'mihomo', 'yaml', 'yml'], true)) {
+            return true;
+        }
+
         if (str_contains($u, 'sing-box') || str_contains($u, 'singbox')) {
             return false;
         }
@@ -1253,29 +1268,27 @@ class VpnConfigController extends Controller
             || str_contains($u, 'verge')
             || str_contains($u, 'clashx')
             || str_contains($u, 'clash.meta')
-            || str_contains($u, 'clashmeta')
-            || str_contains($u, 'hiddify')
-            || str_contains($u, 'hiddifynext')
-            || str_contains($u, 'karing');
+            || str_contains($u, 'clashmeta');
     }
 
     /**
-     * Полный JSON sing-box (Hiddify, Karing и др.): outbound subscription + route с DIRECT по списку из админки.
-     * Не пересекается с Clash: явный ?format=clash остаётся YAML.
+     * Полный JSON sing-box: узлы из URI + route DIRECT по списку из админки.
+     * Hiddify/Karing — всегда JSON (не Clash YAML).
      */
     private function wantsSingBoxSubscriptionProfile(string $userAgent, string $formatQuery): bool
     {
         $f = strtolower($formatQuery);
+        $u = strtolower($userAgent);
+
+        if ($this->isHiddifyOrKaringUserAgent($u)) {
+            return true;
+        }
+
         if (in_array($f, ['clash', 'mihomo', 'yaml', 'yml'], true)) {
             return false;
         }
         if (in_array($f, ['sing-box', 'singbox', 'json'], true)) {
             return true;
-        }
-
-        $u = strtolower($userAgent);
-        if (str_contains($u, 'hiddify') || str_contains($u, 'karing')) {
-            return false;
         }
 
         return str_contains($u, 'sing-box') || str_contains($u, 'singbox');
@@ -1292,9 +1305,9 @@ class VpnConfigController extends Controller
 
         $lines = [
             '# VPN split-routing (Direct):',
-            '# - Hiddify / Karing — Clash YAML с rules (по User-Agent); при сбое: ?format=clash',
-            '# - sing-box / SFA — ?format=sing-box (JSON из URI узлов)',
-            '# - Clash / Mihomo / Stash — ?format=clash',
+            '# - Hiddify / Karing — JSON sing-box (авто); ?format=clash для них не используйте (Clash YAML не импортируют)',
+            '# - sing-box / SFA — ?format=sing-box (то же JSON)',
+            '# - Clash / Mihomo / Stash / FlClash — ?format=clash (YAML + proxy-providers)',
             '# - Отдельно rule-set (source) для ручной склейки: '.route('public.vpn.direct-domains-rule-set', [], true),
             '# - JSON списка доменов: '.route('public.vpn.direct-domains', [], true),
         ];

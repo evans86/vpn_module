@@ -2,6 +2,8 @@
 
 namespace App\Services\VPN;
 
+use App\Models\VPN\VpnDirectDomain;
+
 /**
  * Профиль sing-box (SFA, явный ?format=sing-box): реальные outbounds из URI подписки + selector,
  * split-routing «без VPN» — domain_suffix + action route (sing-box 1.11+).
@@ -22,7 +24,7 @@ class SubscriptionSingBoxProfileBuilder
     public function build(array $directDomains, array $subscriptionUris): string
     {
         $suffixes = $this->normalizeDomainSuffixes($directDomains);
-        $route = $this->buildRoute($suffixes);
+        $route = $this->buildRoute($suffixes, $directDomains);
 
         $proxyOutbounds = [];
         $proxyTags = [];
@@ -420,15 +422,24 @@ class SubscriptionSingBoxProfileBuilder
 
     /**
      * @param  array<int, string>  $suffixes
+     * @param  array<int, string>  $directDomains
      * @return array<string, mixed>
      */
-    private function buildRoute(array $suffixes): array
+    private function buildRoute(array $suffixes, array $directDomains): array
     {
         $rules = [];
 
         if ($suffixes !== []) {
             $rules[] = [
                 'domain_suffix' => $suffixes,
+                'action' => 'route',
+                'outbound' => 'direct',
+            ];
+        }
+
+        if ($this->includesRuZone($directDomains)) {
+            $rules[] = [
+                'geoip' => ['ru'],
                 'action' => 'route',
                 'outbound' => 'direct',
             ];
@@ -444,5 +455,19 @@ class SubscriptionSingBoxProfileBuilder
             'rules' => $rules,
             'final' => 'vpn-sub',
         ];
+    }
+
+    /**
+     * @param  array<int, string>  $directDomains
+     */
+    private function includesRuZone(array $directDomains): bool
+    {
+        foreach ($directDomains as $d) {
+            if (VpnDirectDomain::normalizeDomain((string) $d) === 'ru') {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
