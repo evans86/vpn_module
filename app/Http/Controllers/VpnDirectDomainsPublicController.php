@@ -74,25 +74,39 @@ class VpnDirectDomainsPublicController extends Controller
     {
         $suffixes = [];
         foreach ($domains as $d) {
-            $d = trim((string) $d);
-            if ($d === '') {
+            $n = VpnDirectDomain::normalizeDomain(trim((string) $d));
+            if ($n === '') {
                 continue;
             }
-            if (strpos($d, '*.') === 0) {
-                $s = substr($d, 2);
+            if (str_starts_with($n, '*.')) {
+                $s = substr($n, 2);
                 if ($s !== '') {
                     $suffixes[] = $s;
                 }
             } else {
-                $suffixes[] = $d;
+                $suffixes[] = $n;
             }
         }
         $suffixes = array_values(array_unique($suffixes));
 
+        $dotted = [];
+        foreach ($suffixes as $s) {
+            $s = (string) $s;
+            if ($s === '') {
+                continue;
+            }
+            $dotted[] = str_starts_with($s, '.') ? $s : '.'.$s;
+        }
+        if (in_array('ru', $suffixes, true)) {
+            $dotted[] = '.xn--p1ai';
+        }
+        $dotted = array_values(array_unique($dotted));
+        usort($dotted, fn (string $a, string $b): int => strlen($b) <=> strlen($a));
+
         $rules = [];
-        if ($suffixes !== []) {
+        if ($dotted !== []) {
             $rules[] = [
-                'domain_suffix' => $suffixes,
+                'domain_suffix' => $dotted,
             ];
         }
 

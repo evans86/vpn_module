@@ -6,15 +6,17 @@ use App\Models\VPN\VpnDirectDomain;
 
 /**
  * Профиль sing-box (SFA, явный ?format=sing-box): реальные outbounds из URI подписки + selector,
- * split-routing «без VPN» — domain_suffix + action route (sing-box 1.11+).
+ * split-routing «без VPN» — inline rule_set + route.rules (sing-box 1.10+), плюс DNS.
  *
- * В sing-box нет outbound type «subscription»; узлы должны быть разобраны в JSON.
+ * Графические клиенты (Hiddify) часто не применяют только «плоские» route.rules с domain_suffix;
+ * inline rule_set с тем же списком суффиксов обрабатывается стабильнее.
  *
+ * @see https://sing-box.sagernet.org/configuration/rule-set/
  * @see https://sing-box.sagernet.org/configuration/outbound/
- * @see https://sing-box.sagernet.org/configuration/route/rule/
  */
 class SubscriptionSingBoxProfileBuilder
 {
+    private const DIRECT_RULE_SET_TAG = 'vpn-direct-domains';
     /**
      * @param  array<int, string>  $directDomains
      * @param  array<int, string>  $subscriptionUris  Строки vless/vmess/trojan/ss из той же подписки, что и plain text
@@ -400,10 +402,6 @@ class SubscriptionSingBoxProfileBuilder
     }
 
     /**
-     * @param  array<int, string>  $directDomains
-     * @return array<int, string>
-     */
-    /**
      * Как в админке / VpnDirectDomain::normalizeDomain (URL → хост, .ru → ru).
      *
      * @param  array<int, string>  $directDomains
@@ -496,7 +494,8 @@ class SubscriptionSingBoxProfileBuilder
         $rules = [];
         if ($dottedSuffixes !== []) {
             $rules[] = [
-                'domain_suffix' => $dottedSuffixes,
+                'rule_set' => [self::DIRECT_RULE_SET_TAG],
+                'action' => 'route',
                 'server' => 'dns-direct',
             ];
         }
@@ -517,11 +516,23 @@ class SubscriptionSingBoxProfileBuilder
      */
     private function buildRoute(array $dottedSuffixes, array $directDomains): array
     {
-        $rules = [];
+        $ruleSets = [];
+        if ($dottedSuffixes !== []) {
+            $ruleSets[] = [
+                'type' => 'inline',
+                'tag' => self::DIRECT_RULE_SET_TAG,
+                'rules' => [
+                    [
+                        'domain_suffix' => $dottedSuffixes,
+                    ],
+                ],
+            ];
+        }
 
+        $rules = [];
         if ($dottedSuffixes !== []) {
             $rules[] = [
-                'domain_suffix' => $dottedSuffixes,
+                'rule_set' => [self::DIRECT_RULE_SET_TAG],
                 'action' => 'route',
                 'outbound' => 'direct',
             ];
@@ -541,12 +552,19 @@ class SubscriptionSingBoxProfileBuilder
             'outbound' => 'direct',
         ];
 
-        return [
+        $route = [
             'rules' => $rules,
             'final' => 'vpn-sub',
             'auto_detect_interface' => true,
+            'override_android_vpn' => true,
             'default_domain_strategy' => 'prefer_ipv4',
         ];
+
+        if ($ruleSets !== []) {
+            $route['rule_set'] = $ruleSets;
+        }
+
+        return $route;
     }
 
     /**

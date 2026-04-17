@@ -1273,7 +1273,7 @@ class VpnConfigController extends Controller
 
     /**
      * Полный JSON sing-box: узлы из URI + route DIRECT по списку из админки.
-     * Hiddify/Karing — всегда JSON (не Clash YAML).
+     * Hiddify/Karing — JSON (не Clash YAML). Karing (Flutter) часто шлёт User-Agent «Dart/…» без слова «karing».
      */
     private function wantsSingBoxSubscriptionProfile(string $userAgent, string $formatQuery): bool
     {
@@ -1284,10 +1284,20 @@ class VpnConfigController extends Controller
             return true;
         }
 
+        // Явный plain text подписки (список URI) — не JSON
+        if (in_array($f, ['subscription', 'sub', 'txt'], true)) {
+            return false;
+        }
+
         if (in_array($f, ['clash', 'mihomo', 'yaml', 'yml'], true)) {
             return false;
         }
         if (in_array($f, ['sing-box', 'singbox', 'json'], true)) {
+            return true;
+        }
+
+        // Karing и др. Flutter-клиенты
+        if (str_contains($u, 'dart/') || str_contains($u, 'karingx')) {
             return true;
         }
 
@@ -1305,7 +1315,7 @@ class VpnConfigController extends Controller
 
         $lines = [
             '# VPN split-routing (Direct):',
-            '# - Hiddify / Karing — JSON sing-box (авто); ?format=clash для них не используйте (Clash YAML не импортируют)',
+            '# - Hiddify / Karing — JSON sing-box (авто; Karing идёт с Dart/ UA); без правил: ?format=raw',
             '# - sing-box / SFA — ?format=sing-box (то же JSON)',
             '# - Clash / Mihomo / Stash / FlClash — ?format=clash (YAML + proxy-providers)',
             '# - Отдельно rule-set (source) для ручной склейки: '.route('public.vpn.direct-domains-rule-set', [], true),
