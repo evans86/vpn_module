@@ -227,13 +227,29 @@ class VpnConfigController extends Controller
                         ]);
                         $profileTitle = $this->buildSubscriptionProfileTitle($keyActivate, $key_activate_id);
                         $response = response($json)
-                            ->header('Content-Type', 'application/json; charset=utf-8');
+                            ->header('Content-Type', 'application/json; charset=utf-8')
+                            ->header('X-Subscription-Profile', 'sing-box');
                         if (! $this->hasVersionedBrowserInUserAgent($userAgent) || $this->isVpnClient($userAgent)) {
                             $response->header('Profile-Title', $profileTitle);
                         }
 
                         return $response;
                     }
+                }
+
+                // Явно запрошен sing-box, а до сюда дошли — не JSON: иначе пользователь видит plain с # и думает, что «правил нет».
+                if ($this->explicitSingBoxFormatRequested($formatQuery)) {
+                    if (! config('vpn.sing_box_subscription_profile', true)) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' => 'Профиль sing-box отключён на сервере (VPN_SING_BOX_SUBSCRIPTION_PROFILE=false).',
+                        ], 503)->header('X-Subscription-Profile', 'unavailable');
+                    }
+
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Не удалось собрать JSON sing-box для этой подписки (см. логи: sing-box subscription profile skipped).',
+                    ], 503)->header('X-Subscription-Profile', 'sing-box-build-failed');
                 }
 
                 $keyActivate->loadMissing([
@@ -1253,6 +1269,13 @@ class VpnConfigController extends Controller
         }
 
         return in_array($f, ['clash', 'mihomo', 'yaml', 'yml'], true);
+    }
+
+    private function explicitSingBoxFormatRequested(string $formatQuery): bool
+    {
+        $f = strtolower($formatQuery);
+
+        return in_array($f, ['sing-box', 'singbox', 'json'], true);
     }
 
     /**
