@@ -11,6 +11,9 @@ use App\Models\VPN\VpnDirectDomain;
  * Графические клиенты (Hiddify) часто не применяют только «плоские» route.rules с domain_suffix;
  * inline rule_set с тем же списком суффиксов обрабатывается стабильнее.
  *
+ * Обязательно правило action: sniff в начале route.rules: иначе TLS идёт по IP до SNI,
+ * domain_suffix не матчится — как без sniffer в Clash (см. sing-box migration 1.11 / rule_action sniff).
+ *
  * @see https://sing-box.sagernet.org/configuration/rule-set/
  * @see https://sing-box.sagernet.org/configuration/outbound/
  */
@@ -529,7 +532,12 @@ class SubscriptionSingBoxProfileBuilder
             ];
         }
 
-        $rules = [];
+        $rules = [
+            [
+                'action' => 'sniff',
+                'timeout' => '1s',
+            ],
+        ];
         if ($dottedSuffixes !== []) {
             $rules[] = [
                 'rule_set' => [self::DIRECT_RULE_SET_TAG],
