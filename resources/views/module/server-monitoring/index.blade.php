@@ -66,7 +66,7 @@
                 title="Данные не найдены"
                 description="Выберите другой период или панель" />
         @else
-            <div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 @foreach($statistics as $panelId => $panelData)
                     @php
                         $lastStats = $panelData['data']->last()['statistics'] ?? [];
@@ -131,15 +131,15 @@
 
                         <div class="grid grid-cols-3 gap-px bg-slate-100 divide-x divide-slate-100">
                             <div class="bg-white p-1.5">
-                                <div class="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-0.5">CPU %</div>
+                                <div class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-0.5">CPU %</div>
                                 <div class="chart-mini" id="chart-cpu-{{ $panelId }}"></div>
                             </div>
                             <div class="bg-white p-1.5">
-                                <div class="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-0.5">RAM ГБ</div>
+                                <div class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-0.5">RAM ГБ</div>
                                 <div class="chart-mini" id="chart-memory-{{ $panelId }}"></div>
                             </div>
                             <div class="bg-white p-1.5">
-                                <div class="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-0.5">Онлайн</div>
+                                <div class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-0.5">Онлайн</div>
                                 <div class="chart-mini" id="chart-users-{{ $panelId }}"></div>
                             </div>
                         </div>
@@ -177,7 +177,7 @@
 @push('css')
     <style>
         .chart-mini {
-            height: 110px;
+            height: 130px;
             width: 100%;
             position: relative;
         }
@@ -193,22 +193,22 @@
     <script>
         (function () {
             const miniLayout = (yTitle, yRange) => ({
-                margin: { l: 28, r: 4, t: 2, b: 18 },
+                margin: { l: 32, r: 6, t: 4, b: 22 },
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 plot_bgcolor: 'rgba(248,250,252,0.6)',
-                font: { size: 9, family: 'system-ui, sans-serif' },
+                font: { size: 10, family: 'system-ui, sans-serif' },
                 xaxis: {
                     type: 'date',
                     showgrid: false,
-                    tickfont: { size: 8 },
-                    nticks: 3,
+                    tickfont: { size: 9 },
+                    nticks: 4,
                     tickangle: 0,
                 },
                 yaxis: {
-                    title: { text: yTitle, font: { size: 8 } },
+                    title: { text: yTitle, font: { size: 9 } },
                     showgrid: true,
                     gridcolor: 'rgba(0,0,0,0.06)',
-                    tickfont: { size: 8 },
+                    tickfont: { size: 9 },
                     ...(yRange ? { range: yRange } : {}),
                 },
                 showlegend: false,
