@@ -36,13 +36,15 @@ class SubscriptionSingBoxProfileBuilder
 
         $proxyOutbounds = [];
         $proxyTags = [];
-        $i = 0;
+        $usedTags = [];
+        $fallbackSeq = 0;
         foreach ($subscriptionUris as $uri) {
             $uri = trim((string) $uri);
             if ($uri === '') {
                 continue;
             }
-            $tag = 'vpn-'.(++$i);
+            ++$fallbackSeq;
+            $tag = $this->outboundTagFromSubscriptionUri($uri, $fallbackSeq, $usedTags);
             $ob = $this->parseAnyUri($uri, $tag);
             if ($ob !== null) {
                 $proxyOutbounds[] = $ob;
@@ -86,6 +88,70 @@ class SubscriptionSingBoxProfileBuilder
         } catch (\JsonException $e) {
             throw new \RuntimeException('sing-box profile JSON: '.$e->getMessage(), 0, $e);
         }
+    }
+
+    /**
+     * Имя узла из фрагмента URI подписки (# после ссылки), как в Marzban/Clash — иначе в UI только «vpn-1».
+     *
+     * @param  array<string, true>  $usedTags
+     */
+    private function outboundTagFromSubscriptionUri(string $uri, int $fallbackIndex, array &$usedTags): string
+    {
+        $fragment = parse_url($uri, PHP_URL_FRAGMENT);
+        $name = '';
+        if (is_string($fragment) && $fragment !== '') {
+            $name = trim(rawurldecode(str_replace('+', ' ', $fragment)));
+            $name = preg_replace('/\s+/u', ' ', $name) ?? '';
+        }
+        if ($name === '' && str_starts_with(strtolower($uri), 'vmess://')) {
+            $name = $this->vmessPsFromUri($uri);
+        }
+
+        if ($name === '') {
+            $name = 'vpn-'.$fallbackIndex;
+        } else {
+            $name = $this->sanitizeOutboundTag($name, $fallbackIndex);
+        }
+
+        $base = $name;
+        $n = 1;
+        while (isset($usedTags[$name])) {
+            $n++;
+            $name = $base.'-'.$n;
+        }
+        $usedTags[$name] = true;
+
+        return $name;
+    }
+
+    private function vmessPsFromUri(string $uri): string
+    {
+        $payload = substr($uri, strlen('vmess://'));
+        $hashPos = strpos($payload, '#');
+        if ($hashPos !== false) {
+            $payload = substr($payload, 0, $hashPos);
+        }
+        $json = base64_decode($payload, true);
+        if ($json === false) {
+            return '';
+        }
+        $cfg = json_decode($json, true);
+
+        return is_array($cfg) ? trim((string) ($cfg['ps'] ?? '')) : '';
+    }
+
+    private function sanitizeOutboundTag(string $name, int $fallbackIndex): string
+    {
+        $name = preg_replace('/[\x00-\x1F\x7F]/u', '', $name) ?? '';
+        $name = trim($name);
+        if ($name === '') {
+            return 'vpn-'.$fallbackIndex;
+        }
+        if (mb_strlen($name) > 96) {
+            $name = mb_substr($name, 0, 93).'...';
+        }
+
+        return $name;
     }
 
     /**
