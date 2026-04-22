@@ -1281,6 +1281,9 @@ class VpnConfigController extends Controller
     /**
      * Полный JSON sing-box: узлы из URI + route DIRECT по списку из админки.
      * Karing: пресеты UA (ClashMeta, mihomo, …) → этот JSON; Clash YAML только ?format=clash.
+     *
+     * По умолчанию (без ?format=) — sing-box, иначе OkHttp/CFNetwork/пустой UA получал plain без route.
+     * Только plain: ?format=subscription|sub|txt. Только v2rayNG (UA) — plain. Clash YAML: ?format=clash.
      */
     private function wantsSingBoxSubscriptionProfile(string $userAgent, string $formatQuery): bool
     {
@@ -1312,7 +1315,16 @@ class VpnConfigController extends Controller
             return true;
         }
 
-        return str_contains($u, 'sing-box') || str_contains($u, 'singbox');
+        if (str_contains($u, 'sing-box') || str_contains($u, 'singbox')) {
+            return true;
+        }
+
+        if (str_contains($u, 'v2rayng')) {
+            return false;
+        }
+
+        // Дефолт: sing-box (узлы + route/Direct из админки) для /config/… без ?format= и любого HTTP-клиента
+        return true;
     }
 
     /**
@@ -1350,9 +1362,9 @@ class VpnConfigController extends Controller
 
         $lines = [
             '# VPN split-routing (Direct):',
-            '# - Hiddify / Karing / ClashMeta-пресеты — JSON sing-box (авто); только список узлов: ?format=raw',
-            '# - Clash YAML (proxy-providers) — только явно ?format=clash',
-            '# - sing-box / SFA — ?format=sing-box (то же JSON)',
+            '# - По умолчанию /config/… = JSON sing-box (узлы + route); OkHttp/без ?format= тоже; только URI: ?format=subscription|sub|txt; raw узлы: ?format=raw',
+            '# - Clash YAML (proxy-providers) — ?format=clash',
+            '# - ?format=sing-box — тот же JSON',
             '# - Отдельно rule-set (source) для ручной склейки: '.route('public.vpn.direct-domains-rule-set', [], true),
             '# - JSON списка доменов: '.route('public.vpn.direct-domains', [], true),
         ];
