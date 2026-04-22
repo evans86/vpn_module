@@ -78,20 +78,6 @@ class BotTWebhookController extends Controller
                 ], 400);
             }
 
-            if ($validator->fails()) {
-                Log::warning('BOT-T Webhook: Validation failed', [
-                    'source' => 'bott_webhook',
-                    'errors' => $validator->errors()->toArray(),
-                    'request_data' => $request->all()
-                ]);
-
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Invalid request data',
-                    'errors' => $validator->errors()
-                ], 400);
-            }
-
             $orderData = $request->all();
 
             // Обрабатываем заказ

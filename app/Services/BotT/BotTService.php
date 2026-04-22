@@ -52,9 +52,10 @@ class BotTService
             Log::info('BOT-T: Order processing started', [
                 'source' => 'bott',
                 'order_id' => $orderId,
+                'order_count' => (int) ($orderData['count'] ?? 1),
                 'category_id' => $orderData['category']['id'] ?? null,
                 'category_api_id' => $orderData['category']['api_id'] ?? null,
-                'user_telegram_id' => $orderData['user']['telegram_id'] ?? null
+                'user_telegram_id' => $orderData['user']['telegram_id'] ?? null,
             ]);
             
             // Согласно документации BOT-T и реальным данным:
@@ -73,7 +74,17 @@ class BotTService
                       ?? $orderData['id'] 
                       ?? null;
             $userTelegramId = $orderData['user']['telegram_id'] ?? null;
-            $count = $orderData['count'] ?? 1;
+            $orderCount = max(1, (int) ($orderData['count'] ?? 1));
+            $maxOrderUnits = max(1, (int) config('bott.max_order_units', 500));
+            if ($orderCount > $maxOrderUnits) {
+                Log::warning('BOT-T: order count exceeds max_order_units, capping', [
+                    'source' => 'bott',
+                    'order_id' => $orderId,
+                    'requested' => $orderCount,
+                    'max' => $maxOrderUnits,
+                ]);
+                $orderCount = $maxOrderUnits;
+            }
 
             // Приоритет поиска: productId (ID товара) > categoryApiId (API ID категории)
             $pack = null;
@@ -127,43 +138,51 @@ class BotTService
                 ];
             }
 
-            // Создаем PackSalesman
-            $packSalesman = $this->packSalesmanService->create(
-                $pack->id,
-                $salesman->id,
-                PackSalesman::PAID
-            );
-
-            // Создаем ключи согласно количеству из пакета (не из заказа)
-            // Используем количество ключей из пакета, а не из заказа BOT-T
-            $keysCount = $pack->count ?? 1;
+            // count в заказе BOT-T — число купленных единиц товара; на каждую — свой PackSalesman.
+            // В каждом пакете создаётся столько ключей, сколько задано в шаблоне пакета (pack.count).
+            $keysPerUnit = max(1, (int) ($pack->count ?? 1));
             $keysCreated = 0;
-            $keys = [];
+            $packSalesmanIds = [];
 
-            for ($i = 0; $i < $keysCount; $i++) {
-                try {
-                    $key = $this->keyActivateService->create(
-                        $pack->traffic_limit,
-                        $packSalesman->id,
-                        null,
-                        null
-                    );
-                    $keys[] = $key;
-                    $keysCreated++;
-                } catch (Exception $e) {
-                    Log::error('BOT-T: Error creating key', [
-                        'source' => 'bott',
-                        'order_id' => $orderId,
-                        'pack_salesman_id' => $packSalesman->id,
-                        'key_number' => $i + 1,
-                        'error' => $e->getMessage()
-                    ]);
+            for ($unit = 0; $unit < $orderCount; $unit++) {
+                $packSalesmanDto = $this->packSalesmanService->create(
+                    $pack->id,
+                    $salesman->id,
+                    PackSalesman::PAID
+                );
+                $packSalesmanIds[] = $packSalesmanDto->id;
+
+                for ($k = 0; $k < $keysPerUnit; $k++) {
+                    try {
+                        $this->keyActivateService->create(
+                            $pack->traffic_limit,
+                            $packSalesmanDto->id,
+                            null,
+                            null
+                        );
+                        $keysCreated++;
+                    } catch (Exception $e) {
+                        Log::error('BOT-T: Error creating key', [
+                            'source' => 'bott',
+                            'order_id' => $orderId,
+                            'order_unit' => $unit + 1,
+                            'order_count' => $orderCount,
+                            'pack_salesman_id' => $packSalesmanDto->id,
+                            'key_index' => $k + 1,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 }
             }
 
-            // Отправляем уведомление пользователю о успешной активации пакета
             if ($keysCreated > 0) {
-                $this->sendOrderConfirmation($userTelegramId, $pack, $keysCreated, $orderId);
+                $this->sendOrderConfirmation(
+                    $userTelegramId,
+                    $pack,
+                    $keysCreated,
+                    $orderId,
+                    $orderCount
+                );
             }
 
             Log::info('BOT-T: Order processed successfully', [
@@ -171,14 +190,18 @@ class BotTService
                 'order_id' => $orderId,
                 'pack_id' => $pack->id,
                 'salesman_id' => $salesman->id,
-                'pack_salesman_id' => $packSalesman->id,
-                'keys_created' => $keysCreated
+                'order_count' => $orderCount,
+                'keys_per_unit' => $keysPerUnit,
+                'pack_salesman_ids' => $packSalesmanIds,
+                'keys_created' => $keysCreated,
             ]);
 
             return [
                 'success' => true,
-                'pack_salesman_id' => $packSalesman->id,
-                'keys_created' => $keysCreated
+                'pack_salesman_id' => $packSalesmanIds !== [] ? $packSalesmanIds[count($packSalesmanIds) - 1] : null,
+                'pack_salesman_ids' => $packSalesmanIds,
+                'keys_created' => $keysCreated,
+                'order_units' => $orderCount,
             ];
         } catch (Exception $e) {
             Log::error('BOT-T: Exception during order processing', [
@@ -341,21 +364,25 @@ class BotTService
 
     /**
      * Отправка уведомления пользователю о успешной активации пакета
-     * 
+     *
      * @param int $telegramId Telegram ID пользователя
      * @param Pack $pack Пакет
      * @param int $keysCount Количество созданных ключей
      * @param int $orderId ID заказа из BOT-T
+     * @param int $orderUnits Число купленных единиц (поле count в заказе)
      * @return void
      */
-    private function sendOrderConfirmation(int $telegramId, Pack $pack, int $keysCount, int $orderId): void
+    private function sendOrderConfirmation(int $telegramId, Pack $pack, int $keysCount, int $orderId, int $orderUnits = 1): void
     {
         try {
             $telegram = new Api(config('telegram.father_bot.token'));
 
-            $message = "✅ Ваш пакет на \"{$keysCount}\" ключей успешно активирован!\n\n";
-            $message .= "📦 Количество ключей: {$keysCount}\n";
-            $message .= "⏱ Период действия: {$pack->period} дней";
+            if ($orderUnits > 1) {
+                $message = "✅ Оплата заказа принята: <b>{$orderUnits}</b> пакетов, выдано ключей: <b>{$keysCount}</b>.\n\n";
+            } else {
+                $message = "✅ Пакет активирован, ключей: <b>{$keysCount}</b>.\n\n";
+            }
+            $message .= "⏱ Период действия (на ключ): {$pack->period} дней";
 
             $telegram->sendMessage([
                 'chat_id' => $telegramId,
