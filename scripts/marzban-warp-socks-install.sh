@@ -88,10 +88,10 @@ fi
 WGCF="$STATE_DIR/wgcf"
 
 # --- WARP (Cloudflare) учётка ---
-export WGCF_LICENSE_AGREE=1
+# --accept-tos: без интерактива (иначе «Do you agree?» зависает в SSH/cron)
 if [ ! -f "$STATE_DIR/wgcf-account.toml" ]; then
   log "Регистрация wgcf (WARP)…"
-  if ! "$WGCF" register 2>&1; then
+  if ! "$WGCF" register --accept-tos 2>&1; then
     die "wgcf register не удался (лимит Cloudflare, сеть, уже есть аккаунт — смотрите логи выше)."
   fi
 fi

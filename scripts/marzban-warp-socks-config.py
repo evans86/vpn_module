@@ -81,10 +81,17 @@ def main() -> None:
         raise SystemExit("invalid port")
     state = sys.argv[2] if len(sys.argv) > 2 else os.environ.get("STATE_DIR", "/opt/marzban-warp-socks")
     state_p = Path(state)
-    wgcf_path = state_p / "wgcf.conf"
+    # wgcf generate пишет wgcf-profile.conf; старые инструкции — wgcf.conf
+    for name in ("wgcf.conf", "wgcf-profile.conf"):
+        candidate = state_p / name
+        if candidate.is_file():
+            wgcf_path = candidate
+            break
+    else:
+        raise SystemExit(
+            "нет WireGuard-профиля (wgcf.conf или wgcf-profile.conf) в " + str(state_p)
+        )
     cfg_path = state_p / "config.json"
-    if not wgcf_path.is_file():
-        raise SystemExit("нет wgcf.conf в " + str(state_p))
     text = wgcf_path.read_text(encoding="utf-8", errors="replace")
     sections = parse_wgcf(text)
     wg_out = build_config(sections)
