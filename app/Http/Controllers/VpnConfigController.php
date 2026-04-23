@@ -1280,10 +1280,10 @@ class VpnConfigController extends Controller
 
     /**
      * Полный JSON sing-box: узлы из URI + route DIRECT по списку из админки.
-     * Karing: пресеты UA (ClashMeta, mihomo, …) → этот JSON; Clash YAML только ?format=clash.
+     * Karing / Hiddify / mihomo / Neko / ?format=sing-box — JSON; Clash YAML только ?format=clash.
      *
-     * По умолчанию (без ?format=) — sing-box, иначе OkHttp/CFNetwork/пустой UA получал plain без route.
-     * Plain: ?format=subscription|sub|txt; Streisand и v2rayNG (UA) — plain; Clash YAML: ?format=clash.
+     * По умолчанию (без ?format= и без «просингбоксового» UA) — plain (список URI), как для v2ray-клиентов
+     * с Go-http/без маркера в User-Agent. JSON: ?format=sing-box|json|singbox или явные UA (см. ниже).
      */
     private function wantsSingBoxSubscriptionProfile(string $userAgent, string $formatQuery): bool
     {
@@ -1319,17 +1319,16 @@ class VpnConfigController extends Controller
             return true;
         }
 
-        if (str_contains($u, 'v2rayng')) {
-            return false;
+        // V2RayNG / V2RayN / Streisand — только plain (классическая подписка из URI)
+        foreach (['v2rayng', 'v2rayn', 'v2rayu', 'v2rayx', 'qv2ray', 'v2rayg', 'streisand'] as $legacy) {
+            if (str_contains($u, $legacy)) {
+                return false;
+            }
         }
 
-        // Streisand: подписка по URL — ожидает plain (строки vless/vmess/…), не JSON sing-box
-        if (str_contains($u, 'streisand')) {
-            return false;
-        }
-
-        // Дефолт: sing-box (узлы + route/Direct из админки) для /config/… без ?format= и любого HTTP-клиента
-        return true;
+        // Неопознанные клиенты (в т.ч. V2RayN/подписка с Go-http без бренда в UA) — plain, «как раньше».
+        // JSON sing-box — у тех, кто выше в списке (Hiddify, Karing, mihomo, ?format=sing-box, …).
+        return false;
     }
 
     /**
@@ -1367,9 +1366,9 @@ class VpnConfigController extends Controller
 
         $lines = [
             '# VPN split-routing (Direct):',
-            '# - По умолчанию /config/… = JSON sing-box (узлы + route); OkHttp/без ?format= тоже; только URI: ?format=subscription|sub|txt; raw узлы: ?format=raw',
+            '# - По умолчанию /config/… = список URI; JSON sing-box (узлы + route) — ?format=sing-box (или Hiddify/Karing/mihomo в UA). Только ссылки: ?format=subscription|sub|txt; raw: ?format=raw',
             '# - Clash YAML (proxy-providers) — ?format=clash',
-            '# - ?format=sing-box — тот же JSON',
+            '# - ?format=sing-box|json|singbox — тот же JSON',
             '# - Отдельно rule-set (source) для ручной склейки: '.route('public.vpn.direct-domains-rule-set', [], true),
             '# - JSON списка доменов: '.route('public.vpn.direct-domains', [], true),
         ];
