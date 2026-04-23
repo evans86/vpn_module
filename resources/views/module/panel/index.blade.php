@@ -302,7 +302,7 @@
                                                 </form>
                                                 @if($panel->server_id)
                                                     <form action="{{ route('admin.module.panel.install-warp-socks', $panel) }}" method="POST" class="space-y-2 pt-1"
-                                                          onsubmit="(function(){var p=document.getElementById('marzban-warp-socks-port');var d={{ (int) config('panel.warp_default_socks_port', 40000) }};var t=p&&p.value.trim()!==''?p.value.trim():d;document.getElementById('warp-install-socks-port').value=t;return true;})(); return confirm('На сервер {{ $panel->server?->ip ?? '—' }} по SSH будут установлены sing-box, wgcf и сервис systemd (нужен root). Продолжить?');">
+                                                          onsubmit="(function(){var p=document.getElementById('marzban-warp-socks-port');var d={{ (int) config('panel.warp_default_socks_port', 40000) }};var t=p&&p.value.trim()!==''?p.value.trim():d;document.getElementById('warp-install-socks-port').value=t;return true;})(); return confirm('На сервер {{ optional($panel->server)->ip ?? "—" }} по SSH будут установлены sing-box, wgcf и сервис systemd (нужен root). Продолжить?');">
                                                         @csrf
                                                         <input type="hidden" name="warp_socks_port" id="warp-install-socks-port" value="{{ (int) ($panel->warp_socks_port ?? config('panel.warp_default_socks_port', 40000)) }}">
                                                         <label class="flex items-center gap-2 text-[11px] text-cyan-900 cursor-pointer">
