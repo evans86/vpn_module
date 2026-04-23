@@ -1283,7 +1283,7 @@ class VpnConfigController extends Controller
      * Karing: пресеты UA (ClashMeta, mihomo, …) → этот JSON; Clash YAML только ?format=clash.
      *
      * По умолчанию (без ?format=) — sing-box, иначе OkHttp/CFNetwork/пустой UA получал plain без route.
-     * Только plain: ?format=subscription|sub|txt. Только v2rayNG (UA) — plain. Clash YAML: ?format=clash.
+     * Plain: ?format=subscription|sub|txt; Streisand и v2rayNG (UA) — plain; Clash YAML: ?format=clash.
      */
     private function wantsSingBoxSubscriptionProfile(string $userAgent, string $formatQuery): bool
     {
@@ -1320,6 +1320,11 @@ class VpnConfigController extends Controller
         }
 
         if (str_contains($u, 'v2rayng')) {
+            return false;
+        }
+
+        // Streisand: подписка по URL — ожидает plain (строки vless/vmess/…), не JSON sing-box
+        if (str_contains($u, 'streisand')) {
             return false;
         }
 
