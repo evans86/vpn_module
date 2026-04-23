@@ -280,7 +280,7 @@
                                                     @csrf
                                                     <label class="flex items-center gap-2 text-xs text-cyan-900 cursor-pointer">
                                                         <input type="checkbox" name="warp_routing_enabled" value="1" class="rounded"
-                                                               @checked(old('warp_routing_enabled', $panel->warp_routing_enabled ?? false))>
+                                                               {{ old('warp_routing_enabled', $panel->warp_routing_enabled ?? false) ? 'checked' : '' }}>
                                                         Включить: Google (в т.ч. Gemini) через WARP
                                                     </label>
                                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
