@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Exception;
+use phpseclib3\Net\SFTP;
 use phpseclib3\Net\SSH2;
 use RuntimeException;
 
@@ -454,6 +455,69 @@ class MarzbanService
                 'error' => $e->getMessage()
             ]);
             throw new RuntimeException('SSH connection failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * SSH + SFTP: автоустановка локального SOCKS5 (sing-box + wgcf) в WARP на сервере панели.
+     * Скрипты: scripts/marzban-warp-socks-install.sh, scripts/marzban-warp-socks-config.py
+     *
+     * @return string Вывод на удалённой машине (лог установки)
+     * @throws RuntimeException
+     */
+    public function installWarpSocksOnServer(Panel $panel, int $port): string
+    {
+        if ($panel->panel !== Panel::MARZBAN) {
+            throw new RuntimeException('Автоустановка WARP доступна только для Marzban.');
+        }
+        $panel->load('server');
+        if (! $panel->server) {
+            throw new RuntimeException('К панели не привязан сервер (нужен SSH).');
+        }
+        if ($port < 1 || $port > 65535) {
+            throw new RuntimeException('Некорректный порт SOCKS.');
+        }
+        $installPath = base_path('scripts/marzban-warp-socks-install.sh');
+        $configPyPath = base_path('scripts/marzban-warp-socks-config.py');
+        if (! is_readable($installPath) || ! is_readable($configPyPath)) {
+            throw new RuntimeException('Не найдены scripts/marzban-warp-socks-install.sh или scripts/marzban-warp-socks-config.py в каталоге приложения.');
+        }
+
+        $serverDto = ServerFactory::fromEntity($panel->server);
+        $ssh = $this->connectSshAdapter($serverDto);
+        $oldTimeout = $ssh->getTimeout() ?? 100000;
+        $ssh->setTimeout(600);
+
+        try {
+            $sftp = new SFTP($serverDto->ip, $serverDto->ssh_port ?? 22);
+            if (! $sftp->login($serverDto->login, $serverDto->password)) {
+                throw new RuntimeException('SFTP: не удалось войти (проверьте логин/пароль сервера).');
+            }
+            $remoteSh = '/tmp/marzban-warp-socks-install.sh';
+            $remotePy = '/tmp/marzban-warp-socks-config.py';
+            if (! $sftp->put($remoteSh, $installPath, SFTP::SOURCE_LOCAL_FILE)) {
+                throw new RuntimeException('Не удалось загрузить install-скрипт на сервер.');
+            }
+            if (! $sftp->put($remotePy, $configPyPath, SFTP::SOURCE_LOCAL_FILE)) {
+                throw new RuntimeException('Не удалось загрузить config helper на сервер.');
+            }
+            $ssh->exec('chmod 700 '.escapeshellarg($remoteSh).' 2>&1');
+            $ssh->exec('chmod 600 '.escapeshellarg($remotePy).' 2>&1');
+            $out = $ssh->exec('CONFIG_HELPER='.escapeshellarg($remotePy).' bash '.escapeshellarg($remoteSh).' '.(int) $port.' 2>&1');
+            if ($ssh->getExitStatus() !== 0) {
+                $msg = trim($out) !== '' ? $out : 'код выхода '.$ssh->getExitStatus();
+                throw new RuntimeException('Автоустановка WARP на ноде не завершена: '.Str::limit($msg, 4000, '…'));
+            }
+
+            Log::info('WARP SOCKS auto-install done', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'port' => $port,
+            ]);
+
+            return $out;
+        } finally {
+            $ssh->setTimeout($oldTimeout);
         }
     }
 
@@ -1332,6 +1396,38 @@ class MarzbanService
                 "outboundTag" => "DIRECT"
             ]
         ];
+
+        if ($panel && $panel->warp_routing_enabled) {
+            $host = trim((string) ($panel->warp_socks_host ?: '127.0.0.1'));
+            if ($host === '') {
+                $host = '127.0.0.1';
+            }
+            $port = $panel->warp_socks_port ?? (int) config('panel.warp_default_socks_port', 40000);
+            if ($port < 1 || $port > 65535) {
+                $port = (int) config('panel.warp_default_socks_port', 40000);
+            }
+
+            $outbounds[] = [
+                'protocol' => 'socks',
+                'tag' => 'WARP',
+                'settings' => [
+                    'servers' => [
+                        [
+                            'address' => $host,
+                            'port' => $port,
+                        ],
+                    ],
+                ],
+            ];
+
+            $routingRules[] = [
+                'type' => 'field',
+                'domain' => [
+                    'geosite:google',
+                ],
+                'outboundTag' => 'WARP',
+            ];
+        }
 
         return [
             "log" => [
@@ -2224,6 +2320,35 @@ class MarzbanService
         );
 
         $this->applyConfiguration($panel, $json_config, Panel::CONFIG_TYPE_MIXED);
+    }
+
+    /**
+     * Повторно применить текущий пресет конфигурации (после смены флагов WARP и т.п.).
+     *
+     * @throws GuzzleException
+     */
+    public function reapplyConfigurationForPanel(int $panel_id): void
+    {
+        $panel = Panel::query()->findOrFail($panel_id);
+        $type = $panel->config_type ?? Panel::CONFIG_TYPE_MIXED;
+
+        switch ($type) {
+            case Panel::CONFIG_TYPE_STABLE:
+                $this->updateConfigurationStable($panel_id);
+                break;
+            case Panel::CONFIG_TYPE_REALITY:
+                $this->updateConfigurationReality($panel_id);
+                break;
+            case Panel::CONFIG_TYPE_REALITY_STABLE:
+                $this->updateConfigurationRealityStable($panel_id);
+                break;
+            case Panel::CONFIG_TYPE_MIXED:
+                $this->updateConfigurationMixed($panel_id);
+                break;
+            default:
+                $this->updateConfigurationMixed($panel_id);
+                break;
+        }
     }
 
     /**

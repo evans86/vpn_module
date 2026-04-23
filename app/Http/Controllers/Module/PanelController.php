@@ -20,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Str;
 
 class PanelController extends Controller
 {
@@ -358,6 +359,104 @@ class PanelController extends Controller
 
             return redirect()->route('admin.module.panel.index')
                 ->with('error', 'Ошибка при обновлении конфигурации: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * WARP на ноде: маршрут geosite:google через локальный SOCKS (Cloudflare WARP).
+     * На сервере Marzban должен быть поднят SOCKS5 на указанном адресе (sing-box / и т.п.).
+     */
+    public function updateWarpRouting(Request $request, Panel $panel): RedirectResponse
+    {
+        if ($panel->panel !== Panel::MARZBAN) {
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Маршрутизация WARP доступна только для панелей Marzban.');
+        }
+
+        $request->validate([
+            'warp_socks_host' => ['required', 'string', 'max:64'],
+            'warp_socks_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+        ]);
+
+        $rawPort = $request->input('warp_socks_port');
+        $panel->warp_routing_enabled = $request->boolean('warp_routing_enabled');
+        $panel->warp_socks_host = trim((string) $request->input('warp_socks_host')) ?: '127.0.0.1';
+        $panel->warp_socks_port = ($rawPort === null || $rawPort === '') ? null : (int) $rawPort;
+        $panel->save();
+
+        $this->logger->info('Обновление WARP-маршрутизации панели', [
+            'source' => 'panel',
+            'action' => 'update-warp-routing',
+            'user_id' => auth()->id(),
+            'panel_id' => $panel->id,
+            'warp_routing_enabled' => $panel->warp_routing_enabled,
+        ]);
+
+        try {
+            $strategy = new PanelStrategy($panel->panel);
+            $strategy->reapplyCurrentConfiguration($panel->id);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'Настройки WARP сохранены, конфигурация панели переприменена (текущий пресет: '.($panel->config_type ?? '—').').');
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка переприменения конфига после WARP', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Настройки сохранены, но не удалось переприменить конфиг: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * SSH: sing-box + wgcf на сервере панели, затем (по флажку) маршрут WARP + переприменение.
+     */
+    public function installWarpSocksOnServer(Request $request, Panel $panel): RedirectResponse
+    {
+        if ($panel->panel !== Panel::MARZBAN) {
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Автоустановка WARP только для панелей Marzban.');
+        }
+        if (! $panel->server_id) {
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'К панели не привязан сервер (нужен SSH), автоустановка недоступна.');
+        }
+        $request->validate([
+            'warp_socks_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+        ]);
+        $raw = $request->input('warp_socks_port');
+        $port = ($raw === null || $raw === '')
+            ? (int) ($panel->warp_socks_port ?? config('panel.warp_default_socks_port', 40000))
+            : (int) $raw;
+
+        $panel->load('server');
+        $marzban = app(MarzbanService::class);
+
+        try {
+            $log = $marzban->installWarpSocksOnServer($panel, $port);
+            $panel->warp_socks_host = '127.0.0.1';
+            $panel->warp_socks_port = $port;
+            if ($request->boolean('enable_warp_routing', true)) {
+                $panel->warp_routing_enabled = true;
+            }
+            $panel->save();
+            (new PanelStrategy($panel->panel))->reapplyCurrentConfiguration($panel->id);
+
+            $short = Str::limit(trim($log), 2000, '…');
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'WARP (SOCKS) на ноде установлен или обновлён. 127.0.0.1:'.$port.'. Лог: '.$short);
+        } catch (Exception $e) {
+            $this->logger->error('Автоустановка WARP на ноде', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', $e->getMessage());
         }
     }
 

@@ -90,6 +90,9 @@ class Panel extends Model
         'selection_scope_score',
         'selection_scope_computed_at',
         'selection_scope_meta',
+        'warp_routing_enabled',
+        'warp_socks_host',
+        'warp_socks_port',
     ];
 
     protected $hidden = [
@@ -107,6 +110,8 @@ class Panel extends Model
         'config_updated_at' => 'datetime',
         'excluded_from_rotation' => 'boolean',
         'use_tls' => 'boolean',
+        'warp_routing_enabled' => 'boolean',
+        'warp_socks_port' => 'integer',
         'selection_scope_score' => 'float',
         'selection_scope_computed_at' => 'datetime',
         'selection_scope_meta' => 'array',

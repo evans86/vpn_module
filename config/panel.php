@@ -269,6 +269,15 @@ return [
     | vpn_config_refresh_time_limit и proxy_read_timeout / fastcgi_read_timeout в nginx.
     */
     'vpn_config_refresh_time_limit' => (int) env('VPN_CONFIG_REFRESH_TIME_LIMIT', 300),
+
+    /*
+    |--------------------------------------------------------------------------
+    | WARP на ноде (локальный SOCKS → Cloudflare; маршрут geosite:google в Xray)
+    |--------------------------------------------------------------------------
+    | Порт по умолчанию, если в карточке панели не указан warp_socks_port.
+    | На сервере Marzban должен слушать SOCKS5 (например sing-box / warp) на 127.0.0.1.
+    */
+    'warp_default_socks_port' => (int) env('PANEL_WARP_DEFAULT_SOCKS_PORT', 40000),
 ];
 
 

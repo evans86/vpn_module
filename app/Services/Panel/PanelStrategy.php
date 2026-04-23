@@ -115,6 +115,14 @@ class PanelStrategy
     }
 
     /**
+     * Повторно применить текущий пресет конфигурации панели.
+     */
+    public function reapplyCurrentConfiguration(int $panel_id): void
+    {
+        $this->strategy->reapplyCurrentConfiguration($panel_id);
+    }
+
+    /**
      * Добавление пользователя панели
      *
      * @param int $panel_id

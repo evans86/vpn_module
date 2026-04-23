@@ -3,10 +3,13 @@
 namespace App\Services\VPN;
 
 use App\Models\VPN\VpnDirectDomain;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Профиль sing-box (SFA, явный ?format=sing-box): реальные outbounds из URI подписки + selector,
  * split-routing «без VPN» — inline rule_set + route.rules (sing-box 1.10+), плюс DNS.
+ *
+ * Опционально: Cloudflare WARP (WireGuard) + маршруты для Gemini / Google API — задаётся оператором в .env.
  *
  * Графические клиенты (Hiddify) часто не применяют только «плоские» route.rules с domain_suffix;
  * inline rule_set с тем же списком суффиксов обрабатывается стабильнее.
@@ -20,6 +23,45 @@ use App\Models\VPN\VpnDirectDomain;
 class SubscriptionSingBoxProfileBuilder
 {
     private const DIRECT_RULE_SET_TAG = 'vpn-direct-domains';
+
+    private const GEMINI_WARP_RULE_SET_TAG = 'gemini-warp-routes';
+
+    private const WARP_OUTBOUND_TAG = 'cf-warp';
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function geminiWarpRuleSetEntries(): array
+    {
+        return [
+            [
+                'domain' => [
+                    'gemini.google.com',
+                    'aistudio.google.com',
+                    'ai.google.dev',
+                    'makersuite.google.com',
+                    'labs.google.com',
+                    'notebooklm.google.com',
+                    'jules.google.com',
+                    'deepmind.google',
+                    'opal.google.com',
+                    'antigravity.google',
+                    'stitch.withgoogle.com',
+                    'alkalimakersuite-pa.clients6.google.com',
+                    'webchannel-alkalimakersuite-pa.clients6.google.com',
+                ],
+            ],
+            [
+                'domain_suffix' => [
+                    '.googleapis.com',
+                    '.gstatic.com',
+                    '.googleusercontent.com',
+                    '.clients6.google.com',
+                    '.google.dev',
+                ],
+            ],
+        ];
+    }
     /**
      * @param  array<int, string>  $directDomains
      * @param  array<int, string>  $subscriptionUris  Строки vless/vmess/trojan/ss из той же подписки, что и plain text
@@ -31,8 +73,17 @@ class SubscriptionSingBoxProfileBuilder
         $suffixes = $this->normalizeDomainSuffixes($directDomains);
         $dottedSuffixes = $this->toSingBoxDottedSuffixes($suffixes, $directDomains);
 
-        $route = $this->buildRoute($dottedSuffixes, $directDomains);
-        $dns = $this->buildDns($dottedSuffixes);
+        $warpOutbound = null;
+        if (config('vpn.sing_box_warp_gemini', false)) {
+            $warpOutbound = $this->resolveCloudflareWarpOutbound();
+            if ($warpOutbound === null) {
+                Log::warning('sing-box: VPN_SING_BOX_WARP_GEMINI=true, но WARP outbound не собран — проверьте VPN_SING_BOX_WARP_OUTBOUND_JSON_PATH или PRIVATE_KEY+LOCAL_ADDRESSES');
+            }
+        }
+
+        $useGeminiWarp = $warpOutbound !== null;
+        $route = $this->buildRoute($dottedSuffixes, $directDomains, $useGeminiWarp);
+        $dns = $this->buildDns($dottedSuffixes, $useGeminiWarp);
 
         $proxyOutbounds = [];
         $proxyTags = [];
@@ -61,14 +112,22 @@ class SubscriptionSingBoxProfileBuilder
                 'type' => 'direct',
                 'tag' => 'direct',
             ],
-            ...$proxyOutbounds,
-            [
-                'type' => 'selector',
-                'tag' => 'vpn-sub',
-                'outbounds' => array_merge($proxyTags, ['direct']),
-                'default' => $proxyTags[0],
-            ],
         ];
+        if ($warpOutbound !== null) {
+            $outbounds[] = $warpOutbound;
+        }
+        $outbounds = array_merge(
+            $outbounds,
+            $proxyOutbounds,
+            [
+                [
+                    'type' => 'selector',
+                    'tag' => 'vpn-sub',
+                    'outbounds' => array_merge($proxyTags, ['direct']),
+                    'default' => $proxyTags[0],
+                ],
+            ]
+        );
 
         $config = [
             'log' => [
@@ -541,7 +600,7 @@ class SubscriptionSingBoxProfileBuilder
      * @param  array<int, string>  $dottedSuffixes
      * @return array<string, mixed>
      */
-    private function buildDns(array $dottedSuffixes): array
+    private function buildDns(array $dottedSuffixes, bool $useGeminiWarp): array
     {
         $servers = [
             [
@@ -559,6 +618,15 @@ class SubscriptionSingBoxProfileBuilder
                 'detour' => 'vpn-sub',
             ],
         ];
+        if ($useGeminiWarp) {
+            $servers[] = [
+                'type' => 'udp',
+                'tag' => 'dns-gemini-warp',
+                'server' => '1.1.1.1',
+                'server_port' => 53,
+                'detour' => self::WARP_OUTBOUND_TAG,
+            ];
+        }
 
         $rules = [];
         if ($dottedSuffixes !== []) {
@@ -566,6 +634,13 @@ class SubscriptionSingBoxProfileBuilder
                 'rule_set' => [self::DIRECT_RULE_SET_TAG],
                 'action' => 'route',
                 'server' => 'dns-direct',
+            ];
+        }
+        if ($useGeminiWarp) {
+            $rules[] = [
+                'rule_set' => [self::GEMINI_WARP_RULE_SET_TAG],
+                'action' => 'route',
+                'server' => 'dns-gemini-warp',
             ];
         }
 
@@ -583,7 +658,7 @@ class SubscriptionSingBoxProfileBuilder
      * @param  array<int, string>  $directDomains
      * @return array<string, mixed>
      */
-    private function buildRoute(array $dottedSuffixes, array $directDomains): array
+    private function buildRoute(array $dottedSuffixes, array $directDomains, bool $useGeminiWarp): array
     {
         $ruleSets = [];
         if ($dottedSuffixes !== []) {
@@ -595,6 +670,13 @@ class SubscriptionSingBoxProfileBuilder
                         'domain_suffix' => $dottedSuffixes,
                     ],
                 ],
+            ];
+        }
+        if ($useGeminiWarp) {
+            $ruleSets[] = [
+                'type' => 'inline',
+                'tag' => self::GEMINI_WARP_RULE_SET_TAG,
+                'rules' => $this->geminiWarpRuleSetEntries(),
             ];
         }
 
@@ -609,6 +691,13 @@ class SubscriptionSingBoxProfileBuilder
                 'rule_set' => [self::DIRECT_RULE_SET_TAG],
                 'action' => 'route',
                 'outbound' => 'direct',
+            ];
+        }
+        if ($useGeminiWarp) {
+            $rules[] = [
+                'rule_set' => [self::GEMINI_WARP_RULE_SET_TAG],
+                'action' => 'route',
+                'outbound' => self::WARP_OUTBOUND_TAG,
             ];
         }
 
@@ -653,5 +742,145 @@ class SubscriptionSingBoxProfileBuilder
         }
 
         return false;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function resolveCloudflareWarpOutbound(): ?array
+    {
+        $fromFile = $this->loadWarpOutboundFromJsonPath();
+        if ($fromFile !== null) {
+            return $fromFile;
+        }
+
+        return $this->buildWarpOutboundFromEnvParts();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function loadWarpOutboundFromJsonPath(): ?array
+    {
+        $rawPath = trim((string) config('vpn.sing_box_warp_outbound_json_path', ''));
+        if ($rawPath === '') {
+            return null;
+        }
+        $path = $this->isAbsoluteFilesystemPath($rawPath) ? $rawPath : base_path($rawPath);
+        if (! is_readable($path)) {
+            Log::warning('sing-box: файл WARP JSON не читается', ['path' => $path]);
+
+            return null;
+        }
+        $raw = @file_get_contents($path);
+        if ($raw === false || $raw === '') {
+            return null;
+        }
+        try {
+            $ob = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            Log::warning('sing-box: WARP JSON невалиден', ['path' => $path]);
+
+            return null;
+        }
+        if (! is_array($ob) || ($ob['type'] ?? '') !== 'wireguard') {
+            Log::warning('sing-box: WARP JSON должен быть одним outbound-объектом с "type": "wireguard"');
+
+            return null;
+        }
+        $ob['tag'] = self::WARP_OUTBOUND_TAG;
+
+        return $ob;
+    }
+
+    private function isAbsoluteFilesystemPath(string $path): bool
+    {
+        if (str_starts_with($path, '/')) {
+            return true;
+        }
+
+        return (bool) preg_match('#^[A-Za-z]:[\\\\/]#', $path);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function buildWarpOutboundFromEnvParts(): ?array
+    {
+        $pk = trim((string) config('vpn.sing_box_warp_private_key', ''));
+        $addrRaw = trim((string) config('vpn.sing_box_warp_local_addresses', ''));
+        if ($pk === '' || $addrRaw === '') {
+            return null;
+        }
+        $localAddress = $this->parseLocalAddressesList($addrRaw);
+        if ($localAddress === []) {
+            return null;
+        }
+        $ob = [
+            'type' => 'wireguard',
+            'tag' => self::WARP_OUTBOUND_TAG,
+            'server' => (string) config('vpn.sing_box_warp_server', 'engage.cloudflareclient.com'),
+            'server_port' => (int) config('vpn.sing_box_warp_server_port', 2408),
+            'local_address' => $localAddress,
+            'private_key' => $pk,
+            'peer_public_key' => (string) config('vpn.sing_box_warp_peer_public_key', 'bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo='),
+            'mtu' => 1280,
+        ];
+        $reserved = $this->parseWarpReserved((string) config('vpn.sing_box_warp_reserved', ''));
+        if ($reserved !== null) {
+            $ob['reserved'] = $reserved;
+        }
+
+        return $ob;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function parseLocalAddressesList(string $addrRaw): array
+    {
+        $t = trim($addrRaw);
+        if ($t === '') {
+            return [];
+        }
+        if (str_starts_with($t, '[')) {
+            $dec = json_decode($t, true);
+            if (is_array($dec)) {
+                $out = [];
+                foreach ($dec as $v) {
+                    if (is_string($v) && trim($v) !== '') {
+                        $out[] = trim($v);
+                    }
+                }
+
+                return $out;
+            }
+        }
+        $parts = array_map('trim', explode(',', $t));
+
+        return array_values(array_filter($parts, fn (string $s): bool => $s !== ''));
+    }
+
+    /**
+     * @return array{0: int, 1: int, 2: int}|null
+     */
+    private function parseWarpReserved(string $raw): ?array
+    {
+        $t = trim($raw);
+        if ($t === '') {
+            return null;
+        }
+        if (preg_match('/^\d+\s*,\s*\d+\s*,\s*\d+$/', $t)) {
+            $p = array_map('intval', array_map('trim', explode(',', $t)));
+            if (count($p) === 3) {
+                return [$p[0], $p[1], $p[2]];
+            }
+        }
+        $d = base64_decode($t, true);
+        if ($d !== false && strlen($d) === 3) {
+            return [ord($d[0]), ord($d[1]), ord($d[2])];
+        }
+
+        return null;
     }
 }

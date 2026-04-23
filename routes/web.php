@@ -239,6 +239,8 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
                 Route::post('/{panel}/update-config-reality', [PanelController::class, 'updateConfigReality'])->name('update-config-reality');
                 Route::post('/{panel}/update-config-reality-stable', [PanelController::class, 'updateConfigRealityStable'])->name('update-config-reality-stable');
                 Route::post('/{panel}/update-config-mixed', [PanelController::class, 'updateConfigMixed'])->name('update-config-mixed');
+                Route::post('/{panel}/warp-routing', [PanelController::class, 'updateWarpRouting'])->name('update-warp-routing');
+                Route::post('/{panel}/install-warp-socks', [PanelController::class, 'installWarpSocksOnServer'])->name('install-warp-socks');
                 Route::post('/{panel}/get-letsencrypt-certificate', [PanelController::class, 'getLetsEncryptCertificate'])->name('get-letsencrypt-certificate');
                 Route::delete('/{panel}/remove-certificates', [PanelController::class, 'removeCertificates'])->name('remove-certificates');
                 Route::post('/{panel}/toggle-tls', [PanelController::class, 'toggleTls'])->name('toggle-tls');

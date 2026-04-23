@@ -55,6 +55,11 @@ interface PanelInterface
     public function updateConfigurationMixed(int $panel_id): void;
 
     /**
+     * Повторное применение текущего типа конфигурации (например после изменения WARP).
+     */
+    public function reapplyCurrentConfiguration(int $panel_id): void;
+
+    /**
      * Добавление пользователя панели
      *
      * @param int $panel_id
