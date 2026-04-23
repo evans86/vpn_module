@@ -522,6 +522,59 @@ class MarzbanService
     }
 
     /**
+     * Установка WARP (SOCKS) на ноде, сохранение полей панели и переприменение Xray-конфига.
+     * Предполагается вызов из app()->terminating() после HTTP-ответа, чтобы не держать Cloudflare/браузер минуты.
+     */
+    public function installWarpSocksOnNodeAndReapplyConfig(int $panelId, int $port, bool $enableWarpRouting): void
+    {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(0);
+        }
+        $panel = Panel::with('server')->find($panelId);
+        if (! $panel instanceof Panel) {
+            Log::warning('WARP (фон): панель не найдена', ['panel_id' => $panelId, 'source' => 'panel']);
+
+            return;
+        }
+        $installLog = '';
+        try {
+            $installLog = $this->installWarpSocksOnServer($panel, $port);
+        } catch (\Throwable $e) {
+            Log::error('WARP (фон): автоустановка на ноде', [
+                'source' => 'panel',
+                'panel_id' => $panelId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+        try {
+            $panel->refresh();
+            $panel->warp_socks_host = '127.0.0.1';
+            $panel->warp_socks_port = $port;
+            if ($enableWarpRouting) {
+                $panel->warp_routing_enabled = true;
+            }
+            $panel->save();
+            (new PanelStrategy($panel->panel))->reapplyCurrentConfiguration($panel->id);
+        } catch (\Throwable $e) {
+            Log::error('WARP (фон): переприменение конфига Marzban', [
+                'source' => 'panel',
+                'panel_id' => $panelId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+        Log::info('WARP (фон): установка и конфиг применены', [
+            'source' => 'panel',
+            'panel_id' => $panelId,
+            'port' => $port,
+            'install_log_len' => strlen($installLog),
+        ]);
+    }
+
+    /**
      * Обновление токена доступа панели
      *
      * @param int $panel_id

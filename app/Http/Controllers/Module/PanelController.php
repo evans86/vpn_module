@@ -20,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class PanelController extends Controller
@@ -431,33 +432,29 @@ class PanelController extends Controller
             ? (int) ($panel->warp_socks_port ?? config('panel.warp_default_socks_port', 40000))
             : (int) $raw;
 
-        $panel->load('server');
-        $marzban = app(MarzbanService::class);
+        $panelId = (int) $panel->id;
+        $enableWarp = $request->boolean('enable_warp_routing', true);
 
-        try {
-            $log = $marzban->installWarpSocksOnServer($panel, $port);
-            $panel->warp_socks_host = '127.0.0.1';
-            $panel->warp_socks_port = $port;
-            if ($request->boolean('enable_warp_routing', true)) {
-                $panel->warp_routing_enabled = true;
+        app()->terminating(function () use ($panelId, $port, $enableWarp) {
+            try {
+                app(MarzbanService::class)->installWarpSocksOnNodeAndReapplyConfig($panelId, $port, $enableWarp);
+            } catch (Exception $e) {
+                Log::error('WARP (фон): непредвиденная ошибка', [
+                    'source' => 'panel',
+                    'panel_id' => $panelId,
+                    'error' => $e->getMessage(),
+                ]);
             }
-            $panel->save();
-            (new PanelStrategy($panel->panel))->reapplyCurrentConfiguration($panel->id);
+        });
 
-            $short = Str::limit(trim($log), 2000, '…');
+        $this->logger->info('WARP: установка поставлена в фон (после HTTP-ответа)', [
+            'source' => 'panel',
+            'panel_id' => $panelId,
+            'port' => $port,
+        ]);
 
-            return redirect()->route('admin.module.panel.index')
-                ->with('success', 'WARP (SOCKS) на ноде установлен или обновлён. 127.0.0.1:'.$port.'. Лог: '.$short);
-        } catch (Exception $e) {
-            $this->logger->error('Автоустановка WARP на ноде', [
-                'source' => 'panel',
-                'panel_id' => $panel->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            return redirect()->route('admin.module.panel.index')
-                ->with('error', $e->getMessage());
-        }
+        return redirect()->route('admin.module.panel.index')
+            ->with('success', 'Установка WARP на ноду запущена в фоне — ответ отправлен сразу, Cloudflare больше не ждёт завершения SSH. Подождите 1–3 минуты и обновите страницу. Итог смотрите в storage/logs/laravel.log; при сбое там будет причина.');
     }
 
     /**
