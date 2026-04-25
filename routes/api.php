@@ -70,6 +70,13 @@ Route::prefix('v1/key-activate')->group(function () {
     Route::post('free-key', [KeyActivateController::class, 'getFreeKey']);
     Route::get('free-key', [KeyActivateController::class, 'getFreeKey']);
 
+    /**
+     * Витрина: товар и оплата в Bott-T; после выдачи товара (по orderKey) — активация ключа в VPN по id ключа.
+     * POST/GET, те же поля, что user-key, плюс key (id KeyActivate) и опционально order_key, bott_order_id, email.
+     */
+    Route::post('activate-purchased-key', [KeyActivateController::class, 'activatePurchasedKey']);
+    Route::get('activate-purchased-key', [KeyActivateController::class, 'activatePurchasedKey']);
+
     Route::get('user-key', [KeyActivateController::class, 'getUserKey']);
     Route::get('user-keys', [KeyActivateController::class, 'getUserKeys']);
     Route::get('vpn-instructions', [KeyActivateController::class, 'getVpnInstructions']);

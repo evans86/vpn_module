@@ -7,6 +7,7 @@ use App\Helpers\ApiHelpers;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\BotModule\BotModuleInstructionsRequest;
 use App\Http\Requests\KeyActivate\KeyActivateRequest;
+use App\Http\Requests\PackSalesman\ActivatePurchasedKeyRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanBuyKeyRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanFreeKeyRequest;
 use App\Http\Requests\PackSalesman\PackSalesmanUserKeysRequest;
@@ -145,6 +146,89 @@ class KeyActivateController extends Controller
             'status' => $activatedKey->status,
             'status_text' => $activatedKey->getStatusText(),
         ], \App\Helpers\UrlHelper::configUrlsPayload($activatedKey->id));
+    }
+
+    /**
+     * Активация уже купленного ключа (оплата и выдача товара — на стороне Bott-T / витрины).
+     * Фронт после оплаты получает товар по orderKey, в ответе — id ключа (поле key); сюда передаётся тот же id.
+     * Не списывает баланс и не создаёт заказ в Bott — только {@see KeyActivateService::activateModuleKey}.
+     *
+     * Опционально: order_key, bott_order_id, email — пишем в лог (поддержка / учёт).
+     */
+    public function activatePurchasedKey(ActivatePurchasedKeyRequest $request)
+    {
+        try {
+            $this->dbLogger->info('Активация купленного ключа (витрина)', [
+                'source' => 'key_activate',
+                'action' => 'activate_purchased_key',
+                'user_tg_id' => $request->user_tg_id,
+                'key_prefix' => substr((string) $request->key, 0, 8),
+                'public_key_prefix' => substr((string) $request->public_key, 0, 12),
+                'order_key' => $request->input('order_key') ? '(есть)' : null,
+                'bott_order_id' => $request->input('bott_order_id'),
+                'has_email' => (bool) $request->input('email'),
+            ]);
+
+            $botModule = BotModule::where('public_key', $request->public_key)->first();
+            if (! $botModule) {
+                throw new RuntimeException('Модуль бота не найден');
+            }
+
+            $userCheck = BottApi::checkUser(
+                (int) $request->user_tg_id,
+                (string) $request->user_secret_key,
+                $botModule->public_key,
+                $botModule->private_key
+            );
+            if (! $userCheck['result']) {
+                throw new RuntimeException($userCheck['message'] ?? 'Ошибка авторизации пользователя');
+            }
+
+            $key = KeyActivate::with(['packSalesman.pack', 'moduleSalesman'])
+                ->where('id', $request->key)
+                ->first();
+
+            if (! $key instanceof KeyActivate) {
+                return ApiHelpers::error('Ключ не найден');
+            }
+            // После оплаты в Bott ключ часто ещё без user_tg_id — первый activate присваивает его в tryClaimActivation
+            $boundTg = $key->user_tg_id;
+            if ($boundTg !== null && (string) $boundTg !== '' && (int) $boundTg !== 0) {
+                if ((string) $boundTg !== (string) $request->user_tg_id) {
+                    return ApiHelpers::error('Доступ запрещен');
+                }
+            }
+
+            $salesman = $this->resolveSalesmanForWebModule($botModule, $key);
+            if (! $salesman) {
+                throw new RuntimeException('Продавец не найден для данного модуля');
+            }
+            if (! $this->keyBelongsToWebModule($key, $salesman)) {
+                return ApiHelpers::error('Доступ запрещен');
+            }
+
+            $activated = $this->keyActivateService->activateModuleKey($key, (int) $request->user_tg_id);
+
+            $this->dbLogger->info('Активация купленного ключа завершена', [
+                'source' => 'key_activate',
+                'action' => 'activate_purchased_key_done',
+                'key_id' => $activated->id,
+                'user_tg_id' => $request->user_tg_id,
+            ]);
+
+            return ApiHelpers::success($this->webModuleActivationSuccessPayload($activated));
+        } catch (RuntimeException $e) {
+            return ApiHelpers::error($e->getMessage());
+        } catch (Exception $e) {
+            Log::error('Ошибка activate-purchased-key', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'user_tg_id' => $request->user_tg_id ?? null,
+                'key' => $request->key ?? null,
+            ]);
+
+            return ApiHelpers::error('Произошла ошибка при активации ключа');
+        }
     }
 
     /**
