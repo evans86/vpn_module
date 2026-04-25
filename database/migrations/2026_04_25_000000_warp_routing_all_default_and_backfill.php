@@ -5,6 +5,10 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Должна выполняться после 2026_04_24_100000_add_warp_routing_all_to_panel_table
+ * (добавление колонки warp_routing_all).
+ */
 return new class extends Migration
 {
     public function up(): void
