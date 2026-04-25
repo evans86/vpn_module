@@ -470,10 +470,16 @@ class PanelController extends Controller
         }
 
         try {
+            $panel->refresh();
             $result = app(MarzbanService::class)->checkWarpSocksOnNode($panel);
             if (isset($result['ok']) && $result['ok'] === true) {
+                $msg = $result['message'] ?? 'Проверка пройдена';
+                if (empty($panel->warp_routing_enabled)) {
+                    $msg .= ' Примечание: в карточке панели WARP выключен — Xray сейчас не отправляет трафик в этот SOCKS; проверка лишь подтверждает, что порт на ноде отвечает.';
+                }
+
                 return redirect()->route('admin.module.panel.index')
-                    ->with('success', $result['message'] ?? 'Проверка пройдена');
+                    ->with('success', $msg);
             }
             $err = $result['message'] ?? 'Проверка не пройдена';
             if (! empty($result['detail'])) {
