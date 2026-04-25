@@ -382,9 +382,10 @@ class PanelController extends Controller
         $rawPort = $request->input('warp_socks_port');
         $panel->warp_routing_enabled = $request->boolean('warp_routing_enabled');
         $panel->warp_routing_all = $request->boolean('warp_routing_all');
+        $defSocksHost = (string) config('panel.warp_default_socks_host', '127.0.0.1');
         $panel->warp_socks_host = trim((string) $request->input('warp_socks_host')) !== ''
             ? trim((string) $request->input('warp_socks_host'))
-            : '127.0.0.1';
+            : $defSocksHost;
         $panel->warp_socks_port = ($rawPort === null || $rawPort === '') ? null : (int) $rawPort;
         $panel->save();
 

@@ -550,7 +550,8 @@ class MarzbanService
         }
         try {
             $panel->refresh();
-            $panel->warp_socks_host = '127.0.0.1';
+            // Marzban у нас в Docker; 127.0.0.1 в Xray = loopback контейнера, не sing-box на хосте
+            $panel->warp_socks_host = (string) config('panel.warp_default_socks_host', '172.17.0.1');
             $panel->warp_socks_port = $port;
             if ($enableWarpRouting) {
                 $panel->warp_routing_enabled = true;
@@ -599,9 +600,10 @@ class MarzbanService
             ];
         }
 
-        $host = trim((string) ($panel->warp_socks_host ?: '127.0.0.1'));
+        $defHost = (string) config('panel.warp_default_socks_host', '127.0.0.1');
+        $host = trim((string) ($panel->warp_socks_host ?: $defHost));
         if ($host === '') {
-            $host = '127.0.0.1';
+            $host = $defHost;
         }
         $port = $panel->warp_socks_port ?? (int) config('panel.warp_default_socks_port', 40000);
         if ($port < 1 || $port > 65535) {
@@ -1572,9 +1574,10 @@ class MarzbanService
         ];
 
         if ($panel && $panel->warp_routing_enabled) {
-            $host = trim((string) ($panel->warp_socks_host ?: '127.0.0.1'));
+            $defHost = (string) config('panel.warp_default_socks_host', '127.0.0.1');
+            $host = trim((string) ($panel->warp_socks_host ?: $defHost));
             if ($host === '') {
-                $host = '127.0.0.1';
+                $host = $defHost;
             }
             $port = $panel->warp_socks_port ?? (int) config('panel.warp_default_socks_port', 40000);
             if ($port < 1 || $port > 65535) {

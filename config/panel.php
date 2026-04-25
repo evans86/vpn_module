@@ -275,9 +275,9 @@ return [
     | WARP на ноде (локальный SOCKS → Cloudflare; маршрут geosite:google в Xray)
     |--------------------------------------------------------------------------
     | Порт по умолчанию, если в карточке панели не указан warp_socks_port.
-    | На сервере Marzban должен слушать SOCKS5 (например sing-box / warp) на 127.0.0.1.
-    | Если Marzban в Docker, укажите в карточке IP хоста/bridge, а не 127.0.0.1 (иначе SOCKS
-    | недоступен из контейнера — таймауты к upstream).
+    | Установка Marzban в проекте — через Docker; Xray в контейнере должен стучаться в SOCKS
+    | на хосте (часто шлюз bridge 172.17.0.1, не 127.0.0.1). sing-box: listen 0.0.0.0:port.
+    | См. PANEL_WARP_DEFAULT_SOCKS_HOST; WARP=127.0.0.1 только если Marzban без изоляции Docker.
     |
     | Доп. маршруты (только при выключенном «все сайты через WARP»): списки через запятую.
     | geosite: имена в нижнем регистре, как в geosite.dat на ноде (v2ray-domain-list-community / Loyalsoldier).
@@ -285,6 +285,8 @@ return [
     | Примеры: geosite:google,geosite:google-fcm PANEL_WARP_ROUTING_DOMAIN_EXTRA=full:ai.google.dev
     */
     'warp_default_socks_port' => (int) env('PANEL_WARP_DEFAULT_SOCKS_PORT', 40000),
+
+    'warp_default_socks_host' => trim((string) env('PANEL_WARP_DEFAULT_SOCKS_HOST', '172.17.0.1')) ?: '172.17.0.1',
     'warp_routing_geosite_extra' => array_values(
         array_filter(
             array_map('trim', explode(',', (string) env('PANEL_WARP_ROUTING_GEOSITE_EXTRA', '')))

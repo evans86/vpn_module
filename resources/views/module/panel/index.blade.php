@@ -335,8 +335,8 @@
                                                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                                 <div>
                                                                     <label class="block text-[10px] text-cyan-800 mb-0.5">SOCKS хост</label>
-                                                                    <input type="text" name="warp_socks_host" value="{{ old('warp_socks_host', $panel->warp_socks_host ?? '127.0.0.1') }}"
-                                                                           class="w-full text-xs border border-cyan-200 rounded px-2 py-1.5" placeholder="127.0.0.1">
+                                                                    <input type="text" name="warp_socks_host" value="{{ old('warp_socks_host', $panel->warp_socks_host ?? config('panel.warp_default_socks_host', '172.17.0.1')) }}"
+                                                                           class="w-full text-xs border border-cyan-200 rounded px-2 py-1.5" placeholder="{{ config('panel.warp_default_socks_host', '172.17.0.1') }}">
                                                                 </div>
                                                                 <div>
                                                                     <label class="block text-[10px] text-cyan-800 mb-0.5">SOCKS порт (пусто = {{ config('panel.warp_default_socks_port', 40000) }})</label>
