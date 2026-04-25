@@ -270,53 +270,104 @@
 
                                         @if($panel->panel === \App\Models\Panel\Panel::MARZBAN)
                                             <div class="border border-cyan-200 bg-cyan-50/80 rounded-lg p-3 space-y-2">
-                                                <p class="text-xs font-medium text-cyan-900">WARP (Gemini / Google)</p>
+                                                <div class="flex flex-wrap items-center gap-2">
+                                                    <span class="text-xs font-semibold text-cyan-900">WARP</span>
+                                                    @if($panel->warp_routing_enabled)
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-900 border border-emerald-200" title="Маршрут Xray в локальный SOCKS (Cloudflare)">
+                                                            Включён
+                                                        </span>
+                                                    @else
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200" title="Marzban без WARP, обычная маршрутизация">
+                                                            Не используется
+                                                        </span>
+                                                    @endif
+                                                </div>
                                                 <p class="text-[11px] text-cyan-800 leading-snug">
-                                                    На <strong>сервере</strong> Marzban нужен локальный <strong>SOCKS5</strong> в Cloudflare WARP
-                                                    (часто <code class="bg-white/80 px-1 rounded">127.0.0.1:{{ config('panel.warp_default_socks_port', 40000) }}</code>).
-                                                    Ниже — маршрут <code class="bg-white/80 px-1 rounded">geosite:google</code> в Xray; можно поднять SOCKS вручную или <strong>авто по SSH</strong> (sing-box + wgcf, systemd, нужен root).
+                                                    Опция: панель Marzban <strong>нормально работает без WARP</strong>. Подключайте, если нужен выход в интернет для трафика панели через Cloudflare (например, Gemini/Google). Детали — по кнопке ниже.
                                                 </p>
-                                                <form action="{{ route('admin.module.panel.update-warp-routing', $panel) }}" method="POST" class="space-y-2">
-                                                    @csrf
-                                                    <label class="flex items-center gap-2 text-xs text-cyan-900 cursor-pointer">
-                                                        <input type="checkbox" name="warp_routing_enabled" value="1" class="rounded"
-                                                               {{ old('warp_routing_enabled', $panel->warp_routing_enabled ?? false) ? 'checked' : '' }}>
-                                                        Включить: Google (в т.ч. Gemini) через WARP
-                                                    </label>
-                                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                        <div>
-                                                            <label class="block text-[10px] text-cyan-800 mb-0.5">SOCKS хост</label>
-                                                            <input type="text" name="warp_socks_host" value="{{ old('warp_socks_host', $panel->warp_socks_host ?? '127.0.0.1') }}"
-                                                                   class="w-full text-xs border border-cyan-200 rounded px-2 py-1.5" placeholder="127.0.0.1">
-                                                        </div>
-                                                        <div>
-                                                            <label class="block text-[10px] text-cyan-800 mb-0.5">SOCKS порт (пусто = {{ config('panel.warp_default_socks_port', 40000) }})</label>
-                                                            <input type="number" name="warp_socks_port" id="marzban-warp-socks-port" min="1" max="65535"
-                                                                   value="{{ old('warp_socks_port', $panel->warp_socks_port) }}"
-                                                                   class="w-full text-xs border border-cyan-200 rounded px-2 py-1.5" placeholder="{{ config('panel.warp_default_socks_port', 40000) }}">
-                                                        </div>
+                                                <div class="flex flex-wrap gap-2">
+                                                    @if($panel->warp_routing_enabled)
+                                                        <form action="{{ route('admin.module.panel.toggle-warp-routing', $panel) }}" method="POST" class="inline">
+                                                            @csrf
+                                                            <input type="hidden" name="warp_on" value="0">
+                                                            <button type="submit" class="inline-flex items-center justify-center px-2.5 py-1.5 text-[11px] font-medium rounded-md text-slate-800 bg-white border border-slate-300 hover:bg-slate-50">
+                                                                Отключить WARP
+                                                            </button>
+                                                        </form>
+                                                    @else
+                                                        <form action="{{ route('admin.module.panel.toggle-warp-routing', $panel) }}" method="POST" class="inline">
+                                                            @csrf
+                                                            <input type="hidden" name="warp_on" value="1">
+                                                            <button type="submit" class="inline-flex items-center justify-center px-2.5 py-1.5 text-[11px] font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700">
+                                                                Включить WARP
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                    @if($panel->server_id)
+                                                        <form action="{{ route('admin.module.panel.check-warp-socks', $panel) }}" method="POST" class="inline">
+                                                            @csrf
+                                                            <button type="submit" class="inline-flex items-center justify-center px-2.5 py-1.5 text-[11px] font-medium rounded-md text-cyan-900 bg-cyan-100 border border-cyan-300 hover:bg-cyan-200" title="С ноды (SSH): curl через SOCKS с адресом из настроек">
+                                                                Проверить настройку
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                </div>
+                                                <details class="mt-1 rounded border border-cyan-200/80 bg-white/60" id="warpDetails{{ (int) $panel->id }}">
+                                                    <summary class="px-2 py-2 text-[11px] font-medium text-cyan-900 cursor-pointer select-none list-none">
+                                                        <span class="inline-flex items-center gap-1"><i class="fas fa-sliders-h text-cyan-600 text-[10px]"></i> Настроить WARP (хост, порт, установка…)</span>
+                                                    </summary>
+                                                    <div class="px-2 pb-3 pt-0 space-y-2 border-t border-cyan-100">
+                                                        <p class="text-[10px] text-cyan-800 leading-snug pt-2">
+                                                            SOCKS5 к WARP: часто <code class="bg-cyan-50 px-0.5 rounded">127.0.0.1:{{ config('panel.warp_default_socks_port', 40000) }}</code> на хосте. В Docker — IP хоста, иначе таймауты к 127.0.0.1.
+                                                        </p>
+                                                        <form action="{{ route('admin.module.panel.update-warp-routing', $panel) }}" method="POST" class="space-y-2">
+                                                            @csrf
+                                                            <label class="flex items-center gap-2 text-xs text-cyan-900 cursor-pointer">
+                                                                <input type="checkbox" name="warp_routing_enabled" value="1" class="rounded"
+                                                                       {{ old('warp_routing_enabled', $panel->warp_routing_enabled ?? false) ? 'checked' : '' }}>
+                                                                Маршрут Xray через WARP
+                                                            </label>
+                                                            <label class="flex items-center gap-2 text-[11px] text-cyan-800 cursor-pointer pl-0 sm:pl-1">
+                                                                <input type="checkbox" name="warp_routing_all" value="1" class="rounded"
+                                                                       {{ old('warp_routing_all', $panel->warp_routing_all ?? config('panel.warp_routing_all_default', true)) ? 'checked' : '' }}>
+                                                                Все сайты через WARP; если выкл. — Google + из .env
+                                                            </label>
+                                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                                <div>
+                                                                    <label class="block text-[10px] text-cyan-800 mb-0.5">SOCKS хост</label>
+                                                                    <input type="text" name="warp_socks_host" value="{{ old('warp_socks_host', $panel->warp_socks_host ?? '127.0.0.1') }}"
+                                                                           class="w-full text-xs border border-cyan-200 rounded px-2 py-1.5" placeholder="127.0.0.1">
+                                                                </div>
+                                                                <div>
+                                                                    <label class="block text-[10px] text-cyan-800 mb-0.5">SOCKS порт (пусто = {{ config('panel.warp_default_socks_port', 40000) }})</label>
+                                                                    <input type="number" name="warp_socks_port" id="marzban-warp-socks-port-{{ (int) $panel->id }}" min="1" max="65535"
+                                                                           value="{{ old('warp_socks_port', $panel->warp_socks_port) }}"
+                                                                           class="w-full text-xs border border-cyan-200 rounded px-2 py-1.5" placeholder="{{ config('panel.warp_default_socks_port', 40000) }}">
+                                                                </div>
+                                                            </div>
+                                                            <button type="submit" class="w-full text-xs font-medium py-2 rounded-md text-white bg-cyan-600 hover:bg-cyan-700">
+                                                                Сохранить и переприменить конфиг
+                                                            </button>
+                                                        </form>
+                                                        @if($panel->server_id)
+                                                            <form action="{{ route('admin.module.panel.install-warp-socks', $panel) }}" method="POST" class="space-y-2 pt-1 border-t border-cyan-100"
+                                                                  onsubmit="(function(){var p=document.getElementById('marzban-warp-socks-port-{{ (int) $panel->id }}');var d={{ (int) config('panel.warp_default_socks_port', 40000) }};var t=p&&p.value.trim()!==''?p.value.trim():d;document.getElementById('warp-install-socks-port-{{ (int) $panel->id }}').value=t;return true;})(); return confirm('На сервер {{ optional($panel->server)->ip ?? "—" }} по SSH будут установлены sing-box, wgcf и сервис systemd (нужен root). Продолжить?');">
+                                                                @csrf
+                                                                <input type="hidden" name="warp_socks_port" id="warp-install-socks-port-{{ (int) $panel->id }}" value="{{ (int) ($panel->warp_socks_port ?? config('panel.warp_default_socks_port', 40000)) }}">
+                                                                <label class="flex items-center gap-2 text-[11px] text-cyan-900 cursor-pointer">
+                                                                    <input type="checkbox" name="enable_warp_routing" value="1" class="rounded" checked>
+                                                                    После установки включить WARP и «все сайты», переприменить
+                                                                </label>
+                                                                <button type="submit" class="w-full text-xs font-medium py-2 rounded-md text-cyan-900 bg-cyan-100 hover:bg-cyan-200 border border-cyan-300">
+                                                                    Установить WARP (SOCKS) на сервер по SSH
+                                                                </button>
+                                                                <p class="text-[10px] text-cyan-800 leading-snug">Порт из поля «SOCKS порт» выше. Повтор — обновит установку.</p>
+                                                            </form>
+                                                        @else
+                                                            <p class="text-[10px] text-amber-800 pt-1">Автоустановка: привяжите к панели сервер с SSH.</p>
+                                                        @endif
                                                     </div>
-                                                    <button type="submit" class="w-full text-xs font-medium py-2 rounded-md text-white bg-cyan-600 hover:bg-cyan-700">
-                                                        Сохранить и переприменить конфиг панели
-                                                    </button>
-                                                </form>
-                                                @if($panel->server_id)
-                                                    <form action="{{ route('admin.module.panel.install-warp-socks', $panel) }}" method="POST" class="space-y-2 pt-1"
-                                                          onsubmit="(function(){var p=document.getElementById('marzban-warp-socks-port');var d={{ (int) config('panel.warp_default_socks_port', 40000) }};var t=p&&p.value.trim()!==''?p.value.trim():d;document.getElementById('warp-install-socks-port').value=t;return true;})(); return confirm('На сервер {{ optional($panel->server)->ip ?? "—" }} по SSH будут установлены sing-box, wgcf и сервис systemd (нужен root). Продолжить?');">
-                                                        @csrf
-                                                        <input type="hidden" name="warp_socks_port" id="warp-install-socks-port" value="{{ (int) ($panel->warp_socks_port ?? config('panel.warp_default_socks_port', 40000)) }}">
-                                                        <label class="flex items-center gap-2 text-[11px] text-cyan-900 cursor-pointer">
-                                                            <input type="checkbox" name="enable_warp_routing" value="1" class="rounded" checked>
-                                                            После установки включить маршрут в Xray и переприменить конфиг
-                                                        </label>
-                                                        <button type="submit" class="w-full text-xs font-medium py-2 rounded-md text-cyan-900 bg-cyan-100 hover:bg-cyan-200 border border-cyan-300">
-                                                            Установить WARP (SOCKS) на сервер по SSH
-                                                        </button>
-                                                        <p class="text-[10px] text-cyan-800 leading-snug">Порт подставляется из поля «SOCKS порт» выше (пусто — дефолт {{ config('panel.warp_default_socks_port', 40000) }}). Повторный запуск обновляет установку.</p>
-                                                    </form>
-                                                @else
-                                                    <p class="text-[10px] text-amber-800 pt-1">Автоустановка: привяжите к панели сервер с данными SSH.</p>
-                                                @endif
+                                                </details>
                                             </div>
                                         @endif
 

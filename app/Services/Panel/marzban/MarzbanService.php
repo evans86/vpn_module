@@ -554,6 +554,7 @@ class MarzbanService
             $panel->warp_socks_port = $port;
             if ($enableWarpRouting) {
                 $panel->warp_routing_enabled = true;
+                $panel->warp_routing_all = true;
             }
             $panel->save();
             (new PanelStrategy($panel->panel))->reapplyCurrentConfiguration($panel->id);
@@ -572,6 +573,95 @@ class MarzbanService
             'port' => $port,
             'install_log_len' => strlen($installLog),
         ]);
+    }
+
+    /**
+     * С ноды (SSH) проверяем, отвечает ли SOCKS5 по адресу из настроек панели
+     * (тот же хост/порт, что уходит в Xray — важно для Docker: не 127.0.0.1 из контейнера).
+     *
+     * @return array{ok: bool, message: string, detail: string}
+     */
+    public function checkWarpSocksOnNode(Panel $panel): array
+    {
+        if ($panel->panel !== Panel::MARZBAN) {
+            return [
+                'ok' => false,
+                'message' => 'Проверка WARP только для панелей Marzban.',
+                'detail' => '',
+            ];
+        }
+        $panel->load('server');
+        if (! $panel->server) {
+            return [
+                'ok' => false,
+                'message' => 'К панели не привязан сервер — нет SSH для проверки на ноде.',
+                'detail' => '',
+            ];
+        }
+
+        $host = trim((string) ($panel->warp_socks_host ?: '127.0.0.1'));
+        if ($host === '') {
+            $host = '127.0.0.1';
+        }
+        $port = $panel->warp_socks_port ?? (int) config('panel.warp_default_socks_port', 40000);
+        if ($port < 1 || $port > 65535) {
+            $port = (int) config('panel.warp_default_socks_port', 40000);
+        }
+        $endpoint = $host.':'.$port;
+
+        $serverDto = ServerFactory::fromEntity($panel->server);
+        $ssh = $this->connectSshAdapter($serverDto);
+        $oldTimeout = $ssh->getTimeout() ?? 100000;
+        $ssh->setTimeout(45);
+        $detail = '';
+        try {
+            $checkCurl = (string) $ssh->exec('command -v curl >/dev/null 2>&1 && echo OK || echo NO');
+            if (trim($checkCurl) !== 'OK') {
+                return [
+                    'ok' => false,
+                    'message' => 'На ноде нет команды curl — установите curl или проверяйте SOCKS вручную с сервера.',
+                    'detail' => trim($checkCurl),
+                ];
+            }
+            $remoteLine = 'curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 8 --max-time 25 --socks5-hostname '
+                .escapeshellarg($endpoint)
+                .' https://www.cloudflare.com/cdn-cgi/trace 2>&1; echo; echo "ssh_exit:$?"';
+            $detail = (string) $ssh->exec($remoteLine);
+        } finally {
+            $ssh->setTimeout($oldTimeout);
+        }
+
+        $detailTrim = trim($detail);
+        $lines = preg_split('/\R/', $detailTrim);
+        $firstLine = isset($lines[0]) ? trim((string) $lines[0]) : '';
+        $httpCode = 0;
+        if (preg_match('/^(\d{3})$/', trim($firstLine), $m)) {
+            $httpCode = (int) $m[1];
+        }
+        $ok = $httpCode >= 200 && $httpCode < 400;
+
+        if ($ok) {
+            return [
+                'ok' => true,
+                'message' => 'SOCKS '.$endpoint.' на ноде отвечает (HTTP '.$httpCode.' через прокси). WARP-магистраль доступна с точки зрения сервера.',
+                'detail' => Str::limit($detailTrim, 500, '…'),
+            ];
+        }
+
+        $hint = ' Проверьте сервис на ноде, хост/порт (для Docker — IP хоста, не 127.0.0.1) и фаервол.';
+        if ($httpCode === 0) {
+            return [
+                'ok' => false,
+                'message' => 'SOCKS '.$endpoint.' не дал ожидаемого HTTP-ответа. Возможны таймауты или порт закрыт.'.$hint,
+                'detail' => Str::limit($detailTrim, 500, '…'),
+            ];
+        }
+
+        return [
+            'ok' => false,
+            'message' => 'Запрос через SOCKS завершился с HTTP '.$httpCode.'.'.$hint,
+            'detail' => Str::limit($detailTrim, 500, '…'),
+        ];
     }
 
     /**
@@ -1423,6 +1513,37 @@ class MarzbanService
     }
 
     /**
+     * Список domain/geosite для маршрута WARP (узкий режим, без «весь трафик»).
+     * База: geosite:google; плюс .env: PANEL_WARP_ROUTING_GEOSITE_EXTRA, PANEL_WARP_ROUTING_DOMAIN_EXTRA.
+     *
+     * @return list<string>
+     */
+    private function getWarpSelectiveDomainRules(): array
+    {
+        $list = ['geosite:google'];
+        foreach (config('panel.warp_routing_geosite_extra', []) as $g) {
+            $g = is_string($g) ? trim($g) : '';
+            if ($g === '') {
+                continue;
+            }
+            $list[] = $g;
+        }
+        foreach (config('panel.warp_routing_domain_extra', []) as $d) {
+            $d = is_string($d) ? trim($d) : '';
+            if ($d === '') {
+                continue;
+            }
+            if (preg_match('/^(geosite:|domain:|full:|regexp:|keyword:)/i', $d) === 1) {
+                $list[] = $d;
+            } else {
+                $list[] = 'domain:' . ltrim($d, '.');
+            }
+        }
+
+        return array_values(array_unique($list));
+    }
+
+    /**
      * Построение базовой конфигурации (общая часть)
      *
      * @param Panel|null $panel Панель для проверки настроек прокси
@@ -1473,13 +1594,22 @@ class MarzbanService
                 ],
             ];
 
-            $routingRules[] = [
-                'type' => 'field',
-                'domain' => [
-                    'geosite:google',
-                ],
-                'outboundTag' => 'WARP',
-            ];
+            if (! empty($panel->warp_routing_all)) {
+                $routingRules[] = [
+                    'type' => 'field',
+                    'ip' => [
+                        '0.0.0.0/0',
+                        '::/0',
+                    ],
+                    'outboundTag' => 'WARP',
+                ];
+            } else {
+                $routingRules[] = [
+                    'type' => 'field',
+                    'domain' => $this->getWarpSelectiveDomainRules(),
+                    'outboundTag' => 'WARP',
+                ];
+            }
         }
 
         return [

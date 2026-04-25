@@ -375,13 +375,16 @@ class PanelController extends Controller
         }
 
         $request->validate([
-            'warp_socks_host' => ['required', 'string', 'max:64'],
+            'warp_socks_host' => ['nullable', 'string', 'max:64'],
             'warp_socks_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
         ]);
 
         $rawPort = $request->input('warp_socks_port');
         $panel->warp_routing_enabled = $request->boolean('warp_routing_enabled');
-        $panel->warp_socks_host = trim((string) $request->input('warp_socks_host')) ?: '127.0.0.1';
+        $panel->warp_routing_all = $request->boolean('warp_routing_all');
+        $panel->warp_socks_host = trim((string) $request->input('warp_socks_host')) !== ''
+            ? trim((string) $request->input('warp_socks_host'))
+            : '127.0.0.1';
         $panel->warp_socks_port = ($rawPort === null || $rawPort === '') ? null : (int) $rawPort;
         $panel->save();
 
@@ -391,6 +394,7 @@ class PanelController extends Controller
             'user_id' => auth()->id(),
             'panel_id' => $panel->id,
             'warp_routing_enabled' => $panel->warp_routing_enabled,
+            'warp_routing_all' => $panel->warp_routing_all,
         ]);
 
         try {
@@ -408,6 +412,85 @@ class PanelController extends Controller
 
             return redirect()->route('admin.module.panel.index')
                 ->with('error', 'Настройки сохранены, но не удалось переприменить конфиг: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Включение/отключение WARP (без правки хоста/порта) — панель Marzban может работать без WARP.
+     */
+    public function toggleWarpRouting(Request $request, Panel $panel): RedirectResponse
+    {
+        if ($panel->panel !== Panel::MARZBAN) {
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'WARP доступен только для панелей Marzban.');
+        }
+
+        $enable = $request->boolean('warp_on');
+        $panel->warp_routing_enabled = $enable;
+        $panel->save();
+
+        $this->logger->info('Переключение WARP на панели', [
+            'source' => 'panel',
+            'action' => 'toggle-warp-routing',
+            'user_id' => auth()->id(),
+            'panel_id' => $panel->id,
+            'warp_routing_enabled' => $enable,
+        ]);
+
+        try {
+            $strategy = new PanelStrategy($panel->panel);
+            $strategy->reapplyCurrentConfiguration($panel->id);
+
+            $msg = $enable
+                ? 'WARP включён: внешний трафик Xray пойдёт в локальный SOCKS (по вашим настройкам ниже), конфиг переприменён.'
+                : 'WARP отключён: панель работает без маршрутизации через WARP, конфиг переприменён.';
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', $msg);
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка переприменения после переключения WARP', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Флаг WARP сохранён, но не удалось переприменить конфиг: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * С ноды (SSH) проверка SOCKS: тот же адрес, что в карточке.
+     */
+    public function checkWarpSocks(Panel $panel): RedirectResponse
+    {
+        if ($panel->panel !== Panel::MARZBAN) {
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Проверка WARP только для панелей Marzban.');
+        }
+
+        try {
+            $result = app(MarzbanService::class)->checkWarpSocksOnNode($panel);
+            if (isset($result['ok']) && $result['ok'] === true) {
+                return redirect()->route('admin.module.panel.index')
+                    ->with('success', $result['message'] ?? 'Проверка пройдена');
+            }
+            $err = $result['message'] ?? 'Проверка не пройдена';
+            if (! empty($result['detail'])) {
+                $err .= ' (кратко: '.$result['detail'].')';
+            }
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', $err);
+        } catch (Exception $e) {
+            $this->logger->error('Проверка WARP (SOCKS) на ноде', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Проверка WARP: '.$e->getMessage());
         }
     }
 

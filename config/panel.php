@@ -276,8 +276,31 @@ return [
     |--------------------------------------------------------------------------
     | Порт по умолчанию, если в карточке панели не указан warp_socks_port.
     | На сервере Marzban должен слушать SOCKS5 (например sing-box / warp) на 127.0.0.1.
+    | Если Marzban в Docker, укажите в карточке IP хоста/bridge, а не 127.0.0.1 (иначе SOCKS
+    | недоступен из контейнера — таймауты к upstream).
+    |
+    | Доп. маршруты (только при выключенном «все сайты через WARP»): списки через запятую.
+    | geosite: имена в нижнем регистре, как в geosite.dat на ноде (v2ray-domain-list-community / Loyalsoldier).
+    | domain: можно без префикса — будет domain:…
+    | Примеры: geosite:google,geosite:google-fcm PANEL_WARP_ROUTING_DOMAIN_EXTRA=full:ai.google.dev
     */
     'warp_default_socks_port' => (int) env('PANEL_WARP_DEFAULT_SOCKS_PORT', 40000),
+    'warp_routing_geosite_extra' => array_values(
+        array_filter(
+            array_map('trim', explode(',', (string) env('PANEL_WARP_ROUTING_GEOSITE_EXTRA', '')))
+        )
+    ),
+    'warp_routing_domain_extra' => array_values(
+        array_filter(
+            array_map('trim', explode(',', (string) env('PANEL_WARP_ROUTING_DOMAIN_EXTRA', '')))
+        )
+    ),
+
+    // Документация: фактическое значение по умолчанию для новых строк в БД — в миграции warp_routing_all
+    'warp_routing_all_default' => filter_var(
+        env('PANEL_WARP_DEFAULT_ROUTING_ALL', true),
+        FILTER_VALIDATE_BOOLEAN
+    ),
 ];
 
 
