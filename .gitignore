@@ -1,6 +1,8 @@
 /node_modules
 /public/hot
 /public/storage
+# Большой тестовый бинарник (генерация: scripts/generate-public-123-rar.ps1)
+/public/123.rar
 /storage/*.key
 /storage/app/yandex-cloud/
 /vendor
