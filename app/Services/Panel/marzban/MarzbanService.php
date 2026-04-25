@@ -1592,6 +1592,8 @@ class MarzbanService
                         [
                             'address' => $host,
                             'port' => $port,
+                            // иначе часть трафика (QUIC, VoIP) без UDP через SOCKS — таймауты/обрывы
+                            'udp' => true,
                         ],
                     ],
                 ],
