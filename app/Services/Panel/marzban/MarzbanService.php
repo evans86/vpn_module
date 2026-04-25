@@ -1553,25 +1553,25 @@ class MarzbanService
      */
     private function buildBaseConfig(?Panel $panel = null): array
     {
-        $outbounds = [
-            [
-                "protocol" => "freedom",
-                "tag" => "DIRECT",
-                "settings" => [
-                    "domainStrategy" => "UseIPv4"
-                ]
-            ]
+        $directOutbound = [
+            'protocol' => 'freedom',
+            'tag' => 'DIRECT',
+            'settings' => [
+                'domainStrategy' => 'UseIPv4',
+            ],
         ];
 
         $routingRules = [
             [
-                "type" => "field",
-                "ip" => [
-                    "geoip:private"
+                'type' => 'field',
+                'ip' => [
+                    'geoip:private',
                 ],
-                "outboundTag" => "DIRECT"
-            ]
+                'outboundTag' => 'DIRECT',
+            ],
         ];
+
+        $outbounds = [$directOutbound];
 
         if ($panel && $panel->warp_routing_enabled) {
             $defHost = (string) config('panel.warp_default_socks_host', '127.0.0.1');
@@ -1584,7 +1584,7 @@ class MarzbanService
                 $port = (int) config('panel.warp_default_socks_port', 40000);
             }
 
-            $outbounds[] = [
+            $warpOutbound = [
                 'protocol' => 'socks',
                 'tag' => 'WARP',
                 'settings' => [
@@ -1598,6 +1598,13 @@ class MarzbanService
                     ],
                 ],
             ];
+
+            // Полный туннель: при сбое «0.0.0.0/0»/доменного матча Xray берёт ПЕРВЫЙ outbound — должен быть WARP, не freedom.
+            if (! empty($panel->warp_routing_all)) {
+                $outbounds = [ $warpOutbound, $directOutbound ];
+            } else {
+                $outbounds[] = $warpOutbound;
+            }
 
             if (! empty($panel->warp_routing_all)) {
                 $routingRules[] = [
