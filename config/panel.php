@@ -272,7 +272,7 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | WARP на ноде (локальный SOCKS → Cloudflare; маршрут geosite:google в Xray)
+    | WARP на ноде (локальный SOCKS): узкий маршрут = только Gemini (config/vpn.php — gemini_warp_*), не весь Google.
     |--------------------------------------------------------------------------
     | Порт по умолчанию, если в карточке панели не указан warp_socks_port.
     | Установка Marzban в проекте — через Docker; Xray в контейнере должен стучаться в SOCKS
@@ -282,7 +282,7 @@ return [
     | Доп. маршруты (только при выключенном «все сайты через WARP»): списки через запятую.
     | geosite: имена в нижнем регистре, как в geosite.dat на ноде (v2ray-domain-list-community / Loyalsoldier).
     | domain: можно без префикса — будет domain:…
-    | Примеры: geosite:google,geosite:google-fcm PANEL_WARP_ROUTING_DOMAIN_EXTRA=full:ai.google.dev
+    | Плюс PANEL_WARP_ROUTING_*_EXTRA. Базовый набор — gemini_warp_* в config/vpn.php.
     */
     'warp_default_socks_port' => (int) env('PANEL_WARP_DEFAULT_SOCKS_PORT', 40000),
 
@@ -300,7 +300,7 @@ return [
 
     // Документация: фактическое значение по умолчанию для новых строк в БД — в миграции warp_routing_all
     'warp_routing_all_default' => filter_var(
-        env('PANEL_WARP_DEFAULT_ROUTING_ALL', true),
+        env('PANEL_WARP_DEFAULT_ROUTING_ALL', false),
         FILTER_VALIDATE_BOOLEAN
     ),
 ];

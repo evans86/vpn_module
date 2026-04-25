@@ -329,8 +329,8 @@
                                                             </label>
                                                             <label class="flex items-center gap-2 text-[11px] text-cyan-800 cursor-pointer pl-0 sm:pl-1">
                                                                 <input type="checkbox" name="warp_routing_all" value="1" class="rounded"
-                                                                       {{ old('warp_routing_all', $panel->warp_routing_all ?? config('panel.warp_routing_all_default', true)) ? 'checked' : '' }}>
-                                                                Все сайты через WARP; если выкл. — Google + из .env
+                                                                       {{ old('warp_routing_all', $panel->warp_routing_all ?? config('panel.warp_routing_all_default', false)) ? 'checked' : '' }}>
+                                                                Все сайты через WARP; если выкл. — только Gemini (config/vpn.php) + PANEL_WARP_ROUTING_*_EXTRA
                                                             </label>
                                                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                                 <div>
@@ -356,7 +356,7 @@
                                                                 <input type="hidden" name="warp_socks_port" id="warp-install-socks-port-{{ (int) $panel->id }}" value="{{ (int) ($panel->warp_socks_port ?? config('panel.warp_default_socks_port', 40000)) }}">
                                                                 <label class="flex items-center gap-2 text-[11px] text-cyan-900 cursor-pointer">
                                                                     <input type="checkbox" name="enable_warp_routing" value="1" class="rounded" checked>
-                                                                    После установки включить WARP и «все сайты», переприменить
+                                                                    После установки включить WARP (узкий: только Gemini), переприменить
                                                                 </label>
                                                                 <button type="submit" class="w-full text-xs font-medium py-2 rounded-md text-cyan-900 bg-cyan-100 hover:bg-cyan-200 border border-cyan-300">
                                                                     Установить WARP (SOCKS) на сервер по SSH

@@ -555,7 +555,7 @@ class MarzbanService
             $panel->warp_socks_port = $port;
             if ($enableWarpRouting) {
                 $panel->warp_routing_enabled = true;
-                $panel->warp_routing_all = true;
+                $panel->warp_routing_all = false;
             }
             $panel->save();
             (new PanelStrategy($panel->panel))->reapplyCurrentConfiguration($panel->id);
@@ -1515,14 +1515,27 @@ class MarzbanService
     }
 
     /**
-     * Список domain/geosite для маршрута WARP (узкий режим, без «весь трафик»).
-     * База: geosite:google; плюс .env: PANEL_WARP_ROUTING_GEOSITE_EXTRA, PANEL_WARP_ROUTING_DOMAIN_EXTRA.
+     * Список domain для маршрута WARP (узкий режим): только Gemini (config/vpn.php) + extras из .env.
      *
      * @return list<string>
      */
     private function getWarpSelectiveDomainRules(): array
     {
-        $list = ['geosite:google'];
+        $list = [];
+        foreach (config('vpn.gemini_warp_full_hosts', []) as $h) {
+            $h = is_string($h) ? trim($h) : '';
+            if ($h === '') {
+                continue;
+            }
+            $list[] = 'full:'.$h;
+        }
+        foreach (config('vpn.gemini_warp_domain_suffixes', []) as $s) {
+            $s = is_string($s) ? trim($s) : '';
+            if ($s === '') {
+                continue;
+            }
+            $list[] = 'domain:'.ltrim($s, '.');
+        }
         foreach (config('panel.warp_routing_geosite_extra', []) as $g) {
             $g = is_string($g) ? trim($g) : '';
             if ($g === '') {

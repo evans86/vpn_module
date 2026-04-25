@@ -33,34 +33,37 @@ class SubscriptionSingBoxProfileBuilder
      */
     private function geminiWarpRuleSetEntries(): array
     {
-        return [
-            [
-                'domain' => [
-                    'gemini.google.com',
-                    'aistudio.google.com',
-                    'ai.google.dev',
-                    'makersuite.google.com',
-                    'labs.google.com',
-                    'notebooklm.google.com',
-                    'jules.google.com',
-                    'deepmind.google',
-                    'opal.google.com',
-                    'antigravity.google',
-                    'stitch.withgoogle.com',
-                    'alkalimakersuite-pa.clients6.google.com',
-                    'webchannel-alkalimakersuite-pa.clients6.google.com',
-                ],
-            ],
-            [
-                'domain_suffix' => [
-                    '.googleapis.com',
-                    '.gstatic.com',
-                    '.googleusercontent.com',
-                    '.clients6.google.com',
-                    '.google.dev',
-                ],
-            ],
-        ];
+        $hosts = config('vpn.gemini_warp_full_hosts', []);
+        $hosts = is_array($hosts) ? $hosts : [];
+        $domain = [];
+        foreach ($hosts as $h) {
+            $h = is_string($h) ? trim($h) : '';
+            if ($h !== '') {
+                $domain[] = $h;
+            }
+        }
+
+        $suffs = config('vpn.gemini_warp_domain_suffixes', []);
+        $suffs = is_array($suffs) ? $suffs : [];
+        $domainSuffix = [];
+        foreach ($suffs as $s) {
+            $s = is_string($s) ? trim($s) : '';
+            if ($s === '') {
+                continue;
+            }
+            $domainSuffix[] = '.'.ltrim($s, '.');
+        }
+        $domainSuffix = array_values(array_unique($domainSuffix));
+
+        $rules = [];
+        if ($domain !== []) {
+            $rules[] = ['domain' => $domain];
+        }
+        if ($domainSuffix !== []) {
+            $rules[] = ['domain_suffix' => $domainSuffix];
+        }
+
+        return $rules;
     }
     /**
      * @param  array<int, string>  $directDomains

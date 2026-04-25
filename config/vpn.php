@@ -55,4 +55,33 @@ return [
         'VPN_SING_BOX_WARP_PEER_PUBLIC_KEY',
         'bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo='
     ),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Только Gemini: хосты и суффиксы для WARP (Marzban Xray + sing-box rule-set)
+    |--------------------------------------------------------------------------
+    | Узкий маршрут WARP = этот список + PANEL_WARP_ROUTING_*_EXTRA. Не «весь Google».
+    */
+    'gemini_warp_full_hosts' => [
+        'gemini.google.com',
+        'aistudio.google.com',
+        'ai.google.dev',
+        'makersuite.google.com',
+        'labs.google.com',
+        'notebooklm.google.com',
+        'jules.google.com',
+        'deepmind.google',
+        'opal.google.com',
+        'antigravity.google',
+        'stitch.withgoogle.com',
+        'alkalimakersuite-pa.clients6.google.com',
+        'webchannel-alkalimakersuite-pa.clients6.google.com',
+    ],
+    'gemini_warp_domain_suffixes' => [
+        'googleapis.com',
+        'gstatic.com',
+        'googleusercontent.com',
+        'clients6.google.com',
+        'google.dev',
+    ],
 ];
