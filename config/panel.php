@@ -303,6 +303,21 @@ return [
         env('PANEL_WARP_DEFAULT_ROUTING_ALL', false),
         FILTER_VALIDATE_BOOLEAN
     ),
+
+    /*
+    | При «все сайты через WARP»: исключения DIRECT **до** правила 0.0.0.0/0 → WARP.
+    | Иначе часть направлений даёт таймаут в sing-box (no route / недоступен DC Telegram и т.д.).
+    */
+    'warp_routing_full_bypass_geosite' => array_values(
+        array_filter(
+            array_map('trim', explode(',', (string) env('PANEL_WARP_FULL_BYPASS_GEOSITE', 'geosite:telegram')))
+        )
+    ),
+    'warp_routing_full_bypass_ip_cidr' => array_values(
+        array_filter(
+            array_map('trim', explode(',', (string) env('PANEL_WARP_FULL_BYPASS_IP', '149.154.0.0/16,91.108.0.0/16')))
+        )
+    ),
 ];
 
 

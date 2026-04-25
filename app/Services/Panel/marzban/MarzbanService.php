@@ -1620,6 +1620,22 @@ class MarzbanService
             }
 
             if (! empty($panel->warp_routing_all)) {
+                $bypassIps = config('panel.warp_routing_full_bypass_ip_cidr', []);
+                if (is_array($bypassIps) && $bypassIps !== []) {
+                    $routingRules[] = [
+                        'type' => 'field',
+                        'ip' => array_values($bypassIps),
+                        'outboundTag' => 'DIRECT',
+                    ];
+                }
+                $bypassGeos = config('panel.warp_routing_full_bypass_geosite', []);
+                if (is_array($bypassGeos) && $bypassGeos !== []) {
+                    $routingRules[] = [
+                        'type' => 'field',
+                        'domain' => array_values($bypassGeos),
+                        'outboundTag' => 'DIRECT',
+                    ];
+                }
                 $routingRules[] = [
                     'type' => 'field',
                     'ip' => [
