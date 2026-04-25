@@ -151,7 +151,8 @@ else
   log "curl нет — пропускаю тест через SOCKS"
 fi
 
-log "Готово. SOCKS5: 127.0.0.1:${PORT} (только localhost)."
-log "Если Xray в Docker без host-сети, укажите в админке вместо 127.0.0.1 — IP шлюза хоста (часто 172.17.0.1)."
+log "Готово. SOCKS5: sing-box слушает 0.0.0.0:${PORT} (доступен с хоста как 127.0.0.1 и с docker-сети как IP_шлюза_хоста, часто 172.17.0.1)."
+log "В админке (Marzban в Docker) укажите SOCKS хост: 172.17.0.1 (или вывод: docker network inspect bridge -f '{{(index .IPAM.Config 0).Gateway}}') — НЕ 127.0.0.1."
+log "Не публикуйте ${PORT} в интернет; при необходимости: ufw deny ${PORT} или allow только с docker-сети."
 
 exit 0

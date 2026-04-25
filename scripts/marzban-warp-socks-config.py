@@ -102,18 +102,20 @@ def main() -> None:
             for x in old.get("inbounds", []):
                 if not (
                     x.get("type") == "socks"
-                    and x.get("listen") == "127.0.0.1"
+                    and x.get("listen") in ("127.0.0.1", "0.0.0.0")
                     and int(x.get("listen_port", 0)) == port
                 ):
                     inbounds.append(x)
         except (json.JSONDecodeError, OSError, TypeError, ValueError):
             inbounds = []
     tag = "socks-warp-" + str(port)
+    # 0.0.0.0: чтобы Xray в Docker достучался с контейнера на IP шлюза хоста (часто 172.17.0.1).
+    # Не открывайте этот порт в интернет (ufw/iptables) — только localhost и docker0 при необходимости.
     inbounds.append(
         {
             "type": "socks",
             "tag": tag,
-            "listen": "127.0.0.1",
+            "listen": "0.0.0.0",
             "listen_port": port,
         }
     )
