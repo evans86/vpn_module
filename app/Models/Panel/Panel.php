@@ -94,11 +94,13 @@ class Panel extends Model
         'warp_socks_host',
         'warp_socks_port',
         'warp_routing_all',
+        'warp_wireguard_snapshot',
     ];
 
     protected $hidden = [
         'panel_password',
-        'auth_token'
+        'auth_token',
+        'warp_wireguard_snapshot',
     ];
 
     protected $casts = [
@@ -230,6 +232,43 @@ class Panel extends Model
             $this->attributes['reality_public_key'] = encrypt($value);
         } else {
             $this->attributes['reality_public_key'] = null;
+        }
+    }
+
+    /**
+     * Снимок wgcf (для нативного WireGuard в Xray): зашифрованный JSON в БД.
+     *
+     * @param  array<string, mixed>|null  $value
+     */
+    public function setWarpWireguardSnapshotAttribute($value): void
+    {
+        if ($value === null || $value === []) {
+            $this->attributes['warp_wireguard_snapshot'] = null;
+
+            return;
+        }
+        $this->attributes['warp_wireguard_snapshot'] = encrypt(json_encode($value));
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getWarpWireguardSnapshotAttribute($value)
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            $raw = decrypt($value);
+            if (! is_string($raw)) {
+                return null;
+            }
+            $decoded = json_decode($raw, true);
+
+            return is_array($decoded) ? $decoded : null;
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            return null;
         }
     }
 

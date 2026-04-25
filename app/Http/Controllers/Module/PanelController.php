@@ -502,6 +502,56 @@ class PanelController extends Controller
     }
 
     /**
+     * SSH: с ноды читает wgcf-profile.conf, сохраняет в панель и переприменяет Xray (нативный WireGuard при PANEL_WARP_OUTBOUND_PROTOCOL=auto|wireguard).
+     */
+    public function importWarpWireGuardSnapshot(Panel $panel): RedirectResponse
+    {
+        if ($panel->panel !== Panel::MARZBAN) {
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Импорт WARP (wgcf) только для панелей Marzban.');
+        }
+        if (! $panel->server_id) {
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'К панели не привязан сервер (нужен SSH).');
+        }
+
+        try {
+            $panel->refresh();
+            $result = app(MarzbanService::class)->importWarpWireGuardSnapshotFromNode($panel);
+            if (empty($result['ok'])) {
+                return redirect()->route('admin.module.panel.index')
+                    ->with('error', $result['message'] ?? 'Импорт не выполнен');
+            }
+        } catch (Exception $e) {
+            $this->logger->error('Импорт WARP (wgcf) с ноды', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Импорт WARP: '.$e->getMessage());
+        }
+
+        try {
+            $strategy = new PanelStrategy($panel->panel);
+            $strategy->reapplyCurrentConfiguration($panel->id);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'Параметры WireGuard (wgcf) сохранены в панели, конфиг Xray переприменён. При PANEL_WARP_OUTBOUND_PROTOCOL=auto Xray использует нативный WARP, если снимок есть, иначе — SOCKS.');
+        } catch (Exception $e) {
+            $this->logger->error('Переприменение после импорта WARP (wgcf)', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Ключи сохранены, но не удалось переприменить конфиг: '.$e->getMessage());
+        }
+    }
+
+    /**
      * SSH: sing-box + wgcf на сервере панели, затем (по флажку) маршрут WARP + переприменение.
      */
     public function installWarpSocksOnServer(Request $request, Panel $panel): RedirectResponse

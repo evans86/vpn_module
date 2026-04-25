@@ -548,6 +548,14 @@ class MarzbanService
 
             return;
         }
+        $importWg = $this->importWarpWireGuardSnapshotFromNode($panel);
+        if (! $importWg['ok']) {
+            Log::warning('WARP (фон): не удалось импортировать снимок wgcf для Xray (WireGuard)', [
+                'source' => 'panel',
+                'panel_id' => $panelId,
+                'message' => $importWg['message'] ?? '',
+            ]);
+        }
         try {
             $panel->refresh();
             // Marzban у нас в Docker; 127.0.0.1 в Xray = loopback контейнера, не sing-box на хосте
@@ -1515,26 +1523,33 @@ class MarzbanService
     }
 
     /**
-     * Список domain для маршрута WARP (узкий режим): только Gemini (config/vpn.php) + extras из .env.
+     * Список domain для маршрута WARP (узкий режим).
+     * Режим marzban: geosite:google + geosite:openai (как в доке Marzban). Режим gemini: config/vpn.php.
      *
      * @return list<string>
      */
     private function getWarpSelectiveDomainRules(): array
     {
         $list = [];
-        foreach (config('vpn.gemini_warp_full_hosts', []) as $h) {
-            $h = is_string($h) ? trim($h) : '';
-            if ($h === '') {
-                continue;
+        $base = (string) config('panel.warp_selective_base', 'marzban');
+        if ($base === 'gemini') {
+            foreach (config('vpn.gemini_warp_full_hosts', []) as $h) {
+                $h = is_string($h) ? trim($h) : '';
+                if ($h === '') {
+                    continue;
+                }
+                $list[] = 'full:'.$h;
             }
-            $list[] = 'full:'.$h;
-        }
-        foreach (config('vpn.gemini_warp_domain_suffixes', []) as $s) {
-            $s = is_string($s) ? trim($s) : '';
-            if ($s === '') {
-                continue;
+            foreach (config('vpn.gemini_warp_domain_suffixes', []) as $s) {
+                $s = is_string($s) ? trim($s) : '';
+                if ($s === '') {
+                    continue;
+                }
+                $list[] = 'domain:'.ltrim($s, '.');
             }
-            $list[] = 'domain:'.ltrim($s, '.');
+        } else {
+            $list[] = 'geosite:google';
+            $list[] = 'geosite:openai';
         }
         foreach (config('panel.warp_routing_geosite_extra', []) as $g) {
             $g = is_string($g) ? trim($g) : '';
@@ -1556,6 +1571,248 @@ class MarzbanService
         }
 
         return array_values(array_unique($list));
+    }
+
+    /**
+     * SOCKS5 к локальному sing-box / WARP (Marzban дока, вариант 2).
+     *
+     * @return array<string, mixed>
+     */
+    private function buildWarpSocksOutbound(Panel $panel): array
+    {
+        $defHost = (string) config('panel.warp_default_socks_host', '127.0.0.1');
+        $host = trim((string) ($panel->warp_socks_host ?: $defHost));
+        if ($host === '') {
+            $host = $defHost;
+        }
+        $port = $panel->warp_socks_port ?? (int) config('panel.warp_default_socks_port', 40000);
+        if ($port < 1 || $port > 65535) {
+            $port = (int) config('panel.warp_default_socks_port', 40000);
+        }
+
+        return [
+            'protocol' => 'socks',
+            'tag' => 'WARP',
+            'settings' => [
+                'servers' => [
+                    [
+                        'address' => $host,
+                        'port' => $port,
+                        'udp' => true,
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    private const WARP_WGCF_REMOTE_DIR = '/opt/marzban-warp-socks';
+
+    /**
+     * С ноды читает wgcf-profile.conf, парсит и сохраняет в панель (нативный WireGuard в Xray без ручного .env).
+     *
+     * @return array{ok: bool, message: string}
+     */
+    public function importWarpWireGuardSnapshotFromNode(Panel $panel): array
+    {
+        if ($panel->panel !== Panel::MARZBAN) {
+            return ['ok' => false, 'message' => 'Только Marzban.'];
+        }
+        $panel->load('server');
+        if (! $panel->server) {
+            return ['ok' => false, 'message' => 'Нет сервера (SSH).'];
+        }
+        $serverDto = ServerFactory::fromEntity($panel->server);
+        $ssh = $this->connectSshAdapter($serverDto);
+        $oldTimeout = $ssh->getTimeout() ?? 100000;
+        $ssh->setTimeout(60);
+        try {
+            $dir = self::WARP_WGCF_REMOTE_DIR;
+            $cat = "( test -f {$dir}/wgcf-profile.conf && cat {$dir}/wgcf-profile.conf ) || ( test -f {$dir}/wgcf.conf && cat {$dir}/wgcf.conf ) || echo ''";
+            $text = trim((string) $ssh->exec($cat.' 2>&1'));
+        } finally {
+            $ssh->setTimeout($oldTimeout);
+        }
+        if ($text === '') {
+            return ['ok' => false, 'message' => 'На ноде нет '.self::WARP_WGCF_REMOTE_DIR.'/wgcf-profile.conf (или wgcf.conf). Сначала выполните автоустановку WARP.'];
+        }
+        $parsed = $this->parseWgcfProfileConf($text);
+        if ($parsed === null) {
+            return ['ok' => false, 'message' => 'Не удалось разобрать wgcf-конфиг (PrivateKey / Address / Peer).'];
+        }
+        $panel->warp_wireguard_snapshot = $parsed;
+        $panel->save();
+
+        return ['ok' => true, 'message' => 'Ключи WARP (wgcf) сохранены в панели. Конфиг Xray перепримените вручную или откройте карточку панели.'];
+    }
+
+    /**
+     * @return array{privateKey: string, address: list<string>, peerPublicKey: string, endpoint: string, reserved?: list<int>}|null
+     */
+    private function parseWgcfProfileConf(string $text): ?array
+    {
+        $sections = [];
+        $cur = null;
+        foreach (preg_split('/\R/', $text) as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+            if (preg_match('/^\[([^\]]+)\]$/', $line, $m)) {
+                $cur = $m[1];
+                $sections[$cur] = $sections[$cur] ?? [];
+
+                continue;
+            }
+            if ($cur !== null && str_contains($line, '=')) {
+                $parts = explode('=', $line, 2);
+                $sections[$cur][trim($parts[0])] = trim($parts[1] ?? '');
+            }
+        }
+        $iface = $sections['Interface'] ?? null;
+        $peer = $sections['Peer'] ?? null;
+        if (! is_array($iface) || ! is_array($peer)) {
+            return null;
+        }
+        $priv = (string) ($iface['PrivateKey'] ?? '');
+        if (trim($priv) === '') {
+            return null;
+        }
+        $addrRaw = (string) ($iface['Address'] ?? '');
+        $addresses = [];
+        foreach (preg_split('/[,\s]+/', $addrRaw, -1, PREG_SPLIT_NO_EMPTY) as $a) {
+            $a = trim($a);
+            if ($a !== '') {
+                $addresses[] = $a;
+            }
+        }
+        if ($addresses === []) {
+            return null;
+        }
+        $peerPub = trim((string) ($peer['PublicKey'] ?? ''));
+        if ($peerPub === '') {
+            return null;
+        }
+        $endpoint = trim((string) ($peer['Endpoint'] ?? 'engage.cloudflareclient.com:2408'));
+        if ($endpoint === '') {
+            $endpoint = 'engage.cloudflareclient.com:2408';
+        }
+        $out = [
+            'privateKey' => $priv,
+            'address' => array_values($addresses),
+            'peerPublicKey' => $peerPub,
+            'endpoint' => $endpoint,
+        ];
+        if (! empty($iface['Reserved'])) {
+            $r = [];
+            foreach (preg_split('/[,\s]+/', (string) $iface['Reserved'], -1, PREG_SPLIT_NO_EMPTY) as $p) {
+                if (is_numeric(trim($p))) {
+                    $r[] = (int) trim($p);
+                }
+            }
+            if (count($r) === 3) {
+                $out['reserved'] = $r;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Нативный WireGuard в Xray: снимок панели (после автоимпорта) или PANEL_WARP_WG_* в .env.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function buildWarpWireGuardOutbound(Panel $panel): ?array
+    {
+        $sk = '';
+        $addrs = [];
+        $peerPub = '';
+        $endpoint = (string) config('panel.warp_wireguard_endpoint', 'engage.cloudflareclient.com:2408');
+        $endpoint = trim($endpoint) !== '' ? trim($endpoint) : 'engage.cloudflareclient.com:2408';
+        $reserved = null;
+
+        $snap = $panel->warp_wireguard_snapshot;
+        if (is_array($snap) && ! empty($snap['privateKey'])) {
+            $sk = trim((string) $snap['privateKey']);
+            $addrs = is_array($snap['address'] ?? null) ? $snap['address'] : [];
+            $peerPub = trim((string) ($snap['peerPublicKey'] ?? ''));
+            if (! empty($snap['endpoint'])) {
+                $endpoint = trim((string) $snap['endpoint']) ?: $endpoint;
+            }
+            if (isset($snap['reserved']) && is_array($snap['reserved']) && count($snap['reserved']) === 3) {
+                $reserved = array_values($snap['reserved']);
+            }
+        }
+        if ($sk === '' || $addrs === [] || $peerPub === '') {
+            $sk = trim((string) config('panel.warp_wireguard_secret_key', ''));
+            $addrs = config('panel.warp_wireguard_address', []);
+            if (! is_array($addrs)) {
+                $addrs = [];
+            }
+            $peerPub = trim((string) config('panel.warp_wireguard_peer_public_key', ''));
+            $envReserved = config('panel.warp_wireguard_reserved', []);
+            if (is_array($envReserved) && count($envReserved) === 3) {
+                $reserved = array_values($envReserved);
+            }
+        }
+        if ($sk === '' || $addrs === [] || trim($peerPub) === '') {
+            return null;
+        }
+
+        $settings = [
+            'secretKey' => $sk,
+            'address' => array_values($addrs),
+            'peers' => [
+                [
+                    'publicKey' => $peerPub,
+                    'endpoint' => $endpoint,
+                ],
+            ],
+            'noKernelTun' => (bool) config('panel.warp_wireguard_no_kernel_tun', true),
+            'mtu' => max(576, (int) config('panel.warp_wireguard_mtu', 1420)),
+            'domainStrategy' => 'ForceIP',
+        ];
+        if (is_array($reserved) && count($reserved) === 3) {
+            $settings['reserved'] = $reserved;
+        }
+
+        return [
+            'protocol' => 'wireguard',
+            'tag' => 'WARP',
+            'settings' => $settings,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function resolveWarpOutbound(Panel $panel): array
+    {
+        $proto = strtolower((string) config('panel.warp_outbound_protocol', 'auto'));
+        if ($proto === 'socks') {
+            return $this->buildWarpSocksOutbound($panel);
+        }
+
+        $wg = $this->buildWarpWireGuardOutbound($panel);
+        if ($proto === 'wireguard') {
+            if ($wg !== null) {
+                return $wg;
+            }
+            Log::warning('WARP: protocol=wireguard, но нет ключей (снимок панели или PANEL_WARP_WG_*) — fallback SOCKS', [
+                'panel_id' => $panel->id,
+            ]);
+
+            return $this->buildWarpSocksOutbound($panel);
+        }
+
+        if ($proto === 'auto' && $wg !== null) {
+            return $wg;
+        }
+        if ($proto === 'auto' && $wg === null) {
+            return $this->buildWarpSocksOutbound($panel);
+        }
+
+        return $this->buildWarpSocksOutbound($panel);
     }
 
     /**
@@ -1587,30 +1844,7 @@ class MarzbanService
         $outbounds = [$directOutbound];
 
         if ($panel && $panel->warp_routing_enabled) {
-            $defHost = (string) config('panel.warp_default_socks_host', '127.0.0.1');
-            $host = trim((string) ($panel->warp_socks_host ?: $defHost));
-            if ($host === '') {
-                $host = $defHost;
-            }
-            $port = $panel->warp_socks_port ?? (int) config('panel.warp_default_socks_port', 40000);
-            if ($port < 1 || $port > 65535) {
-                $port = (int) config('panel.warp_default_socks_port', 40000);
-            }
-
-            $warpOutbound = [
-                'protocol' => 'socks',
-                'tag' => 'WARP',
-                'settings' => [
-                    'servers' => [
-                        [
-                            'address' => $host,
-                            'port' => $port,
-                            // иначе часть трафика (QUIC, VoIP) без UDP через SOCKS — таймауты/обрывы
-                            'udp' => true,
-                        ],
-                    ],
-                ],
-            ];
+            $warpOutbound = $this->resolveWarpOutbound($panel);
 
             // Полный туннель: при сбое «0.0.0.0/0»/доменного матча Xray берёт ПЕРВЫЙ outbound — должен быть WARP, не freedom.
             if (! empty($panel->warp_routing_all)) {

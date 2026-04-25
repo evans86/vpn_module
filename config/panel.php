@@ -305,6 +305,58 @@ return [
     ),
 
     /*
+    | Исходящий WARP: socks (как в Marzban вар.2 — к локальному sing-box) или wireguard (Marzban вар.1 — в Xray).
+    | @see https://marzban-docs.sm1ky.com/tutorials/cloudflare-warp/
+    */
+    // socks | wireguard | auto — auto: нативный WG из снимка на панели или .env, иначе SOCKS
+    'warp_outbound_protocol' => strtolower((string) env('PANEL_WARP_OUTBOUND_PROTOCOL', 'auto')),
+
+    /*
+    | Нативный WireGuard в Xray: зашифрованный снимок с ноды (wgcf) в панели или PANEL_WARP_WG_* в .env.
+    | Для protocol=wireguard без снимка нужны PANEL_WARP_WG_SECRET_KEY + PANEL_WARP_WG_ADDRESS.
+    | В Docker/LXC обычно no_kernel_tun=true.
+    */
+    'warp_wireguard_secret_key' => trim((string) env('PANEL_WARP_WG_SECRET_KEY', '')),
+    'warp_wireguard_address' => array_values(
+        array_filter(
+            array_map('trim', explode(',', (string) env('PANEL_WARP_WG_ADDRESS', '')))
+        )
+    ),
+    'warp_wireguard_peer_public_key' => trim((string) env(
+        'PANEL_WARP_WG_PEER_PUBLIC_KEY',
+        'bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo='
+    )),
+    'warp_wireguard_endpoint' => trim((string) env('PANEL_WARP_WG_ENDPOINT', 'engage.cloudflareclient.com:2408'))
+        ?: 'engage.cloudflareclient.com:2408',
+    // Три байта через запятую, как в wgcf (или пусто — не передаётся в Xray)
+    'warp_wireguard_reserved' => (static function (): array {
+        $raw = trim((string) env('PANEL_WARP_WG_RESERVED', ''));
+        if ($raw === '') {
+            return [];
+        }
+        $parts = array_map('trim', explode(',', $raw));
+        $out = [];
+        foreach ($parts as $p) {
+            if ($p === '' || ! is_numeric($p)) {
+                continue;
+            }
+            $out[] = (int) $p;
+        }
+
+        return count($out) === 3 ? $out : [];
+    })(),
+    'warp_wireguard_no_kernel_tun' => filter_var(
+        env('PANEL_WARP_WG_NO_KERNEL_TUN', true),
+        FILTER_VALIDATE_BOOL
+    ),
+    'warp_wireguard_mtu' => (int) env('PANEL_WARP_WG_MTU', 1420),
+
+    /*
+    | Узкий маршрут: marzban — geosite:google + geosite:openai (как в доке), gemini — только список config/vpn.php.
+    */
+    'warp_selective_base' => strtolower((string) env('PANEL_WARP_SELECTIVE_BASE', 'marzban')),
+
+    /*
     | При «все сайты через WARP»: исключения DIRECT **до** правила 0.0.0.0/0 → WARP.
     | Иначе часть направлений даёт таймаут в sing-box (no route / недоступен DC Telegram и т.д.).
     */

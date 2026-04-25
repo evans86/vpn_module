@@ -310,6 +310,12 @@
                                                                 Проверить настройку
                                                             </button>
                                                         </form>
+                                                        <form action="{{ route('admin.module.panel.import-warp-wireguard-snapshot', $panel) }}" method="POST" class="inline" onsubmit="return confirm('Считать wgcf-profile.conf с ноды и сохранить в панель (для нативного WireGuard в Xray)?');">
+                                                            @csrf
+                                                            <button type="submit" class="inline-flex items-center justify-center px-2.5 py-1.5 text-[11px] font-medium rounded-md text-slate-800 bg-white border border-slate-300 hover:bg-slate-50" title="SSH: /opt/marzban-warp-socks/wgcf-profile.conf → зашифрованный снимок в БД; затем переприменение конфига">
+                                                                Подтянуть wgcf (WireGuard)
+                                                            </button>
+                                                        </form>
                                                     @endif
                                                 </div>
                                                 <details class="mt-1 rounded border border-cyan-200/80 bg-white/60" id="warpDetails{{ (int) $panel->id }}">
@@ -318,7 +324,7 @@
                                                     </summary>
                                                     <div class="px-2 pb-3 pt-0 space-y-2 border-t border-cyan-100">
                                                         <p class="text-[10px] text-cyan-800 leading-snug pt-2">
-                                                            SOCKS5 к WARP: часто <code class="bg-cyan-50 px-0.5 rounded">127.0.0.1:{{ config('panel.warp_default_socks_port', 40000) }}</code> на хосте. В Docker — IP хоста, иначе таймауты к 127.0.0.1.
+                                                            Рекомендация <a href="https://marzban-docs.sm1ky.com/tutorials/cloudflare-warp/" class="text-cyan-700 underline" target="_blank" rel="noopener">Marzban</a>: <strong>auto</strong> (по умолчанию) — нативный <strong>WireGuard</strong> в Xray, если в панели есть снимок после автоустановки/кнопки «Подтянуть wgcf», иначе <strong>SOCKS</strong>. Вручную: <code class="bg-cyan-50 px-0.5 rounded">PANEL_WARP_OUTBOUND_PROTOCOL=wireguard</code> и <code class="bg-cyan-50 px-0.5 rounded">PANEL_WARP_WG_*</code> в <code class="bg-cyan-50 px-0.5 rounded">.env</code> из <code class="bg-cyan-50 px-0.5 rounded">wgcf</code>. Только SOCKS: <code class="bg-cyan-50 px-0.5 rounded">PANEL_WARP_OUTBOUND_PROTOCOL=socks</code> — <code class="bg-cyan-50 px-0.5 rounded">127.0.0.1:{{ config('panel.warp_default_socks_port', 40000) }}</code> на хосте, в Docker — IP хоста (часто 172.17.0.1).
                                                         </p>
                                                         <form action="{{ route('admin.module.panel.update-warp-routing', $panel) }}" method="POST" class="space-y-2">
                                                             @csrf
