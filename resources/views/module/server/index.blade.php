@@ -281,17 +281,46 @@
                                             </div>
                                         </div>
                                     @endif
+                                    @php
+                                        $decoyStubActive = $server->decoy_stub_last_applied_at
+                                            && !\Illuminate\Support\Str::startsWith((string) ($server->decoy_stub_last_message ?? ''), 'Ошибка:');
+                                    @endphp
                                     <div class="mb-3 p-3 bg-slate-50 border border-slate-200 rounded-md space-y-2">
                                         <p class="text-sm text-slate-800 font-medium">Nginx-заглушка по IP (80/443)</p>
-                                        <p class="text-xs text-slate-600">Копирует <code class="text-xs">deploy/stub-assets</code> и конфиг default_server. Нужен root SSH и nginx в ОС.</p>
-                                        @if($server->decoy_stub_last_applied_at || $server->decoy_stub_last_message)
-                                            <p class="text-xs text-slate-700">
-                                                <span class="font-medium">После последнего запуска:</span>
-                                                @if($server->decoy_stub_last_applied_at)
-                                                    {{ $server->decoy_stub_last_applied_at->format('d.m.Y H:i') }} —
-                                                @endif
-                                                {{ \Illuminate\Support\Str::limit((string) $server->decoy_stub_last_message, 200) }}
-                                            </p>
+                                        @if(! $decoyStubActive)
+                                            <p class="text-xs text-slate-600">Копирует <code class="text-xs">deploy/stub-assets</code> и конфиг default_server. Нужен root SSH, nginx в ОС или Docker (по веткам панели).</p>
+                                        @endif
+                                        @if($decoyStubActive)
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <button type="button"
+                                                        onclick="applyDecoyStub({{ $server->id }}, true)"
+                                                        class="group inline-flex items-center gap-2 pl-1 pr-2 py-1 rounded-md text-sm font-medium text-emerald-900 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-emerald-500"
+                                                        title="Нажмите, чтобы снова применить заглушку (те же настройки по SSH)">
+                                                    <span class="inline-flex items-center justify-center w-7 h-7 rounded bg-emerald-200/80 text-emerald-800 group-hover:bg-emerald-200">
+                                                        <i class="fas fa-check text-sm"></i>
+                                                    </span>
+                                                    <span class="pr-0.5">Включена</span>
+                                                    <span class="text-xs font-normal text-emerald-800/80 border-l border-emerald-300 pl-2 ml-0.5">
+                                                        {{ $server->decoy_stub_last_applied_at?->format('d.m.Y H:i') }}
+                                                    </span>
+                                                    <i class="fas fa-sync-alt text-xs text-emerald-700/80 ml-0.5" aria-hidden="true"></i>
+                                                </button>
+                                            </div>
+                                            @if($server->decoy_stub_last_message)
+                                                <p class="text-xs text-slate-600" title="{{ $server->decoy_stub_last_message }}">
+                                                    {{ \Illuminate\Support\Str::limit((string) $server->decoy_stub_last_message, 140) }}
+                                                </p>
+                                            @endif
+                                        @else
+                                            @if($server->decoy_stub_last_message)
+                                                <p class="text-xs text-slate-700">
+                                                    <span class="font-medium">После последнего запуска:</span>
+                                                    @if($server->decoy_stub_last_applied_at)
+                                                        {{ $server->decoy_stub_last_applied_at->format('d.m.Y H:i') }} —
+                                                    @endif
+                                                    {{ \Illuminate\Support\Str::limit((string) $server->decoy_stub_last_message, 200) }}
+                                                </p>
+                                            @endif
                                         @endif
                                         <label class="inline-flex items-center gap-2 text-sm text-slate-800 cursor-pointer">
                                             <input type="checkbox" id="decoyStub123-{{ $server->id }}"
@@ -299,13 +328,15 @@
                                                    @if($server->decoy_stub_include_123_rar) checked @endif>
                                             <span>Добавить «приманку» <code class="text-xs">123.rar</code> (~15 МиБ в каталоге заглушки)</span>
                                         </label>
-                                        <div>
-                                            <button type="button" onclick="applyDecoyStub({{ $server->id }})"
-                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-slate-800 bg-white hover:bg-slate-100 border border-slate-300 transition-colors">
-                                                <i class="fas fa-mask mr-2"></i>
-                                                <span>Применить заглушку</span>
-                                            </button>
-                                        </div>
+                                        @if(! $decoyStubActive)
+                                            <div>
+                                                <button type="button" onclick="applyDecoyStub({{ $server->id }}, false)"
+                                                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-slate-800 bg-white hover:bg-slate-100 border border-slate-300 transition-colors">
+                                                    <i class="fas fa-mask mr-2"></i>
+                                                    <span>Применить заглушку</span>
+                                                </button>
+                                            </div>
+                                        @endif
                                     </div>
                                     {{-- Одна строка кнопок: по 2 в ряд (flex + basis), «Удалить» на всю ширину --}}
                                     <div class="flex flex-wrap gap-2">
@@ -854,8 +885,11 @@
                 });
             });
 
-            function applyDecoyStub(id) {
-                if (!confirm('Развернуть Nginx-заглушку на этом сервере (SSH, /etc/nginx, /var/www)?')) {
+            function applyDecoyStub(id, isUpdate) {
+                var msg = isUpdate
+                    ? 'Обновить Nginx-заглушку на этом сервере (тот же SSH, nginx/caddy, каталог /var/www/panel-stub)?'
+                    : 'Развернуть Nginx-заглушку на этом сервере (SSH, /etc/nginx, /var/www)?';
+                if (!confirm(msg)) {
                     return;
                 }
                 const includeRar = document.getElementById('decoyStub123-' + id) ? document.getElementById('decoyStub123-' + id).checked : false;
