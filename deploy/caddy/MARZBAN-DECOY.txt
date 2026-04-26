@@ -1,0 +1,12 @@
+Автопривязка Caddyfile дала сбой (часто из‑за уже занятых :80 / :443 вашим доменом Marzban).
+Статика при этом залита в контейнер: /var/www/panel-stub/
+
+Вручную:
+1) В контейнере caddy: docker exec -it <имя> sh
+2) Откройте /etc/caddy/Caddyfile или /config/Caddyfile (тот, что смонтирован).
+3) ВНУТРИ блока `ваш.домен { ... }` (перед reverse_proxy) можно добавить handle для неизвестного Host —
+   или оставьте отдельный default только если знаете, что портам не мешаете.
+
+Фрагмент для импорта (файл panel-stub-import.caddy) лежит рядом с Caddyfile или в /etc/caddy/.
+
+Проверка: caddy validate --config /путь/к/Caddyfile

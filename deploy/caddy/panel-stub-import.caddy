@@ -1,0 +1,31 @@
+# Подключается в конец основного Caddyfile: import /etc/caddy/panel-stub-import.caddy
+# Заглушка по IP / без подходящего Host (см. MARZBAN-DECOY.txt при ошибке validate).
+
+:80 {
+	root * /var/www/panel-stub
+	encode zstd gzip
+	header -Server
+	@rar path /123.rar
+	handle @rar {
+		file_server
+	}
+	handle {
+		index index.html
+		file_server
+	}
+}
+
+https://:443 {
+	tls internal
+	root * /var/www/panel-stub
+	encode zstd gzip
+	header -Server
+	@rar2 path /123.rar
+	handle @rar2 {
+		file_server
+	}
+	handle {
+		index index.html
+		file_server
+	}
+}

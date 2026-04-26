@@ -13,8 +13,7 @@ use phpseclib3\Net\SSH2;
 use RuntimeException;
 
 /**
- * Заглушка Nginx (default_server) на 80/443: сначала nginx в ОС, иначе контейнер Docker с образом nginx/openresty
- * (Marzban и др. — часто без бинарника на хосте).
+ * Заглушка 80/443: nginx в ОС → docker nginx → docker Caddy (Marzban).
  */
 class ServerDecoyStubService
 {
@@ -22,7 +21,12 @@ class ServerDecoyStubService
 
     private const NGINX_CONF = '/etc/nginx/conf.d/00-panel-stub.conf';
 
+    private const DECOY_CADDY_MARKER = '# DECOY_STUB_ADMIN_IMPORT';
+
     private MarzbanService $marzbanService;
+
+    /** @var string доп. текст к успеху (частичное применение Caddy) */
+    private string $caddyPostscript = '';
 
     public function __construct(MarzbanService $marzbanService)
     {
@@ -62,32 +66,55 @@ class ServerDecoyStubService
                 throw new RuntimeException('SFTP: не удалось войти');
             }
 
+            $this->caddyPostscript = '';
             $hostNginx = $this->resolveNginxBinary($ssh);
             if ($hostNginx !== null) {
                 $this->applyOnHostNginx($ssh, $sftp, $indexPath, $nginxPath, $include123Rar, $hostNginx);
             } else {
                 $docker = $this->resolveDockerNginxContext($ssh);
-                if ($docker === null) {
-                    throw $this->notFoundException();
+                if ($docker !== null) {
+                    $this->applyInDockerNginx(
+                        $ssh,
+                        $sftp,
+                        $indexPath,
+                        $nginxPath,
+                        $include123Rar,
+                        $docker['container_id'],
+                        $docker['docker_argv']
+                    );
+                } else {
+                    $caddy = $this->resolveDockerCaddyContext($ssh);
+                    if ($caddy === null) {
+                        throw $this->notFoundException();
+                    }
+                    $caddyImport = base_path('deploy/caddy/panel-stub-import.caddy');
+                    if (! is_readable($caddyImport)) {
+                        throw new RuntimeException('В проекте нет deploy/caddy/panel-stub-import.caddy');
+                    }
+                    $this->applyInDockerCaddy(
+                        $ssh,
+                        $sftp,
+                        $indexPath,
+                        $caddyImport,
+                        $include123Rar,
+                        $caddy['container_id'],
+                        $caddy['docker_argv']
+                    );
                 }
-                $this->applyInDockerNginx(
-                    $ssh,
-                    $sftp,
-                    $indexPath,
-                    $nginxPath,
-                    $include123Rar,
-                    $docker['container_id'],
-                    $docker['docker_argv']
-                );
             }
 
             $server->decoy_stub_last_applied_at = now();
-            $server->decoy_stub_last_message = 'Заглушка применена (default_server 80/443).';
+            $baseMsg = 'Готово: заглушка на 80/443. Проверьте запрос к IP.';
+            if ($this->caddyPostscript !== '') {
+                $baseMsg .= ' '.$this->caddyPostscript;
+            }
+            $this->caddyPostscript = '';
+            $server->decoy_stub_last_message = $baseMsg;
             $server->save();
 
             Log::info('Decoy stub applied', ['server_id' => $server->id, 'include_123' => $include123Rar]);
 
-            return ['success' => true, 'message' => 'Готово: заглушка на 80/443. Проверьте запрос к IP.'];
+            return ['success' => true, 'message' => $baseMsg];
         } catch (Exception $e) {
             $msg = $e->getMessage();
             $server->decoy_stub_last_message = 'Ошибка: '.$msg;
@@ -105,9 +132,8 @@ class ServerDecoyStubService
     private function notFoundException(): RuntimeException
     {
         return new RuntimeException(
-            'Нет nginx в ОС и нет Docker-контейнера с образом nginx/openresty. '
-            .'Marzban на 80/443 часто отдаёт Caddy, а не nginx — кнопка не сможет выставить эту nginx-заглушку сама. '
-            .'Варианты: apt install nginx на хост (если порты 80/443 свободны), отдельный контейнер nginx, либо вручную в том, что слушает 80/443.'
+            'Нет: nginx в ОС, docker-образа nginx/openresty и docker-образа caddy. '
+            .'Проверьте `docker ps` и доступ к docker. Либо apt install nginx на хост, если 80/443 не заняты.'
         );
     }
 
@@ -317,6 +343,206 @@ BASH;
         }
 
         return null;
+    }
+
+    /**
+     * Первый контейнер, в имени образа которого есть caddy (часто Marzban).
+     *
+     * @return array{container_id: string, docker_argv: list<string>}|null
+     */
+    private function resolveDockerCaddyContext(SSH2 $ssh): ?array
+    {
+        $script = <<<'BASH'
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+if docker info >/dev/null 2>&1; then
+  MODE=direct
+  LINE=$(docker ps --no-trunc --format '{{.ID}}|{{.Image}}' 2>/dev/null | grep -iF 'caddy' | head -1)
+elif command -v sudo >/dev/null 2>&1 && sudo -n docker info >/dev/null 2>&1; then
+  MODE=sudo
+  LINE=$(sudo docker ps --no-trunc --format '{{.ID}}|{{.Image}}' 2>/dev/null | grep -iF 'caddy' | head -1)
+else
+  exit 1
+fi
+if [ -z "$LINE" ]; then
+  exit 1
+fi
+CID=${LINE%%|*}
+echo "$MODE"
+echo "$CID"
+BASH;
+
+        $out = trim((string) $ssh->exec('bash -lc '.escapeshellarg($script)));
+        if ($ssh->getExitStatus() !== 0 || $out === '') {
+            return null;
+        }
+        $lines = preg_split('/\R/', $out, -1, PREG_SPLIT_NO_EMPTY);
+        if (count($lines) < 2) {
+            return null;
+        }
+        $mode = $lines[0];
+        $containerId = $lines[1];
+        if (! preg_match('/^[a-f0-9]{4,64}$/i', $containerId)) {
+            return null;
+        }
+        if ($mode === 'direct') {
+            return ['container_id' => $containerId, 'docker_argv' => ['docker']];
+        }
+        if ($mode === 'sudo') {
+            return ['container_id' => $containerId, 'docker_argv' => ['sudo', 'docker']];
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  list<string>  $dockerArgv
+     */
+    private function applyInDockerCaddy(
+        SSH2 $ssh,
+        SFTP $sftp,
+        string $indexPath,
+        string $caddyImportPath,
+        bool $include123Rar,
+        string $containerId,
+        array $dockerArgv
+    ): void {
+        $dc = $this->shellJoinEscaped($dockerArgv);
+        $c = escapeshellarg($containerId);
+        $tmp = '/tmp/panel-caddy-'.bin2hex(random_bytes(4));
+
+        $ssh->exec('mkdir -p '.escapeshellarg($tmp).' 2>&1');
+        if (! $sftp->put($tmp.'/index.html', $indexPath, SFTP::SOURCE_LOCAL_FILE)) {
+            throw new RuntimeException('Не удалось загрузить index.html (Caddy /tmp)');
+        }
+        if (! $sftp->put($tmp.'/panel-stub-import.caddy', $caddyImportPath, SFTP::SOURCE_LOCAL_FILE)) {
+            throw new RuntimeException('Не удалось залить panel-stub-import.caddy');
+        }
+        $readme = base_path('deploy/caddy/MARZBAN-DECOY.txt');
+        if (is_readable($readme)) {
+            $sftp->put($tmp.'/MARZBAN-DECOY.txt', $readme, SFTP::SOURCE_LOCAL_FILE);
+        }
+
+        $mout = (string) $ssh->exec($dc.' exec '.$c.' sh -c '.escapeshellarg('mkdir -p /var/www/panel-stub').' 2>&1');
+        if ($ssh->getExitStatus() !== 0) {
+            throw new RuntimeException('docker exec mkdir (Caddy): '.Str::limit($mout, 500));
+        }
+        $c1 = (string) $ssh->exec($dc.' cp '.escapeshellarg($tmp.'/index.html')." {$c}:/var/www/panel-stub/index.html 2>&1");
+        if ($ssh->getExitStatus() !== 0) {
+            throw new RuntimeException('docker cp index (Caddy): '.Str::limit($c1, 500));
+        }
+        if ($include123Rar) {
+            $dout = (string) $ssh->exec(
+                $dc.' exec '.$c.' sh -c '.escapeshellarg(
+                    'dd if=/dev/zero of=/var/www/panel-stub/123.rar bs=1M count=15 status=none && chmod 644 /var/www/panel-stub/123.rar'
+                ).' 2>&1'
+            );
+            if ($ssh->getExitStatus() !== 0) {
+                throw new RuntimeException('dd 123.rar (Caddy): '.Str::limit($dout, 500));
+            }
+        } else {
+            $ssh->exec($dc.' exec '.$c.' rm -f /var/www/panel-stub/123.rar 2>/dev/null; true');
+        }
+
+        $mainFind = (string) $ssh->exec(
+            $dc.' exec '.$c.' sh -c '.escapeshellarg('for f in /etc/caddy/Caddyfile /config/Caddyfile; do [ -f "$f" ] && echo "$f" && exit 0; done; exit 1').' 2>&1'
+        );
+        if ($ssh->getExitStatus() !== 0 || $mainFind === '') {
+            $this->caddyPostscript = 'Статика в /var/www/panel-stub в контейнере caddy, но Caddyfile не найден (ожидали /etc/caddy/Caddyfile или /config/Caddyfile).';
+            $ssh->exec('rm -rf '.escapeshellarg($tmp).' 2>/dev/null; true');
+
+            return;
+        }
+        $main = trim($mainFind);
+        $dir = rtrim((string) preg_replace('#[/\\\\][^/\\\\]*$#', '', $main), '/');
+        $frag = ($dir !== '' ? $dir : '/etc/caddy').'/panel-stub-import.caddy';
+        $readmeInContainer = '';
+
+        $x = (string) $ssh->exec(
+            $dc.' cp '.escapeshellarg($tmp.'/panel-stub-import.caddy').' '.$c.':'.escapeshellarg($frag).' 2>&1'
+        );
+        if ($ssh->getExitStatus() !== 0) {
+            $this->caddyPostscript = 'Статика залита; не удалось docker cp Caddy-фрагмента: '.Str::limit($x, 400);
+            $ssh->exec('rm -rf '.escapeshellarg($tmp).' 2>/dev/null; true');
+
+            return;
+        }
+        if (is_readable($readme)) {
+            $readmeInContainer = ($dir !== '' ? $dir : '/config').'/MARZBAN-DECOY.txt';
+            $ssh->exec(
+                $dc.' cp '.escapeshellarg($tmp.'/MARZBAN-DECOY.txt').' '.$c.':'.escapeshellarg($readmeInContainer).' 2>&1'
+            );
+        }
+
+        $appendBash = 'set -e'."\n"
+            .'M='.escapeshellarg(self::DECOY_CADDY_MARKER)."\n"
+            .'MAIN='.escapeshellarg($main)."\n"
+            .'FRAG='.escapeshellarg($frag)."\n"
+            .'grep -qF "$M" "$MAIN" 2>/dev/null || { printf "\n%s\n" "$M" >> "$MAIN" && printf "import %s\n" "$FRAG" >> "$MAIN"; }'."\n";
+        $localSh = (string) tempnam(sys_get_temp_dir(), 'caddy-a-');
+        file_put_contents($localSh, $appendBash, LOCK_EX);
+        if (! $sftp->put($tmp.'/append-caddy.sh', $localSh, SFTP::SOURCE_LOCAL_FILE)) {
+            @unlink($localSh);
+            throw new RuntimeException('SFTP: не удалось залить append-caddy.sh');
+        }
+        @unlink($localSh);
+        $ssh->exec('chmod 755 '.escapeshellarg($tmp.'/append-caddy.sh').' 2>&1');
+        $aout = (string) $ssh->exec(
+            $dc.' cp '.escapeshellarg($tmp.'/append-caddy.sh')." {$c}:/tmp/append-caddy.sh 2>&1"
+        );
+        if ($ssh->getExitStatus() !== 0) {
+            $this->caddyPostscript = 'Статика залита; не удалось docker cp append-скрипта: '.Str::limit($aout, 400);
+            $ssh->exec('rm -rf '.escapeshellarg($tmp).' 2>/dev/null; true');
+
+            return;
+        }
+        $aout = (string) $ssh->exec($dc.' exec '.$c.' sh /tmp/append-caddy.sh 2>&1');
+        $appendOk = $ssh->getExitStatus() === 0;
+        $ssh->exec($dc.' exec '.$c.' rm -f /tmp/append-caddy.sh 2>/dev/null; true');
+        if (! $appendOk) {
+            $this->caddyPostscript = 'Статика залита, append в Caddyfile не выполнен: '.Str::limit($aout, 500);
+            $ssh->exec('rm -rf '.escapeshellarg($tmp).' 2>/dev/null; true');
+
+            return;
+        }
+
+        $val = (string) $ssh->exec(
+            $dc.' exec '.$c.' caddy validate --config '.escapeshellarg($main).' 2>&1'
+        );
+        if ($ssh->getExitStatus() !== 0) {
+            $importLine = 'import '.$frag;
+            $rollBash = 'set -e'."\n"
+                .'MAIN='.escapeshellarg($main)."\n"
+                .'L1='.escapeshellarg(self::DECOY_CADDY_MARKER)."\n"
+                .'L2='.escapeshellarg($importLine)."\n"
+                .'TMP=/tmp/CF-rollback.$$'."\n"
+                .'grep -Fvx "$L1" "$MAIN" | grep -Fvx "$L2" > "$TMP" && mv "$TMP" "$MAIN"'."\n";
+            $localRb = (string) tempnam(sys_get_temp_dir(), 'caddy-r-');
+            file_put_contents($localRb, $rollBash, LOCK_EX);
+            if (! $sftp->put($tmp.'/rollback-caddy.sh', $localRb, SFTP::SOURCE_LOCAL_FILE)) {
+                @unlink($localRb);
+            } else {
+                @unlink($localRb);
+                $ssh->exec('chmod 755 '.escapeshellarg($tmp.'/rollback-caddy.sh').' 2>&1');
+                $ssh->exec($dc.' cp '.escapeshellarg($tmp.'/rollback-caddy.sh')." {$c}:/tmp/rollback-caddy.sh 2>&1");
+                $ssh->exec($dc.' exec '.$c.' sh /tmp/rollback-caddy.sh 2>&1');
+                $ssh->exec($dc.' exec '.$c.' rm -f /tmp/rollback-caddy.sh 2>/dev/null; true');
+            }
+            $help = $readmeInContainer !== '' ? 'См. в контейнере: '.$readmeInContainer : 'См. deploy/caddy/MARZBAN-DECOY.txt';
+            $this->caddyPostscript = 'Статика в /var/www/panel-stub. caddy validate не прошёл (часто конфликт :80/:443 с доменом Marzban) — import откатан. '.Str::limit($val, 500).' '.$help;
+
+            $ssh->exec('rm -rf '.escapeshellarg($tmp).' 2>/dev/null; true');
+
+            return;
+        }
+
+        $rl = (string) $ssh->exec(
+            $dc.' exec '.$c.' caddy reload --config '.escapeshellarg($main).' 2>&1'
+        );
+        if ($ssh->getExitStatus() !== 0) {
+            $this->caddyPostscript = 'Caddyfile применён (validate ok), reload сбой: '.Str::limit($rl, 400);
+        }
+
+        $ssh->exec('rm -rf '.escapeshellarg($tmp).' 2>/dev/null; true');
     }
 
     /**
