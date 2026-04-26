@@ -45,6 +45,17 @@ SH;
     }
 
     /**
+     * Многострочный bash на удалённом Linux. На Windows при `bash -lc`.escapeshellarg() портятся
+     * кавычки — сервер тогда пишет: syntax error: unexpected end of file.
+     */
+    private function execRemoteBashScript(SSH2 $ssh, string $script): string
+    {
+        $b64 = base64_encode($script);
+
+        return (string) $ssh->exec('printf %s '.var_export($b64, true).' | base64 -d | /bin/sh 2>&1');
+    }
+
+    /**
      * @return array{success: bool, message: string}
      */
     public function apply(Server $server, bool $include123Rar): array
@@ -168,7 +179,7 @@ else
   id; groups
 fi
 BASH;
-        $raw = trim((string) $ssh->exec('bash -lc '.escapeshellarg($probeBash)));
+        $raw = trim((string) $this->execRemoteBashScript($ssh, $probeBash));
         if ($raw === '') {
             $raw = '(пусто)';
         }
@@ -380,7 +391,7 @@ BASH;
             .'echo "$MODE"'."\n"
             .'echo "$CID"';
 
-        $out = trim((string) $ssh->exec('bash -lc '.escapeshellarg($script)));
+        $out = trim((string) $this->execRemoteBashScript($ssh, $script));
         if ($ssh->getExitStatus() !== 0 || $out === '') {
             return null;
         }
