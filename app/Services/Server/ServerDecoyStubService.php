@@ -9,6 +9,7 @@ use Exception;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use phpseclib3\Net\SFTP;
+use phpseclib3\Net\SSH2;
 use RuntimeException;
 
 /**
@@ -61,9 +62,12 @@ class ServerDecoyStubService
                 throw new RuntimeException('SFTP: не удалось войти');
             }
 
-            $check = trim((string) $ssh->exec('command -v nginx >/dev/null 2>&1 && echo ok || echo no'));
-            if ($check !== 'ok') {
-                throw new RuntimeException('На сервере нет бинарника nginx (нужен nginx в ОС, не только в Docker).');
+            if (! $this->nginxBinaryExistsOnHost($ssh)) {
+                throw new RuntimeException(
+                    'На хосте не найден nginx (нужен пакет в ОС, например: apt install nginx; '
+                    .'заглушка не ставится внутрь Docker). После ssh по умолчанию в PATH нет /usr/sbin — '
+                    .'проверьте, что существует /usr/sbin/nginx.'
+                );
             }
 
             $ssh->exec('mkdir -p '.escapeshellarg(self::STUB_ROOT).' /etc/nginx/ssl 2>&1');
@@ -102,7 +106,7 @@ class ServerDecoyStubService
                 throw new RuntimeException('openssl: '.Str::limit($sslOut, 800));
             }
 
-            $nt = trim((string) $ssh->exec('nginx -t 2>&1'));
+            $nt = trim((string) $ssh->exec($this->nginxTestShell()));
             if ($ssh->getExitStatus() !== 0) {
                 throw new RuntimeException('nginx -t: '.Str::limit($nt, 800));
             }
@@ -130,5 +134,23 @@ class ServerDecoyStubService
                 $ssh->setTimeout($oldTimeout);
             }
         }
+    }
+
+    /**
+     * Неинтерактивный ssh часто даёт урезанный PATH без /usr/sbin, где лежит nginx.
+     */
+    private function nginxBinaryExistsOnHost(SSH2 $ssh): bool
+    {
+        $cmd = 'if [ -x /usr/sbin/nginx ] || [ -x /usr/bin/nginx ]; then echo ok;'
+            .' elif command -v nginx >/dev/null 2>&1; then echo ok; else echo no; fi';
+
+        return trim((string) $ssh->exec($cmd)) === 'ok';
+    }
+
+    private function nginxTestShell(): string
+    {
+        return 'if [ -x /usr/sbin/nginx ]; then /usr/sbin/nginx -t 2>&1;'
+            .' elif [ -x /usr/bin/nginx ]; then /usr/bin/nginx -t 2>&1;'
+            .' else nginx -t 2>&1; fi';
     }
 }
