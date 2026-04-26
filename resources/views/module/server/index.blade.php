@@ -301,7 +301,7 @@
                                                     </span>
                                                     <span class="pr-0.5">Включена</span>
                                                     <span class="text-xs font-normal text-emerald-800/80 border-l border-emerald-300 pl-2 ml-0.5">
-                                                        {{ $server->decoy_stub_last_applied_at?->format('d.m.Y H:i') }}
+                                                        {{ optional($server->decoy_stub_last_applied_at)->format('d.m.Y H:i') }}
                                                     </span>
                                                     <i class="fas fa-sync-alt text-xs text-emerald-700/80 ml-0.5" aria-hidden="true"></i>
                                                 </button>
