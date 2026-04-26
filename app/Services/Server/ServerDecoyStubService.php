@@ -101,22 +101,60 @@ SH;
                     );
                 } else {
                     $caddy = $this->resolveDockerCaddyContext($ssh);
-                    if ($caddy === null) {
-                        throw $this->notFoundException($ssh);
+                    if ($caddy !== null) {
+                        $caddyImport = base_path('deploy/caddy/panel-stub-import.caddy');
+                        if (! is_readable($caddyImport)) {
+                            throw new RuntimeException('В проекте нет deploy/caddy/panel-stub-import.caddy');
+                        }
+                        $this->applyInDockerCaddy(
+                            $ssh,
+                            $sftp,
+                            $indexPath,
+                            $caddyImport,
+                            $include123Rar,
+                            $caddy['container_id'],
+                            $caddy['docker_argv']
+                        );
+                    } else {
+                        $goz = $this->resolveDockerGozargahMarzbanContext($ssh);
+                        if ($goz === null) {
+                            throw $this->notFoundException($ssh);
+                        }
+                        $proxy = $this->probeContainerHasCaddyOrNginx($ssh, $goz['container_id'], $goz['docker_argv']);
+                        if ($proxy === 'CADDY') {
+                            $caddyImport = base_path('deploy/caddy/panel-stub-import.caddy');
+                            if (! is_readable($caddyImport)) {
+                                throw new RuntimeException('В проекте нет deploy/caddy/panel-stub-import.caddy');
+                            }
+                            $this->applyInDockerCaddy(
+                                $ssh,
+                                $sftp,
+                                $indexPath,
+                                $caddyImport,
+                                $include123Rar,
+                                $goz['container_id'],
+                                $goz['docker_argv']
+                            );
+                        } elseif ($proxy === 'NGINX') {
+                            $this->applyInDockerNginx(
+                                $ssh,
+                                $sftp,
+                                $indexPath,
+                                $nginxPath,
+                                $include123Rar,
+                                $goz['container_id'],
+                                $goz['docker_argv']
+                            );
+                        } else {
+                            $this->applyInMarzbanContainerStaticOnly(
+                                $ssh,
+                                $sftp,
+                                $indexPath,
+                                $include123Rar,
+                                $goz
+                            );
+                        }
                     }
-                    $caddyImport = base_path('deploy/caddy/panel-stub-import.caddy');
-                    if (! is_readable($caddyImport)) {
-                        throw new RuntimeException('В проекте нет deploy/caddy/panel-stub-import.caddy');
-                    }
-                    $this->applyInDockerCaddy(
-                        $ssh,
-                        $sftp,
-                        $indexPath,
-                        $caddyImport,
-                        $include123Rar,
-                        $caddy['container_id'],
-                        $caddy['docker_argv']
-                    );
                 }
             }
 
@@ -149,8 +187,8 @@ SH;
     private function notFoundException(SSH2 $ssh): RuntimeException
     {
         return new RuntimeException(
-            'Автозаглушка не сработала: нет подходящего nginx в ОС и не найден запущенный Docker-контейнер с образом '
-            .'nginx / openresty / caddy (или `docker` недоступен этому SSH-пользователю). '
+            'Автозаглушка не сработала: нет nginx в ОС, нет контейнера с образом nginx/openresty/caddy и нет gozargah/marzban '
+            .'(либо `docker` недоступен этому SSH-пользователю). '
             .$this->buildNoStubHint($ssh)
         );
     }
@@ -407,6 +445,92 @@ BASH;
         }
 
         return null;
+    }
+
+    /**
+     * Только ghcr.io/gozargah/marzban — без caddy в имени образа, но с одним контейнером панели.
+     *
+     * @return array{container_id: string, docker_argv: list<string>}|null
+     */
+    private function resolveDockerGozargahMarzbanContext(SSH2 $ssh): ?array
+    {
+        return $this->resolveFirstRunningContainer($ssh, 'gozargah/marzban');
+    }
+
+    /**
+     * @param  list<string>  $dockerArgv
+     * @return 'CADDY'|'NGINX'|'NONE'
+     */
+    private function probeContainerHasCaddyOrNginx(SSH2 $ssh, string $containerId, array $dockerArgv): string
+    {
+        $dc = $this->shellJoinEscaped($dockerArgv);
+        $c = escapeshellarg($containerId);
+        $out = trim((string) $ssh->exec(
+            $dc.' exec '.$c.' sh -c '.escapeshellarg(
+                'if command -v caddy >/dev/null 2>&1; then echo CADDY; '
+                .'elif command -v nginx >/dev/null 2>&1; then echo NGINX; else echo NONE; fi'
+            )
+        ));
+        if ($out === 'CADDY' || $out === 'NGINX' || $out === 'NONE') {
+            return $out;
+        }
+        if (str_starts_with($out, 'CADDY')) {
+            return 'CADDY';
+        }
+        if (str_starts_with($out, 'NGINX')) {
+            return 'NGINX';
+        }
+
+        return 'NONE';
+    }
+
+    /**
+     * Официальный образ gozargah/marzban — часто без caddy/nginx в $PATH, только Uvicorn; отдельный caddy в compose.
+     *
+     * @param  array{container_id: string, docker_argv: list<string>}  $ctx
+     */
+    private function applyInMarzbanContainerStaticOnly(
+        SSH2 $ssh,
+        SFTP $sftp,
+        string $indexPath,
+        bool $include123Rar,
+        array $ctx
+    ): void {
+        $dc = $this->shellJoinEscaped($ctx['docker_argv']);
+        $c = escapeshellarg($ctx['container_id']);
+        $tmp = '/tmp/panel-mz-'.bin2hex(random_bytes(4));
+        $ssh->exec('mkdir -p '.escapeshellarg($tmp).' 2>&1');
+        if (! $sftp->put($tmp.'/index.html', $indexPath, SFTP::SOURCE_LOCAL_FILE)) {
+            throw new RuntimeException('Не удалось залить index.html (Marzban)');
+        }
+        $mout = (string) $ssh->exec(
+            $dc.' exec '.$c.' sh -c '.escapeshellarg('mkdir -p /var/www/panel-stub').' 2>&1'
+        );
+        if ($ssh->getExitStatus() !== 0) {
+            throw new RuntimeException('Marzban: mkdir: '.Str::limit($mout, 400));
+        }
+        $c1 = (string) $ssh->exec(
+            $dc.' cp '.escapeshellarg($tmp.'/index.html')." {$c}:/var/www/panel-stub/index.html 2>&1"
+        );
+        if ($ssh->getExitStatus() !== 0) {
+            throw new RuntimeException('Marzban: docker cp index: '.Str::limit($c1, 400));
+        }
+        if ($include123Rar) {
+            $dout = (string) $ssh->exec(
+                $dc.' exec '.$c.' sh -c '.escapeshellarg(
+                    'dd if=/dev/zero of=/var/www/panel-stub/123.rar bs=1M count=15 status=none && chmod 644 /var/www/panel-stub/123.rar'
+                ).' 2>&1'
+            );
+            if ($ssh->getExitStatus() !== 0) {
+                throw new RuntimeException('dd 123.rar: '.Str::limit($dout, 500));
+            }
+        } else {
+            $ssh->exec($dc.' exec '.$c.' rm -f /var/www/panel-stub/123.rar 2>/dev/null; true');
+        }
+        $this->caddyPostscript = 'Контейнер на образе gozargah/marzban: в нём нет caddy/nginx в $PATH (типично: только панель; reverse proxy вынесен в отдельный сервис). Статика в /var/www/panel-stub. '
+            .'Чтобы :80/:443 обслуживались, добавьте caddy в docker-compose (как в доке Marzban), `apt install nginx` на хост, либо вручную настройте публикацию.';
+
+        $ssh->exec('rm -rf '.escapeshellarg($tmp).' 2>/dev/null; true');
     }
 
     /**
