@@ -281,6 +281,32 @@
                                             </div>
                                         </div>
                                     @endif
+                                    <div class="mb-3 p-3 bg-slate-50 border border-slate-200 rounded-md space-y-2">
+                                        <p class="text-sm text-slate-800 font-medium">Nginx-заглушка по IP (80/443)</p>
+                                        <p class="text-xs text-slate-600">Копирует <code class="text-xs">deploy/stub-assets</code> и конфиг default_server. Нужен root SSH и nginx в ОС.</p>
+                                        @if($server->decoy_stub_last_applied_at || $server->decoy_stub_last_message)
+                                            <p class="text-xs text-slate-700">
+                                                <span class="font-medium">После последнего запуска:</span>
+                                                @if($server->decoy_stub_last_applied_at)
+                                                    {{ $server->decoy_stub_last_applied_at->format('d.m.Y H:i') }} —
+                                                @endif
+                                                {{ \Illuminate\Support\Str::limit((string) $server->decoy_stub_last_message, 200) }}
+                                            </p>
+                                        @endif
+                                        <label class="inline-flex items-center gap-2 text-sm text-slate-800 cursor-pointer">
+                                            <input type="checkbox" id="decoyStub123-{{ $server->id }}"
+                                                   class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                   @if($server->decoy_stub_include_123_rar) checked @endif>
+                                            <span>Добавить «приманку» <code class="text-xs">123.rar</code> (~15 МиБ в каталоге заглушки)</span>
+                                        </label>
+                                        <div>
+                                            <button type="button" onclick="applyDecoyStub({{ $server->id }})"
+                                                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-slate-800 bg-white hover:bg-slate-100 border border-slate-300 transition-colors">
+                                                <i class="fas fa-mask mr-2"></i>
+                                                <span>Применить заглушку</span>
+                                            </button>
+                                        </div>
+                                    </div>
                                     {{-- Одна строка кнопок: по 2 в ряд (flex + basis), «Удалить» на всю ширину --}}
                                     <div class="flex flex-wrap gap-2">
                                         @if($server->panel)
@@ -827,6 +853,39 @@
                     });
                 });
             });
+
+            function applyDecoyStub(id) {
+                if (!confirm('Развернуть Nginx-заглушку на этом сервере (SSH, /etc/nginx, /var/www)?')) {
+                    return;
+                }
+                const includeRar = document.getElementById('decoyStub123-' + id) ? document.getElementById('decoyStub123-' + id).checked : false;
+                $.ajax({
+                    url: '{{ route('admin.module.server.apply-decoy-stub', ['server' => ':id']) }}'.replace(':id', id),
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        include_123_rar: includeRar ? 1 : 0
+                    },
+                    beforeSend: function() {
+                        toastr.info('Применяем заглушку…', 'Подождите');
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            toastr.success(response.message || 'Готово');
+                            setTimeout(function () { window.location.reload(); }, 1500);
+                        } else {
+                            toastr.error(response.message || 'Ошибка');
+                        }
+                    },
+                    error: function (xhr) {
+                        var errorMessage = 'Ошибка при применении заглушки';
+                        if (xhr.responseJSON) {
+                            errorMessage = xhr.responseJSON.message || errorMessage;
+                        }
+                        toastr.error(errorMessage);
+                    }
+                });
+            }
 
             // Включить выгрузку логов
             function enableLogUpload(id) {

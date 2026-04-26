@@ -1,0 +1,37 @@
+Заглушка для панельных серверов (Nginx, порты 80 и 443)
+=======================================================
+
+Зачем: при заходе по IP или с «левым» Host (сканирование, блокировки) отдаётся
+нейтральная страница, похожая на дефолтный nginx, а не панель и не ошибка приложения.
+
+Шаги на Linux (root):
+
+1) Каталог со статикой:
+   sudo mkdir -p /var/www/panel-stub
+   sudo cp index.html /var/www/panel-stub/
+   sudo chown -R root:root /var/www/panel-stub
+   sudo chmod -R a+rX /var/www/panel-stub
+
+2) (Опционально) Файл ~15 Мб для URL /123.rar:
+   sudo bash generate-123-rar.sh /var/www/panel-stub
+
+3) SSL для заглушки на 443 (самоподписанный):
+   sudo mkdir -p /etc/nginx/ssl
+   sudo openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+     -keyout /etc/nginx/ssl/panel-stub.key \
+     -out /etc/nginx/ssl/panel-stub.crt \
+     -subj "/CN=localhost"
+
+4) Конфиг nginx:
+   sudo cp ../nginx/panel-stub.default-server.conf /etc/nginx/conf.d/00-panel-stub.conf
+
+5) Проверка:
+   sudo nginx -t && sudo systemctl reload nginx
+
+6) Ваши реальные сайты/панели — отдельные server { server_name panel.example.com; ... }
+   БЕЗ default_server, чтобы по домену открывалась панель, а по IP — заглушка.
+
+Проверка с другой машины:
+   curl -sI http://IP_СЕРВЕРА/
+   curl -k -sI https://IP_СЕРВЕРА/
+   curl -O http://IP_СЕРВЕРА/123.rar

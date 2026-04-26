@@ -27,6 +27,9 @@ use Illuminate\Support\Carbon;
  * @property bool|null $is_free
  * @property string|null $tariff_tier Тариф сервера для фильтра при активации (free|full|whitelist)
  * @property string|null $timeweb_api_profile null = TIMEWEB_API_KEY; legacy = TIMEWEB_API_KEY_LEGACY
+ * @property bool $decoy_stub_include_123_rar
+ * @property Carbon|null $decoy_stub_last_applied_at
+ * @property string|null $decoy_stub_last_message
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Panel|null $panel
@@ -53,6 +56,9 @@ class Server extends Model
         'logs_upload_enabled',
         'dns_record_id',
         'cloudflare_zone_id',
+        'decoy_stub_include_123_rar',
+        'decoy_stub_last_applied_at',
+        'decoy_stub_last_message',
     ];
 
     /**
@@ -63,6 +69,8 @@ class Server extends Model
     protected $casts = [
         'server_status' => 'integer',
         'ssh_port' => 'integer',
+        'decoy_stub_include_123_rar' => 'boolean',
+        'decoy_stub_last_applied_at' => 'datetime',
     ];
 
     /**

@@ -7,6 +7,7 @@ use App\Constants\TariffTier;
 use App\Models\Server\Server;
 use App\Services\Server\ServerStrategy;
 use App\Services\Server\LogUploadService;
+use App\Services\Server\ServerDecoyStubService;
 use App\Services\Cloudflare\CloudflareService;
 use App\Repositories\Panel\PanelRepository;
 use App\Repositories\Server\ServerRepository;
@@ -43,17 +44,24 @@ class ServerController extends Controller
      */
     private PanelRepository $panelRepository;
 
+    /**
+     * @var ServerDecoyStubService
+     */
+    private ServerDecoyStubService $decoyStubService;
+
     public function __construct(
         ServerRepository $serverRepository,
         DatabaseLogger   $logger,
         LogUploadService $logUploadService,
-        PanelRepository $panelRepository
+        PanelRepository $panelRepository,
+        ServerDecoyStubService $decoyStubService
     )
     {
         $this->serverRepository = $serverRepository;
         $this->logger = $logger;
         $this->logUploadService = $logUploadService;
         $this->panelRepository = $panelRepository;
+        $this->decoyStubService = $decoyStubService;
     }
 
     /**
@@ -773,6 +781,48 @@ class ServerController extends Controller
                     'enabled_in_db' => (bool)$server->logs_upload_enabled,
                     'active' => false
                 ]
+            ], 500);
+        }
+    }
+
+    /**
+     * Nginx-заглушка (default_server 80/443) на сервере по SSH.
+     */
+    public function applyDecoyStub(Request $request, Server $server): JsonResponse
+    {
+        $include = $request->boolean('include_123_rar');
+
+        try {
+            $this->logger->info('Apply decoy stub', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'server_id' => $server->id,
+                'include_123_rar' => $include,
+            ]);
+
+            $result = $this->decoyStubService->apply($server, $include);
+
+            if (! $result['success']) {
+                $this->logger->error('Decoy stub apply failed', [
+                    'source' => 'server',
+                    'user_id' => auth()->id(),
+                    'server_id' => $server->id,
+                    'message' => $result['message'],
+                ]);
+            }
+
+            return response()->json($result, $result['success'] ? 200 : 400);
+        } catch (Exception $e) {
+            $this->logger->error('Decoy stub exception', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
             ], 500);
         }
     }

@@ -222,6 +222,7 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
                 Route::post('/{server}/toggle-status', [ServerController::class, 'toggleStatus'])->name('toggle-status');
                 Route::post('/{server}/enable-log-upload', [ServerController::class, 'enableLogUpload'])->name('enable-log-upload');
                 Route::get('/{server}/check-log-upload-status', [ServerController::class, 'checkLogUploadStatus'])->name('check-log-upload-status');
+                Route::post('/{server}/apply-decoy-stub', [ServerController::class, 'applyDecoyStub'])->name('apply-decoy-stub');
             });
 
             // Панели
