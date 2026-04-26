@@ -23,6 +23,17 @@ class ServerDecoyStubService
 
     private const DECOY_CADDY_MARKER = '# DECOY_STUB_ADMIN_IMPORT';
 
+    /** @var string префикс export PATH в удалённых bash-скриптах (snap, полный /usr/bin) */
+    private const DOCKER_BASH_PROLOG = <<<'SH'
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
+# Явно подхватить docker, если в неинтерактивной сессии пустой PATH
+if ! command -v docker >/dev/null 2>&1; then
+  for try in /usr/bin/docker /snap/bin/docker; do
+    [ -x "$try" ] && { export PATH="${try%/*}:$PATH"; break; }
+  done
+fi
+SH;
+
     private MarzbanService $marzbanService;
 
     /** @var string доп. текст к успеху (частичное применение Caddy) */
@@ -85,7 +96,7 @@ class ServerDecoyStubService
                 } else {
                     $caddy = $this->resolveDockerCaddyContext($ssh);
                     if ($caddy === null) {
-                        throw $this->notFoundException();
+                        throw $this->notFoundException($ssh);
                     }
                     $caddyImport = base_path('deploy/caddy/panel-stub-import.caddy');
                     if (! is_readable($caddyImport)) {
@@ -129,12 +140,41 @@ class ServerDecoyStubService
         }
     }
 
-    private function notFoundException(): RuntimeException
+    private function notFoundException(SSH2 $ssh): RuntimeException
     {
         return new RuntimeException(
-            'Нет: nginx в ОС, docker-образа nginx/openresty и docker-образа caddy. '
-            .'Проверьте `docker ps` и доступ к docker. Либо apt install nginx на хост, если 80/443 не заняты.'
+            'Автозаглушка не сработала: нет подходящего nginx в ОС и не найден запущенный Docker-контейнер с образом '
+            .'nginx / openresty / caddy (или `docker` недоступен этому SSH-пользователю). '
+            .$this->buildNoStubHint($ssh)
         );
+    }
+
+    private function buildNoStubHint(SSH2 $ssh): string
+    {
+        $probeBash = self::DOCKER_BASH_PROLOG.<<<'BASH'
+D=""
+if command -v docker >/dev/null 2>&1; then D=$(command -v docker)
+elif [ -x /usr/bin/docker ]; then D=/usr/bin/docker
+elif [ -x /snap/bin/docker ]; then D=/snap/bin/docker; fi
+if [ -n "$D" ]; then
+  echo "docker_path=$D"
+  "$D" info 2>&1 | head -2
+  echo "--- running ---"
+  "$D" ps --no-trunc --format 'status={{.Status}}\tname={{.Names}}\timage={{.Image}}' 2>&1 | head -15
+  echo "--- all images (first 12) ---"
+  "$D" ps -a --no-trunc --format '{{.Image}}' 2>&1 | head -12
+else
+  echo "no_docker_cli"
+  id; groups
+fi
+BASH;
+        $raw = trim((string) $ssh->exec('bash -lc '.escapeshellarg($probeBash)));
+        if ($raw === '') {
+            $raw = '(пусто)';
+        }
+
+        return 'Снимок: '.Str::limit(str_replace(["\r\n", "\n"], ' | ', $raw), 1000)
+            .' | Нужен запущенный контейнер (в docker ps с образом, где встречается nginx, openresty или caddy) и права: root или группа docker. Либо apt install nginx на хост (если 80/443 свободны).';
     }
 
     private function applyOnHostNginx(
@@ -298,78 +338,47 @@ class ServerDecoyStubService
         return implode(' ', $parts);
     }
 
-    /**
-     * @return array{container_id: string, docker_argv: list<string>}|null
-     */
     private function resolveDockerNginxContext(SSH2 $ssh): ?array
     {
-        $script = <<<'BASH'
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-if docker info >/dev/null 2>&1; then
-  MODE=direct
-  LINE=$(docker ps --no-trunc --format '{{.ID}}|{{.Image}}' 2>/dev/null | grep -iE 'nginx|openresty' | head -1)
-elif command -v sudo >/dev/null 2>&1 && sudo -n docker info >/dev/null 2>&1; then
-  MODE=sudo
-  LINE=$(sudo docker ps --no-trunc --format '{{.ID}}|{{.Image}}' 2>/dev/null | grep -iE 'nginx|openresty' | head -1)
-else
-  exit 1
-fi
-if [ -z "$LINE" ]; then
-  exit 1
-fi
-CID=${LINE%%|*}
-echo "$MODE"
-echo "$CID"
-BASH;
+        return $this->resolveFirstRunningContainer($ssh, 'nginx|openresty');
+    }
 
-        $out = trim((string) $ssh->exec('bash -lc '.escapeshellarg($script)));
-        if ($ssh->getExitStatus() !== 0 || $out === '') {
-            return null;
-        }
-        $lines = preg_split('/\R/', $out, -1, PREG_SPLIT_NO_EMPTY);
-        if (count($lines) < 2) {
-            return null;
-        }
-        $mode = $lines[0];
-        $containerId = $lines[1];
-        if (! preg_match('/^[a-f0-9]{4,64}$/i', $containerId)) {
-            return null;
-        }
-        if ($mode === 'direct') {
-            return ['container_id' => $containerId, 'docker_argv' => ['docker']];
-        }
-        if ($mode === 'sudo') {
-            return ['container_id' => $containerId, 'docker_argv' => ['sudo', 'docker']];
-        }
-
-        return null;
+    private function resolveDockerCaddyContext(SSH2 $ssh): ?array
+    {
+        return $this->resolveFirstRunningContainer($ssh, 'caddy');
     }
 
     /**
-     * Первый контейнер, в имени образа которого есть caddy (часто Marzban).
-     *
+     * @param  string  $pattern  расширенное REGEXP для grep -iE (подставляем только из кода, не от пользователя)
      * @return array{container_id: string, docker_argv: list<string>}|null
      */
-    private function resolveDockerCaddyContext(SSH2 $ssh): ?array
+    private function resolveFirstRunningContainer(SSH2 $ssh, string $pattern): ?array
     {
-        $script = <<<'BASH'
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-if docker info >/dev/null 2>&1; then
-  MODE=direct
-  LINE=$(docker ps --no-trunc --format '{{.ID}}|{{.Image}}' 2>/dev/null | grep -iF 'caddy' | head -1)
-elif command -v sudo >/dev/null 2>&1 && sudo -n docker info >/dev/null 2>&1; then
-  MODE=sudo
-  LINE=$(sudo docker ps --no-trunc --format '{{.ID}}|{{.Image}}' 2>/dev/null | grep -iF 'caddy' | head -1)
-else
-  exit 1
-fi
-if [ -z "$LINE" ]; then
-  exit 1
-fi
-CID=${LINE%%|*}
-echo "$MODE"
-echo "$CID"
-BASH;
+        $g = escapeshellarg($pattern);
+        $script = self::DOCKER_BASH_PROLOG."\n"
+            ."LINE=''\nMODE=''\n"
+            ."if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then\n"
+            ."  MODE=direct\n"
+            ."  LINE=\$(docker ps --no-trunc --format '{{.ID}}|{{.Image}}' 2>/dev/null | grep -iE $g | head -1)\n"
+            ."elif [ -x /usr/bin/docker ] && /usr/bin/docker info >/dev/null 2>&1; then\n"
+            ."  MODE=direct\n"
+            ."  LINE=\$(/usr/bin/docker ps --no-trunc --format '{{.ID}}|{{.Image}}' 2>/dev/null | grep -iE $g | head -1)\n"
+            ."elif [ -x /snap/bin/docker ] && /snap/bin/docker info >/dev/null 2>&1; then\n"
+            ."  MODE=direct\n"
+            ."  LINE=\$(/snap/bin/docker ps --no-trunc --format '{{.ID}}|{{.Image}}' 2>/dev/null | grep -iE $g | head -1)\n"
+            ."elif command -v sudo >/dev/null 2>&1 && sudo -n docker info >/dev/null 2>&1; then\n"
+            ."  MODE=sudo\n"
+            ."  LINE=\$(sudo docker ps --no-trunc --format '{{.ID}}|{{.Image}}' 2>/dev/null | grep -iE $g | head -1)\n"
+            ."elif command -v sudo >/dev/null 2>&1 && [ -x /usr/bin/docker ] && sudo -n /usr/bin/docker info >/dev/null 2>&1; then\n"
+            ."  MODE=sudo\n"
+            ."  LINE=\$(sudo /usr/bin/docker ps --no-trunc --format '{{.ID}}|{{.Image}}' 2>/dev/null | grep -iE $g | head -1)\n"
+            ."else\n"
+            ."  exit 1\n"
+            ."fi\n"
+            .'[ -n "$LINE" ] || exit 1'."\n"
+            .'CID=${LINE%%|*}'."\n"
+            .'echo "$MODE"'."\n"
+            .'echo "$CID"';
 
         $out = trim((string) $ssh->exec('bash -lc '.escapeshellarg($script)));
         if ($ssh->getExitStatus() !== 0 || $out === '') {
