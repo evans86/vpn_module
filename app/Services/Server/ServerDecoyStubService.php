@@ -23,15 +23,9 @@ class ServerDecoyStubService
 
     private const DECOY_CADDY_MARKER = '# DECOY_STUB_ADMIN_IMPORT';
 
-    /** @var string префикс export PATH в удалённых bash-скриптах (snap, полный /usr/bin) */
+    /** @var string префикс: один export PATH, без if/for (совместимость с /bin/sh, без CRLF-ловушек) */
     private const DOCKER_BASH_PROLOG = <<<'SH'
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
-# Явно подхватить docker, если в неинтерактивной сессии пустой PATH
-if ! command -v docker >/dev/null 2>&1; then
-  for try in /usr/bin/docker /snap/bin/docker; do
-    [ -x "$try" ] && { export PATH="${try%/*}:$PATH"; break; }
-  done
-fi
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin:/usr/sbin:/sbin:/snap/bin"
 SH;
 
     private MarzbanService $marzbanService;
@@ -50,6 +44,7 @@ SH;
      */
     private function execRemoteBashScript(SSH2 $ssh, string $script): string
     {
+        $script = str_replace(["\r\n", "\r"], "\n", $script);
         $b64 = base64_encode($script);
 
         return (string) $ssh->exec('printf %s '.var_export($b64, true).' | base64 -d | /bin/sh 2>&1');
@@ -164,16 +159,16 @@ SH;
     {
         $probeBash = self::DOCKER_BASH_PROLOG.<<<'BASH'
 D=""
-if command -v docker >/dev/null 2>&1; then D=$(command -v docker)
-elif [ -x /usr/bin/docker ]; then D=/usr/bin/docker
-elif [ -x /snap/bin/docker ]; then D=/snap/bin/docker; fi
+[ -x /usr/bin/docker ] && D="/usr/bin/docker"
+[ -z "$D" ] && [ -x /snap/bin/docker ] && D="/snap/bin/docker"
+[ -z "$D" ] && command -v docker >/dev/null 2>&1 && D=$(command -v docker)
 if [ -n "$D" ]; then
   echo "docker_path=$D"
   "$D" info 2>&1 | head -2
   echo "--- running ---"
-  "$D" ps --no-trunc --format 'status={{.Status}}\tname={{.Names}}\timage={{.Image}}' 2>&1 | head -15
+  "$D" ps --no-trunc --format "status={{.Status}}  name={{.Names}}  image={{.Image}}" 2>&1 | head -15
   echo "--- all images (first 12) ---"
-  "$D" ps -a --no-trunc --format '{{.Image}}' 2>&1 | head -12
+  "$D" ps -a --no-trunc --format "{{.Image}}" 2>&1 | head -12
 else
   echo "no_docker_cli"
   id; groups
