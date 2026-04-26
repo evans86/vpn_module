@@ -62,11 +62,12 @@ class ServerDecoyStubService
                 throw new RuntimeException('SFTP: не удалось войти');
             }
 
-            if (! $this->nginxBinaryExistsOnHost($ssh)) {
+            $nginxBin = $this->resolveNginxBinary($ssh);
+            if ($nginxBin === null) {
                 throw new RuntimeException(
-                    'На хосте не найден nginx (нужен пакет в ОС, например: apt install nginx; '
-                    .'заглушка не ставится внутрь Docker). После ssh по умолчанию в PATH нет /usr/sbin — '
-                    .'проверьте, что существует /usr/sbin/nginx.'
+                    'На хосте (по SSH) не найден исполняемый nginx. Установите пакет в ОС, например: '
+                    .'Debian/Ubuntu: `sudo apt update && sudo apt install -y nginx`, затем: `ls -la /usr/sbin/nginx`. '
+                    .'Если панель только в Docker и на ВМ нет системного nginx — эта кнопка не подойдёт, пока на хост не поставлен nginx (или иные ручные шаги).'
                 );
             }
 
@@ -106,7 +107,7 @@ class ServerDecoyStubService
                 throw new RuntimeException('openssl: '.Str::limit($sslOut, 800));
             }
 
-            $nt = trim((string) $ssh->exec($this->nginxTestShell()));
+            $nt = trim((string) $ssh->exec(escapeshellarg($nginxBin).' -t 2>&1'));
             if ($ssh->getExitStatus() !== 0) {
                 throw new RuntimeException('nginx -t: '.Str::limit($nt, 800));
             }
@@ -137,20 +138,38 @@ class ServerDecoyStubService
     }
 
     /**
-     * Неинтерактивный ssh часто даёт урезанный PATH без /usr/sbin, где лежит nginx.
+     * В неинтерактивной SSH-сессии PATH часто пустой. Задаём типичный PATH и перебираем известные пути.
+     *
+     * @return non-empty-string|null
      */
-    private function nginxBinaryExistsOnHost(SSH2 $ssh): bool
+    private function resolveNginxBinary(SSH2 $ssh): ?string
     {
-        $cmd = 'if [ -x /usr/sbin/nginx ] || [ -x /usr/bin/nginx ]; then echo ok;'
-            .' elif command -v nginx >/dev/null 2>&1; then echo ok; else echo no; fi';
+        $script = <<<'BASH'
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+for p in \
+  /usr/sbin/nginx \
+  /usr/bin/nginx \
+  /usr/local/nginx/sbin/nginx \
+  /usr/local/openresty/nginx/sbin/nginx
+do
+  if [ -x "$p" ]; then
+    printf %s "$p"
+    exit 0
+  fi
+done
+c=$(command -v nginx 2>/dev/null)
+if [ -n "$c" ] && { [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; }; then
+  printf %s "$c"
+  exit 0
+fi
+exit 1
+BASH;
 
-        return trim((string) $ssh->exec($cmd)) === 'ok';
-    }
+        $out = trim((string) $ssh->exec($script));
+        if ($out === '' || $ssh->getExitStatus() !== 0) {
+            return null;
+        }
 
-    private function nginxTestShell(): string
-    {
-        return 'if [ -x /usr/sbin/nginx ]; then /usr/sbin/nginx -t 2>&1;'
-            .' elif [ -x /usr/bin/nginx ]; then /usr/bin/nginx -t 2>&1;'
-            .' else nginx -t 2>&1; fi';
+        return $out;
     }
 }
