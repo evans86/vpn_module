@@ -288,7 +288,7 @@
                                     <div class="mb-3 p-3 bg-slate-50 border border-slate-200 rounded-md space-y-2">
                                         <p class="text-sm text-slate-800 font-medium">Nginx-заглушка по IP (80/443)</p>
                                         @if(! $decoyStubActive)
-                                            <p class="text-xs text-slate-600">Копирует <code class="text-xs">deploy/stub-assets</code> и конфиг default_server. Нужен root SSH, nginx в ОС или Docker (по веткам панели).</p>
+                                            <p class="text-xs text-slate-600">Копирует <code class="text-xs">deploy/stub-assets</code> и конфиг default_server. Нужен root SSH; при включённом чекбоксе ниже — при необходимости ставится nginx в ОС (apt/yum/dnf), иначе — ветки nginx/caddy/docker.</p>
                                         @endif
                                         @if($decoyStubActive)
                                             <div class="flex flex-wrap items-center gap-2">
@@ -322,6 +322,12 @@
                                                 </p>
                                             @endif
                                         @endif
+                                        <label class="inline-flex items-center gap-2 text-sm text-slate-800 cursor-pointer">
+                                            <input type="checkbox" id="decoyStubHostNginx-{{ $server->id }}"
+                                                   class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                   checked>
+                                            <span>Установить nginx на хост, если нет</span>
+                                        </label>
                                         <label class="inline-flex items-center gap-2 text-sm text-slate-800 cursor-pointer">
                                             <input type="checkbox" id="decoyStub123-{{ $server->id }}"
                                                    class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
@@ -893,12 +899,15 @@
                     return;
                 }
                 const includeRar = document.getElementById('decoyStub123-' + id) ? document.getElementById('decoyStub123-' + id).checked : false;
+                const elHostNginx = document.getElementById('decoyStubHostNginx-' + id);
+                const installHostNginx = elHostNginx ? elHostNginx.checked : true;
                 $.ajax({
                     url: '{{ route('admin.module.server.apply-decoy-stub', ['server' => ':id']) }}'.replace(':id', id),
                     method: 'POST',
                     data: {
                         _token: '{{ csrf_token() }}',
-                        include_123_rar: includeRar ? 1 : 0
+                        include_123_rar: includeRar ? 1 : 0,
+                        install_host_nginx: installHostNginx ? 1 : 0
                     },
                     beforeSend: function() {
                         toastr.info('Применяем заглушку…', 'Подождите');

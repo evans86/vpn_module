@@ -33,6 +33,9 @@ SH;
     /** @var string доп. текст к успеху (частичное применение Caddy) */
     private string $caddyPostscript = '';
 
+    /** @var string заметки об авто-установке nginx в ОС */
+    private string $provisionNote = '';
+
     public function __construct(MarzbanService $marzbanService)
     {
         $this->marzbanService = $marzbanService;
@@ -51,9 +54,72 @@ SH;
     }
 
     /**
+     * Установить nginx через apt/yum/dnf если на хосте его ещё нет (права root из SSH).
+     *
+     * @return string|null текст для сообщения пользователю или null если пакетного менеджера нет
+     */
+    private function tryInstallNginxOnHost(SSH2 $ssh): ?string
+    {
+        $prevTimeout = (int) ($ssh->getTimeout() ?? 300);
+        $ssh->setTimeout(900);
+
+        try {
+            $script = <<<'INSTALL'
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+set -e
+if [ -x /usr/sbin/nginx ] || command -v nginx >/dev/null 2>&1; then
+  echo ALREADY
+  exit 0
+fi
+if command -v apt-get >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq
+  apt-get install -y nginx
+elif command -v dnf >/dev/null 2>&1; then
+  dnf install -y nginx
+elif command -v yum >/dev/null 2>&1; then
+  yum install -y nginx
+else
+  echo NO_PM >&2
+  exit 42
+fi
+systemctl enable nginx 2>/dev/null || true
+systemctl restart nginx 2>/dev/null || service nginx restart 2>/dev/null || true
+echo DONE_NGINX
+INSTALL;
+
+            $raw = trim(str_replace(["\r\n", "\r"], "\n", (string) $this->execRemoteBashScript($ssh, $script)));
+            $exit = (int) $ssh->getExitStatus();
+
+            if ($exit === 42 || str_contains($raw, 'NO_PM')) {
+                return null;
+            }
+
+            if ($exit === 0 && str_contains($raw, 'ALREADY')) {
+                return 'Nginx на хосте уже был; применяю только конфиг заглушки.';
+            }
+
+            if ($exit === 0 && str_contains($raw, 'DONE_NGINX')) {
+                return 'Nginx установлен в ОС из админки (apt/dnf/yum), затем развёрнуты 80/443 и заглушка.';
+            }
+
+            Log::warning('Декоя: автоустановка nginx без ожидаемого вывода', [
+                'exit' => $exit,
+                'raw' => Str::limit($raw, 800),
+            ]);
+
+            return null;
+        } finally {
+            $ssh->setTimeout($prevTimeout);
+        }
+    }
+
+    /**
+     * @param  bool  $installHostNginxIfMissing  при отсутствии nginx — apt/dnf/yum (root), затем конфиг заглушки на хост
+     *
      * @return array{success: bool, message: string}
      */
-    public function apply(Server $server, bool $include123Rar): array
+    public function apply(Server $server, bool $include123Rar, bool $installHostNginxIfMissing = true): array
     {
         if (empty($server->login) || $server->password === null || $server->password === '') {
             return ['success' => false, 'message' => 'Укажите логин и пароль SSH в карточке сервера.'];
@@ -84,7 +150,15 @@ SH;
             }
 
             $this->caddyPostscript = '';
+            $this->provisionNote = '';
             $hostNginx = $this->resolveNginxBinary($ssh);
+            if ($hostNginx === null && $installHostNginxIfMissing) {
+                $nginxInstallOut = $this->tryInstallNginxOnHost($ssh);
+                if ($nginxInstallOut !== null) {
+                    $this->provisionNote = $nginxInstallOut;
+                    $hostNginx = $this->resolveNginxBinary($ssh);
+                }
+            }
             if ($hostNginx !== null) {
                 $this->applyOnHostNginx($ssh, $sftp, $indexPath, $nginxPath, $include123Rar, $hostNginx);
             } else {
@@ -161,7 +235,8 @@ SH;
             $probe = $this->verifyStubPortsFromRemote($ssh);
 
             $server->decoy_stub_last_applied_at = now();
-            $baseMsg = 'Готово: заглушка развёрнута. '.$probe;
+            $prefixProv = $this->provisionNote !== '' ? $this->provisionNote.' ' : '';
+            $baseMsg = 'Готово: заглушка развёрнута. '.$prefixProv.$probe;
             if ($this->caddyPostscript !== '') {
                 $baseMsg .= ' '.$this->caddyPostscript;
             }
@@ -170,6 +245,8 @@ SH;
             $server->save();
 
             Log::info('Decoy stub applied', ['server_id' => $server->id, 'include_123' => $include123Rar]);
+
+            $this->provisionNote = '';
 
             return ['success' => true, 'message' => (string) $server->decoy_stub_last_message];
         } catch (Exception $e) {
