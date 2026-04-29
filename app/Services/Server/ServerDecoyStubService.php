@@ -158,18 +158,20 @@ SH;
                 }
             }
 
+            $probe = $this->verifyStubPortsFromRemote($ssh);
+
             $server->decoy_stub_last_applied_at = now();
-            $baseMsg = 'Готово: заглушка на 80/443. Проверьте запрос к IP.';
+            $baseMsg = 'Готово: заглушка развёрнута. '.$probe;
             if ($this->caddyPostscript !== '') {
                 $baseMsg .= ' '.$this->caddyPostscript;
             }
             $this->caddyPostscript = '';
-            $server->decoy_stub_last_message = $baseMsg;
+            $server->decoy_stub_last_message = Str::limit($baseMsg, 2000);
             $server->save();
 
             Log::info('Decoy stub applied', ['server_id' => $server->id, 'include_123' => $include123Rar]);
 
-            return ['success' => true, 'message' => $baseMsg];
+            return ['success' => true, 'message' => (string) $server->decoy_stub_last_message];
         } catch (Exception $e) {
             $msg = $e->getMessage();
             $server->decoy_stub_last_message = 'Ошибка: '.$msg;
@@ -527,8 +529,8 @@ BASH;
         } else {
             $ssh->exec($dc.' exec '.$c.' rm -f /var/www/panel-stub/123.rar 2>/dev/null; true');
         }
-        $this->caddyPostscript = 'Контейнер на образе gozargah/marzban: в нём нет caddy/nginx в $PATH (типично: только панель; reverse proxy вынесен в отдельный сервис). Статика в /var/www/panel-stub. '
-            .'Чтобы :80/:443 обслуживались, добавьте caddy в docker-compose (как в доке Marzban), `apt install nginx` на хост, либо вручную настройте публикацию.';
+        $this->caddyPostscript = '[Частично] Контейнер gozargah/marzban без caddy/nginx: статика записана в /var/www/panel-stub внутри контейнера; с хоста :80/:443 могут быть пусты. '
+            .'Откройте веб-доступ: `apt install nginx` на хосте (как даёт заглушка при наличии nginx в ОС), либо отдельный контейнер caddy/nginx с `ports: 80:80` и монтированием, либо docker-compose из доков Marzban с reverse-proxy.';
 
         $ssh->exec('rm -rf '.escapeshellarg($tmp).' 2>/dev/null; true');
     }
@@ -682,6 +684,41 @@ BASH;
         }
 
         $ssh->exec('rm -rf '.escapeshellarg($tmp).' 2>/dev/null; true');
+    }
+
+    /**
+     * С самой VPS: curl по localhost (не ping) и ss — видно ли LISTEN на 80/443.
+     * Снаружи могут блокировать при рабущем icmp; здесь проверяем именно «веб» на ноде.
+     */
+    private function verifyStubPortsFromRemote(SSH2 $ssh): string
+    {
+        $script = self::DOCKER_BASH_PROLOG.<<<'BASH'
+sleep 1
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+H80=""
+H443=""
+if command -v curl >/dev/null 2>&1; then
+  H80=$(curl -sS --connect-timeout 5 -m 12 -o /dev/null -w "%{http_code}" http://127.0.0.1/ 2>/dev/null || printf 'fail')
+  H443=$(curl -sSk --connect-timeout 5 -m 12 -o /dev/null -w "%{http_code}" https://127.0.0.1/ 2>/dev/null || printf 'fail')
+else
+  H80="nocurl"
+  H443="nocurl"
+fi
+LN80=$(ss -tln 2>/dev/null | grep ':80 ' | wc -l | tr -d ' ')
+LN443=$(ss -tln 2>/dev/null | grep ':443 ' | wc -l | tr -d ' ')
+EXTRA=""
+if [ "${LN80:-0}" = "0" ] && [ "${LN443:-0}" = "0" ]; then
+  EXTRA=" Узел сам не принимает :80/:443 — проверьте publish Docker, ufw, Security Group провайдера; при Marzban-only см. текст [Частично] выше."
+fi
+printf 'Проверка на узле (не ping): HTTP/80 код=%s, HTTPS/443 код=%s; строки LISTEN ss :80=%s :443=%s.%s\n' "${H80}" "${H443}" "${LN80}" "${LN443}" "${EXTRA}"
+BASH;
+
+        $out = trim(str_replace(["\r\n", "\r"], "\n", (string) $this->execRemoteBashScript($ssh, $script)));
+        if ($out === '') {
+            return '(проверка localhost недоступна)';
+        }
+
+        return Str::limit($out, 900);
     }
 
     /**
