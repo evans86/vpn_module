@@ -696,8 +696,16 @@ BASH;
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 sleep 1
 if command -v curl >/dev/null 2>&1; then
-  H80=$(curl -sS --connect-timeout 5 -m 12 -o /dev/null -w "%{http_code}" http://127.0.0.1/ 2>/dev/null || echo fail)
-  H443=$(curl -sSk --connect-timeout 5 -m 12 -o /dev/null -w "%{http_code}" https://127.0.0.1/ 2>/dev/null || echo fail)
+  H80=$(curl -sS --connect-timeout 5 -m 12 -o /dev/null -w "%{http_code}" http://127.0.0.1/ 2>/dev/null) || true
+  H443=$(curl -sSk --connect-timeout 5 -m 12 -o /dev/null -w "%{http_code}" https://127.0.0.1/ 2>/dev/null) || true
+  case "${H80}" in
+    ''|000) H80='нет-ответа' ;;
+    *) ;;
+  esac
+  case "${H443}" in
+    ''|000) H443='нет-ответа' ;;
+    *) ;;
+  esac
 else
   H80=nocurl
   H443=nocurl
