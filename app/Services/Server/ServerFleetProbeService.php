@@ -210,10 +210,14 @@ class ServerFleetProbeService
     private function probeTestSpeed(string $hostBracket, string $token): array
     {
         try {
-            $url = 'https://'.$hostBracket.'/test-speed?'.http_build_query(['token' => $token]);
+            // Полный отчёт на VPS может идти >200 с (curl + speedtest); в сводке запрашиваем только проверку токена и fcgi (см. panel-stub-test-speed.sh fleet_check=1).
+            $url = 'https://'.$hostBracket.'/test-speed?'.http_build_query([
+                'token' => $token,
+                'fleet_check' => '1',
+            ]);
             $t0 = microtime(true);
             $res = Http::withoutVerifying()
-                ->timeout(200)
+                ->timeout(45)
                 ->withOptions([
                     'connect_timeout' => 10,
                     'http_errors' => false,

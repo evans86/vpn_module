@@ -33,6 +33,13 @@ if [[ -n "$EXPECTED" && "$GOT" != "$EXPECTED" ]]; then
   exit 0
 fi
 
+# Короткий ответ для массовых проверок из панели (не гоняем скачивания и speedtest — там укладываемся в секунды)
+if [[ "&${QUERY_STRING}&" == *"&fleet_check=1&"* ]]; then
+  echo "=== /test-speed: короткая проверка из панели ==="
+  echo "ok ($(date -Iseconds 2>/dev/null || date))"
+  exit 0
+fi
+
 mbps_line() {
   local label="$1"
   local spd="$2"

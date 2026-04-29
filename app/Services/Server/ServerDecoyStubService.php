@@ -405,8 +405,11 @@ fi
   || true
 sleep 2
 SOC=""
-for c in /run/fcgiwrap.socket /var/run/fcgiwrap.socket /run/fcgiwrap/fcgiwrap.sock; do
-  if [ -S "$c" ]; then SOC="$c"; break; fi
+for i in 1 2 3 4 5 6 7 8 9 10; do
+for c in /run/fcgiwrap.socket /var/run/fcgiwrap.socket /run/fcgiwrap/fcgiwrap.sock /run/fcgiwrap.sock /var/run/nginx/fcgiwrap.socket /run/nginx/fcgiwrap.socket /run/nginx/fcgiwrap.sock; do
+  if [ -S "$c" ]; then SOC="$c"; break 2; fi
+done
+  sleep 1
 done
 printf %s "$SOC"
 exit 0
