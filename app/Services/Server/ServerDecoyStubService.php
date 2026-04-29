@@ -374,6 +374,43 @@ SH;
     }
 
     /**
+     * stdout установщика fcgiwrap: на старых логах apt/dnf могли печататься в начало строки —
+     * берём последнюю строку, похожую на один абсолютный путь без пробелов (сокет).
+     *
+     * @return non-empty-string|null
+     */
+    private function parseFcgiSocketPathFromInstallerOutput(string $raw): ?string
+    {
+        $raw = trim(str_replace(["\r\n", "\r"], "\n", $raw));
+        if ($raw === '') {
+            return null;
+        }
+
+        $candidates = [];
+        foreach (preg_split("/\n/", $raw) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            if (str_starts_with($line, '/') && ! str_contains($line, ' ')) {
+                $candidates[] = $line;
+            }
+        }
+
+        if ($candidates !== []) {
+            $last = end($candidates);
+
+            return $last !== false ? $last : null;
+        }
+
+        if (str_starts_with($raw, '/') && ! str_contains($raw, ' ') && strpos($raw, "\n") === false) {
+            return $raw;
+        }
+
+        return null;
+    }
+
+    /**
      * fcgiwrap + скрипт + snippet + token для ?token= (только хостовый nginx).
      *
      * @return array{socket: string, token: string}|null
@@ -392,14 +429,14 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 set +e
 if command -v apt-get >/dev/null 2>&1; then
   export DEBIAN_FRONTEND=noninteractive
-  apt-get update -qq
-  apt-get install -y fcgiwrap
+  apt-get update -qq </dev/null >/dev/null 2>&1
+  apt-get install -y fcgiwrap </dev/null >/dev/null 2>&1
 elif command -v dnf >/dev/null 2>&1; then
-  dnf install -y fcgiwrap
+  dnf install -y fcgiwrap >/dev/null 2>&1
 elif command -v yum >/dev/null 2>&1; then
-  yum install -y fcgiwrap
+  yum install -y fcgiwrap >/dev/null 2>&1
 elif command -v apk >/dev/null 2>&1; then
-  apk add --no-cache fcgiwrap
+  apk add --no-cache fcgiwrap >/dev/null 2>&1
 fi
 (systemctl daemon-reload >/dev/null 2>&1) || true
 (systemctl enable --now fcgiwrap.socket >/dev/null 2>&1) \
@@ -421,13 +458,17 @@ fi
 if [ "$SOC" = "" ]; then
   SOC=$(find /run /var/run -maxdepth 6 -type s \( -name 'wrap_fcgi.sock' -o -name 'fcgiwrap.sock' \) ! -iname '*php-fpm*' ! -iname '*fpm.sock*' 2>/dev/null | head -1)
 fi
-printf %s "$SOC"
+printf '%s' "$SOC"
 exit 0
 SH;
 
-        $sockOut = trim(str_replace(["\r\n", "\r"], "\n", (string) $this->execRemoteBashScript($ssh, $installer)));
-        if ($sockOut === '' || ! str_starts_with($sockOut, '/')) {
-            Log::warning('fcgiwrap: сокет не найден после установки', ['out' => Str::limit($sockOut, 200)]);
+        $installerRawOut = trim(str_replace(["\r\n", "\r"], "\n", (string) $this->execRemoteBashScript($ssh, $installer)));
+        $sockOut = $this->parseFcgiSocketPathFromInstallerOutput($installerRawOut);
+        if ($sockOut === null || ! str_starts_with($sockOut, '/')) {
+            Log::warning('fcgiwrap: сокет не найден после установки', [
+                'out' => Str::limit($installerRawOut, 500),
+                'parsed' => $sockOut,
+            ]);
 
             return null;
         }
