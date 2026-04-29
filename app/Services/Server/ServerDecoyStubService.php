@@ -300,6 +300,32 @@ BASH;
             .' | Нужен запущенный контейнер (в docker ps с образом, где встречается nginx, openresty или caddy) и права: root или группа docker. Либо apt install nginx на хост (если 80/443 свободны).';
     }
 
+    /**
+     * У Debian/Ubuntu второй блок default_server задаёт шаблон в sites-enabled/default;
+     * наша заглушка лежит в conf.d → nginx -t сообщает duplicate default_server.
+     * Выключение симлинка/файла и при наличии — снятие default_server со stock default.conf в conf.d/http.d.
+     */
+    private function suppressConflictingVanillaDefaultServer(SSH2 $ssh): void
+    {
+        $shell = <<<'SH'
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+for p in /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/default.conf; do
+  [ ! -e "$p" ] && continue
+  if [ -L "$p" ]; then rm -f "$p"; continue; fi
+  if [ -f "$p" ]; then mv -f "$p" "${p}.disabled-by-panel-stub"; fi
+done
+for f in /etc/nginx/conf.d/default.conf /etc/nginx/http.d/default.conf; do
+  [ ! -f "$f" ] && continue
+  grep -qE '^[[:space:]]*listen[[:space:]].*default_server' "$f" || continue
+  cp -a "$f" "${f}.bak-panelstub.$$" 2>/dev/null || true
+  sed -i '/^[[:space:]]*listen /s/[[:space:]]*default_server//g' "$f" 2>/dev/null \
+    || sed -i.bak '/^[[:space:]]*listen /s/[[:space:]]*default_server//g' "$f"
+done
+exit 0
+SH;
+        $this->execRemoteBashScript($ssh, $shell);
+    }
+
     private function applyOnHostNginx(
         SSH2 $ssh,
         SFTP $sftp,
@@ -343,6 +369,8 @@ BASH;
         if ($ssh->getExitStatus() !== 0 && ! str_contains($sslOut, 'writing') && $sslOut !== 'ok') {
             throw new RuntimeException('openssl: '.Str::limit($sslOut, 800));
         }
+
+        $this->suppressConflictingVanillaDefaultServer($ssh);
 
         $nt = trim((string) $ssh->exec(escapeshellarg($nginxBin).' -t 2>&1'));
         if ($ssh->getExitStatus() !== 0) {
