@@ -791,6 +791,7 @@ class ServerController extends Controller
     public function applyDecoyStub(Request $request, Server $server): JsonResponse
     {
         $include = $request->boolean('include_123_rar');
+        $installHostNginxIfMissing = $request->boolean('install_host_nginx', true);
 
         try {
             $this->logger->info('Apply decoy stub', [
@@ -798,9 +799,10 @@ class ServerController extends Controller
                 'user_id' => auth()->id(),
                 'server_id' => $server->id,
                 'include_123_rar' => $include,
+                'install_host_nginx_if_missing' => $installHostNginxIfMissing,
             ]);
 
-            $result = $this->decoyStubService->apply($server, $include);
+            $result = $this->decoyStubService->apply($server, $include, $installHostNginxIfMissing);
 
             if (! $result['success']) {
                 $this->logger->error('Decoy stub apply failed', [

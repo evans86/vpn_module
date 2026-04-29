@@ -261,7 +261,11 @@ INSTALL;
             }
             $this->caddyPostscript = '';
             $server->decoy_stub_last_message = Str::limit($baseMsg, 2000);
-            $server->decoy_stub_test_speed_token = $hostNginx !== null ? $testSpeedTokenForDb : null;
+
+            $tokenForDb = $hostNginx !== null
+                ? $this->hydrateOutboundTestSpeedTokenFromRemoteIfMissing($ssh, $testSpeedTokenForDb)
+                : null;
+            $server->decoy_stub_test_speed_token = $tokenForDb;
             $server->save();
 
             Log::info('Decoy stub applied', ['server_id' => $server->id, 'include_123' => $include123Rar]);
@@ -411,6 +415,12 @@ for c in /run/fcgiwrap.socket /var/run/fcgiwrap.socket /run/fcgiwrap/fcgiwrap.so
 done
   sleep 1
 done
+if [ "$SOC" = "" ]; then
+  SOC=$(find /run /var/run /usr/local/var/run -maxdepth 8 -type s -iname '*fcgiwrap*' ! -iname '*php*' 2>/dev/null | head -1)
+fi
+if [ "$SOC" = "" ]; then
+  SOC=$(find /run /var/run -maxdepth 6 -type s \( -name 'wrap_fcgi.sock' -o -name 'fcgiwrap.sock' \) ! -iname '*php-fpm*' ! -iname '*fpm.sock*' 2>/dev/null | head -1)
+fi
 printf %s "$SOC"
 exit 0
 SH;
@@ -498,6 +508,29 @@ NGINX;
             .'Исходящие: GET http(s)://<IP>/test-speed?token='.$token.' (см. curl -k).';
 
         return ['socket' => $sockOut, 'token' => $token];
+    }
+
+    /**
+     * Сохраняем в БД токен после применения: если массив из deploy уже содержит токен —
+     * он приоритетен; иначе читаем /var/www/panel-stub/.test-speed-token с VPS (бывает при
+     * расхождениях SFTP/exec или когда файл создавался при прошлых попытках).
+     */
+    private function hydrateOutboundTestSpeedTokenFromRemoteIfMissing(SSH2 $ssh, ?string $tokenFromDeploy): ?string
+    {
+        if (is_string($tokenFromDeploy) && trim($tokenFromDeploy) !== '') {
+            return trim($tokenFromDeploy);
+        }
+
+        $p = escapeshellarg(self::HOST_TEST_SPEED_TOKEN);
+        $out = trim((string) $ssh->exec('[ -s '.$p.' ] && LANG=C LC_ALL=C tr -dc "0123456789abcdefABCDEF" < '.$p.' 2>/dev/null | head -c 96'));
+
+        if ($out !== '' && preg_match('/^[a-fA-F0-9]{40,96}$/', $out)) {
+            Log::info('Подтянут токен /test-speed с VPS в БД (файл .test-speed-token уже на диске)');
+
+            return strtolower($out);
+        }
+
+        return null;
     }
 
     private function applyOnHostNginx(
