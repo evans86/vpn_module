@@ -3,7 +3,7 @@
 # QUERY_STRING может содержать token=...
 
 set +u
-exec 2>&1
+# stderr не смешиваем с stdout: иначе fcgiwrap может отдавать upstream в виде некорректного ответа (nginx 502)
 export LC_ALL=C.UTF-8
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 : "${QUERY_STRING:=}"

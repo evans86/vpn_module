@@ -21,8 +21,8 @@ class ServerDecoyStubService
 
     private const NGINX_CONF = '/etc/nginx/conf.d/00-panel-stub.conf';
 
-    /** Исходящие тесты по HTTP (/test-speed) при наличии fcgiwrap на хосте */
-    private const HOST_TEST_SPEED_SCRIPT = '/usr/local/sbin/panel-stub-test-speed';
+    /** CGI-скрипт внутри DOCUMENT_ROOT (fcgiwrap/nginx ожидают согласованные пути). */
+    private const HOST_TEST_SPEED_SCRIPT = self::STUB_ROOT.'/panel-stub-test-speed';
 
     private const HOST_TEST_SPEED_SNIPPET = '/etc/nginx/snippets/panel-stub-test-speed.inc';
 
@@ -473,15 +473,19 @@ SH;
             return null;
         }
 
-        $ssh->exec('mkdir -p /etc/nginx/snippets /usr/local/sbin 2>&1');
+        $ssh->exec('mkdir -p '.escapeshellarg(self::STUB_ROOT).' /etc/nginx/snippets 2>&1');
         $tmpSh = '/tmp/panel-stub-ts-'.bin2hex(random_bytes(4)).'.sh';
         if (! $sftp->put($tmpSh, $scriptLocal, SFTP::SOURCE_LOCAL_FILE)) {
             Log::warning('Не удалось залить panel-stub-test-speed.sh');
 
             return null;
         }
-        $mvSh = $ssh->exec('mv -f '.escapeshellarg($tmpSh).' '.escapeshellarg(self::HOST_TEST_SPEED_SCRIPT)
-            .' && chmod 755 '.escapeshellarg(self::HOST_TEST_SPEED_SCRIPT).' 2>&1');
+        $mvSh = $ssh->exec(
+            'mv -f '.escapeshellarg($tmpSh).' '.escapeshellarg(self::HOST_TEST_SPEED_SCRIPT)
+                .' && chmod 755 '.escapeshellarg(self::HOST_TEST_SPEED_SCRIPT)
+                .' && rm -f /usr/local/sbin/panel-stub-test-speed 2>/dev/null || true'
+                .' 2>&1'
+        );
         if ($ssh->getExitStatus() !== 0) {
             Log::warning('Не удалось установить panel-stub-test-speed', ['out' => Str::limit($mvSh, 500)]);
 
@@ -511,6 +515,8 @@ location = /test-speed {
     default_type text/plain;
     charset utf-8;
     include fastcgi_params;
+    fastcgi_param DOCUMENT_ROOT __STUB_ROOT__;
+    fastcgi_param SCRIPT_NAME /test-speed;
     fastcgi_param GATEWAY_INTERFACE CGI/1.1;
     fastcgi_param SCRIPT_FILENAME __SCRIPT__;
     fastcgi_param QUERY_STRING $query_string;
@@ -522,7 +528,11 @@ location = /test-speed {
     fastcgi_pass unix:__SOCK__;
 }
 NGINX;
-        $snippet = str_replace(['__SCRIPT__', '__SOCK__'], [self::HOST_TEST_SPEED_SCRIPT, $sockOut], $snippet);
+        $snippet = str_replace(
+            ['__SCRIPT__', '__SOCK__', '__STUB_ROOT__'],
+            [self::HOST_TEST_SPEED_SCRIPT, $sockOut, self::STUB_ROOT],
+            $snippet
+        );
 
         $tmpSn = '/tmp/panel-stub-sn-'.bin2hex(random_bytes(4)).'.inc';
         $localSn = tempnam(sys_get_temp_dir(), 'pstub');
