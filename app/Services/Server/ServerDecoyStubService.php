@@ -21,6 +21,13 @@ class ServerDecoyStubService
 
     private const NGINX_CONF = '/etc/nginx/conf.d/00-panel-stub.conf';
 
+    /** Исходящие тесты по HTTP (/test-speed) при наличии fcgiwrap на хосте */
+    private const HOST_TEST_SPEED_SCRIPT = '/usr/local/sbin/panel-stub-test-speed';
+
+    private const HOST_TEST_SPEED_SNIPPET = '/etc/nginx/snippets/panel-stub-test-speed.inc';
+
+    private const HOST_TEST_SPEED_TOKEN = self::STUB_ROOT.'/.test-speed-token';
+
     private const DECOY_CADDY_MARKER = '# DECOY_STUB_ADMIN_IMPORT';
 
     /** @var string префикс: один export PATH, без if/for (совместимость с /bin/sh, без CRLF-ловушек) */
@@ -159,8 +166,20 @@ INSTALL;
                     $hostNginx = $this->resolveNginxBinary($ssh);
                 }
             }
+            $nginxStubBodyDocker = $this->nginxStubBody(true);
+            $testSpeedTokenForDb = null;
+
             if ($hostNginx !== null) {
-                $this->applyOnHostNginx($ssh, $sftp, $indexPath, $nginxPath, $include123Rar, $hostNginx);
+                $fcgiArtifacts = $this->deployHostOutboundTestSpeedFcgiArtifacts($ssh, $sftp);
+                $omitTestSpeedMarkers = ($fcgiArtifacts === null);
+                if ($omitTestSpeedMarkers) {
+                    Log::info('Заглушка: без /test-speed (нет fcgiwrap или UNIX-сокета fcgi)');
+                }
+                if ($fcgiArtifacts !== null) {
+                    $testSpeedTokenForDb = $fcgiArtifacts['token'];
+                }
+                $nginxStubBodyHost = $this->nginxStubBody($omitTestSpeedMarkers);
+                $this->applyOnHostNginx($ssh, $sftp, $indexPath, $nginxStubBodyHost, $include123Rar, $hostNginx);
             } else {
                 $docker = $this->resolveDockerNginxContext($ssh);
                 if ($docker !== null) {
@@ -168,7 +187,7 @@ INSTALL;
                         $ssh,
                         $sftp,
                         $indexPath,
-                        $nginxPath,
+                        $nginxStubBodyDocker,
                         $include123Rar,
                         $docker['container_id'],
                         $docker['docker_argv']
@@ -214,7 +233,7 @@ INSTALL;
                                 $ssh,
                                 $sftp,
                                 $indexPath,
-                                $nginxPath,
+                                $nginxStubBodyDocker,
                                 $include123Rar,
                                 $goz['container_id'],
                                 $goz['docker_argv']
@@ -242,6 +261,7 @@ INSTALL;
             }
             $this->caddyPostscript = '';
             $server->decoy_stub_last_message = Str::limit($baseMsg, 2000);
+            $server->decoy_stub_test_speed_token = $hostNginx !== null ? $testSpeedTokenForDb : null;
             $server->save();
 
             Log::info('Decoy stub applied', ['server_id' => $server->id, 'include_123' => $include123Rar]);
@@ -326,11 +346,162 @@ SH;
         $this->execRemoteBashScript($ssh, $shell);
     }
 
+    /**
+     * Конфиг заглушки: при omit — убрать include /test-speed (Docker или нет fcgiwrap на хосте).
+     *
+     * @return non-empty-string
+     */
+    private function nginxStubBody(bool $omitTestSpeedMarkers): string
+    {
+        $path = base_path('deploy/nginx/panel-stub.default-server.conf');
+        if (! is_readable($path)) {
+            throw new RuntimeException('В проекте нет deploy/nginx/panel-stub.default-server.conf');
+        }
+        $raw = file_get_contents($path);
+        $raw = is_string($raw) ? $raw : '';
+        if ($omitTestSpeedMarkers) {
+            $raw = (string) preg_replace('/#\s*HOST_TEST_SPEED_BEGIN.*?#\s*HOST_TEST_SPEED_END\s*\r?\n?/su', '', $raw);
+        }
+        if ($raw === '') {
+            throw new RuntimeException('Пустой шаблон nginx заглушки');
+        }
+
+        return $raw;
+    }
+
+    /**
+     * fcgiwrap + скрипт + snippet + token для ?token= (только хостовый nginx).
+     *
+     * @return array{socket: string, token: string}|null
+     */
+    private function deployHostOutboundTestSpeedFcgiArtifacts(SSH2 $ssh, SFTP $sftp): ?array
+    {
+        $scriptLocal = base_path('deploy/stub-assets/panel-stub-test-speed.sh');
+        if (! is_readable($scriptLocal)) {
+            Log::warning('deploy/stub-assets/panel-stub-test-speed.sh не найден — /test-speed пропускается');
+
+            return null;
+        }
+
+        $installer = <<<'SH'
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+set +e
+if command -v apt-get >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq
+  apt-get install -y fcgiwrap
+elif command -v dnf >/dev/null 2>&1; then
+  dnf install -y fcgiwrap
+elif command -v yum >/dev/null 2>&1; then
+  yum install -y fcgiwrap
+elif command -v apk >/dev/null 2>&1; then
+  apk add --no-cache fcgiwrap
+fi
+(systemctl daemon-reload >/dev/null 2>&1) || true
+(systemctl enable --now fcgiwrap.socket >/dev/null 2>&1) \
+  || systemctl restart fcgiwrap >/dev/null 2>&1 \
+  || service fcgiwrap restart >/dev/null 2>&1 \
+  || service fcgiwrap start >/dev/null 2>&1 \
+  || true
+sleep 2
+SOC=""
+for c in /run/fcgiwrap.socket /var/run/fcgiwrap.socket /run/fcgiwrap/fcgiwrap.sock; do
+  if [ -S "$c" ]; then SOC="$c"; break; fi
+done
+printf %s "$SOC"
+exit 0
+SH;
+
+        $sockOut = trim(str_replace(["\r\n", "\r"], "\n", (string) $this->execRemoteBashScript($ssh, $installer)));
+        if ($sockOut === '' || ! str_starts_with($sockOut, '/')) {
+            Log::warning('fcgiwrap: сокет не найден после установки', ['out' => Str::limit($sockOut, 200)]);
+
+            return null;
+        }
+
+        $ssh->exec('mkdir -p /etc/nginx/snippets /usr/local/sbin 2>&1');
+        $tmpSh = '/tmp/panel-stub-ts-'.bin2hex(random_bytes(4)).'.sh';
+        if (! $sftp->put($tmpSh, $scriptLocal, SFTP::SOURCE_LOCAL_FILE)) {
+            Log::warning('Не удалось залить panel-stub-test-speed.sh');
+
+            return null;
+        }
+        $mvSh = $ssh->exec('mv -f '.escapeshellarg($tmpSh).' '.escapeshellarg(self::HOST_TEST_SPEED_SCRIPT)
+            .' && chmod 755 '.escapeshellarg(self::HOST_TEST_SPEED_SCRIPT).' 2>&1');
+        if ($ssh->getExitStatus() !== 0) {
+            Log::warning('Не удалось установить panel-stub-test-speed', ['out' => Str::limit($mvSh, 500)]);
+
+            return null;
+        }
+
+        $token = bin2hex(random_bytes(24));
+        $tokenEsc = escapeshellarg($token);
+        $tokenPath = escapeshellarg(self::HOST_TEST_SPEED_TOKEN);
+        $writeTok = trim((string) $ssh->exec(
+            'printf %s '.$tokenEsc.' > '.$tokenPath.' 2>/dev/null'
+            .' ; if getent passwd www-data >/dev/null 2>&1 && getent group www-data >/dev/null 2>&1; then '
+            .'chown root:www-data '.$tokenPath.' 2>/dev/null; chmod 0640 '.$tokenPath.'; '
+            .'else chmod 0644 '.$tokenPath.' 2>/dev/null; fi'
+            .' ; test -s '.$tokenPath.' && echo ok'
+        ));
+        if (! str_contains($writeTok, 'ok')) {
+            Log::warning('Не удалось записать .test-speed-token');
+
+            return null;
+        }
+
+        // www-data должна иметь возможность прочесть token без world-readable если возможно
+        $snippet = <<<'NGINX'
+location = /test-speed {
+    gzip off;
+    default_type text/plain;
+    charset utf-8;
+    include fastcgi_params;
+    fastcgi_param GATEWAY_INTERFACE CGI/1.1;
+    fastcgi_param SCRIPT_FILENAME __SCRIPT__;
+    fastcgi_param QUERY_STRING $query_string;
+    fastcgi_param REQUEST_METHOD $request_method;
+    fastcgi_intercept_errors off;
+    fastcgi_connect_timeout 15s;
+    fastcgi_send_timeout 180s;
+    fastcgi_read_timeout 180s;
+    fastcgi_pass unix:__SOCK__;
+}
+NGINX;
+        $snippet = str_replace(['__SCRIPT__', '__SOCK__'], [self::HOST_TEST_SPEED_SCRIPT, $sockOut], $snippet);
+
+        $tmpSn = '/tmp/panel-stub-sn-'.bin2hex(random_bytes(4)).'.inc';
+        $localSn = tempnam(sys_get_temp_dir(), 'pstub');
+        if ($localSn === false) {
+            return null;
+        }
+        file_put_contents($localSn, $snippet);
+        $okPut = $sftp->put($tmpSn, $localSn, SFTP::SOURCE_LOCAL_FILE);
+        @unlink($localSn);
+        if (! $okPut) {
+            Log::warning('Не удалось залить snippet test-speed');
+
+            return null;
+        }
+        $mvSn = $ssh->exec('mv -f '.escapeshellarg($tmpSn).' '.escapeshellarg(self::HOST_TEST_SPEED_SNIPPET)
+            .' && chmod 644 '.escapeshellarg(self::HOST_TEST_SPEED_SNIPPET).' 2>&1');
+        if ($ssh->getExitStatus() !== 0) {
+            Log::warning('Не удалось установить snippet', ['out' => Str::limit($mvSn, 400)]);
+
+            return null;
+        }
+
+        $this->provisionNote = ($this->provisionNote !== '' ? $this->provisionNote.' ' : '')
+            .'Исходящие: GET http(s)://<IP>/test-speed?token='.$token.' (см. curl -k).';
+
+        return ['socket' => $sockOut, 'token' => $token];
+    }
+
     private function applyOnHostNginx(
         SSH2 $ssh,
         SFTP $sftp,
         string $indexPath,
-        string $nginxPath,
+        string $nginxConfBody,
         bool $include123Rar,
         string $nginxBin
     ): void {
@@ -349,11 +520,23 @@ SH;
             $ssh->exec('rm -f '.escapeshellarg(self::STUB_ROOT.'/123.rar').' 2>/dev/null; true');
         }
 
-        if (! $sftp->put('/tmp/00-panel-stub.conf', $nginxPath, SFTP::SOURCE_LOCAL_FILE)) {
+        $localNginx = tempnam(sys_get_temp_dir(), 'stubng');
+        if ($localNginx === false) {
+            throw new RuntimeException('Нет временной директории для конфига nginx');
+        }
+        if (false === file_put_contents($localNginx, $nginxConfBody)) {
+            @unlink($localNginx);
+            throw new RuntimeException('Не удалось подготовить конфиг nginx');
+        }
+        $rnameNginx = '/tmp/panel-stub-'.bin2hex(random_bytes(8)).'.conf';
+
+        if (! $sftp->put($rnameNginx, $localNginx, SFTP::SOURCE_LOCAL_FILE)) {
+            @unlink($localNginx);
             throw new RuntimeException('Не удалось загрузить конфиг nginx');
         }
+        @unlink($localNginx);
         $mv = $ssh->exec(
-            'mv -f /tmp/00-panel-stub.conf '.escapeshellarg(self::NGINX_CONF)
+            'mv -f '.escapeshellarg($rnameNginx).' '.escapeshellarg(self::NGINX_CONF)
             .' && chmod 644 '.escapeshellarg(self::NGINX_CONF).' 2>&1'
         );
         if ($ssh->getExitStatus() !== 0) {
@@ -389,7 +572,7 @@ SH;
         SSH2 $ssh,
         SFTP $sftp,
         string $indexPath,
-        string $nginxPath,
+        string $nginxConfBody,
         bool $include123Rar,
         string $containerId,
         array $dockerArgv
@@ -401,9 +584,19 @@ SH;
         if (! $sftp->put($tmp.'/index.html', $indexPath, SFTP::SOURCE_LOCAL_FILE)) {
             throw new RuntimeException('Не удалось загрузить index.html (этап /tmp)');
         }
-        if (! $sftp->put($tmp.'/00-panel-stub.conf', $nginxPath, SFTP::SOURCE_LOCAL_FILE)) {
+        $localConf = tempnam(sys_get_temp_dir(), 'dockng');
+        if ($localConf === false) {
+            throw new RuntimeException('Нет временной директории для конфига nginx');
+        }
+        if (false === file_put_contents($localConf, $nginxConfBody)) {
+            @unlink($localConf);
+            throw new RuntimeException('Не удалось подготовить конфиг nginx');
+        }
+        if (! $sftp->put($tmp.'/00-panel-stub.conf', $localConf, SFTP::SOURCE_LOCAL_FILE)) {
+            @unlink($localConf);
             throw new RuntimeException('Не удалось загрузить конфиг nginx (этап /tmp)');
         }
+        @unlink($localConf);
 
         $c = escapeshellarg($containerId);
         $mkdir = $dc.' exec '.$c.' sh -c '.escapeshellarg(
@@ -823,6 +1016,9 @@ EXTRA=""
 if [ "$LN80" = "0" ] && [ "$LN443" = "0" ]; then
   EXTRA=" Узел не слушает :80/:443 на этом хосте — publish Docker / ufw / SG провайдера или Marzban-only."
 fi
+if [ -f /etc/nginx/snippets/panel-stub-test-speed.inc ] && [ -s /var/www/panel-stub/.test-speed-token ]; then
+  EXTRA="${EXTRA} Исходящие/check: GET /test-speed?token=<секрет с сервера> (см. текст панели)."
+fi
 echo "Проверка VPS: localhost HTTP=${H80} HTTPS=${H443}; ss LISTEN :80 строк=${LN80} :443 строк=${LN443}.${EXTRA}"
 
 ENDSCRIPT;
@@ -832,7 +1028,7 @@ ENDSCRIPT;
             return '(проверка localhost недоступна)';
         }
 
-        return Str::limit($out, 900);
+        return Str::limit($out, 1150);
     }
 
     /**

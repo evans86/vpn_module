@@ -10,6 +10,7 @@ use App\Http\Controllers\Module\PackController;
 use App\Http\Controllers\Module\PackSalesmanController;
 use App\Http\Controllers\Module\KeyActivateController;
 use App\Http\Controllers\Module\BotController;
+use App\Http\Controllers\Module\ServerFleetHealthController;
 use App\Http\Controllers\Module\ServerMonitoringController;
 use App\Http\Controllers\Module\TelegramUserController;
 use App\Http\Controllers\Module\VpnDirectDomainController;
@@ -223,6 +224,13 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
                 Route::post('/{server}/enable-log-upload', [ServerController::class, 'enableLogUpload'])->name('enable-log-upload');
                 Route::get('/{server}/check-log-upload-status', [ServerController::class, 'checkLogUploadStatus'])->name('check-log-upload-status');
                 Route::post('/{server}/apply-decoy-stub', [ServerController::class, 'applyDecoyStub'])->name('apply-decoy-stub');
+            });
+
+            Route::prefix('server-fleet')->name('server-fleet.')->group(function () {
+                Route::get('/report', [ServerFleetHealthController::class, 'index'])->name('report');
+                Route::post('/report/run', [ServerFleetHealthController::class, 'run'])
+                    ->middleware('throttle:8,1')
+                    ->name('report.run');
             });
 
             // Панели

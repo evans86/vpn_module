@@ -28,6 +28,10 @@
 5) Проверка:
    sudo nginx -t && sudo systemctl reload nginx
 
+5a) При развёртывании заглушки из админ-панели дополнительно может быть настроен GET
+   /test-speed (fcgiwrap + скрипт исходящих тестов). Вручную: apt install fcgiwrap,
+   список см. deploy/stub-assets/panel-stub-test-speed.sh.
+
 6) Ваши реальные сайты/панели — отдельные server { server_name panel.example.com; ... }
    БЕЗ default_server, чтобы по домену открывалась панель, а по IP — заглушка.
 

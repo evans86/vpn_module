@@ -148,8 +148,15 @@
                         'admin.module.server-users.*',
                         'admin.module.server-monitoring.*',
                         'admin.module.connection-limit-violations.*',
+                        'admin.module.server-fleet.*',
                     ],
                     'items' => [
+                        [
+                            'route' => 'admin.module.server-fleet.report',
+                            'icon' => 'fa-heart-pulse',
+                            'label' => 'Проверка серверов',
+                            'routes' => ['admin.module.server-fleet.*'],
+                        ],
                         [
                             'route' => 'admin.module.server.index',
                             'icon' => 'fa-server',

@@ -30,6 +30,7 @@ use Illuminate\Support\Carbon;
  * @property bool $decoy_stub_include_123_rar
  * @property Carbon|null $decoy_stub_last_applied_at
  * @property string|null $decoy_stub_last_message
+ * @property string|null $decoy_stub_test_speed_token токен для /test-speed (cast encrypted)
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Panel|null $panel
@@ -59,6 +60,7 @@ class Server extends Model
         'decoy_stub_include_123_rar',
         'decoy_stub_last_applied_at',
         'decoy_stub_last_message',
+        'decoy_stub_test_speed_token',
     ];
 
     /**
@@ -71,6 +73,7 @@ class Server extends Model
         'ssh_port' => 'integer',
         'decoy_stub_include_123_rar' => 'boolean',
         'decoy_stub_last_applied_at' => 'datetime',
+        'decoy_stub_test_speed_token' => 'encrypted',
     ];
 
     /**
