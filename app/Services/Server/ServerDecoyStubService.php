@@ -458,6 +458,20 @@ fi
 if [ "$SOC" = "" ]; then
   SOC=$(find /run /var/run -maxdepth 6 -type s \( -name 'wrap_fcgi.sock' -o -name 'fcgiwrap.sock' \) ! -iname '*php-fpm*' ! -iname '*fpm.sock*' 2>/dev/null | head -1)
 fi
+if command -v systemctl >/dev/null 2>&1; then
+  L=$(systemctl show -p ListenStream --value fcgiwrap.socket 2>/dev/null | head -n1 | tr -d '\r\n')
+  if [ -n "$L" ]; then
+    case "$L" in
+      unix:*)
+        L=${L#unix:}
+      ;;
+      @*|fd:*|'')
+        L=""
+      ;;
+    esac
+  fi
+  if [ -n "$L" ] && [ -S "$L" ]; then SOC="$L"; fi
+fi
 printf '%s' "$SOC"
 exit 0
 SH;

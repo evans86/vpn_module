@@ -209,12 +209,14 @@ class ServerFleetProbeService
      */
     private function probeTestSpeed(string $hostBracket, string $token): array
     {
+        $query = http_build_query([
+            'token' => $token,
+            'fleet_check' => '1',
+        ]);
+        $httpsUrl = 'https://'.$hostBracket.'/test-speed?'.$query;
+        $httpUrl = 'http://'.$hostBracket.'/test-speed?'.$query;
+
         try {
-            // Полный отчёт на VPS может идти >200 с (curl + speedtest); в сводке запрашиваем только проверку токена и fcgi (см. panel-stub-test-speed.sh fleet_check=1).
-            $url = 'https://'.$hostBracket.'/test-speed?'.http_build_query([
-                'token' => $token,
-                'fleet_check' => '1',
-            ]);
             $t0 = microtime(true);
             $res = Http::withoutVerifying()
                 ->timeout(45)
@@ -222,18 +224,57 @@ class ServerFleetProbeService
                     'connect_timeout' => 10,
                     'http_errors' => false,
                 ])
-                ->get($url);
+                ->get($httpsUrl);
 
             $sec = round(microtime(true) - $t0, 2);
             $code = $res->status();
             $body = $res->body();
-            $excerpt = trim(Str::limit($body, 4000));
+            $excerptBase = trim(Str::limit($body, 4000));
+
+            if ($code >= 200 && $code < 300) {
+                return [
+                    'state' => 'ok',
+                    'excerpt' => $excerptBase !== '' ? $excerptBase : '(пустое тело)',
+                    'http_code' => $code,
+                    'error' => null,
+                    'seconds' => $sec,
+                ];
+            }
+
+            // Частый случай гонки: nginx смотрит не в тот UNIX-сокет; по HTTP может отрабатывать тот же vhost без http2-тонкости
+            $tryHttpStatuses = [502, 503, 504];
+            if (in_array($code, $tryHttpStatuses, true)) {
+                $t1 = microtime(true);
+                $httpRes = Http::withoutVerifying()
+                    ->timeout(45)
+                    ->withOptions([
+                        'connect_timeout' => 10,
+                        'http_errors' => false,
+                    ])
+                    ->get($httpUrl);
+                $sec2 = round(microtime(true) - $t1, 2);
+                $hCode = $httpRes->status();
+                $hBody = trim(Str::limit($httpRes->body(), 4000));
+
+                if ($hCode >= 200 && $hCode < 300) {
+                    $note = 'HTTPS '.$code.', по HTTP — '.$hCode.' (проверьте сокет fcgiwrap/nginx; повторите «Применить заглушку»). ';
+                    $excerpt = trim($note.($hBody !== '' ? $hBody : '(пустое тело)'));
+
+                    return [
+                        'state' => 'ok',
+                        'excerpt' => $excerpt,
+                        'http_code' => $hCode,
+                        'error' => null,
+                        'seconds' => $sec2,
+                    ];
+                }
+            }
 
             return [
-                'state' => $code >= 200 && $code < 300 ? 'ok' : 'fail',
-                'excerpt' => $excerpt !== '' ? $excerpt : '(пустое тело)',
+                'state' => 'fail',
+                'excerpt' => $excerptBase !== '' ? $excerptBase : '(пустое тело)',
                 'http_code' => $code,
-                'error' => $code >= 200 && $code < 300 ? null : ('HTTP '.$code),
+                'error' => 'HTTP '.$code,
                 'seconds' => $sec,
             ];
         } catch (Throwable $e) {
