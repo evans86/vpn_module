@@ -8,12 +8,19 @@ use App\Services\Server\ServerFleetProbeService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class ServerFleetHealthController extends Controller
 {
-    public function __construct(
-        private ServerFleetProbeService $fleetProbeService
-    ) {}
+    /**
+     * @var ServerFleetProbeService
+     */
+    private ServerFleetProbeService $fleetProbeService;
+
+    public function __construct(ServerFleetProbeService $fleetProbeService)
+    {
+        $this->fleetProbeService = $fleetProbeService;
+    }
 
     /**
      * Страница сводной проверки VPS в статусе «Настроен».
@@ -41,7 +48,22 @@ class ServerFleetHealthController extends Controller
     {
         $includeTestSpeed = $request->boolean('include_test_speed');
 
+        $tbl = (new Server)->getTable();
+        $select = [
+            'id',
+            'name',
+            'ip',
+            'server_status',
+            'decoy_stub_include_123_rar',
+            'decoy_stub_last_applied_at',
+            'decoy_stub_last_message',
+        ];
+        if (Schema::hasColumn($tbl, 'decoy_stub_test_speed_token')) {
+            $select[] = 'decoy_stub_test_speed_token';
+        }
+
         $servers = Server::query()
+            ->select($select)
             ->where('server_status', Server::SERVER_CONFIGURED)
             ->whereNotNull('ip')
             ->where('ip', '!=', '')

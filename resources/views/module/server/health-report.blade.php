@@ -15,10 +15,7 @@
             Тяжёлый сценарий <code class="text-[11px] bg-slate-100 px-1 rounded">/test-speed</code> — только если токен сохранён в БД (после применения заглушки с fcgiwrap).
         </p>
 
-        <x-admin.card>
-            <x-slot name="title">
-                <span class="text-sm font-semibold">Запуск</span>
-            </x-slot>
+        <x-admin.card title="Запуск">
             <div class="flex flex-wrap items-center gap-4 text-sm">
                 <label class="inline-flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" id="fleetIncludeTestSpeed" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
@@ -35,41 +32,39 @@
 
         <div id="fleetSummary" class="hidden grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 text-sm"></div>
 
-        <x-admin.card id="fleetTableCard" class="hidden">
-            <x-slot name="title">
-                <span class="text-sm font-semibold">Результаты по узлам</span>
-            </x-slot>
-            <div class="overflow-x-auto border border-slate-200 rounded-md">
-                <table class="min-w-full divide-y divide-slate-200 text-xs">
-                    <thead class="bg-slate-50 text-slate-700">
-                        <tr>
-                            <th class="px-2 py-2 text-left font-medium">#</th>
-                            <th class="px-2 py-2 text-left font-medium">Имя / IP</th>
-                            <th class="px-2 py-2 text-left font-medium">HTTP</th>
-                            <th class="px-2 py-2 text-left font-medium">HTTPS</th>
-                            <th class="px-2 py-2 text-left font-medium">Заглушка БД</th>
-                            <th class="px-2 py-2 text-left font-medium">/123.rar</th>
-                            <th class="px-2 py-2 text-left font-medium">/test-speed</th>
-                        </tr>
-                    </thead>
-                    <tbody id="fleetTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
-                </table>
-            </div>
-        </x-admin.card>
+        <div id="fleetTableCard" class="hidden">
+            <x-admin.card title="Результаты по узлам">
+                <div class="overflow-x-auto border border-slate-200 rounded-md">
+                    <table class="min-w-full divide-y divide-slate-200 text-xs">
+                        <thead class="bg-slate-50 text-slate-700">
+                            <tr>
+                                <th class="px-2 py-2 text-left font-medium">#</th>
+                                <th class="px-2 py-2 text-left font-medium">Имя / IP</th>
+                                <th class="px-2 py-2 text-left font-medium">HTTP</th>
+                                <th class="px-2 py-2 text-left font-medium">HTTPS</th>
+                                <th class="px-2 py-2 text-left font-medium">Заглушка БД</th>
+                                <th class="px-2 py-2 text-left font-medium">/123.rar</th>
+                                <th class="px-2 py-2 text-left font-medium">/test-speed</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fleetTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
+                    </table>
+                </div>
+            </x-admin.card>
+        </div>
 
-        <x-admin.card id="fleetReportCard" class="hidden">
-            <x-slot name="title">
-                <span class="text-sm font-semibold">Текстовый отчёт</span>
-            </x-slot>
-            <div class="flex flex-wrap gap-2 mb-2">
-                <button type="button" id="fleetCopyReport"
-                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded border border-slate-300 bg-white hover:bg-slate-50">
-                    <i class="fas fa-copy mr-1.5"></i> Копировать
-                </button>
-            </div>
-            <textarea id="fleetTextReport" readonly rows="22"
-                      class="w-full font-mono text-xs text-slate-800 border border-slate-300 rounded-md p-2 bg-slate-50"></textarea>
-        </x-admin.card>
+        <div id="fleetReportCard" class="hidden">
+            <x-admin.card title="Текстовый отчёт">
+                <div class="flex flex-wrap gap-2 mb-2">
+                    <button type="button" id="fleetCopyReport"
+                            class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded border border-slate-300 bg-white hover:bg-slate-50">
+                        <i class="fas fa-copy mr-1.5"></i> Копировать
+                    </button>
+                </div>
+                <textarea id="fleetTextReport" readonly rows="22"
+                          class="w-full font-mono text-xs text-slate-800 border border-slate-300 rounded-md p-2 bg-slate-50"></textarea>
+            </x-admin.card>
+        </div>
     </div>
 
     @push('scripts')
