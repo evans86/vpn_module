@@ -11,6 +11,12 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 TOKEN_FILE="/var/www/panel-stub/.test-speed-token"
 
+# CGI: до тела нужны заголовки и пустая строка; иначе nginx читает первую строку тела как HTTP-шапку и даёт «upstream sent invalid header» → 502
+cgi_reply_headers() {
+  echo "Content-Type: text/plain; charset=utf-8"
+  echo ""
+}
+
 extract_query_token() {
   local q="$QUERY_STRING"
   local t
@@ -29,12 +35,14 @@ fi
 GOT="$(extract_query_token | tr -d '\r\n\t ')"
 
 if [[ -n "$EXPECTED" && "$GOT" != "$EXPECTED" ]]; then
+  cgi_reply_headers
   echo "Доступ запрещён: укажите корректный ?token= (сохранён в файле на сервере ${TOKEN_FILE}, строка указана также в сообщении панели после применения заглушки)."
   exit 0
 fi
 
 # Короткий ответ для массовых проверок из панели (не гоняем скачивания и speedtest — там укладываемся в секунды)
 if [[ "&${QUERY_STRING}&" == *"&fleet_check=1&"* ]]; then
+  cgi_reply_headers
   echo "=== /test-speed: короткая проверка из панели ==="
   echo "ok ($(date -Iseconds 2>/dev/null || date))"
   exit 0
@@ -81,6 +89,7 @@ probe_https() {
   printf '  %-32s connect/TLS/total sec: %s\n' "${label}" "$timing"
 }
 
+cgi_reply_headers
 echo "=== Исходящие тесты с VPS (${HOSTNAME:-?}, $(date -Iseconds 2>/dev/null || date)) ==="
 echo ""
 echo "--- Скачивание (Mbps ≈ по curl speed_download, таймаут на каждый источник) ---"
