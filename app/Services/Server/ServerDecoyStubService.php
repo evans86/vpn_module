@@ -551,6 +551,9 @@ location = /test-speed {
     fastcgi_connect_timeout 15s;
     fastcgi_send_timeout 180s;
     fastcgi_read_timeout 180s;
+    fastcgi_request_buffering off;
+    fastcgi_buffer_size 64k;
+    fastcgi_buffers 8 64k;
 
     fastcgi_pass unix:__SOCK__;
 }
