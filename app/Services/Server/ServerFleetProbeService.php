@@ -213,70 +213,76 @@ class ServerFleetProbeService
             'token' => $token,
             'fleet_check' => '1',
         ]);
-        $httpsUrl = 'https://'.$hostBracket.'/test-speed?'.$query;
-        $httpUrl = 'http://'.$hostBracket.'/test-speed?'.$query;
+        /** @var array{url: string, label: string} $tries HTTP первым — у части сборок только там уходит без http2/ssl тонкостей */
+        $tries = [
+            ['label' => 'HTTP', 'url' => 'http://'.$hostBracket.'/test-speed?'.$query],
+            ['label' => 'HTTPS', 'url' => 'https://'.$hostBracket.'/test-speed?'.$query],
+        ];
+
+        $lastFail = [
+            'state' => 'fail',
+            'excerpt' => null,
+            'http_code' => null,
+            'error' => null,
+            'seconds' => null,
+        ];
 
         try {
-            $t0 = microtime(true);
-            $res = Http::withoutVerifying()
-                ->timeout(45)
-                ->withOptions([
-                    'connect_timeout' => 10,
-                    'http_errors' => false,
-                ])
-                ->get($httpsUrl);
-
-            $sec = round(microtime(true) - $t0, 2);
-            $code = $res->status();
-            $body = $res->body();
-            $excerptBase = trim(Str::limit($body, 4000));
-
-            if ($code >= 200 && $code < 300) {
-                return [
-                    'state' => 'ok',
-                    'excerpt' => $excerptBase !== '' ? $excerptBase : '(пустое тело)',
-                    'http_code' => $code,
-                    'error' => null,
-                    'seconds' => $sec,
-                ];
-            }
-
-            // Частый случай гонки: nginx смотрит не в тот UNIX-сокет; по HTTP может отрабатывать тот же vhost без http2-тонкости
-            $tryHttpStatuses = [502, 503, 504];
-            if (in_array($code, $tryHttpStatuses, true)) {
-                $t1 = microtime(true);
-                $httpRes = Http::withoutVerifying()
+            foreach ($tries as $try) {
+                $t0 = microtime(true);
+                $res = Http::withoutVerifying()
                     ->timeout(45)
                     ->withOptions([
                         'connect_timeout' => 10,
                         'http_errors' => false,
                     ])
-                    ->get($httpUrl);
-                $sec2 = round(microtime(true) - $t1, 2);
-                $hCode = $httpRes->status();
-                $hBody = trim(Str::limit($httpRes->body(), 4000));
+                    ->get($try['url']);
 
-                if ($hCode >= 200 && $hCode < 300) {
-                    $note = 'HTTPS '.$code.', по HTTP — '.$hCode.' (проверьте сокет fcgiwrap/nginx; повторите «Применить заглушку»). ';
-                    $excerpt = trim($note.($hBody !== '' ? $hBody : '(пустое тело)'));
+                $sec = round(microtime(true) - $t0, 2);
+                $code = $res->status();
+                $body = trim(Str::limit($res->body(), 4000));
+
+                if ($code >= 200 && $code < 300) {
+                    $prefix = '';
+                    if ($try['label'] === 'HTTP') {
+                        try {
+                            $tHttps = microtime(true);
+                            $hb = Http::withoutVerifying()
+                                ->timeout(25)
+                                ->withOptions([
+                                    'connect_timeout' => 8,
+                                    'http_errors' => false,
+                                ])
+                                ->get('https://'.$hostBracket.'/test-speed?'.$query);
+                            $hc = $hb->status();
+                            $secHttps = round(microtime(true) - $tHttps, 2);
+                            if ($hc < 200 || $hc >= 300) {
+                                $prefix = 'Ответ по HTTP ок; проверка HTTPS: код '.$hc.' ('.$secHttps.' с). Исправьте :443/snippet/fastcgi или http2+fci или перепримените заглушку. ';
+                            }
+                        } catch (Throwable $e) {
+                            $prefix = 'Ответ по HTTP ок; доп. проверка HTTPS не удалась ('.Str::limit($e->getMessage(), 120).'). ';
+                        }
+                    }
 
                     return [
                         'state' => 'ok',
-                        'excerpt' => $excerpt,
-                        'http_code' => $hCode,
+                        'excerpt' => $prefix.($body !== '' ? $body : '(пустое тело)'),
+                        'http_code' => $code,
                         'error' => null,
-                        'seconds' => $sec2,
+                        'seconds' => $sec,
                     ];
                 }
+
+                $lastFail = [
+                    'state' => 'fail',
+                    'excerpt' => $body !== '' ? $body : '(пустое тело)',
+                    'http_code' => $code,
+                    'error' => $try['label'].' HTTP '.$code,
+                    'seconds' => $sec,
+                ];
             }
 
-            return [
-                'state' => 'fail',
-                'excerpt' => $excerptBase !== '' ? $excerptBase : '(пустое тело)',
-                'http_code' => $code,
-                'error' => 'HTTP '.$code,
-                'seconds' => $sec,
-            ];
+            return $lastFail;
         } catch (Throwable $e) {
             return [
                 'state' => 'fail',

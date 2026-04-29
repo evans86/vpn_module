@@ -522,23 +522,36 @@ SH;
             return null;
         }
 
-        // www-data должна иметь возможность прочесть token без world-readable если возможно
+        // Полный комплект параметров задаём здесь без include fastcgi_params: иначе сокет systemd
+        // уже правильный, но из include подставится «чужой» SCRIPT_FILENAME под $document_root.
         $snippet = <<<'NGINX'
 location = /test-speed {
     gzip off;
     default_type text/plain;
     charset utf-8;
-    include fastcgi_params;
+
+    fastcgi_param GATEWAY_INTERFACE "CGI/1.1";
+    fastcgi_param SERVER_SOFTWARE nginx;
+    fastcgi_param SERVER_NAME $server_name;
+    fastcgi_param SERVER_PORT $server_port;
+    fastcgi_param SERVER_PROTOCOL $server_protocol;
+    fastcgi_param REMOTE_ADDR $remote_addr;
+    fastcgi_param REMOTE_PORT $remote_port;
+    fastcgi_param REQUEST_SCHEME $scheme;
+    fastcgi_param REQUEST_URI $request_uri;
+    fastcgi_param DOCUMENT_URI $document_uri;
     fastcgi_param DOCUMENT_ROOT __STUB_ROOT__;
     fastcgi_param SCRIPT_NAME /test-speed;
-    fastcgi_param GATEWAY_INTERFACE CGI/1.1;
     fastcgi_param SCRIPT_FILENAME __SCRIPT__;
+    fastcgi_param PATH_INFO "";
     fastcgi_param QUERY_STRING $query_string;
     fastcgi_param REQUEST_METHOD $request_method;
+
     fastcgi_intercept_errors off;
     fastcgi_connect_timeout 15s;
     fastcgi_send_timeout 180s;
     fastcgi_read_timeout 180s;
+
     fastcgi_pass unix:__SOCK__;
 }
 NGINX;
