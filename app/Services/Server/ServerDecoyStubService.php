@@ -39,15 +39,15 @@ SH;
     }
 
     /**
-     * Многострочный bash на удалённом Linux. На Windows при `bash -lc`.escapeshellarg() портятся
-     * кавычки — сервер тогда пишет: syntax error: unexpected end of file.
+     * Многострочный скрипт на удалённом Linux через base64; исполняет bash,
+     * не posix sh (dash), иначе подстановки вида ${var:-0} и часть синтаксиса ломаются.
      */
     private function execRemoteBashScript(SSH2 $ssh, string $script): string
     {
         $script = str_replace(["\r\n", "\r"], "\n", $script);
         $b64 = base64_encode($script);
 
-        return (string) $ssh->exec('printf %s '.var_export($b64, true).' | base64 -d | /bin/sh 2>&1');
+        return (string) $ssh->exec('printf %s '.var_export($b64, true).' | base64 -d | /bin/bash 2>&1');
     }
 
     /**
@@ -692,26 +692,27 @@ BASH;
      */
     private function verifyStubPortsFromRemote(SSH2 $ssh): string
     {
-        $script = self::DOCKER_BASH_PROLOG.<<<'BASH'
+        $script = <<<'ENDSCRIPT'
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 sleep 1
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-H80=""
-H443=""
 if command -v curl >/dev/null 2>&1; then
-  H80=$(curl -sS --connect-timeout 5 -m 12 -o /dev/null -w "%{http_code}" http://127.0.0.1/ 2>/dev/null || printf 'fail')
-  H443=$(curl -sSk --connect-timeout 5 -m 12 -o /dev/null -w "%{http_code}" https://127.0.0.1/ 2>/dev/null || printf 'fail')
+  H80=$(curl -sS --connect-timeout 5 -m 12 -o /dev/null -w "%{http_code}" http://127.0.0.1/ 2>/dev/null || echo fail)
+  H443=$(curl -sSk --connect-timeout 5 -m 12 -o /dev/null -w "%{http_code}" https://127.0.0.1/ 2>/dev/null || echo fail)
 else
-  H80="nocurl"
-  H443="nocurl"
+  H80=nocurl
+  H443=nocurl
 fi
-LN80=$(ss -tln 2>/dev/null | grep ':80 ' | wc -l | tr -d ' ')
-LN443=$(ss -tln 2>/dev/null | grep ':443 ' | wc -l | tr -d ' ')
+LN80=$(ss -tln 2>/dev/null | grep ':80 ' | wc -l | tr -cd '0-9')
+LN443=$(ss -tln 2>/dev/null | grep ':443 ' | wc -l | tr -cd '0-9')
+[ -z "$LN80" ] && LN80=0
+[ -z "$LN443" ] && LN443=0
 EXTRA=""
-if [ "${LN80:-0}" = "0" ] && [ "${LN443:-0}" = "0" ]; then
-  EXTRA=" Узел сам не принимает :80/:443 — проверьте publish Docker, ufw, Security Group провайдера; при Marzban-only см. текст [Частично] выше."
+if [ "$LN80" = "0" ] && [ "$LN443" = "0" ]; then
+  EXTRA=" Узел не слушает :80/:443 на этом хосте — publish Docker / ufw / SG провайдера или Marzban-only."
 fi
-printf 'Проверка на узле (не ping): HTTP/80 код=%s, HTTPS/443 код=%s; строки LISTEN ss :80=%s :443=%s.%s\n' "${H80}" "${H443}" "${LN80}" "${LN443}" "${EXTRA}"
-BASH;
+echo "Проверка VPS: localhost HTTP=${H80} HTTPS=${H443}; ss LISTEN :80 строк=${LN80} :443 строк=${LN443}.${EXTRA}"
+
+ENDSCRIPT;
 
         $out = trim(str_replace(["\r\n", "\r"], "\n", (string) $this->execRemoteBashScript($ssh, $script)));
         if ($out === '') {
