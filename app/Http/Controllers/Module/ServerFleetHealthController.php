@@ -70,6 +70,11 @@ class ServerFleetHealthController extends Controller
             ->orderBy('name')
             ->get();
 
+        if ($includeTestSpeed && function_exists('set_time_limit')) {
+            /** @see ServerFleetProbeService::probeTestSpeed время полного /test-speed на каждый сервер может быть многих минут */
+            set_time_limit(0);
+        }
+
         $payload = $this->fleetProbeService->probe($servers, $includeTestSpeed);
 
         return response()->json([

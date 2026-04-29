@@ -12,14 +12,16 @@
         <p class="text-xs text-slate-600 leading-relaxed max-w-4xl">
             Для каждого узла: HTTP/HTTPS на корень, поля заглушки из БД (последнее применение без префикса «Ошибка:»),
             при необходимости — <code class="text-[11px] bg-slate-100 px-1 rounded">/123.rar</code> (если приманка включена в БД и заглушка успешна).
-            Тяжёлый сценарий <code class="text-[11px] bg-slate-100 px-1 rounded">/test-speed</code> — только если токен сохранён в БД (после применения заглушки с fcgiwrap).
+            Опционально включается <strong class="font-normal">полный</strong>
+            <code class="text-[11px] bg-slate-100 px-1 rounded">/test-speed</code> на VPS (скачивания, проверки зон HTTPS, опционально speedtest) —
+            только при сохранённом токене в БД; на каждый сервер до ~10 мин ожидания ответа.
         </p>
 
         <x-admin.card title="Запуск">
             <div class="flex flex-wrap items-center gap-4 text-sm">
                 <label class="inline-flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" id="fleetIncludeTestSpeed" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
-                    <span>Включить <code class="text-xs">/test-speed</code> (долго, до нескольких минут на сервер)</span>
+                    <span>Включить полный <code class="text-xs">/test-speed</code> (до ~10 мин на сервер из-за загрузок и speedtest)</span>
                 </label>
                 <button type="button" id="fleetRunBtn"
                         class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">

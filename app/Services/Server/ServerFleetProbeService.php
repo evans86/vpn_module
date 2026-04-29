@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Сводная проверка «рабочих» VPS: доступность заглушки, приманка, опционально /test-speed.
+ * Сводная проверка «рабочих» VPS: доступность заглушки, приманка, опционально полный /test-speed (скачивания + speedtest).
  */
 class ServerFleetProbeService
 {
@@ -236,86 +236,46 @@ class ServerFleetProbeService
     }
 
     /**
-     * Тяжёлый удалённый сценарий (до ~3 мин по таймауту Laravel HTTP).
+     * Полный удалённый сценарий на VPS (скачивание тестовых файлов, проверки HTTPS, опционально speedtest).
+     * Без ?fleet_check=1 — см. deploy/stub-assets/panel-stub-test-speed.sh.
      *
      * @return array{state: string, excerpt: ?string, http_code: ?int, error: ?string, seconds: ?float}
      */
     private function probeTestSpeed(string $hostBracket, string $token): array
     {
-        $query = http_build_query([
-            'token' => $token,
-            'fleet_check' => '1',
-        ]);
-        /** @var array{url: string, label: string} $tries HTTP первым — у части сборок только там уходит без http2/ssl тонкостей */
-        $tries = [
-            ['label' => 'HTTP', 'url' => 'http://'.$hostBracket.'/test-speed?'.$query],
-            ['label' => 'HTTPS', 'url' => 'https://'.$hostBracket.'/test-speed?'.$query],
-        ];
-
-        $lastFail = [
-            'state' => 'fail',
-            'excerpt' => null,
-            'http_code' => null,
-            'error' => null,
-            'seconds' => null,
-        ];
+        $url = 'https://'.$hostBracket.'/test-speed?'.http_build_query(['token' => $token]);
 
         try {
-            foreach ($tries as $try) {
-                $t0 = microtime(true);
-                $res = Http::withoutVerifying()
-                    ->timeout(45)
-                    ->withOptions([
-                        'connect_timeout' => 10,
-                        'http_errors' => false,
-                    ])
-                    ->get($try['url']);
+            $t0 = microtime(true);
+            $res = Http::withoutVerifying()
+                ->timeout(620)
+                ->withOptions([
+                    'connect_timeout' => 15,
+                    'http_errors' => false,
+                ])
+                ->get($url);
 
-                $sec = round(microtime(true) - $t0, 2);
-                $code = $res->status();
-                $body = trim(Str::limit($res->body(), 4000));
+            $sec = round(microtime(true) - $t0, 2);
+            $code = $res->status();
+            $body = trim(Str::limit($res->body(), 65535));
 
-                if ($code >= 200 && $code < 300) {
-                    $prefix = '';
-                    if ($try['label'] === 'HTTP') {
-                        try {
-                            $tHttps = microtime(true);
-                            $hb = Http::withoutVerifying()
-                                ->timeout(25)
-                                ->withOptions([
-                                    'connect_timeout' => 8,
-                                    'http_errors' => false,
-                                ])
-                                ->get('https://'.$hostBracket.'/test-speed?'.$query);
-                            $hc = $hb->status();
-                            $secHttps = round(microtime(true) - $tHttps, 2);
-                            if ($hc < 200 || $hc >= 300) {
-                                $prefix = 'Ответ по HTTP ок; проверка HTTPS: код '.$hc.' ('.$secHttps.' с). Исправьте :443/snippet/fastcgi или http2+fci или перепримените заглушку. ';
-                            }
-                        } catch (Throwable $e) {
-                            $prefix = 'Ответ по HTTP ок; доп. проверка HTTPS не удалась ('.Str::limit($e->getMessage(), 120).'). ';
-                        }
-                    }
-
-                    return [
-                        'state' => 'ok',
-                        'excerpt' => $prefix.($body !== '' ? $body : '(пустое тело)'),
-                        'http_code' => $code,
-                        'error' => null,
-                        'seconds' => $sec,
-                    ];
-                }
-
-                $lastFail = [
-                    'state' => 'fail',
+            if ($code >= 200 && $code < 300) {
+                return [
+                    'state' => 'ok',
                     'excerpt' => $body !== '' ? $body : '(пустое тело)',
                     'http_code' => $code,
-                    'error' => 'код '.$code.' ('.$try['label'].')',
+                    'error' => null,
                     'seconds' => $sec,
                 ];
             }
 
-            return $lastFail;
+            return [
+                'state' => 'fail',
+                'excerpt' => $body !== '' ? $body : '(пустое тело)',
+                'http_code' => $code,
+                'error' => 'код '.$code.' (HTTPS)',
+                'seconds' => $sec,
+            ];
         } catch (Throwable $e) {
             return [
                 'state' => 'fail',
@@ -368,11 +328,11 @@ class ServerFleetProbeService
             } else {
                 $sec = isset($ts['seconds']) ? (string) $ts['seconds'].' с' : '';
                 $lines[] = '  /test-speed: '.(($ts['state'] ?? '') === 'ok' ? 'ОК '.$sec : (($ts['error'] ?? 'ошибка').' '.$sec));
-                $ex = isset($ts['excerpt']) ? Str::limit((string) $ts['excerpt'], 2200) : '';
+                $ex = isset($ts['excerpt']) ? Str::limit((string) $ts['excerpt'], 38000) : '';
                 if ($ex !== '') {
                     foreach (preg_split("/\r\n|\r|\n/", $ex, -1, PREG_SPLIT_NO_EMPTY) as $pex) {
                         $lines[] = '    '.$pex;
-                        if (count($lines) > 120) {
+                        if (count($lines) > 260) {
                             break 2;
                         }
                     }
