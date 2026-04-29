@@ -72,7 +72,13 @@ class ServerFleetProbeService
                     $testSpeed = $this->probeTestSpeed($base, $token);
                 } else {
                     $testSpeed['state'] = 'skipped';
-                    $testSpeed['error'] = ! $stubOkDb ? 'нет успешной заглушки' : ((! is_string($token) || $token === '') ? 'нет токена в БД (повторите «Применить заглушку» при работающем fcgiwrap)' : 'нет IP');
+                    if (! $stubOkDb) {
+                        $testSpeed['error'] = 'нет успешной заглушки';
+                    } elseif (! is_string($token) || $token === '') {
+                        $testSpeed['error'] = $this->testSpeedSkippedNoTokenHint($server);
+                    } else {
+                        $testSpeed['error'] = 'нет IP';
+                    }
                 }
             }
 
@@ -119,6 +125,33 @@ class ServerFleetProbeService
             'elapsed_ms' => $elapsed,
             'text_report' => $this->buildTextReport($rows, $summary, $elapsed, $includeTestSpeed),
         ];
+    }
+
+    /**
+     * Пояснение «пропуск /test-speed»: токен пишется в БД только при ветке «nginx на хосте + fcgi».
+     */
+    private function testSpeedSkippedNoTokenHint(Server $server): string
+    {
+        $msg = mb_strtolower((string) ($server->decoy_stub_last_message ?? ''), 'UTF-8');
+
+        if (Str::contains($msg, 'docker')
+            || Str::contains($msg, 'контейнер')
+            || Str::contains($msg, 'caddy')
+            || Str::contains($msg, 'marzban')
+            || Str::contains($msg, 'gozargah')) {
+            return 'нет токена: /test-speed в сводке только при nginx в ОС + fcgiwrap (заглушка из Docker/Caddy не пишет токен).';
+        }
+
+        if (Str::contains($msg, 'исходящие:') || Str::contains($msg, '/test-speed')
+            || Str::contains($msg, 'curl -k')) {
+            return 'нет токена в БД при тексте про /test-speed — перепримените заглушку или обновите панель и снова «Применить».';
+        }
+
+        if (Str::contains($msg, 'nginx установлен') || Str::contains($msg, 'nginx на хосте')) {
+            return 'нет токена после установки nginx на хост — перепримените заглушку (нужен fcgiwrap и запись токена).';
+        }
+
+        return 'нет токена в БД: он сохраняется только при nginx в ОС и fcgiwrap; при заглушке только в Docker — токена не будет. Перепримените на хосте при необходимости.';
     }
 
     private function hostBracket(string $ip): ?string
@@ -277,7 +310,7 @@ class ServerFleetProbeService
                     'state' => 'fail',
                     'excerpt' => $body !== '' ? $body : '(пустое тело)',
                     'http_code' => $code,
-                    'error' => $try['label'].' HTTP '.$code,
+                    'error' => 'код '.$code.' ('.$try['label'].')',
                     'seconds' => $sec,
                 ];
             }
