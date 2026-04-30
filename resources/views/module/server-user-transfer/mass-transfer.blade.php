@@ -42,7 +42,18 @@
                                 </div>
                                 <div>
                                     <dt class="font-medium text-gray-500">Страна</dt>
-                                    <dd class="mt-0.5 text-gray-900" x-text="panelField(sourcePanelId, 'country')"></dd>
+                                    <dd class="mt-0.5 flex flex-wrap items-center gap-2 text-gray-900 min-h-[1.5rem]">
+                                        <template x-if="panelField(sourcePanelId, 'country_flag_url')">
+                                            <span class="inline-flex shrink-0">
+                                                <img :src="panelField(sourcePanelId, 'country_flag_url')"
+                                                     :alt="panelField(sourcePanelId, 'country')"
+                                                     width="26" height="16"
+                                                     decoding="async" loading="lazy"
+                                                     class="h-5 w-auto rounded shadow-sm ring-1 ring-black/10">
+                                            </span>
+                                        </template>
+                                        <span x-text="panelField(sourcePanelId, 'country')" class="font-medium"></span>
+                                    </dd>
                                 </div>
                                 <div>
                                     <dt class="font-medium text-gray-500">ID панели</dt>
@@ -85,7 +96,18 @@
                                 </div>
                                 <div>
                                     <dt class="font-medium text-gray-500">Страна</dt>
-                                    <dd class="mt-0.5 text-gray-900" x-text="panelField(targetPanelId, 'country')"></dd>
+                                    <dd class="mt-0.5 flex flex-wrap items-center gap-2 text-gray-900 min-h-[1.5rem]">
+                                        <template x-if="panelField(targetPanelId, 'country_flag_url')">
+                                            <span class="inline-flex shrink-0">
+                                                <img :src="panelField(targetPanelId, 'country_flag_url')"
+                                                     :alt="panelField(targetPanelId, 'country')"
+                                                     width="26" height="16"
+                                                     decoding="async" loading="lazy"
+                                                     class="h-5 w-auto rounded shadow-sm ring-1 ring-black/10">
+                                            </span>
+                                        </template>
+                                        <span x-text="panelField(targetPanelId, 'country')" class="font-medium"></span>
+                                    </dd>
                                 </div>
                                 <div>
                                     <dt class="font-medium text-gray-500">ID панели</dt>

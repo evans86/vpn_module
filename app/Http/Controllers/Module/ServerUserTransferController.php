@@ -320,14 +320,21 @@ class ServerUserTransferController extends Controller
             $server = $p->server;
             $loc = $server !== null ? $server->location : null;
             $country = '—';
+            $country_flag_url = '';
             if ($loc !== null && $loc->code) {
-                $country = CountryFlagHelper::countryLabelWithFlag((string) $loc->code, $loc->emoji);
+                $alpha = CountryFlagHelper::countryCodeAlpha2((string) $loc->code);
+                if ($alpha !== '') {
+                    $country = $alpha;
+                    $flagUrl = CountryFlagHelper::flagCdnUrl($alpha);
+                    $country_flag_url = $flagUrl !== null ? $flagUrl : '';
+                }
             }
 
             return [
                 (string) $p->id => [
                     'server_name' => $server !== null ? (string) $server->name : '—',
                     'country' => $country,
+                    'country_flag_url' => $country_flag_url,
                     'panel_id' => $p->id,
                 ],
             ];

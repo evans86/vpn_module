@@ -53,19 +53,41 @@ final class CountryFlagHelper
     }
 
     /**
-     * Подпись для списков: «🇳🇱 (NL)» — флаг один раз и явный код в скобках
-     * (иначе браузеры часто рисуют индикаторы как вторую пару латиницы «NL NL»).
+     * URL картинки флага (ISO 3166-1 alpha-2) для &lt;img&gt; рядом с селектом.
+     * Внутри &lt;option&gt; браузеры не поддерживают изображения.
+     */
+    public static function flagCdnUrl(?string $countryCode): ?string
+    {
+        $c = strtolower(substr(preg_replace('/[^A-Za-z]/', '', (string) $countryCode), 0, 2));
+        if (strlen($c) !== 2) {
+            return null;
+        }
+
+        return 'https://flagcdn.com/w20/'.$c.'.png';
+    }
+
+    /** Двухбуквенный код (пустая строка, если не задан). */
+    public static function countryCodeAlpha2(?string $countryCode): string
+    {
+        return strtoupper(trim((string) ($countryCode ?? '')));
+    }
+
+    /** Для текста опций выпадающего списка. */
+    public static function countryCodeLabel(?string $countryCode): string
+    {
+        $code = self::countryCodeAlpha2($countryCode);
+
+        return $code !== '' ? $code : '—';
+    }
+
+    /**
+     * @deprecated по смыслу для подписей с флагом: в &lt;option&gt; — countryCodeLabel + flagCdnUrl.
      */
     public static function countryLabelWithFlag(?string $countryCode, ?string $storedEmoji): string
     {
-        $code = strtoupper(trim((string) ($countryCode ?? '')));
-        if ($code === '') {
-            return '';
-        }
+        unset($storedEmoji);
 
-        $flag = self::resolvedEmojiFromStored($code, $storedEmoji);
-
-        return $flag !== '' ? trim($flag.' ('.$code.')') : $code;
+        return self::countryCodeLabel($countryCode);
     }
 
     private static function codePointToUtf8(int $cp): string
