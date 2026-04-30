@@ -52,7 +52,10 @@ final class CountryFlagHelper
         return self::emojiFromAlpha2($code);
     }
 
-    /** Подпись для списков: «🇳🇱 NL». Без кода страны — пустая строка. */
+    /**
+     * Подпись для списков: «🇳🇱 (NL)» — флаг один раз и явный код в скобках
+     * (иначе браузеры часто рисуют индикаторы как вторую пару латиницы «NL NL»).
+     */
     public static function countryLabelWithFlag(?string $countryCode, ?string $storedEmoji): string
     {
         $code = strtoupper(trim((string) ($countryCode ?? '')));
@@ -62,11 +65,18 @@ final class CountryFlagHelper
 
         $flag = self::resolvedEmojiFromStored($code, $storedEmoji);
 
-        return $flag !== '' ? ($flag.' '.$code) : $code;
+        return $flag !== '' ? trim($flag.' ('.$code.')') : $code;
     }
 
     private static function codePointToUtf8(int $cp): string
     {
-        return html_entity_decode('&#x' . dechex($cp) . ';', ENT_HTML5, 'UTF-8');
+        $decoded = html_entity_decode('&#x' . dechex($cp) . ';', ENT_HTML5, 'UTF-8');
+        if ($decoded !== '') {
+            return $decoded;
+        }
+
+        return function_exists('mb_chr')
+            ? (string) mb_chr($cp, 'UTF-8')
+            : '';
     }
 }
