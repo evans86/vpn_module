@@ -320,7 +320,7 @@ class ServerUserTransferController extends Controller
             $loc = $server !== null ? $server->location : null;
             $country = '—';
             if ($loc !== null && $loc->code) {
-                $country = trim(($loc->emoji ? $loc->emoji.' ' : '').strtoupper((string) $loc->code));
+                $country = $loc->labelWithFlag();
             }
 
             return [
