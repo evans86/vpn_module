@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
-use App\Models\Server\FleetTerritoryReport;
 use App\Models\Server\Server;
 use App\Services\Server\ServerFleetProbeService;
 use Illuminate\Contracts\View\View;
@@ -32,16 +31,11 @@ class ServerFleetHealthController extends Controller
             ->where('server_status', Server::SERVER_CONFIGURED)
             ->count();
 
-        $recentTerritoryReports = FleetTerritoryReport::query()
-            ->latest()
-            ->paginate(12);
-
-        $title = 'Проверка серверов (массовая)';
-        $pageTitle = 'Проверка серверов';
+        $title = 'Проверка сети и серверов';
+        $pageTitle = 'Проверка сети и серверов';
 
         return view('module.server.health-report', [
             'configuredCount' => $configuredCount,
-            'recentTerritoryReports' => $recentTerritoryReports,
             'title' => $title,
             'pageTitle' => $pageTitle,
         ]);

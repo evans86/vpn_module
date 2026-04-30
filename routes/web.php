@@ -10,7 +10,6 @@ use App\Http\Controllers\Module\PackController;
 use App\Http\Controllers\Module\PackSalesmanController;
 use App\Http\Controllers\Module\KeyActivateController;
 use App\Http\Controllers\Module\BotController;
-use App\Http\Controllers\Module\FleetTerritoryReportController;
 use App\Http\Controllers\Module\ServerFleetHealthController;
 use App\Http\Controllers\Module\ServerMonitoringController;
 use App\Http\Controllers\Module\TelegramUserController;
@@ -232,10 +231,6 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
                 Route::post('/report/run', [ServerFleetHealthController::class, 'run'])
                     ->middleware('throttle:8,1')
                     ->name('report.run');
-                Route::post('/territory-reports', [FleetTerritoryReportController::class, 'store'])
-                    ->middleware('throttle:30,1')
-                    ->name('territory-reports.store');
-                Route::get('/territory-reports/{fleetTerritoryReport}', [FleetTerritoryReportController::class, 'show'])->name('territory-reports.show');
             });
 
             // Панели

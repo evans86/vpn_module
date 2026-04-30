@@ -4,188 +4,322 @@
 @section('page-title', $pageTitle)
 
 @section('content')
-    <div class="space-y-4">
-        @if(session('success'))
-            <div class="rounded-md bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-3">
-                {{ session('success') }}
-            </div>
-        @endif
-        @if($errors->any())
-            <div class="rounded-md bg-red-50 border border-red-200 text-red-800 text-sm px-4 py-3 space-y-1">
-                @foreach ($errors->all() as $e)
-                    <div>{{ $e }}</div>
-                @endforeach
-            </div>
-        @endif
-
-        <p class="text-sm text-slate-700">
-            Одна страница для <strong class="font-normal">сводной картины</strong>: здесь ваши VPS проверяются с хоста панели,
-            а ниже учитываются отчёты, которые выполняют <strong class="font-normal">в других сетях или странах</strong> вашим же скриптом (GeoIP в тексте).
-            Сравните результаты с панели с «видом снаружи» — так проще понять объективность ситуации.
-        </p>
-        <p class="text-sm text-slate-700">
-            В выборке сейчас <span class="font-semibold">{{ $configuredCount }}</span> серверов в статусе <span class="font-medium">«Настроен»</span> с непустым IP.
-        </p>
-        <p class="text-xs text-slate-600 leading-relaxed max-w-4xl">
-            Для каждого узла: HTTP/HTTPS на корень, поля заглушки из БД (последнее применение без префикса «Ошибка:»),
-            при необходимости — <code class="text-[11px] bg-slate-100 px-1 rounded">/123.rar</code> (если приманка включена в БД и заглушка успешна).
-            Опционально — <strong class="font-normal">полный</strong>
-            <code class="text-[11px] bg-slate-100 px-1 rounded">/test-speed</code>
-            только при сохранённом токене в БД; на каждый сервер до ~10 мин ожидания ответа.
-        </p>
-
-        <div id="external-probes">
-            <x-admin.card title="Внешние точки замера (отчёт скриптов с других территорий)">
-                <p class="text-xs text-slate-600 mb-4 max-w-4xl">
-                    Вставьте текст файла <code class="bg-slate-100 px-1 rounded">report_*.txt</code> или приложите .txt.
-                    По блоку GeoIP подставится страна/город — это не новый раздел, а часть той же сводной проверки.
-                </p>
-                <form method="post"
-                      action="{{ route('admin.module.server-fleet.territory-reports.store') }}"
-                      enctype="multipart/form-data"
-                      class="space-y-4 text-sm mb-8">
-                    @csrf
-                    <div>
-                        <label for="submitter_note" class="block text-xs font-medium text-slate-600 mb-1">Метка (необязательно)</label>
-                        <input type="text" name="submitter_note" id="submitter_note" value="{{ old('submitter_note') }}" maxlength="255"
-                               class="block w-full max-w-xl rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                               placeholder="Например: коллега, Франкфурт">
-                    </div>
-                    <div>
-                        <label for="report_file" class="block text-xs font-medium text-slate-600 mb-1">Файл (.txt)</label>
-                        <input type="file" name="report_file" id="report_file" accept=".txt,text/plain" class="block w-full max-w-xl text-xs text-slate-700">
-                    </div>
-                    <div>
-                        <label for="raw_report" class="block text-xs font-medium text-slate-600 mb-1">Или вставьте текст отчёта</label>
-                        <textarea name="raw_report" id="raw_report" rows="6"
-                                  class="w-full font-mono text-xs rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                  placeholder="Содержимое report_*.txt">{{ old('raw_report') }}</textarea>
-                    </div>
-                    <button type="submit"
-                            class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-slate-700 hover:bg-slate-800">
-                        Сохранить и разобрать GeoIP
-                    </button>
-                </form>
-
-                <p class="text-xs font-medium text-slate-700 mb-2">Последние сохранённые пробы</p>
-                <div class="overflow-x-auto border border-slate-200 rounded-md">
-                    <table class="min-w-full divide-y divide-slate-200 text-xs">
-                        <thead class="bg-slate-50 text-slate-700">
-                        <tr>
-                            <th class="px-2 py-2 text-left font-medium">#</th>
-                            <th class="px-2 py-2 text-left font-medium">Дата</th>
-                            <th class="px-2 py-2 text-left font-medium">Метка</th>
-                            <th class="px-2 py-2 text-left font-medium">Территория</th>
-                            <th class="px-2 py-2 text-left font-medium">IP</th>
-                            <th class="px-2 py-2 text-left font-medium">Режим</th>
-                            <th class="px-2 py-2 text-left font-medium"></th>
-                        </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100 bg-white">
-                        @forelse($recentTerritoryReports as $r)
-                            <tr>
-                                <td class="px-2 py-2 whitespace-nowrap">{{ $r->id }}</td>
-                                <td class="px-2 py-2 whitespace-nowrap text-slate-600">{{ optional($r->created_at)->format('Y-m-d H:i') }}</td>
-                                <td class="px-2 py-2">{{ $r->submitter_note ?? '—' }}</td>
-                                <td class="px-2 py-2">
-                                    @if($r->country_code || $r->country_name)
-                                        <span class="font-medium">{{ $r->country_name }}</span>
-                                        @if($r->country_code)
-                                            <span class="text-slate-500">({{ $r->country_code }})</span>
-                                        @endif
-                                        @if($r->city)
-                                            <div class="text-slate-600">{{ $r->city }}</div>
-                                        @endif
-                                    @elseif($r->geo_parse_error)
-                                        <span class="text-amber-800">Не распознано</span>
-                                        <div class="text-slate-500 max-w-xs truncate" title="{{ $r->geo_parse_error }}">{{ \Illuminate\Support\Str::limit($r->geo_parse_error, 56) }}</div>
-                                    @else
-                                        —
-                                    @endif
-                                </td>
-                                <td class="px-2 py-2 font-mono">{{ $r->public_ip ?? '—' }}</td>
-                                <td class="px-2 py-2 max-w-[10rem] truncate" title="{{ $r->mode_label }}">{{ $r->mode_label ?? '—' }}</td>
-                                <td class="px-2 py-2 whitespace-nowrap">
-                                    <a href="{{ route('admin.module.server-fleet.territory-reports.show', $r) }}"
-                                       class="text-indigo-600 hover:text-indigo-800 font-medium">Полный текст</a>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="7" class="px-2 py-6 text-center text-slate-500">Пока ни одного сохранённого отчёта.</td>
-                            </tr>
-                        @endforelse
-                        </tbody>
-                    </table>
-                </div>
-                <div class="mt-3">{{ $recentTerritoryReports->fragment('external-probes')->links() }}</div>
-            </x-admin.card>
-        </div>
-
-        <x-admin.card title="Запуск">
-            <div class="flex flex-wrap items-center gap-4 text-sm">
-                <label class="inline-flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" id="fleetIncludeTestSpeed" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
-                    <span>Включить полный <code class="text-xs">/test-speed</code> (до ~10 мин на сервер из-за загрузок и speedtest)</span>
-                </label>
-                <button type="button" id="fleetRunBtn"
-                        class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">
+    <div class="space-y-5">
+        {{-- Проверка из браузера: сеть того, кто открыл страницу --}}
+        <x-admin.card title="Проверка с вашей стороны">
+            <p class="text-sm text-slate-700 mb-4 max-w-3xl">
+                Нажмите кнопку — замеры выполняются в <strong class="font-normal">вашем браузере</strong> (ваш провайдер и регион).
+                Результат можно скопировать или сохранить в файл .txt.
+            </p>
+            <div class="flex flex-wrap items-center gap-3 mb-4">
+                <button type="button" id="clientProbeBtn"
+                        class="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">
                     <i class="fas fa-play mr-2 text-xs"></i>
                     Запустить проверку
                 </button>
+                <button type="button" id="clientProbeSaveTxt" disabled
+                        class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:opacity-40">
+                    Сохранить .txt
+                </button>
+                <button type="button" id="clientProbeCopy" disabled
+                        class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:opacity-40">
+                    Копировать
+                </button>
             </div>
-            <p id="fleetStatus" class="mt-3 text-xs text-slate-500 hidden"></p>
+            <p id="clientProbeStatus" class="text-sm text-slate-600 mb-3 min-h-[1.25rem]"></p>
+            <textarea id="clientProbeReport" readonly rows="22" placeholder="Отчёт появится здесь после проверки…"
+                      class="w-full font-mono text-sm text-slate-800 border border-slate-300 rounded-md p-3 bg-slate-50"></textarea>
         </x-admin.card>
 
-        <div id="fleetSummary" class="hidden grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 text-sm"></div>
+        {{-- Массовый опрос VPS с бэкенда панели — по желанию --}}
+        <details class="group border border-slate-200 rounded-lg bg-white shadow-sm">
+            <summary class="cursor-pointer list-none px-4 py-3 text-sm font-medium text-slate-800 flex items-center gap-2 hover:bg-slate-50 rounded-lg">
+                <i class="fas fa-chevron-right text-slate-400 group-open:rotate-90 transition-transform text-xs"></i>
+                Проверка ваших VPS с сервера панели
+                <span class="text-slate-500 font-normal">({{ $configuredCount }} в статусе «Настроен»)</span>
+            </summary>
+            <div class="px-4 pb-4 pt-0 space-y-4 border-t border-slate-100">
+                <p class="text-sm text-slate-600 pt-3">
+                    Это не ваша «домашняя» сеть, а обход узлов <strong class="font-normal">с хоста, где установлена панель</strong>.
+                    Опция <code class="text-xs bg-slate-100 px-1 rounded">/test-speed</code> может занимать долго на каждый сервер.
+                </p>
+                <x-admin.card title="">
+                    <div class="flex flex-wrap items-center gap-4 text-sm">
+                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="fleetIncludeTestSpeed" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                            <span>Включить полный <code class="text-xs">/test-speed</code></span>
+                        </label>
+                        <button type="button" id="fleetRunBtn"
+                                class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-slate-700 hover:bg-slate-800 disabled:opacity-50">
+                            <i class="fas fa-server mr-2 text-xs"></i>
+                            Проверить VPS
+                        </button>
+                    </div>
+                    <p id="fleetStatus" class="mt-3 text-sm text-slate-500 hidden"></p>
+                </x-admin.card>
 
-        <div id="fleetTableCard" class="hidden">
-            <x-admin.card title="Результаты по узлам">
-                <div class="overflow-x-auto border border-slate-200 rounded-md">
-                    <table class="min-w-full divide-y divide-slate-200 text-xs">
-                        <thead class="bg-slate-50 text-slate-700">
-                            <tr>
-                                <th class="px-2 py-2 text-left font-medium">#</th>
-                                <th class="px-2 py-2 text-left font-medium">Имя / IP</th>
-                                <th class="px-2 py-2 text-left font-medium">HTTP</th>
-                                <th class="px-2 py-2 text-left font-medium">HTTPS</th>
-                                <th class="px-2 py-2 text-left font-medium">Заглушка БД</th>
-                                <th class="px-2 py-2 text-left font-medium">/123.rar</th>
-                                <th class="px-2 py-2 text-left font-medium">/test-speed</th>
-                            </tr>
-                        </thead>
-                        <tbody id="fleetTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
-                    </table>
-                </div>
-            </x-admin.card>
-        </div>
+                <div id="fleetSummary" class="hidden grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 text-sm"></div>
 
-        <div id="fleetReportCard" class="hidden">
-            <x-admin.card title="Текстовый отчёт">
-                <div class="flex flex-wrap gap-2 mb-2">
-                    <button type="button" id="fleetCopyReport"
-                            class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded border border-slate-300 bg-white hover:bg-slate-50">
-                        <i class="fas fa-copy mr-1.5"></i> Копировать
-                    </button>
+                <div id="fleetTableCard" class="hidden">
+                    <x-admin.card title="Результаты по узлам">
+                        <div class="overflow-x-auto border border-slate-200 rounded-md">
+                            <table class="min-w-full divide-y divide-slate-200 text-xs">
+                                <thead class="bg-slate-50 text-slate-700">
+                                <tr>
+                                    <th class="px-2 py-2 text-left font-medium">#</th>
+                                    <th class="px-2 py-2 text-left font-medium">Имя / IP</th>
+                                    <th class="px-2 py-2 text-left font-medium">HTTP</th>
+                                    <th class="px-2 py-2 text-left font-medium">HTTPS</th>
+                                    <th class="px-2 py-2 text-left font-medium">Заглушка БД</th>
+                                    <th class="px-2 py-2 text-left font-medium">/123.rar</th>
+                                    <th class="px-2 py-2 text-left font-medium">/test-speed</th>
+                                </tr>
+                                </thead>
+                                <tbody id="fleetTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
+                            </table>
+                        </div>
+                    </x-admin.card>
                 </div>
-                <textarea id="fleetTextReport" readonly rows="22"
-                          class="w-full font-mono text-xs text-slate-800 border border-slate-300 rounded-md p-2 bg-slate-50"></textarea>
-            </x-admin.card>
-        </div>
+
+                <div id="fleetReportCard" class="hidden">
+                    <x-admin.card title="Текстовый отчёт (панель → VPS)">
+                        <div class="flex flex-wrap gap-2 mb-2">
+                            <button type="button" id="fleetCopyReport"
+                                    class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded border border-slate-300 bg-white hover:bg-slate-50">
+                                <i class="fas fa-copy mr-1.5"></i> Копировать
+                            </button>
+                            <button type="button" id="fleetSaveTxt"
+                                    class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded border border-slate-300 bg-white hover:bg-slate-50">
+                                Сохранить .txt
+                            </button>
+                        </div>
+                        <textarea id="fleetTextReport" readonly rows="14"
+                                  class="w-full font-mono text-xs text-slate-800 border border-slate-300 rounded-md p-2 bg-slate-50"></textarea>
+                    </x-admin.card>
+                </div>
+            </div>
+        </details>
     </div>
 
     @push('scripts')
         <script>
             (function () {
-                const btn = document.getElementById('fleetRunBtn');
-                const st = document.getElementById('fleetStatus');
-                const sum = document.getElementById('fleetSummary');
-                const tbody = document.getElementById('fleetTableBody');
-                const tableCard = document.getElementById('fleetTableCard');
-                const reportCard = document.getElementById('fleetReportCard');
-                const ta = document.getElementById('fleetTextReport');
-                const copyBtn = document.getElementById('fleetCopyReport');
-                const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+                var pingUrl = @json(route('netcheck.ping'));
+                var payloadUrl = @json(route('netcheck.payload', ['size' => '2mb']));
+                var probeBtn = document.getElementById('clientProbeBtn');
+                var probeStatus = document.getElementById('clientProbeStatus');
+                var probeTa = document.getElementById('clientProbeReport');
+                var probeSave = document.getElementById('clientProbeSaveTxt');
+                var probeCopy = document.getElementById('clientProbeCopy');
+
+                function esc(s) {
+                    return String(s == null ? '' : s)
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;');
+                }
+
+                function avg(arr) {
+                    var n = arr.filter(function (x) { return x != null; });
+                    if (!n.length) return null;
+                    var s = 0;
+                    n.forEach(function (x) { s += x; });
+                    return Math.round(s / n.length);
+                }
+
+                function pad2(n) {
+                    return (n < 10 ? '0' : '') + n;
+                }
+
+                function stampFile() {
+                    var d = new Date();
+                    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate())
+                        + '_' + pad2(d.getHours()) + '-' + pad2(d.getMinutes()) + '-' + pad2(d.getSeconds());
+                }
+
+                function downloadTxt(text, baseName) {
+                    var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+                    var a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = baseName + '.txt';
+                    document.body.appendChild(a);
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                    a.remove();
+                }
+
+                async function measurePingMs(url, trials) {
+                    var out = [];
+                    for (var i = 0; i < trials; i++) {
+                        var t0 = performance.now();
+                        try {
+                            var u = url + (url.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now() + '_' + i;
+                            var res = await fetch(u, {
+                                cache: 'no-store',
+                                credentials: 'same-origin'
+                            });
+                            await res.blob();
+                            out.push(Math.round(performance.now() - t0));
+                        } catch (e) {
+                            out.push(null);
+                        }
+                        await new Promise(function (r) { setTimeout(r, 120); });
+                    }
+                    return out;
+                }
+
+                async function measureNoCorsMs(url) {
+                    var t0 = performance.now();
+                    try {
+                        await fetch(url, { mode: 'no-cors', cache: 'no-store' });
+                        return Math.round(performance.now() - t0);
+                    } catch (e) {
+                        return null;
+                    }
+                }
+
+                async function measureDownload(url, maxBytes, label, lines) {
+                    var t0 = performance.now();
+                    var res = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
+                    if (!res.ok) {
+                        lines.push(label + ': ошибка HTTP ' + res.status);
+                        return;
+                    }
+                    var reader = res.body ? res.body.getReader() : null;
+                    var total = 0;
+                    if (!reader) {
+                        var buf = await res.arrayBuffer();
+                        total = buf.byteLength;
+                    } else {
+                        while (true) {
+                            var rd = await reader.read();
+                            if (rd.done) break;
+                            total += rd.value.length;
+                            if (maxBytes && total >= maxBytes) {
+                                try { await reader.cancel(); } catch (e) {}
+                                break;
+                            }
+                        }
+                    }
+                    var sec = (performance.now() - t0) / 1000;
+                    var mbps = sec > 0 ? (total * 8 / 1e6 / sec) : 0;
+                    lines.push(label + ': ' + total + ' байт за ' + sec.toFixed(2) + ' с (~' + mbps.toFixed(2) + ' Мбит/s)');
+                }
+
+                probeBtn.addEventListener('click', async function () {
+                    probeBtn.disabled = true;
+                    probeSave.disabled = true;
+                    probeCopy.disabled = true;
+                    probeTa.value = '';
+                    probeStatus.textContent = 'Выполняется…';
+
+                    var lines = [];
+                    lines.push('=== Сетевые замеры из браузера ===');
+                    lines.push('Страница: ' + window.location.href);
+                    lines.push('Дата и время (локально): ' + new Date().toString());
+                    try {
+                        lines.push('Часовой пояс: ' + Intl.DateTimeFormat().resolvedOptions().timeZone);
+                    } catch (e) {
+                        lines.push('Часовой пояс: —');
+                    }
+                    lines.push('User-Agent: ' + navigator.userAgent);
+                    lines.push('');
+
+                    try {
+                        lines.push('--- Публичный IP и GeoIP ---');
+                        var rip = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
+                        var jip = await rip.json();
+                        lines.push('Публичный IPv4/IPv6 (ipify): ' + (jip.ip || '—'));
+                        try {
+                            var rg = await fetch('https://ipwho.is/' + encodeURIComponent(jip.ip), { cache: 'no-store' });
+                            var g = await rg.json();
+                            if (g.success) {
+                                lines.push('Страна: ' + g.country + ' (' + g.country_code + ')');
+                                lines.push('Город: ' + (g.city || '—') + ', регион: ' + (g.region || '—'));
+                                if (g.connection) {
+                                    lines.push('Провайдер: ' + (g.connection.isp || '—') + ', ASN: ' + (g.connection.asn || '—'));
+                                }
+                            } else {
+                                lines.push('GeoIP (ipwho.is): ' + (g.message || 'нет данных'));
+                            }
+                        } catch (e) {
+                            lines.push('GeoIP (ipwho.is): ошибка — ' + e.message);
+                        }
+                    } catch (e) {
+                        lines.push('Публичный IP (ipify): ошибка — ' + e.message);
+                    }
+                    lines.push('');
+
+                    try {
+                    probeStatus.textContent = 'Задержки до вашего сайта (панель)…';
+                    lines.push('--- До хоста панели (ваш трафик → этот сайт) ---');
+                    var pingTimes = await measurePingMs(pingUrl, 4);
+                    lines.push('GET ' + pingUrl + ' (4 замера, мс): ' + pingTimes.map(function (x) { return x == null ? '×' : x; }).join(', ') + ' — среднее: ' + (avg(pingTimes) != null ? avg(pingTimes) + ' мс' : '—'));
+
+                    try {
+                        await measureDownload(payloadUrl, 2 * 1024 * 1024, 'Скачивание с панели (до ~2 MiB, ' + payloadUrl + ')', lines);
+                    } catch (e) {
+                        lines.push('Скачивание с панели: ошибка — ' + e.message);
+                    }
+                    lines.push('');
+
+                    probeStatus.textContent = 'Доступность крупных HTTPS-ресурсов (время до ответа, из вашей сети)…';
+                    lines.push('--- Доступность внешних сервисов (no-cors, только время) ---');
+                    var ext = [
+                        { label: 'Яндекс', url: 'https://yandex.ru/favicon.ico' },
+                        { label: 'Google', url: 'https://www.google.com/favicon.ico' },
+                        { label: 'Cloudflare', url: 'https://www.cloudflare.com/favicon.ico' },
+                        { label: 'Telegram', url: 'https://telegram.org/favicon.ico' }
+                    ];
+                    for (var k = 0; k < ext.length; k++) {
+                        var ms = await measureNoCorsMs(ext[k].url);
+                        lines.push(ext[k].label + ' (' + ext[k].url + '): ' + (ms != null ? ms + ' мс' : 'ошибка'));
+                    }
+
+                    lines.push('');
+                    lines.push('--- Конец отчёта ---');
+
+                    var text = lines.join('\n');
+                    probeTa.value = text;
+                    probeStatus.textContent = 'Готово. Сохраните отчёт в .txt при необходимости.';
+                    probeSave.disabled = false;
+                    probeCopy.disabled = false;
+                    } catch (err) {
+                    probeStatus.textContent = 'Прервано из-за ошибки.';
+                    var failText = (probeTa.value ? probeTa.value + '\n\n' : '') + '[Ошибка] ' + err.message;
+                    probeTa.value = failText;
+                    probeSave.disabled = !probeTa.value;
+                    probeCopy.disabled = !probeTa.value;
+                } finally {
+                    probeBtn.disabled = false;
+                }
+                });
+
+                probeSave.addEventListener('click', function () {
+                    if (!probeTa.value) return;
+                    downloadTxt(probeTa.value, 'network-check-browser-' + stampFile());
+                });
+
+                probeCopy.addEventListener('click', function () {
+                    if (!probeTa.value) return;
+                    probeTa.select();
+                    document.execCommand('copy');
+                });
+            })();
+
+            (function () {
+                var btn = document.getElementById('fleetRunBtn');
+                var st = document.getElementById('fleetStatus');
+                var sum = document.getElementById('fleetSummary');
+                var tbody = document.getElementById('fleetTableBody');
+                var tableCard = document.getElementById('fleetTableCard');
+                var reportCard = document.getElementById('fleetReportCard');
+                var ta = document.getElementById('fleetTextReport');
+                var copyBtn = document.getElementById('fleetCopyReport');
+                var saveFleetBtn = document.getElementById('fleetSaveTxt');
+                var meta = document.querySelector('meta[name="csrf-token"]');
+                var csrf = meta ? meta.getAttribute('content') : '';
 
                 function esc(s) {
                     return String(s == null ? '' : s)
@@ -207,6 +341,16 @@
                     var ms = h.ms != null ? (' ' + h.ms + ' мс') : '';
                     var err = h.error ? (' <span class="text-slate-500">' + esc(h.error) + '</span>') : '';
                     return badge(!!h.ok) + ' <span class="text-slate-600">' + c + ms + '</span>' + err;
+                }
+
+                function pad2(n) {
+                    return (n < 10 ? '0' : '') + n;
+                }
+
+                function stampFile() {
+                    var d = new Date();
+                    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate())
+                        + '_' + pad2(d.getHours()) + '-' + pad2(d.getMinutes()) + '-' + pad2(d.getSeconds());
                 }
 
                 btn.addEventListener('click', function () {
@@ -237,7 +381,7 @@
                         }
                         var d = j.data || {};
                         var s = d.summary || {};
-                        st.textContent = 'Готово за ' + (d.elapsed_ms || '?') + ' мс · серверов в отчёте: ' + (j.included_count || 0);
+                        st.textContent = 'Готово за ' + (d.elapsed_ms || '?') + ' мс · серверов: ' + (j.included_count || 0);
                         sum.innerHTML =
                             kv('Всего', s.total)
                             + kv('HTTP OK', s.http_ok)
@@ -313,6 +457,18 @@
                 copyBtn.addEventListener('click', function () {
                     ta.select();
                     document.execCommand('copy');
+                });
+
+                saveFleetBtn.addEventListener('click', function () {
+                    if (!ta.value) return;
+                    var blob = new Blob([ta.value], { type: 'text/plain;charset=utf-8' });
+                    var a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'fleet-panel-check-' + stampFile() + '.txt';
+                    document.body.appendChild(a);
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                    a.remove();
                 });
             })();
         </script>
