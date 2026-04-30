@@ -5,17 +5,122 @@
 
 @section('content')
     <div class="space-y-4">
+        @if(session('success'))
+            <div class="rounded-md bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-3">
+                {{ session('success') }}
+            </div>
+        @endif
+        @if($errors->any())
+            <div class="rounded-md bg-red-50 border border-red-200 text-red-800 text-sm px-4 py-3 space-y-1">
+                @foreach ($errors->all() as $e)
+                    <div>{{ $e }}</div>
+                @endforeach
+            </div>
+        @endif
+
         <p class="text-sm text-slate-700">
-            Проверяются серверы в статусе <span class="font-medium">«Настроен»</span> с непустым IP.
-            Сейчас в выборке: <span class="font-semibold">{{ $configuredCount }}</span> шт.
+            Одна страница для <strong class="font-normal">сводной картины</strong>: здесь ваши VPS проверяются с хоста панели,
+            а ниже учитываются отчёты, которые выполняют <strong class="font-normal">в других сетях или странах</strong> вашим же скриптом (GeoIP в тексте).
+            Сравните результаты с панели с «видом снаружи» — так проще понять объективность ситуации.
+        </p>
+        <p class="text-sm text-slate-700">
+            В выборке сейчас <span class="font-semibold">{{ $configuredCount }}</span> серверов в статусе <span class="font-medium">«Настроен»</span> с непустым IP.
         </p>
         <p class="text-xs text-slate-600 leading-relaxed max-w-4xl">
             Для каждого узла: HTTP/HTTPS на корень, поля заглушки из БД (последнее применение без префикса «Ошибка:»),
             при необходимости — <code class="text-[11px] bg-slate-100 px-1 rounded">/123.rar</code> (если приманка включена в БД и заглушка успешна).
-            Опционально включается <strong class="font-normal">полный</strong>
-            <code class="text-[11px] bg-slate-100 px-1 rounded">/test-speed</code> на VPS (скачивания, проверки зон HTTPS, опционально speedtest) —
+            Опционально — <strong class="font-normal">полный</strong>
+            <code class="text-[11px] bg-slate-100 px-1 rounded">/test-speed</code>
             только при сохранённом токене в БД; на каждый сервер до ~10 мин ожидания ответа.
         </p>
+
+        <div id="external-probes">
+            <x-admin.card title="Внешние точки замера (отчёт скриптов с других территорий)">
+                <p class="text-xs text-slate-600 mb-4 max-w-4xl">
+                    Вставьте текст файла <code class="bg-slate-100 px-1 rounded">report_*.txt</code> или приложите .txt.
+                    По блоку GeoIP подставится страна/город — это не новый раздел, а часть той же сводной проверки.
+                </p>
+                <form method="post"
+                      action="{{ route('admin.module.server-fleet.territory-reports.store') }}"
+                      enctype="multipart/form-data"
+                      class="space-y-4 text-sm mb-8">
+                    @csrf
+                    <div>
+                        <label for="submitter_note" class="block text-xs font-medium text-slate-600 mb-1">Метка (необязательно)</label>
+                        <input type="text" name="submitter_note" id="submitter_note" value="{{ old('submitter_note') }}" maxlength="255"
+                               class="block w-full max-w-xl rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                               placeholder="Например: коллега, Франкфурт">
+                    </div>
+                    <div>
+                        <label for="report_file" class="block text-xs font-medium text-slate-600 mb-1">Файл (.txt)</label>
+                        <input type="file" name="report_file" id="report_file" accept=".txt,text/plain" class="block w-full max-w-xl text-xs text-slate-700">
+                    </div>
+                    <div>
+                        <label for="raw_report" class="block text-xs font-medium text-slate-600 mb-1">Или вставьте текст отчёта</label>
+                        <textarea name="raw_report" id="raw_report" rows="6"
+                                  class="w-full font-mono text-xs rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                  placeholder="Содержимое report_*.txt">{{ old('raw_report') }}</textarea>
+                    </div>
+                    <button type="submit"
+                            class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-slate-700 hover:bg-slate-800">
+                        Сохранить и разобрать GeoIP
+                    </button>
+                </form>
+
+                <p class="text-xs font-medium text-slate-700 mb-2">Последние сохранённые пробы</p>
+                <div class="overflow-x-auto border border-slate-200 rounded-md">
+                    <table class="min-w-full divide-y divide-slate-200 text-xs">
+                        <thead class="bg-slate-50 text-slate-700">
+                        <tr>
+                            <th class="px-2 py-2 text-left font-medium">#</th>
+                            <th class="px-2 py-2 text-left font-medium">Дата</th>
+                            <th class="px-2 py-2 text-left font-medium">Метка</th>
+                            <th class="px-2 py-2 text-left font-medium">Территория</th>
+                            <th class="px-2 py-2 text-left font-medium">IP</th>
+                            <th class="px-2 py-2 text-left font-medium">Режим</th>
+                            <th class="px-2 py-2 text-left font-medium"></th>
+                        </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 bg-white">
+                        @forelse($recentTerritoryReports as $r)
+                            <tr>
+                                <td class="px-2 py-2 whitespace-nowrap">{{ $r->id }}</td>
+                                <td class="px-2 py-2 whitespace-nowrap text-slate-600">{{ $r->created_at?->format('Y-m-d H:i') }}</td>
+                                <td class="px-2 py-2">{{ $r->submitter_note ?? '—' }}</td>
+                                <td class="px-2 py-2">
+                                    @if($r->country_code || $r->country_name)
+                                        <span class="font-medium">{{ $r->country_name }}</span>
+                                        @if($r->country_code)
+                                            <span class="text-slate-500">({{ $r->country_code }})</span>
+                                        @endif
+                                        @if($r->city)
+                                            <div class="text-slate-600">{{ $r->city }}</div>
+                                        @endif
+                                    @elseif($r->geo_parse_error)
+                                        <span class="text-amber-800">Не распознано</span>
+                                        <div class="text-slate-500 max-w-xs truncate" title="{{ $r->geo_parse_error }}">{{ \Illuminate\Support\Str::limit($r->geo_parse_error, 56) }}</div>
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                                <td class="px-2 py-2 font-mono">{{ $r->public_ip ?? '—' }}</td>
+                                <td class="px-2 py-2 max-w-[10rem] truncate" title="{{ $r->mode_label }}">{{ $r->mode_label ?? '—' }}</td>
+                                <td class="px-2 py-2 whitespace-nowrap">
+                                    <a href="{{ route('admin.module.server-fleet.territory-reports.show', $r) }}"
+                                       class="text-indigo-600 hover:text-indigo-800 font-medium">Полный текст</a>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="7" class="px-2 py-6 text-center text-slate-500">Пока ни одного сохранённого отчёта.</td>
+                            </tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3">{{ $recentTerritoryReports->fragment('external-probes')->links() }}</div>
+            </x-admin.card>
+        </div>
 
         <x-admin.card title="Запуск">
             <div class="flex flex-wrap items-center gap-4 text-sm">
