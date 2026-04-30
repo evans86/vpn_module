@@ -16,8 +16,9 @@
                 @csrf
                 <input type="hidden" name="max_total" id="mass-transfer-max-total" value="">
 
-                <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <div class="rounded-lg border border-gray-200 bg-gray-50/60 p-5">
+                @php $panelListsMeta = $panelsMeta ?? []; @endphp
+                <div class="flex flex-col gap-6">
+                    <div class="rounded-lg border border-gray-200 bg-gray-50/60 p-5 w-full">
                         <label for="source_panel_id" class="block font-medium text-gray-900 mb-3">Исходная панель</label>
                         <select id="source_panel_id" name="source_panel_id" required
                                 class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base py-2.5"
@@ -25,7 +26,12 @@
                                 @change="loadKeyCount()">
                             <option value="">Выберите панель</option>
                             @foreach($panels as $p)
-                                <option value="{{ $p->id }}">Панель #{{ $p->id }} — {{ $p->server->name ?? '—' }}</option>
+                                @php
+                                    $lm = $panelListsMeta[(string) $p->id] ?? null;
+                                    $optName = is_array($lm) ? ($lm['server_name'] ?? ($p->server->name ?? '—')) : ($p->server->name ?? '—');
+                                    $optCountry = is_array($lm) ? ($lm['country'] ?? '—') : '—';
+                                @endphp
+                                <option value="{{ $p->id }}">#{{ $p->id }} · {{ $optName }} · {{ $optCountry }}</option>
                             @endforeach
                         </select>
                         <div class="mt-4 space-y-3" x-show="panelInfo(sourcePanelId)" x-cloak>
@@ -56,14 +62,19 @@
                         </div>
                     </div>
 
-                    <div class="rounded-lg border border-gray-200 bg-gray-50/60 p-5">
+                    <div class="rounded-lg border border-gray-200 bg-gray-50/60 p-5 w-full">
                         <label for="target_panel_id" class="block font-medium text-gray-900 mb-3">Целевая панель</label>
                         <select id="target_panel_id" name="target_panel_id" required
                                 class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base py-2.5"
                                 x-model="targetPanelId">
                             <option value="">Выберите панель</option>
                             @foreach($panels as $p)
-                                <option value="{{ $p->id }}">Панель #{{ $p->id }} — {{ $p->server->name ?? '—' }}</option>
+                                @php
+                                    $lm = $panelListsMeta[(string) $p->id] ?? null;
+                                    $optName = is_array($lm) ? ($lm['server_name'] ?? ($p->server->name ?? '—')) : ($p->server->name ?? '—');
+                                    $optCountry = is_array($lm) ? ($lm['country'] ?? '—') : '—';
+                                @endphp
+                                <option value="{{ $p->id }}">#{{ $p->id }} · {{ $optName }} · {{ $optCountry }}</option>
                             @endforeach
                         </select>
                         <div class="mt-4 space-y-3" x-show="panelInfo(targetPanelId)" x-cloak>
@@ -100,10 +111,9 @@
 
                 <div class="flex flex-wrap gap-3">
                     <button type="submit" id="btn-submit"
-                            class="inline-flex items-center px-5 py-2.5 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="inline-flex justify-center items-center min-w-[12rem] px-5 py-2.5 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             :disabled="blockedSubmit">
-                        <span x-show="!loading">Перенести все ключи</span>
-                        <span x-show="loading" x-cloak>Идёт перенос…</span>
+                        <span id="btn-submit-label">Перенести все ключи</span>
                     </button>
                     <button type="button" id="btn-test-transfer"
                             class="inline-flex items-center px-5 py-2.5 border border-amber-300 text-base font-medium rounded-md shadow-sm text-amber-900 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -295,7 +305,13 @@
             var BATCH_SIZE = readBatchSize();
 
             const btn = document.getElementById('btn-submit');
-            const resultBlock = document.getElementById('result-block');
+            const btnSubmitLabel = document.getElementById('btn-submit-label');
+            function setMassTransferSubmitLabel(busy) {
+                if (!btnSubmitLabel) return;
+                btnSubmitLabel.textContent = busy ? 'Идёт перенос…' : 'Перенести все ключи';
+            }
+
+            var resultBlock = document.getElementById('result-block');
             const resultMessage = document.getElementById('result-message');
             const resultErrors = document.getElementById('result-errors');
             const progressBlock = document.getElementById('progress-block');
@@ -309,7 +325,8 @@
             if (maxTotalInput && e.submitter && e.submitter.id === 'btn-submit') maxTotalInput.value = '';
             BATCH_SIZE = readBatchSize();
             if (alpineData) alpineData.loading = true;
-            btn.disabled = true;
+            if (btn) btn.disabled = true;
+            setMassTransferSubmitLabel(true);
             resultBlock.classList.add('hidden');
             progressBlock.classList.remove('hidden');
             progressBar.style.width = '0%';
@@ -346,7 +363,8 @@
                             resultErrors.classList.add('hidden');
                             if (typeof toastr !== 'undefined') toastr.error(data.message);
                             if (alpineData) alpineData.loading = false;
-                            btn.disabled = false;
+                            if (btn) btn.disabled = false;
+                            setMassTransferSubmitLabel(false);
                             return;
                         }
                         totalTransferred += data.transferred || 0;
@@ -402,7 +420,8 @@
                             if (typeof toastr !== 'undefined') toastr.success('Перенос завершён.');
                             if (alpineData && alpineData.loadKeyCount) alpineData.loadKeyCount();
                             if (alpineData) alpineData.loading = false;
-                            btn.disabled = false;
+                            if (btn) btn.disabled = false;
+                            setMassTransferSubmitLabel(false);
                             return;
                         }
                         runBatch();
@@ -416,7 +435,8 @@
                         resultErrors.classList.add('hidden');
                         if (typeof toastr !== 'undefined') toastr.error('Ошибка запроса');
                         if (alpineData) alpineData.loading = false;
-                        btn.disabled = false;
+                        if (btn) btn.disabled = false;
+                        setMassTransferSubmitLabel(false);
                     });
             }
             runBatch();
