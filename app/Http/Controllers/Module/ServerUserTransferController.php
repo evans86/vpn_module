@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Module;
 use App\Http\Controllers\Controller;
 use App\Models\KeyActivate\KeyActivate;
 use App\Models\KeyActivateUser\KeyActivateUser;
+use App\Models\Location\Location;
 use App\Models\Panel\Panel;
 use App\Models\ServerUser\ServerUser;
 use App\Helpers\CountryFlagHelper;
@@ -73,54 +74,44 @@ class ServerUserTransferController extends Controller
             ]);
             $keyId = $validated['key_id'];
 
-            $slots = KeyActivateUser::query()
+            $slotModels = KeyActivateUser::query()
                 ->where('key_activate_id', $keyId)
-                ->with(['serverUser.panel.server:id,name,provider', 'serverUser.panel:id,panel_adress,server_id'])
-                ->get()
-                ->map(function (KeyActivateUser $kau) {
-                    $panel = $kau->serverUser ? $kau->serverUser->panel : null;
-                    $server = $panel ? $panel->server : null;
-                    return [
-                        'server_user_id' => $kau->server_user_id,
-                        'panel_id' => $panel ? $panel->id : null,
-                        'server_name' => $server ? $server->name : ('Панель #' . ($panel ? $panel->id : '?')),
-                        'provider' => $server ? $server->provider : '',
-                    ];
+                ->with([
+                    'serverUser.panel',
+                    'serverUser.panel.server' => static function ($query) {
+                        $query->select('id', 'name', 'provider', 'location_id');
+                    },
+                    'serverUser.panel.server.location:id,code,emoji',
+                ])
+                ->get();
+
+            $slots = [];
+            $panelIdsWithKey = [];
+
+            foreach ($slotModels as $kau) {
+                $serialized = self::serializeKeyTransferSlot($kau);
+                if ($serialized !== null) {
+                    $slots[] = $serialized;
+                    $panelIdsWithKey[(int) $serialized['panel_id']] = true;
+                }
+            }
+            $excludeIds = array_keys($panelIdsWithKey);
+
+            $panels = self::makePanelsEligibleForOperationalTransferBaseQuery()
+                ->when(count($excludeIds) > 0, static function ($query) use ($excludeIds) {
+                    return $query->whereNotIn('id', $excludeIds);
                 })
-                ->filter(function ($s) {
-                    return !empty($s['panel_id']) && !empty($s['server_user_id']);
+                ->get()
+                ->map(static function (Panel $panel) {
+                    return self::serializeTargetPanelChoice($panel);
                 })
                 ->values()
                 ->all();
 
-            $panelIdsWithKey = KeyActivateUser::query()
-                ->where('key_activate_id', $keyId)
-                ->join('server_user', 'key_activate_user.server_user_id', '=', 'server_user.id')
-                ->select('server_user.panel_id')
-                ->pluck('panel_id')
-                ->unique()
-                ->values()
-                ->all();
-
-            $panels = Panel::select('id', 'panel_status', 'server_id')
-                ->with(['server' => function ($query) {
-                    $query->select('id', 'name', 'provider');
-                }])
-                ->where('panel_status', 2)
-                ->when(!empty($panelIdsWithKey), function ($query) use ($panelIdsWithKey) {
-                    return $query->whereNotIn('id', $panelIdsWithKey);
-                })
-                ->get()
-                ->map(function ($panel) {
-                    $server = $panel->server;
-                    return [
-                        'id' => $panel->id,
-                        'server_name' => $server ? $server->name : 'Неизвестный сервер',
-                        'provider' => $server ? $server->provider : '',
-                    ];
-                });
-
-            return response()->json(['slots' => $slots, 'panels' => $panels]);
+            return response()->json([
+                'slots' => array_values($slots),
+                'panels' => $panels,
+            ]);
         } catch (Exception $e) {
             Log::error('Failed to get transfer data', [
                 'error' => $e->getMessage(),
@@ -158,26 +149,16 @@ class ServerUserTransferController extends Controller
                 ->values()
                 ->all();
 
-            $panels = Panel::select('id', 'panel_status', 'server_id')
-                ->with(['server' => function ($query) {
-                    $query->select('id', 'name', 'provider');
-                }])
-                ->where('panel_status', 2)
-                ->when(!empty($panelIdsWithKey), function ($query) use ($panelIdsWithKey) {
+            $panels = self::makePanelsEligibleForOperationalTransferBaseQuery()
+                ->when(!empty($panelIdsWithKey), static function ($query) use ($panelIdsWithKey) {
                     return $query->whereNotIn('id', $panelIdsWithKey);
                 })
-                ->get();
+                ->get()
+                ->map(static function (Panel $panel) {
+                    return self::serializeTargetPanelChoice($panel);
+                });
 
-            $result = $panels->map(function ($panel) {
-                $server = $panel->server;
-                return [
-                    'id' => $panel->id,
-                    'server_name' => $server ? $server->name : 'Неизвестный сервер',
-                    'provider' => $server ? $server->provider : '',
-                ];
-            });
-
-            return response()->json(['panels' => $result]);
+            return response()->json(['panels' => $panels]);
         } catch (Exception $e) {
             Log::error('Failed to get panels list', [
                 'error' => $e->getMessage(),
@@ -726,6 +707,96 @@ class ServerUserTransferController extends Controller
         } finally {
             ini_set('memory_limit', $originalMemoryLimit);
         }
+    }
+
+    /**
+     * Панели Marzban с теми же критериями, что и «массовый перенос» (настроена, без ошибки, есть сервер).
+     */
+    private static function makePanelsEligibleForOperationalTransferBaseQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return Panel::query()
+            ->select('id', 'panel', 'panel_adress', 'panel_status', 'server_id', 'has_error')
+            ->whereNotNull('server_id')
+            ->where('panel_status', Panel::PANEL_CONFIGURED)
+            ->where('panel', Panel::MARZBAN)
+            ->where(static function ($query) {
+                $query->whereNull('has_error')->orWhere('has_error', false);
+            })
+            ->with([
+                'server' => static function ($query) {
+                    $query->select('id', 'name', 'provider', 'location_id');
+                },
+                'server.location:id,code,emoji',
+            ])
+            ->orderBy('id');
+    }
+
+    /**
+     * @return array{country:string,country_flag_url:string}
+     */
+    private static function countryMetaFromLocation(?Location $loc): array
+    {
+        if ($loc === null || !$loc->code) {
+            return ['country' => '—', 'country_flag_url' => ''];
+        }
+
+        $alpha = CountryFlagHelper::countryCodeAlpha2((string) $loc->code);
+        if ($alpha === '') {
+            return ['country' => '—', 'country_flag_url' => ''];
+        }
+
+        $fu = CountryFlagHelper::flagCdnUrl($alpha);
+
+        return [
+            'country' => $alpha,
+            'country_flag_url' => $fu !== null ? $fu : '',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function serializeTargetPanelChoice(Panel $panel): array
+    {
+        $server = $panel->server;
+        $meta = self::countryMetaFromLocation($server !== null ? $server->location : null);
+        $serverName = $server !== null ? (string) $server->name : '—';
+
+        return [
+            'id' => (int) $panel->id,
+            'server_name' => $serverName,
+            'provider' => $server !== null ? (string) $server->provider : '',
+            'country' => $meta['country'],
+            'country_flag_url' => $meta['country_flag_url'],
+            'option_label' => '#'.$panel->id.' · '.$serverName.' · '.$meta['country'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private static function serializeKeyTransferSlot(KeyActivateUser $kau): ?array
+    {
+        $su = $kau->serverUser;
+        $panel = $su ? $su->panel : null;
+        $server = $panel ? $panel->server : null;
+
+        if ($su === null || $panel === null || empty($kau->server_user_id) || empty($panel->id)) {
+            return null;
+        }
+
+        $meta = self::countryMetaFromLocation($server !== null ? $server->location : null);
+        $serverName = $server !== null ? (string) $server->name : ('Панель #'.$panel->id);
+
+        return [
+            'server_user_id' => (string) $kau->server_user_id,
+            'panel_id' => (int) $panel->id,
+            'server_name' => $serverName,
+            'provider' => $server !== null ? (string) $server->provider : '',
+            'country' => $meta['country'],
+            'country_flag_url' => $meta['country_flag_url'],
+            'option_label' => '#'.$panel->id.' · '.$serverName.' · '.$meta['country'],
+        ];
     }
 
 }
