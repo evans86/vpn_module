@@ -14,7 +14,7 @@
         <div class="flex flex-wrap gap-3 items-center justify-between">
             <a href="{{ route('admin.module.server-fleet.report') }}#external-probes"
                class="text-indigo-600 hover:text-indigo-800 text-sm">← К проверке серверов</a>
-            <span class="text-xs text-slate-500">№ {{ $report->id }} · {{ $report->created_at?->format('Y-m-d H:i') }}</span>
+            <span class="text-xs text-slate-500">№ {{ $report->id }} · {{ optional($report->created_at)->format('Y-m-d H:i') }}</span>
         </div>
 
         <x-admin.card title="Территория и сеть (из отчёта)">

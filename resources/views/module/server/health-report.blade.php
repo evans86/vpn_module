@@ -85,7 +85,7 @@
                         @forelse($recentTerritoryReports as $r)
                             <tr>
                                 <td class="px-2 py-2 whitespace-nowrap">{{ $r->id }}</td>
-                                <td class="px-2 py-2 whitespace-nowrap text-slate-600">{{ $r->created_at?->format('Y-m-d H:i') }}</td>
+                                <td class="px-2 py-2 whitespace-nowrap text-slate-600">{{ optional($r->created_at)->format('Y-m-d H:i') }}</td>
                                 <td class="px-2 py-2">{{ $r->submitter_note ?? '—' }}</td>
                                 <td class="px-2 py-2">
                                     @if($r->country_code || $r->country_name)
