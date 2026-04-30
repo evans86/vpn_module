@@ -102,6 +102,11 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
         $this->marzbanService->updateConfigurationMixed($panel_id);
     }
 
+    public function updateConfigurationMixedWarp(int $panel_id): void
+    {
+        $this->marzbanService->updateConfigurationMixedWarp($panel_id);
+    }
+
     public function reapplyCurrentConfiguration(int $panel_id): void
     {
         $this->marzbanService->reapplyConfigurationForPanel($panel_id);

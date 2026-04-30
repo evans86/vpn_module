@@ -377,6 +377,11 @@ class Panel extends Model
     const CONFIG_TYPE_MIXED = 'mixed';
 
     /**
+     * @var string Тот же inbounds, что и mixed, плюс полный WARP с узким DIRECT (dest REALITY, Gemini и т.д. через WARP)
+     */
+    const CONFIG_TYPE_MIXED_WARP = 'mixed_warp';
+
+    /**
      * Get the server associated with the panel.
      *
      * @return BelongsTo
@@ -577,6 +582,8 @@ class Panel extends Model
                 return 'REALITY стабильный (только REALITY)';
             case self::CONFIG_TYPE_MIXED:
                 return 'SS + Trojan + 3 REALITY';
+            case self::CONFIG_TYPE_MIXED_WARP:
+                return 'SS + Trojan + 3 REALITY + WARP';
             default:
                 return 'Неизвестно';
         }
@@ -598,6 +605,8 @@ class Panel extends Model
                 return 'primary';
             case self::CONFIG_TYPE_MIXED:
                 return 'warning';
+            case self::CONFIG_TYPE_MIXED_WARP:
+                return 'purple';
             default:
                 return 'secondary';
         }

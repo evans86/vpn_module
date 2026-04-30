@@ -210,11 +210,11 @@ class ServerController extends Controller
             // Получаем список доступных провайдеров через фабрику
             $serverStrategyFactory = new \App\Services\Server\ServerStrategyFactory();
             $availableProviders = $serverStrategyFactory->getAvailableProviders();
-            
+
             if (empty($availableProviders)) {
                 throw new \DomainException('No server providers available');
             }
-            
+
             // Валидация входных данных
             $validated = $request->validate([
                 'location_id' => 'required|integer|exists:location,id',
@@ -791,7 +791,6 @@ class ServerController extends Controller
     public function applyDecoyStub(Request $request, Server $server): JsonResponse
     {
         $include = $request->boolean('include_123_rar');
-        $installHostNginxIfMissing = $request->boolean('install_host_nginx', true);
 
         try {
             $this->logger->info('Apply decoy stub', [
@@ -799,10 +798,9 @@ class ServerController extends Controller
                 'user_id' => auth()->id(),
                 'server_id' => $server->id,
                 'include_123_rar' => $include,
-                'install_host_nginx_if_missing' => $installHostNginxIfMissing,
             ]);
 
-            $result = $this->decoyStubService->apply($server, $include, $installHostNginxIfMissing);
+            $result = $this->decoyStubService->apply($server, $include);
 
             if (! $result['success']) {
                 $this->logger->error('Decoy stub apply failed', [

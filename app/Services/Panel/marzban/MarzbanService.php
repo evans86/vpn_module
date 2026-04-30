@@ -564,6 +564,7 @@ class MarzbanService
             $panel->warp_socks_port = $port;
             if ($enableWarpRouting) {
                 $panel->warp_routing_enabled = true;
+                // Как раньше: узкий маршрут Marzban по умолчанию; «весь трафик через WARP» — только при явной настройке в админке / пресете mixed_warp.
                 $panel->warp_routing_all = false;
             }
             $panel->save();
@@ -1575,6 +1576,67 @@ class MarzbanService
     }
 
     /**
+     * Маршрутизация для пресета mixed_warp: DIRECT для dest REALITY + служебных сетей, иначе весь трафик → WARP.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function buildRealityFullWarpRoutingRules(): array
+    {
+        $rules = [
+            [
+                'type' => 'field',
+                'ip' => ['geoip:private'],
+                'outboundTag' => 'DIRECT',
+            ],
+        ];
+        $tgIps = config('panel.warp_routing_full_bypass_ip_cidr', ['149.154.0.0/16', '91.108.0.0/16']);
+        if (is_array($tgIps) && $tgIps !== []) {
+            $rules[] = [
+                'type' => 'field',
+                'ip' => array_values($tgIps),
+                'outboundTag' => 'DIRECT',
+            ];
+        }
+        $rules[] = [
+            'type' => 'field',
+            'domain' => ['geosite:telegram'],
+            'outboundTag' => 'DIRECT',
+        ];
+        $custom = config('panel.warp_reality_full_bypass_custom');
+        if (is_array($custom) && $custom !== []) {
+            $rules[] = [
+                'type' => 'field',
+                'domain' => array_values($custom),
+                'outboundTag' => 'DIRECT',
+            ];
+        } else {
+            $google = config('panel.warp_reality_full_bypass_google', ['full:www.google.com', 'full:google.com']);
+            if (is_array($google) && $google !== []) {
+                $rules[] = [
+                    'type' => 'field',
+                    'domain' => array_values($google),
+                    'outboundTag' => 'DIRECT',
+                ];
+            }
+            $services = config('panel.warp_reality_full_bypass_service_domains', []);
+            if (is_array($services) && $services !== []) {
+                $rules[] = [
+                    'type' => 'field',
+                    'domain' => array_values($services),
+                    'outboundTag' => 'DIRECT',
+                ];
+            }
+        }
+        $rules[] = [
+            'type' => 'field',
+            'ip' => ['0.0.0.0/0', '::/0'],
+            'outboundTag' => 'WARP',
+        ];
+
+        return $rules;
+    }
+
+    /**
      * SOCKS5 к локальному sing-box / WARP (Marzban дока, вариант 2).
      *
      * @return array<string, mixed>
@@ -1760,6 +1822,15 @@ class MarzbanService
             return null;
         }
 
+        $endpointIpOverride = trim((string) config('panel.warp_wireguard_endpoint_ip', ''));
+        if ($endpointIpOverride !== '') {
+            $port = '2408';
+            if (preg_match('/:(\d+)\s*$/', $endpoint, $em)) {
+                $port = $em[1];
+            }
+            $endpoint = $endpointIpOverride.':'.$port;
+        }
+
         $settings = [
             'secretKey' => $sk,
             'address' => array_values($addrs),
@@ -1855,30 +1926,34 @@ class MarzbanService
             }
 
             if (! empty($panel->warp_routing_all)) {
-                $bypassIps = config('panel.warp_routing_full_bypass_ip_cidr', []);
-                if (is_array($bypassIps) && $bypassIps !== []) {
+                if (isset($panel->config_type) && $panel->config_type === Panel::CONFIG_TYPE_MIXED_WARP) {
+                    $routingRules = $this->buildRealityFullWarpRoutingRules();
+                } else {
+                    $bypassIps = config('panel.warp_routing_full_bypass_ip_cidr', []);
+                    if (is_array($bypassIps) && $bypassIps !== []) {
+                        $routingRules[] = [
+                            'type' => 'field',
+                            'ip' => array_values($bypassIps),
+                            'outboundTag' => 'DIRECT',
+                        ];
+                    }
+                    $bypassGeos = config('panel.warp_routing_full_bypass_geosite', []);
+                    if (is_array($bypassGeos) && $bypassGeos !== []) {
+                        $routingRules[] = [
+                            'type' => 'field',
+                            'domain' => array_values($bypassGeos),
+                            'outboundTag' => 'DIRECT',
+                        ];
+                    }
                     $routingRules[] = [
                         'type' => 'field',
-                        'ip' => array_values($bypassIps),
-                        'outboundTag' => 'DIRECT',
+                        'ip' => [
+                            '0.0.0.0/0',
+                            '::/0',
+                        ],
+                        'outboundTag' => 'WARP',
                     ];
                 }
-                $bypassGeos = config('panel.warp_routing_full_bypass_geosite', []);
-                if (is_array($bypassGeos) && $bypassGeos !== []) {
-                    $routingRules[] = [
-                        'type' => 'field',
-                        'domain' => array_values($bypassGeos),
-                        'outboundTag' => 'DIRECT',
-                    ];
-                }
-                $routingRules[] = [
-                    'type' => 'field',
-                    'ip' => [
-                        '0.0.0.0/0',
-                        '::/0',
-                    ],
-                    'outboundTag' => 'WARP',
-                ];
             } else {
                 $routingRules[] = [
                     'type' => 'field',
@@ -2782,6 +2857,41 @@ class MarzbanService
     }
 
     /**
+     * Как updateConfigurationMixed, но тип {@see Panel::CONFIG_TYPE_MIXED_WARP} — для маршрутизации full WARP с узким DIRECT.
+     */
+    public function updateConfigurationMixedWarp(int $panel_id): void
+    {
+        $panel = self::updateMarzbanToken($panel_id);
+
+        Log::info('Updating configuration to mixed + WARP routing preset', [
+            'panel_id' => $panel_id,
+            'source' => 'panel',
+        ]);
+
+        $realityKeys = $this->getOrGenerateRealityKeys($panel);
+
+        $allRealityInbounds = $this->buildRealityInbounds(
+            $realityKeys['private_key'],
+            $realityKeys['short_id'],
+            $realityKeys['grpc_short_id'],
+            $realityKeys['xhttp_short_id']
+        );
+        $threeReality = [
+            $allRealityInbounds[0],
+            $allRealityInbounds[1],
+            $allRealityInbounds[3],
+        ];
+
+        $json_config = $this->buildBaseConfig($panel);
+        $json_config['inbounds'] = array_merge(
+            $this->buildStableBasicInboundsForMixed($panel),
+            $threeReality
+        );
+
+        $this->applyConfiguration($panel, $json_config, Panel::CONFIG_TYPE_MIXED_WARP);
+    }
+
+    /**
      * Повторно применить текущий пресет конфигурации (после смены флагов WARP и т.п.).
      *
      * @throws GuzzleException
@@ -2803,6 +2913,9 @@ class MarzbanService
                 break;
             case Panel::CONFIG_TYPE_MIXED:
                 $this->updateConfigurationMixed($panel_id);
+                break;
+            case Panel::CONFIG_TYPE_MIXED_WARP:
+                $this->updateConfigurationMixedWarp($panel_id);
                 break;
             default:
                 $this->updateConfigurationMixed($panel_id);
@@ -2915,7 +3028,7 @@ class MarzbanService
             return [$inbounds, $proxies];
         }
 
-        if ($configType === Panel::CONFIG_TYPE_MIXED) {
+        if ($configType === Panel::CONFIG_TYPE_MIXED || $configType === Panel::CONFIG_TYPE_MIXED_WARP) {
             // SS + Trojan + 3 VLESS REALITY (без VLESS-WS)
             $inbounds = [
                 'vless' => ['VLESS TCP REALITY', 'VLESS GRPC REALITY', 'VLESS TCP REALITY ALT'],

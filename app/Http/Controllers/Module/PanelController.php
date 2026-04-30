@@ -364,6 +364,53 @@ class PanelController extends Controller
     }
 
     /**
+     * Смешанные inbounds + полный WARP с узким списком DIRECT (как в пресете mixed_warp); включает WARP на панели.
+     */
+    public function updateConfigMixedWarp(Panel $panel): RedirectResponse
+    {
+        if ($panel->panel !== Panel::MARZBAN) {
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Пресет «смешанный + WARP» доступен только для панелей Marzban.');
+        }
+
+        try {
+            $this->logger->info('Обновление конфигурации панели (смешанный + WARP)', [
+                'source' => 'panel',
+                'action' => 'update-config-mixed-warp',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+            ]);
+
+            $panel->warp_routing_enabled = true;
+            $panel->warp_routing_all = true;
+            if ($panel->warp_socks_port === null) {
+                $panel->warp_socks_port = (int) config('panel.warp_default_socks_port', 40000);
+            }
+            if (trim((string) $panel->warp_socks_host) === '') {
+                $panel->warp_socks_host = (string) config('panel.warp_default_socks_host', '127.0.0.1');
+            }
+            $panel->save();
+
+            $strategy = new PanelStrategy($panel->panel);
+            $strategy->updateConfigurationMixedWarp($panel->id);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'Пресет «SS + Trojan + 3 REALITY + WARP (полный туннель)» применён. Убедитесь, что на ноде поднят WARP (SOCKS или WireGuard) по настройкам ниже.');
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при обновлении конфигурации панели (смешанный + WARP)', [
+                'source' => 'panel',
+                'action' => 'update-config-mixed-warp',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Ошибка при обновлении конфигурации: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * WARP на ноде: маршрут geosite:google через локальный SOCKS (Cloudflare WARP).
      * На сервере Marzban должен быть поднят SOCKS5 на указанном адресе (sing-box / и т.п.).
      */
@@ -380,8 +427,14 @@ class PanelController extends Controller
         ]);
 
         $rawPort = $request->input('warp_socks_port');
-        $panel->warp_routing_enabled = $request->boolean('warp_routing_enabled');
-        $panel->warp_routing_all = $request->boolean('warp_routing_all');
+        if ($request->has('warp_routing_enabled')) {
+            $panel->warp_routing_enabled = $request->boolean('warp_routing_enabled');
+        }
+        if ($request->has('warp_routing_touched')) {
+            $panel->warp_routing_all = ! $request->boolean('warp_selective');
+        } elseif ($request->has('warp_routing_all')) {
+            $panel->warp_routing_all = $request->boolean('warp_routing_all');
+        }
         $defSocksHost = (string) config('panel.warp_default_socks_host', '127.0.0.1');
         $panel->warp_socks_host = trim((string) $request->input('warp_socks_host')) !== ''
             ? trim((string) $request->input('warp_socks_host'))

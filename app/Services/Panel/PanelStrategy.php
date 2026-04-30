@@ -114,6 +114,11 @@ class PanelStrategy
         $this->strategy->updateConfigurationMixed($panel_id);
     }
 
+    public function updateConfigurationMixedWarp(int $panel_id): void
+    {
+        $this->strategy->updateConfigurationMixedWarp($panel_id);
+    }
+
     /**
      * Повторно применить текущий пресет конфигурации панели.
      */

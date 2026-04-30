@@ -982,7 +982,7 @@ class VpnConfigController extends Controller
             $userData = $marzbanApi->getUser($panel->auth_token, $serverUser->id);
 
             // Если links есть, но их мало (меньше 10 для REALITY), обновляем пользователя с правильными inbounds
-            if (!empty($userData['links']) && in_array($panel->config_type, ['reality', 'reality_stable', 'mixed'], true) && count($userData['links']) < 10) {
+            if (!empty($userData['links']) && in_array($panel->config_type, ['reality', 'reality_stable', 'mixed', 'mixed_warp'], true) && count($userData['links']) < 10) {
                 try {
                     // Получаем конфигурацию панели, чтобы узнать доступные inbounds
                     $panelConfig = $marzbanApi->getConfig($panel->auth_token);

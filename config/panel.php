@@ -349,6 +349,7 @@ return [
         env('PANEL_WARP_WG_NO_KERNEL_TUN', true),
         FILTER_VALIDATE_BOOL
     ),
+    // Дефолт как раньше (1420), чтобы обновление кода без .env не меняло WARP у уже настроенных панелей.
     'warp_wireguard_mtu' => (int) env('PANEL_WARP_WG_MTU', 1420),
 
     /*
@@ -370,6 +371,82 @@ return [
             array_map('trim', explode(',', (string) env('PANEL_WARP_FULL_BYPASS_IP', '149.154.0.0/16,91.108.0.0/16')))
         )
     ),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Пресет mixed_warp: DIRECT для dest REALITY, остальное — WARP (Gemini и т.д. через WARP).
+    | Правила Xray: две группы (как в Marzban) — full:google, затем domain:* для сервисов.
+    | Если задан PANEL_WARP_REALITY_BYPASS_DOMAINS — одно объединённое правило (продвинутый режим).
+    |--------------------------------------------------------------------------
+    */
+    'warp_reality_full_bypass_custom' => (static function (): ?array {
+        $raw = trim((string) env('PANEL_WARP_REALITY_BYPASS_DOMAINS', ''));
+        if ($raw === '') {
+            return null;
+        }
+        if (str_starts_with($raw, '[')) {
+            $d = json_decode($raw, true);
+            if (is_array($d)) {
+                $out = array_values(array_filter($d, 'is_string'));
+
+                return $out !== [] ? $out : null;
+            }
+        }
+
+        $out = array_values(array_filter(array_map('trim', explode(',', $raw))));
+
+        return $out !== [] ? $out : null;
+    })(),
+
+    'warp_reality_full_bypass_google' => (static function (): array {
+        $raw = trim((string) env('PANEL_WARP_BYPASS_GOOGLE', ''));
+        if ($raw !== '' && str_starts_with($raw, '[')) {
+            $d = json_decode($raw, true);
+            if (is_array($d)) {
+                return array_values(array_filter($d, 'is_string'));
+            }
+        }
+        if ($raw !== '') {
+            return array_values(array_filter(array_map('trim', explode(',', $raw))));
+        }
+
+        return ['full:www.google.com', 'full:google.com'];
+    })(),
+
+    'warp_reality_full_bypass_service_domains' => (static function (): array {
+        $raw = trim((string) env('PANEL_WARP_BYPASS_SERVICE_DOMAINS', ''));
+        if ($raw !== '' && str_starts_with($raw, '[')) {
+            $d = json_decode($raw, true);
+            if (is_array($d)) {
+                return array_values(array_filter($d, 'is_string'));
+            }
+        }
+        if ($raw !== '') {
+            return array_values(array_filter(array_map('trim', explode(',', $raw))));
+        }
+
+        return [
+            'domain:microsoft.com',
+            'domain:windows.net',
+            'domain:office.com',
+            'domain:live.com',
+            'domain:cloudflare.com',
+            'domain:discord.com',
+            'domain:apple.com',
+            'domain:icloud.com',
+            'domain:cdn-apple.com',
+            'domain:github.com',
+            'domain:githubusercontent.com',
+            'domain:stackoverflow.com',
+            'domain:amazon.com',
+            'domain:netflix.com',
+        ];
+    })(),
+
+    /*
+    | Подмена endpoint WARP на IP:порт (см. PANEL_WARP_WG_ENDPOINT_IP), если Xray не резолвит engage…
+    */
+    'warp_wireguard_endpoint_ip' => trim((string) env('PANEL_WARP_WG_ENDPOINT_IP', '')),
 ];
 
 

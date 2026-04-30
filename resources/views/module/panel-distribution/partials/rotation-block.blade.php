@@ -111,6 +111,8 @@
                                         <div><strong>Тип конфига:</strong>
                                             @if($panel->config_type === 'reality_stable')
                                                 <span class="px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">REALITY (только)</span>
+                                            @elseif($panel->config_type === 'mixed_warp')
+                                                <span class="px-2 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-800">+ WARP (пресет)</span>
                                             @elseif($panel->config_type === 'reality')
                                                 <span class="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">REALITY</span>
                                             @elseif($panel->config_type === 'mixed')
