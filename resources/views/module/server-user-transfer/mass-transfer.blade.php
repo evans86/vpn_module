@@ -3,121 +3,110 @@
 @section('title', 'Массовый перенос ключей')
 @section('page-title', 'Массовый перенос ключей')
 
-@php
-    use App\Models\Panel\Panel;
-    /** @var \Illuminate\Support\Collection<int, Panel> $panels */
-    $panelsConfigured = $panels->filter(fn (Panel $p) => (int) $p->panel_status === Panel::PANEL_CONFIGURED)->sortBy('id')->values();
-    $panelsOther = $panels->filter(fn (Panel $p) => (int) $p->panel_status !== Panel::PANEL_CONFIGURED)->sortBy('id')->values();
-
-    $panelOptionLabel = static function (Panel $p): string {
-        $name = $p->server->name ?? 'Без сервера';
-        $type = $p->panel ? strtoupper((string) $p->panel) : '—';
-
-        return '№'.$p->id.' — '.$name.' ('.$type.')';
-    };
-@endphp
-
 @section('content')
-    <div class="max-w-3xl mx-auto space-y-6">
-        <x-admin.card title="Перенос с недоступной панели">
-            <p class="text-sm text-gray-600 mb-5 leading-relaxed">
-                Когда исходная панель недоступна, ключи восстанавливаются по данным из БД на выбранной рабочей панели Marzban. Ссылка подписки не меняется — пользователю достаточно обновить конфиг в боте или клиенте.
-            </p>
+    <script type="application/json" id="mass-transfer-panels-meta">@json($panelsMeta)</script>
 
-            <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 mb-5">
-                <strong class="font-medium">Рекомендуемый порядок:</strong> выберите исходную и целевую панели → проверьте счётчик ключей → при большом числе ключей уменьшите размер порции → сначала «Тест (2 ключа)» → затем полный перенос.
-            </div>
-
-            <form id="mass-transfer-form" class="space-y-6" x-data="massTransferForm()">
+    <div class="space-y-6">
+        <x-admin.card title="Массовый перенос с недоступной панели (Marzban)">
+            @if($panels->isEmpty())
+                <p class="text-base text-gray-800">Подходящих панелей нет (Marzban, статус «настроена», без ошибки привязки к серверу).</p>
+            @else
+            <form id="mass-transfer-form" class="space-y-8" x-data="massTransferForm()">
 
                 @csrf
                 <input type="hidden" name="max_total" id="mass-transfer-max-total" value="">
 
-                <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                    <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                        <label for="source_panel_id" class="block text-sm font-medium text-gray-900 mb-1">Откуда</label>
-                        <p class="text-xs text-gray-500 mb-2">Исходная панель (часто нерабочая или старая).</p>
+                <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                    <div class="rounded-lg border border-gray-200 bg-gray-50/60 p-5">
+                        <label for="source_panel_id" class="block font-medium text-gray-900 mb-3">Исходная панель</label>
                         <select id="source_panel_id" name="source_panel_id" required
-                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base py-2.5"
                                 x-model="sourcePanelId"
                                 @change="loadKeyCount()">
-                            <option value="">Выберите панель…</option>
-                            @if($panelsConfigured->isNotEmpty())
-                                <optgroup label="Настроенные">
-                                    @foreach($panelsConfigured as $p)
-                                        <option value="{{ $p->id }}">{{ $panelOptionLabel($p) }}</option>
-                                    @endforeach
-                                </optgroup>
-                            @endif
-                            @if($panelsOther->isNotEmpty())
-                                <optgroup label="Не настроены / ошибка">
-                                    @foreach($panelsOther as $p)
-                                        <option value="{{ $p->id }}">{{ $panelOptionLabel($p) }}</option>
-                                    @endforeach
-                                </optgroup>
-                            @endif
+                            <option value="">Выберите панель</option>
+                            @foreach($panels as $p)
+                                <option value="{{ $p->id }}">Панель #{{ $p->id }} — {{ $p->server->name ?? '—' }}</option>
+                            @endforeach
                         </select>
-                        <div class="mt-3 flex flex-wrap items-center gap-2">
-                            <template x-if="keyCount === null && sourcePanelId">
-                                <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-600">Считаем ключи…</span>
-                            </template>
-                            <template x-if="keyCount !== null">
-                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-                                      :class="keyCount > 0 ? 'bg-emerald-100 text-emerald-900' : 'bg-gray-100 text-gray-600'"
-                                      x-text="'Активных ключей: ' + keyCount"></span>
-                            </template>
+                        <div class="mt-4 space-y-3" x-show="panelInfo(sourcePanelId)" x-cloak>
+                            <dl class="grid grid-cols-1 gap-y-2 sm:grid-cols-3 text-base">
+                                <div>
+                                    <dt class="font-medium text-gray-500">Сервер</dt>
+                                    <dd class="mt-0.5 text-gray-900" x-text="panelField(sourcePanelId, 'server_name')"></dd>
+                                </div>
+                                <div>
+                                    <dt class="font-medium text-gray-500">Страна</dt>
+                                    <dd class="mt-0.5 text-gray-900" x-text="panelField(sourcePanelId, 'country')"></dd>
+                                </div>
+                                <div>
+                                    <dt class="font-medium text-gray-500">ID панели</dt>
+                                    <dd class="mt-0.5 text-gray-900 font-mono" x-text="'#' + (panelField(sourcePanelId, 'panel_id') || '')"></dd>
+                                </div>
+                            </dl>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <template x-if="keyCount === null && sourcePanelId">
+                                    <span class="rounded-md bg-gray-200 px-2.5 py-1 text-sm text-gray-800">Подсчёт ключей…</span>
+                                </template>
+                                <template x-if="keyCount !== null">
+                                    <span class="rounded-md px-2.5 py-1 text-sm font-medium"
+                                          :class="keyCount > 0 ? 'bg-emerald-200 text-emerald-950' : 'bg-gray-200 text-gray-800'"
+                                          x-text="'Активных ключей: ' + keyCount"></span>
+                                </template>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                        <label for="target_panel_id" class="block text-sm font-medium text-gray-900 mb-1">Куда</label>
-                        <p class="text-xs text-gray-500 mb-2">Целевая рабочая панель <span class="text-gray-700">Marzban</span> (должна быть настроена и доступна).</p>
+                    <div class="rounded-lg border border-gray-200 bg-gray-50/60 p-5">
+                        <label for="target_panel_id" class="block font-medium text-gray-900 mb-3">Целевая панель</label>
                         <select id="target_panel_id" name="target_panel_id" required
-                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base py-2.5"
                                 x-model="targetPanelId">
-                            <option value="">Выберите панель…</option>
-                            @if($panelsConfigured->isNotEmpty())
-                                <optgroup label="Настроенные">
-                                    @foreach($panelsConfigured as $p)
-                                        <option value="{{ $p->id }}">{{ $panelOptionLabel($p) }}</option>
-                                    @endforeach
-                                </optgroup>
-                            @endif
-                            @if($panelsOther->isNotEmpty())
-                                <optgroup label="Не настроены / ошибка">
-                                    @foreach($panelsOther as $p)
-                                        <option value="{{ $p->id }}">{{ $panelOptionLabel($p) }}</option>
-                                    @endforeach
-                                </optgroup>
-                            @endif
+                            <option value="">Выберите панель</option>
+                            @foreach($panels as $p)
+                                <option value="{{ $p->id }}">Панель #{{ $p->id }} — {{ $p->server->name ?? '—' }}</option>
+                            @endforeach
                         </select>
-                        <p class="mt-3 text-xs text-gray-500" x-show="samePanel && sourcePanelId" x-cloak>
-                            Целевая панель совпадает с исходной — так перенести нельзя.
-                        </p>
+                        <div class="mt-4 space-y-3" x-show="panelInfo(targetPanelId)" x-cloak>
+                            <dl class="grid grid-cols-1 gap-y-2 sm:grid-cols-3 text-base">
+                                <div>
+                                    <dt class="font-medium text-gray-500">Сервер</dt>
+                                    <dd class="mt-0.5 text-gray-900" x-text="panelField(targetPanelId, 'server_name')"></dd>
+                                </div>
+                                <div>
+                                    <dt class="font-medium text-gray-500">Страна</dt>
+                                    <dd class="mt-0.5 text-gray-900" x-text="panelField(targetPanelId, 'country')"></dd>
+                                </div>
+                                <div>
+                                    <dt class="font-medium text-gray-500">ID панели</dt>
+                                    <dd class="mt-0.5 text-gray-900 font-mono" x-text="'#' + (panelField(targetPanelId, 'panel_id') || '')"></dd>
+                                </div>
+                            </dl>
+                        </div>
                     </div>
                 </div>
 
-                <div class="flex flex-wrap items-end gap-4 rounded-lg border border-gray-100 bg-gray-50/80 p-4">
-                    <div>
-                        <label for="mass-transfer-batch-size" class="block text-sm font-medium text-gray-800 mb-1">Ключей за один запрос</label>
+                <div x-show="samePanel && sourcePanelId" x-cloak
+                     class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950">
+                    Исходная и целевая панели не должны совпадать.
+                </div>
+
+                <div class="flex flex-wrap items-center gap-4">
+                    <label for="mass-transfer-batch-size" class="inline-flex items-center gap-3 font-medium text-gray-900">
+                        <span>Ключей за запрос</span>
                         <input type="number" id="mass-transfer-batch-size" name="mass_transfer_batch_size" value="100" min="1" max="200" step="1"
-                               class="block w-28 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                               title="Меньше значение — короче запрос при таймаутах шлюза (например 524)">
-                    </div>
-                    <p class="text-xs text-gray-600 max-w-md flex-1 min-w-[12rem]">
-                        Перенос идёт порциями без одного огромного HTTP-ответа. При ошибках по времени попробуйте <strong class="font-medium">25–50</strong>.
-                    </p>
+                               class="w-24 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 text-base">
+                    </label>
                 </div>
 
                 <div class="flex flex-wrap gap-3">
                     <button type="submit" id="btn-submit"
-                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="inline-flex items-center px-5 py-2.5 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             :disabled="blockedSubmit">
                         <span x-show="!loading">Перенести все ключи</span>
                         <span x-show="loading" x-cloak>Идёт перенос…</span>
                     </button>
                     <button type="button" id="btn-test-transfer"
-                            class="inline-flex items-center px-4 py-2 border border-amber-300 text-sm font-medium rounded-md shadow-sm text-amber-900 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="inline-flex items-center px-5 py-2.5 border border-amber-300 text-base font-medium rounded-md shadow-sm text-amber-900 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             :disabled="blockedTest">
                         <i class="fas fa-vial mr-2"></i> Тест: 2 ключа
                     </button>
@@ -159,6 +148,7 @@
                     </div>
                 </div>
             </div>
+            @endif
         </x-admin.card>
     </div>
 
@@ -169,6 +159,26 @@
                 targetPanelId: '',
                 keyCount: null,
                 loading: false,
+                panelsMeta: {},
+
+                init() {
+                    try {
+                        const el = document.getElementById('mass-transfer-panels-meta');
+                        this.panelsMeta = el ? JSON.parse(el.textContent) : {};
+                    } catch (e) {
+                        this.panelsMeta = {};
+                    }
+                },
+
+                panelInfo(id) {
+                    if (id === '' || id === null || id === undefined) return null;
+                    return this.panelsMeta[String(id)] ?? null;
+                },
+
+                panelField(id, field) {
+                    const info = this.panelInfo(id);
+                    return info && info[field] != null ? info[field] : '';
+                },
 
                 get samePanel() {
                     return this.sourcePanelId !== '' && this.targetPanelId !== ''
@@ -221,7 +231,12 @@
         var totalKeys = 0;
         var lastTransferReport = [];
 
-        document.getElementById('btn-download-report').addEventListener('click', function () {
+        (function () {
+            var formEl = document.getElementById('mass-transfer-form');
+            if (!formEl) return;
+
+            var btnDownload = document.getElementById('btn-download-report');
+            if (btnDownload) btnDownload.addEventListener('click', function () {
             if (!lastTransferReport.length) return;
             var headers = ['key_activate_id', 'server_user_id', 'traffic_limit_mb', 'traffic_limit_bytes', 'expire_date', 'finish_at', 'user_tg_id'];
             var rows = [headers.join(',')];
@@ -245,7 +260,8 @@
             URL.revokeObjectURL(a.href);
         });
 
-        document.getElementById('btn-test-transfer').addEventListener('click', function () {
+            var btnTest = document.getElementById('btn-test-transfer');
+            if (btnTest) btnTest.addEventListener('click', function () {
             var form = document.getElementById('mass-transfer-form');
             var input = document.getElementById('mass-transfer-max-total');
             var alpineEl = document.getElementById('mass-transfer-form');
@@ -255,10 +271,10 @@
                 return;
             }
             if (input) input.value = '2';
-            form.requestSubmit();
+                if (form) form.requestSubmit();
         });
 
-        document.getElementById('mass-transfer-form').addEventListener('submit', function (e) {
+            formEl.addEventListener('submit', function (e) {
             e.preventDefault();
             const form = this;
             const alpineEl = form;
@@ -405,5 +421,5 @@
             }
             runBatch();
         });
-    </script>
+        })();
 @endsection

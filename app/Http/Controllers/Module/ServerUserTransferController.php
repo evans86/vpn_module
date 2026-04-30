@@ -299,13 +299,42 @@ class ServerUserTransferController extends Controller
     public function massTransferPage(): View
     {
         $panels = Panel::query()
-            ->select('id', 'panel', 'panel_adress', 'panel_status', 'server_id')
-            ->with(['server:id,name'])
+            ->select('id', 'panel', 'panel_adress', 'panel_status', 'server_id', 'has_error')
+            ->whereNotNull('server_id')
+            ->where('panel_status', Panel::PANEL_CONFIGURED)
+            ->where('panel', Panel::MARZBAN)
+            ->where(function ($query) {
+                $query->whereNull('has_error')->orWhere('has_error', false);
+            })
+            ->with([
+                'server' => static function ($query) {
+                    $query->select('id', 'name', 'location_id');
+                },
+                'server.location:id,code,emoji',
+            ])
             ->orderBy('id')
             ->get();
 
+        $panelsMeta = $panels->mapWithKeys(static function (Panel $p) {
+            $server = $p->server;
+            $loc = $server !== null ? $server->location : null;
+            $country = '—';
+            if ($loc !== null && $loc->code) {
+                $country = trim(($loc->emoji ? $loc->emoji.' ' : '').strtoupper((string) $loc->code));
+            }
+
+            return [
+                (string) $p->id => [
+                    'server_name' => $server !== null ? (string) $server->name : '—',
+                    'country' => $country,
+                    'panel_id' => $p->id,
+                ],
+            ];
+        })->all();
+
         return view('module.server-user-transfer.mass-transfer', [
             'panels' => $panels,
+            'panelsMeta' => $panelsMeta,
         ]);
     }
 
