@@ -30,39 +30,12 @@ class Location extends Model
      */
     public function resolvedFlagEmoji(): string
     {
-        $code = strtoupper(trim((string) ($this->code ?? '')));
-        $raw = trim((string) ($this->emoji ?? ''));
-
-        if ($raw !== '') {
-            if (preg_match('/^:([a-z]{2}):$/i', $raw, $m)) {
-                return CountryFlagHelper::emojiFromAlpha2($m[1]);
-            }
-
-            if (strpos($raw, '&') !== false && strpos($raw, ';') !== false && strpos($raw, '#') !== false) {
-                $decoded = html_entity_decode($raw, ENT_HTML5 | ENT_HTML401, 'UTF-8');
-                if (preg_match('/[\x{1F1E6}-\x{1F1FF}]{2}/u', $decoded, $match)) {
-                    return $match[0];
-                }
-            }
-
-            if (preg_match('/^[\x{1F1E6}-\x{1F1FF}]{2}$/u', $raw)) {
-                return $raw;
-            }
-        }
-
-        return CountryFlagHelper::emojiFromAlpha2($code);
+        return CountryFlagHelper::resolvedEmojiFromStored($this->code, $this->emoji);
     }
 
     /** Подпись для UI: «🇳🇱 NL» или «NL», если emoji не удалось восстановить. */
     public function labelWithFlag(): string
     {
-        $code = strtoupper(trim((string) ($this->code ?? '')));
-        if ($code === '') {
-            return '';
-        }
-
-        $flag = $this->resolvedFlagEmoji();
-
-        return $flag !== '' ? ($flag.' '.$code) : $code;
+        return CountryFlagHelper::countryLabelWithFlag($this->code, $this->emoji);
     }
 }

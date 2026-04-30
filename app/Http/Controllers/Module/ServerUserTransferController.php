@@ -7,6 +7,7 @@ use App\Models\KeyActivate\KeyActivate;
 use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Models\Panel\Panel;
 use App\Models\ServerUser\ServerUser;
+use App\Helpers\CountryFlagHelper;
 use App\Repositories\Panel\PanelRepository;
 use App\Services\Panel\marzban\MarzbanService;
 use App\Services\Panel\PanelStrategy;
@@ -320,7 +321,7 @@ class ServerUserTransferController extends Controller
             $loc = $server !== null ? $server->location : null;
             $country = '—';
             if ($loc !== null && $loc->code) {
-                $country = $loc->labelWithFlag();
+                $country = CountryFlagHelper::countryLabelWithFlag((string) $loc->code, $loc->emoji);
             }
 
             return [
