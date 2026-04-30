@@ -242,12 +242,11 @@
                                 @endif
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" style="overflow: visible !important; position: relative;">
-                                <div class="relative inline-block text-left" x-data="{ open: false, buttonRect: null }" x-init="$watch('open', value => {
-                                    if (value) {
-                                        buttonRect = $refs.button.getBoundingClientRect();
-                                    }
-                                })">
-                                    <button @click="open = !open" 
+                                <div class="relative inline-block text-left" x-data="{ open: false, buttonRect: null }">
+                                    <button @click="
+                                            open = !open;
+                                            buttonRect = open ? $refs.button.getBoundingClientRect() : null;
+                                        "
                                             x-ref="button"
                                             class="text-gray-400 hover:text-gray-600 focus:outline-none"
                                             title="Действия">
@@ -255,7 +254,7 @@
                                     </button>
                                     
                                     <div x-show="open" 
-                                         @click.away="open = false"
+                                         @click.away="open = false; buttonRect = null"
                                          x-cloak
                                          x-transition
                                          class="dropdown-menu-actions dropdown-action-buttons fixed rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
