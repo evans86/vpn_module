@@ -11,6 +11,7 @@ use App\Models\Panel\Panel;
 use App\Models\Server\Server;
 use App\Models\ServerMonitoring\ServerMonitoring;
 use App\Models\ServerUser\ServerUser;
+use App\Jobs\NotifyUserKeyTransferredJob;
 use App\Services\External\MarzbanAPI;
 use App\Services\Notification\TelegramNotificationService;
 use App\Services\Key\KeyActivateUserService;
@@ -3151,13 +3152,9 @@ class MarzbanService
 
                 DB::commit();
 
-                // Уведомление пользователю (модуль Bot-T или бот продавца) — та же логика, что в TelegramNotificationService
+                // Одиночный перенос: уведомление сразу (без очереди). Текст тот же, что в NotifyUserKeyTransferredJob.
                 if ($key_activate) {
-                    $message = "⚠️ Ваш ключ доступа: " . "<code>{$key_activate->id}</code> " . "был перемещен на новый сервер!\n\n";
-                    $message .= "🔗 Для продолжения работы:\n";
-                    $message .= "• Заново вставьте ссылку-подключение в клиент VPN, или\n";
-                    $message .= "• При выключенном VPN нажмите кнопку обновления конфигурации\n\n";
-                    $message .= "\n" . \App\Helpers\UrlHelper::telegramConfigLinksHtml($key_activate->id);
+                    $message = NotifyUserKeyTransferredJob::telegramMessage($key_activate->id);
 
                     try {
                         $keyActivateFull = KeyActivate::with(['moduleSalesman.botModule', 'packSalesman.salesman'])
@@ -3265,6 +3262,10 @@ class MarzbanService
             $serverUser->keys = is_array($newUser['links']) ? json_encode($newUser['links']) : $newUser['links'];
             $serverUser->save();
         });
+
+        if (NotifyUserKeyTransferredJob::canEnqueueForOwner($keyActivate)) {
+            NotifyUserKeyTransferredJob::dispatch((string) $keyActivateId);
+        }
 
         Log::info('Mass transfer: key moved without source panel', [
             'key_activate_id' => $keyActivateId,
