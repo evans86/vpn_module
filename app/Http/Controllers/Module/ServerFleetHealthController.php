@@ -27,17 +27,9 @@ class ServerFleetHealthController extends Controller
      */
     public function index(): View
     {
-        $configuredCount = Server::query()
-            ->where('server_status', Server::SERVER_CONFIGURED)
-            ->count();
-
-        $title = 'Проверка сети и серверов';
-        $pageTitle = 'Проверка сети и серверов';
-
         return view('module.server.health-report', [
-            'configuredCount' => $configuredCount,
-            'title' => $title,
-            'pageTitle' => $pageTitle,
+            'title' => 'Проверка сети и серверов',
+            'pageTitle' => 'Проверка сети и серверов',
         ]);
     }
 
