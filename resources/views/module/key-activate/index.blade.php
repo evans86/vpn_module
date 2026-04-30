@@ -612,9 +612,10 @@
 
                 var name = item.server_name || '—';
                 var c = item.country || '—';
+                var ip = item.server_ip ? item.server_ip : '—';
                 var hashId = item.panel_id != null ? item.panel_id : item.id;
 
-                return '#' + hashId + ' · ' + name + ' · ' + c;
+                return '#' + hashId + ' · ' + name + ' · ' + c + ' · ' + ip;
             }
 
             function buildTransferOptionAttrs(item) {

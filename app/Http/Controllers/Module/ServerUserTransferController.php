@@ -7,6 +7,7 @@ use App\Models\KeyActivate\KeyActivate;
 use App\Models\KeyActivateUser\KeyActivateUser;
 use App\Models\Location\Location;
 use App\Models\Panel\Panel;
+use App\Models\Server\Server;
 use App\Models\ServerUser\ServerUser;
 use App\Helpers\CountryFlagHelper;
 use App\Repositories\Panel\PanelRepository;
@@ -25,7 +26,7 @@ class ServerUserTransferController extends Controller
 {
 
     /** @see self::allEligibleOperationalTransferPanelsSerialized() */
-    private const ELIGIBLE_TRANSFER_PANELS_CACHE_KEY = 'server_user_transfer.eligible_panel_choices.v1';
+    private const ELIGIBLE_TRANSFER_PANELS_CACHE_KEY = 'server_user_transfer.eligible_panel_choices.v2';
 
     private const ELIGIBLE_TRANSFER_PANELS_CACHE_TTL = 90;
 
@@ -44,7 +45,7 @@ class ServerUserTransferController extends Controller
 
             $slots = KeyActivateUser::query()
                 ->where('key_activate_id', $validated['key_id'])
-                ->with(['serverUser.panel.server:id,name,provider', 'serverUser.panel:id,panel_adress,server_id'])
+                ->with(['serverUser.panel.server:id,name,provider,ip', 'serverUser.panel:id,panel_adress,server_id'])
                 ->get()
                 ->map(function (KeyActivateUser $kau) {
                     $panel = $kau->serverUser ? $kau->serverUser->panel : null;
@@ -52,6 +53,7 @@ class ServerUserTransferController extends Controller
                     return [
                         'panel_id' => $panel ? $panel->id : null,
                         'server_name' => $server ? $server->name : ('Панель #' . ($panel ? $panel->id : '?')),
+                        'server_ip' => self::serverIpLabel($server),
                         'provider' => $server ? $server->provider : '',
                     ];
                 })
@@ -91,7 +93,7 @@ class ServerUserTransferController extends Controller
                         $query->select('id', 'server_id');
                     },
                     'serverUser.panel.server' => static function ($query) {
-                        $query->select('id', 'name', 'provider', 'location_id');
+                        $query->select('id', 'name', 'provider', 'location_id', 'ip');
                     },
                     'serverUser.panel.server.location:id,code,emoji',
                 ])
@@ -292,7 +294,7 @@ class ServerUserTransferController extends Controller
             })
             ->with([
                 'server' => static function ($query) {
-                    $query->select('id', 'name', 'location_id');
+                    $query->select('id', 'name', 'location_id', 'ip');
                 },
                 'server.location:id,code,emoji',
             ])
@@ -312,10 +314,12 @@ class ServerUserTransferController extends Controller
                     $country_flag_url = $flagUrl !== null ? $flagUrl : '';
                 }
             }
+            $serverIp = self::serverIpLabel($server);
 
             return [
                 (string) $p->id => [
                     'server_name' => $server !== null ? (string) $server->name : '—',
+                    'server_ip' => $serverIp,
                     'country' => $country,
                     'country_flag_url' => $country_flag_url,
                     'panel_id' => $p->id,
@@ -772,11 +776,24 @@ class ServerUserTransferController extends Controller
             })
             ->with([
                 'server' => static function ($query) {
-                    $query->select('id', 'name', 'provider', 'location_id');
+                    $query->select('id', 'name', 'provider', 'location_id', 'ip');
                 },
                 'server.location:id,code,emoji',
             ])
             ->orderBy('id');
+    }
+
+    /**
+     * Отображаемый IP сервера для подписей в UI (массовый / одиночный перенос).
+     */
+    private static function serverIpLabel(?Server $server): string
+    {
+        if ($server === null) {
+            return '—';
+        }
+        $ip = isset($server->ip) ? trim((string) $server->ip) : '';
+
+        return $ip !== '' ? $ip : '—';
     }
 
     /**
@@ -809,14 +826,16 @@ class ServerUserTransferController extends Controller
         $server = $panel->server;
         $meta = self::countryMetaFromLocation($server !== null ? $server->location : null);
         $serverName = $server !== null ? (string) $server->name : '—';
+        $serverIp = self::serverIpLabel($server);
 
         return [
             'id' => (int) $panel->id,
             'server_name' => $serverName,
+            'server_ip' => $serverIp,
             'provider' => $server !== null ? (string) $server->provider : '',
             'country' => $meta['country'],
             'country_flag_url' => $meta['country_flag_url'],
-            'option_label' => '#'.$panel->id.' · '.$serverName.' · '.$meta['country'],
+            'option_label' => '#'.$panel->id.' · '.$serverName.' · '.$meta['country'].' · '.$serverIp,
         ];
     }
 
@@ -835,15 +854,17 @@ class ServerUserTransferController extends Controller
 
         $meta = self::countryMetaFromLocation($server !== null ? $server->location : null);
         $serverName = $server !== null ? (string) $server->name : ('Панель #'.$panel->id);
+        $serverIp = self::serverIpLabel($server);
 
         return [
             'server_user_id' => (string) $kau->server_user_id,
             'panel_id' => (int) $panel->id,
             'server_name' => $serverName,
+            'server_ip' => $serverIp,
             'provider' => $server !== null ? (string) $server->provider : '',
             'country' => $meta['country'],
             'country_flag_url' => $meta['country_flag_url'],
-            'option_label' => '#'.$panel->id.' · '.$serverName.' · '.$meta['country'],
+            'option_label' => '#'.$panel->id.' · '.$serverName.' · '.$meta['country'].' · '.$serverIp,
         ];
     }
 

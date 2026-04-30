@@ -30,8 +30,12 @@
                                     $lm = $panelListsMeta[(string) $p->id] ?? null;
                                     $optName = is_array($lm) ? ($lm['server_name'] ?? ($p->server->name ?? '—')) : ($p->server->name ?? '—');
                                     $optCountry = is_array($lm) ? ($lm['country'] ?? '—') : '—';
+                                    $optIp = is_array($lm) ? ($lm['server_ip'] ?? '—') : '—';
+                                    if ($optIp === '—' && $p->server && trim((string) ($p->server->ip ?? '')) !== '') {
+                                        $optIp = trim((string) $p->server->ip);
+                                    }
                                 @endphp
-                                <option value="{{ $p->id }}">#{{ $p->id }} · {{ $optName }} · {{ $optCountry }}</option>
+                                <option value="{{ $p->id }}">#{{ $p->id }} · {{ $optName }} · {{ $optCountry }} · {{ $optIp }}</option>
                             @endforeach
                         </select>
                         <div class="mt-4 space-y-3" x-show="panelInfo(sourcePanelId)" x-cloak>
@@ -39,6 +43,8 @@
                                 <div>
                                     <dt class="font-medium text-gray-500">Сервер</dt>
                                     <dd class="mt-0.5 text-gray-900" x-text="panelField(sourcePanelId, 'server_name')"></dd>
+                                    <dt class="mt-2 font-medium text-gray-500">IP сервера</dt>
+                                    <dd class="mt-0.5 text-gray-900 font-mono text-sm tracking-tight" x-text="panelField(sourcePanelId, 'server_ip')"></dd>
                                 </div>
                                 <div>
                                     <dt class="font-medium text-gray-500">Страна</dt>
@@ -84,8 +90,12 @@
                                     $lm = $panelListsMeta[(string) $p->id] ?? null;
                                     $optName = is_array($lm) ? ($lm['server_name'] ?? ($p->server->name ?? '—')) : ($p->server->name ?? '—');
                                     $optCountry = is_array($lm) ? ($lm['country'] ?? '—') : '—';
+                                    $optIp = is_array($lm) ? ($lm['server_ip'] ?? '—') : '—';
+                                    if ($optIp === '—' && $p->server && trim((string) ($p->server->ip ?? '')) !== '') {
+                                        $optIp = trim((string) $p->server->ip);
+                                    }
                                 @endphp
-                                <option value="{{ $p->id }}">#{{ $p->id }} · {{ $optName }} · {{ $optCountry }}</option>
+                                <option value="{{ $p->id }}">#{{ $p->id }} · {{ $optName }} · {{ $optCountry }} · {{ $optIp }}</option>
                             @endforeach
                         </select>
                         <div class="mt-4 space-y-3" x-show="panelInfo(targetPanelId)" x-cloak>
@@ -93,6 +103,8 @@
                                 <div>
                                     <dt class="font-medium text-gray-500">Сервер</dt>
                                     <dd class="mt-0.5 text-gray-900" x-text="panelField(targetPanelId, 'server_name')"></dd>
+                                    <dt class="mt-2 font-medium text-gray-500">IP сервера</dt>
+                                    <dd class="mt-0.5 text-gray-900 font-mono text-sm tracking-tight" x-text="panelField(targetPanelId, 'server_ip')"></dd>
                                 </div>
                                 <div>
                                     <dt class="font-medium text-gray-500">Страна</dt>
