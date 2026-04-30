@@ -316,13 +316,6 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
                 Route::post('/mass-transfer/run-batch', [ServerUserTransferController::class, 'massTransferBatch'])->name('mass-transfer.run-batch');
                 Route::post('/balance/stats', [ServerUserTransferController::class, 'balanceStats'])->name('balance.stats');
                 Route::post('/balance/step', [ServerUserTransferController::class, 'balanceStep'])->name('balance.step');
-                Route::post('/multi-provider-migration/count', [ServerUserTransferController::class, 'multiProviderMigrationCount'])->name('multi-provider-migration.count');
-                Route::post('/multi-provider-migration/check-key', [ServerUserTransferController::class, 'multiProviderMigrationCheckKey'])->name('multi-provider-migration.check-key');
-                Route::post('/multi-provider-migration/single-key', [ServerUserTransferController::class, 'multiProviderMigrationSingleKey'])->name('multi-provider-migration.single-key');
-                Route::post('/multi-provider-migration/run-batch', [ServerUserTransferController::class, 'multiProviderMigrationBatch'])->name('multi-provider-migration.run-batch');
-                Route::post('/multi-provider-migration/start', [ServerUserTransferController::class, 'multiProviderMigrationStart'])->name('multi-provider-migration.start');
-                Route::post('/multi-provider-migration/cancel', [ServerUserTransferController::class, 'multiProviderMigrationCancel'])->name('multi-provider-migration.cancel');
-                Route::get('/multi-provider-migration/status', [ServerUserTransferController::class, 'multiProviderMigrationStatus'])->name('multi-provider-migration.status');
                 Route::post('/key-slots', [ServerUserTransferController::class, 'getKeySlots'])->name('key-slots');
                 Route::post('/transfer-data', [ServerUserTransferController::class, 'getTransferData'])->name('transfer-data');
                 Route::post('/panels', [ServerUserTransferController::class, 'getPanels'])->name('panels');
