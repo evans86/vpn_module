@@ -17,11 +17,17 @@ use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class ServerUserTransferController extends Controller
 {
+
+    /** @see self::allEligibleOperationalTransferPanelsSerialized() */
+    private const ELIGIBLE_TRANSFER_PANELS_CACHE_KEY = 'server_user_transfer.eligible_panel_choices.v1';
+
+    private const ELIGIBLE_TRANSFER_PANELS_CACHE_TTL = 90;
 
     /**
      * Слоты ключа (панели/провайдеры) для выбора при переносе при мульти-провайдере.
@@ -77,7 +83,13 @@ class ServerUserTransferController extends Controller
             $slotModels = KeyActivateUser::query()
                 ->where('key_activate_id', $keyId)
                 ->with([
-                    'serverUser.panel',
+                    // Только нужные столбцы: без ключей пользователя сервера и прочего «тяжёлого»
+                    'serverUser' => static function ($query) {
+                        $query->select('id', 'panel_id');
+                    },
+                    'serverUser.panel' => static function ($query) {
+                        $query->select('id', 'server_id');
+                    },
                     'serverUser.panel.server' => static function ($query) {
                         $query->select('id', 'name', 'provider', 'location_id');
                     },
@@ -97,16 +109,10 @@ class ServerUserTransferController extends Controller
             }
             $excludeIds = array_keys($panelIdsWithKey);
 
-            $panels = self::makePanelsEligibleForOperationalTransferBaseQuery()
-                ->when(count($excludeIds) > 0, static function ($query) use ($excludeIds) {
-                    return $query->whereNotIn('id', $excludeIds);
-                })
-                ->get()
-                ->map(static function (Panel $panel) {
-                    return self::serializeTargetPanelChoice($panel);
-                })
-                ->values()
-                ->all();
+            $panels = self::filterEligiblePanelsExcludedIds(
+                self::allEligibleOperationalTransferPanelsSerialized(),
+                $excludeIds
+            );
 
             return response()->json([
                 'slots' => array_values($slots),
@@ -149,16 +155,12 @@ class ServerUserTransferController extends Controller
                 ->values()
                 ->all();
 
-            $panels = self::makePanelsEligibleForOperationalTransferBaseQuery()
-                ->when(!empty($panelIdsWithKey), static function ($query) use ($panelIdsWithKey) {
-                    return $query->whereNotIn('id', $panelIdsWithKey);
-                })
-                ->get()
-                ->map(static function (Panel $panel) {
-                    return self::serializeTargetPanelChoice($panel);
-                });
+            $panelsCollection = collect(self::filterEligiblePanelsExcludedIds(
+                self::allEligibleOperationalTransferPanelsSerialized(),
+                $panelIdsWithKey
+            ));
 
-            return response()->json(['panels' => $panels]);
+            return response()->json(['panels' => $panelsCollection]);
         } catch (Exception $e) {
             Log::error('Failed to get panels list', [
                 'error' => $e->getMessage(),
@@ -707,6 +709,52 @@ class ServerUserTransferController extends Controller
         } finally {
             ini_set('memory_limit', $originalMemoryLimit);
         }
+    }
+
+    /**
+     * Список целевых панелей (сериализованный) общий для всех ключей: без учёта «уже есть на панели».
+     * Кэшируем, чтобы не перечитывать десятки/сотни панелей при каждом открытии модалки.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private static function allEligibleOperationalTransferPanelsSerialized(): array
+    {
+        return Cache::remember(
+            self::ELIGIBLE_TRANSFER_PANELS_CACHE_KEY,
+            self::ELIGIBLE_TRANSFER_PANELS_CACHE_TTL,
+            static function (): array {
+                return self::makePanelsEligibleForOperationalTransferBaseQuery()
+                    ->get()
+                    ->map(static function (Panel $panel) {
+                        return self::serializeTargetPanelChoice($panel);
+                    })
+                    ->values()
+                    ->all();
+            }
+        );
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $serializedPanels
+     * @param array<int, int|string>          $excludePanelIds
+     * @return array<int, array<string, mixed>>
+     */
+    private static function filterEligiblePanelsExcludedIds(array $serializedPanels, array $excludePanelIds): array
+    {
+        if ($excludePanelIds === []) {
+            return array_values($serializedPanels);
+        }
+
+        $excluded = [];
+        foreach ($excludePanelIds as $pid) {
+            $excluded[(int) $pid] = true;
+        }
+
+        return array_values(array_filter($serializedPanels, static function (array $row) use ($excluded) {
+            $id = (int) ($row['id'] ?? 0);
+
+            return empty($excluded[$id]);
+        }));
     }
 
     /**
