@@ -14,8 +14,14 @@
         max-width: min(20rem, calc(100vw - 2rem));
     }
 
+    .dropdown-menu-actions.dropdown-action-buttons > .py-1 {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
     .dropdown-menu-actions.dropdown-action-buttons button {
-        display: inline-flex;
+        display: flex;
         align-items: flex-start;
         gap: 0.35rem;
         width: 100%;
