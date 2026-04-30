@@ -383,8 +383,9 @@
                 <div id="transfer-slot-preview-wrap" class="mt-2 mb-3 small d-none">
                     <span class="text-gray-600 d-block mb-1">Исходный слот:</span>
                     <div class="d-flex align-items-center flex-wrap">
-                        <img id="transfer-slot-flag-img" src="#" alt="" width="26" height="16"
-                             class="mr-2 rounded border shadow-sm bg-white d-none flex-shrink-0" loading="lazy" decoding="async">
+                        <img id="transfer-slot-flag-img" alt="" width="26" height="16"
+                             class="mr-2 rounded border shadow-sm bg-white d-none flex-shrink-0"
+                             style="object-fit: cover;" loading="lazy" decoding="async">
                         <span id="transfer-slot-preview-text" class="text-gray-800"></span>
                     </div>
                 </div>
@@ -397,9 +398,18 @@
                     </select>
                     <div id="transfer-target-preview-wrap" class="mt-2 mb-3 small d-none">
                         <span class="text-gray-600 d-block mb-1">Целевая панель (выбор):</span>
-                        <div class="d-flex align-items-center flex-wrap">
-                            <img id="transfer-target-flag-img" src="#" alt="" width="26" height="16"
-                                 class="mr-2 rounded border shadow-sm bg-white d-none flex-shrink-0" loading="lazy" decoding="async">
+                        <div class="d-flex align-items-center flex-wrap" style="gap: 0.5rem;">
+                            <div id="transfer-target-flag-frame"
+                                 class="flex-shrink-0 d-inline-flex align-items-center justify-content-center rounded border border-gray-200 bg-gray-50 text-gray-500 overflow-hidden"
+                                 style="width: 2.25rem; height: 1.5rem;"
+                                 title="">
+                                <img id="transfer-target-flag-img" alt="" width="26" height="16"
+                                     class="d-none rounded-sm flex-shrink-0"
+                                     style="object-fit: cover;" loading="lazy" decoding="async">
+                                <span id="transfer-target-flag-fallback" class="d-inline-flex align-items-center justify-content-center w-100 h-100">
+                                    <i class="fas fa-globe" style="font-size: 0.75rem;" aria-hidden="true"></i>
+                                </span>
+                            </div>
                             <span id="transfer-target-preview-text" class="text-gray-800 font-weight-medium"></span>
                         </div>
                     </div>
@@ -644,28 +654,99 @@
             }
 
             function showTargetPreviewFromOption() {
-                var $opt = $('#target-panel-select').find('option:selected');
-                var $wrap = $('#transfer-target-preview-wrap');
+                var $select = $('#target-panel-select');
                 var $img = $('#transfer-target-flag-img');
+                var $fb = $('#transfer-target-flag-fallback');
+                var $frame = $('#transfer-target-flag-frame');
                 var $text = $('#transfer-target-preview-text');
+                var $opt = $select.find('option:selected');
+                var optionVal = $opt.val();
+                var cc = ($opt.attr('data-country') || '').trim();
                 var flag = $opt.attr('data-flag-url');
-                var lbl = $opt.text();
 
-                if (!$opt.val()) {
-                    $wrap.addClass('d-none');
+                function showGlobePlaceholder(title) {
+                    $img.addClass('d-none').removeAttr('src').off('load.transferTargetFlag error.transferTargetFlag');
+                    $fb.removeClass('d-none').empty();
+                    $fb.append($('<i class="fas fa-globe" aria-hidden="true"></i>').css('font-size', '0.75rem'));
+                    $frame.attr('title', title || '');
+                }
+
+                function showCountryCodeLetters(code) {
+                    $img.addClass('d-none').removeAttr('src').off('load.transferTargetFlag error.transferTargetFlag');
+                    $fb.removeClass('d-none').empty();
+                    $('<span class="font-weight-bold text-secondary"></span>')
+                        .text(code)
+                        .css({ fontSize: '0.62rem', letterSpacing: '0.05em' })
+                        .appendTo($fb);
+                    $frame.attr('title', '');
+                }
+
+                function hasSelectableTargetOptions() {
+                    var ok = false;
+
+                    $select.find('option').each(function () {
+                        if (String($(this).val())) {
+                            ok = true;
+
+                            return false;
+                        }
+                    });
+
+                    return ok;
+                }
+
+                var hasTargets = hasSelectableTargetOptions();
+
+                if (!optionVal) {
+                    if (!hasTargets) {
+                        $text
+                            .text('Нет доступных панелей — ключ уже есть на всех подходящих серверах.')
+                            .removeClass('font-weight-medium text-gray-800')
+                            .addClass('text-muted');
+                    } else {
+                        $text
+                            .text('Выберите панель из списка выше — здесь появится превью с флагом или кодом страны.')
+                            .removeClass('font-weight-medium text-gray-800')
+                            .addClass('text-muted');
+                    }
+                    showGlobePlaceholder('');
 
                     return;
                 }
 
-                $text.text(lbl);
+                $text
+                    .text($opt.text())
+                    .removeClass('text-muted')
+                    .addClass('text-gray-800 font-weight-medium');
 
                 if (flag) {
-                    $img.attr('src', flag).attr('alt', $opt.attr('data-country') || '').removeClass('d-none');
-                } else {
-                    $img.addClass('d-none').removeAttr('src');
-                }
+                    showGlobePlaceholder('');
 
-                $wrap.removeClass('d-none');
+                    $img
+                        .off('load.transferTargetFlag error.transferTargetFlag')
+                        .on('load.transferTargetFlag', function () {
+                            $fb.addClass('d-none');
+                            $img.removeClass('d-none');
+                        })
+                        .on('error.transferTargetFlag', function () {
+                            $img.addClass('d-none').removeAttr('src');
+                            if (cc.length >= 2) {
+                                showCountryCodeLetters(cc.substring(0, 2).toUpperCase());
+                            } else {
+                                showGlobePlaceholder('Флаг недоступен (сеть или политика сайта)');
+                            }
+                        });
+
+                    $img.attr('src', flag).attr('alt', cc || '');
+                    if ($img.get(0) && $img.get(0).complete && $img.get(0).naturalWidth > 0) {
+                        $fb.addClass('d-none');
+                        $img.removeClass('d-none');
+                    }
+                } else if (cc.length >= 2) {
+                    showCountryCodeLetters(cc.substring(0, 2).toUpperCase());
+                } else {
+                    showGlobePlaceholder('');
+                }
             }
 
             $(document).on('click', '.btn-transfer-key', function () {
@@ -772,6 +853,7 @@
                             showTargetPreviewFromOption();
                         });
                         select.val('');
+                        $('#transfer-target-preview-wrap').removeClass('d-none');
                         showTargetPreviewFromOption();
 
                         if (panels.length === 0) {
