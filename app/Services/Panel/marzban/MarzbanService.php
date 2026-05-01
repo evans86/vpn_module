@@ -430,26 +430,86 @@ RUNDC() {
   sudo docker compose -p marzban "$@" 2>/dev/null || docker compose -p marzban "$@" 2>/dev/null || true;
 }
 
+# Из вывода curl -w держим только три цифры кода (иногда попадают мусор/несколько цифр → http_000000).
+http_code_three() {
+  RAW="$1"
+  echo "$RAW" | tr -cd '0-9' | awk '{ if(length($0)>=3) print substr($0,length($0)-2,3); }'
+}
+
+probe_https_dashboard() {
+  local raw last hdr
+  if command -v curl >/dev/null 2>&1; then
+    raw=$(curl -sk -o /dev/null -w '%%{http_code}' \
+      --http1.1 --connect-timeout 25 --max-time 40 \
+      --resolve "${H}:${P}:127.0.0.1" "${U}" 2>/dev/null) || raw=""
+    last=$(http_code_three "$raw")
+    if test -n "$last"; then
+      echo "${last} curl"
+      return 0
+    fi
+  fi
+  # Fallback без --resolve (старый curl / сбои TLS-сокета через --resolve)
+  if command -v wget >/dev/null 2>&1; then
+    hdr=$(wget --no-check-certificate -S -q -O /dev/null \
+      --header="Host: ${H}" "https://127.0.0.1:${P}/dashboard/" 2>&1 || true)
+    last=$(printf '%s' "$hdr" | sed -n 's/.*HTTP\\/[0-9][0-9]*\\.[0-9][0-9]* \\([0123456789][0123456789][0123456789]\\).*/\\1/p' | tail -n 1 || true)
+    if test -n "$last"; then
+      echo "${last} wget_proxy"
+      return 0
+    fi
+  fi
+  return 1
+}
+
 DOCKER_OK=0
-for i in $(seq 1 24); do
+for i in $(seq 1 26); do
   if RUNDC ps -q --status running | grep -qE '[[:alnum:]]'; then DOCKER_OK=1; break; fi
   sleep 3
 done
 if test "$DOCKER_OK" != 1; then echo MARZBAN_RT_FAIL=docker_containers_down; exit 73; fi
 
-LAST=000
-for j in $(seq 1 16); do
-  LAST=$(curl -sk -o /dev/null -w '%%{http_code}' --connect-timeout 14 --max-time 24 --resolve "${H}:${P}:127.0.0.1" "${U}" 2>/dev/null || printf '000')
-  case "$LAST" in
-    2??|3??|401|403|404|502|503)
-      echo "MARZBAN_RT_OK=http_${LAST}"
-      exit 0
-      ;;
-    *) ;;
-  esac
-  sleep 4
+CODE=""
+SRC=""
+LAST=""
+MARZ_NOTE=""
+for j in $(seq 1 22); do
+  if outp=$(probe_https_dashboard); then
+    CODE=$(printf '%s' "$outp" | awk 'NR==1{print $1}')
+    SRC=$(printf '%s' "$outp" | awk 'NR==1{print $2}')
+    LAST="$CODE"
+    case "$LAST" in
+      2??|3??|401|403|404|502|503)
+        echo "MARZBAN_RT_OK=http_${LAST}_${SRC}_j${j}"
+        exit 0
+        ;;
+    esac
+  fi
+
+  BACK_OK=0
+  if RUNDC exec -T marzban wget -q -T 8 -O- http://127.0.0.1:8000/ >/dev/null 2>&1 \\
+     || RUNDC exec -T marzban sh -lc 'curl -sf --max-time 8 http://127.0.0.1:8000/' >/dev/null 2>&1; then BACK_OK=1; fi
+
+  if test "$BACK_OK" != 1; then
+    for alt in dashboard marzban app; do
+      if RUNDC exec -T "$alt" wget -q -T 6 -O- http://127.0.0.1:8000/ >/dev/null 2>&1 \\
+        || RUNDC exec -T "$alt" sh -lc 'curl -sf --max-time 6 http://127.0.0.1:8000/' >/dev/null 2>&1; then
+        BACK_OK=1
+        break
+      fi
+    done
+  fi
+
+  if test "$BACK_OK" = 1; then
+    echo MARZBAN_RT_OK=backend_8000_https_probe_failed_or_delayed
+    exit 0
+  fi
+
+  MARZ_NOTE="marz_uvicorn_not_ready"
+
+  sleep 5
 done
-echo "MARZBAN_RT_FAIL=http_${LAST}"
+echo "MARZBAN_RT_FAIL=https_last=${LAST:-none}_probe=${SRC:-none}_loops_22_$MARZ_NOTE"
+echo "MARZBAN_RT_HINT=check_uvicorn_in_docker_exec_wget_127.0.0.1_8000"
 exit 72
 EOS,
             escapeshellarg($host),
