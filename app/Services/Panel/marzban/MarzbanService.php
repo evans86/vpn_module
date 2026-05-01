@@ -1888,21 +1888,38 @@ class MarzbanService
         $ssh = $this->connectSshAdapter($serverDto);
         $oldTimeout = $ssh->getTimeout() ?? 100000;
         $ssh->setTimeout(60);
+        $dir = self::WARP_WGCF_REMOTE_DIR;
+        $text = '';
         try {
-            $dir = self::WARP_WGCF_REMOTE_DIR;
             // Сначала profile, затем wgcf.conf — в profile часто один Address (только IPv6),
             // полный список (две строки Address=) лежит в wgcf.conf; склеиваем оба.
             $cat = "( cat {$dir}/wgcf-profile.conf 2>/dev/null; cat {$dir}/wgcf.conf 2>/dev/null )";
             $text = trim((string) $ssh->exec($cat.' 2>&1'));
+            $text = $this->stripUtf8BomFromText($text);
         } finally {
             $ssh->setTimeout($oldTimeout);
         }
         if ($text === '') {
-            return ['ok' => false, 'message' => 'На ноде нет '.self::WARP_WGCF_REMOTE_DIR.'/wgcf-profile.conf (или wgcf.conf). Сначала выполните автоустановку WARP.'];
+            return ['ok' => false, 'message' => 'На ноде нет '.$dir.'/wgcf-profile.conf (или wgcf.conf). Сначала выполните автоустановку WARP.'];
         }
         $parsed = $this->parseWgcfProfileConf($text);
         if ($parsed === null) {
             return ['ok' => false, 'message' => 'Не удалось разобрать wgcf-конфиг (PrivateKey / Address / Peer).'];
+        }
+        if (! $this->wireguardIfaceListHasIpv4($parsed['address'] ?? [])) {
+            try {
+                $ssh->setTimeout(60);
+                $wgcfOnly = trim((string) $ssh->exec('cat '.$dir.'/wgcf.conf 2>/dev/null'));
+                $wgcfOnly = $this->stripUtf8BomFromText($wgcfOnly);
+                $extra = $this->wgcfGatherAllWireguardAddresses($wgcfOnly);
+                if ($extra !== []) {
+                    $parsed['address'] = array_values(array_unique(array_merge($parsed['address'] ?? [], $extra)));
+                }
+            } catch (\Throwable $ignored) {
+                // остаётся первый проход
+            } finally {
+                $ssh->setTimeout($oldTimeout);
+            }
         }
         $panel->warp_wireguard_snapshot = $parsed;
         $panel->save();
@@ -1915,6 +1932,7 @@ class MarzbanService
      */
     private function parseWgcfProfileConf(string $text): ?array
     {
+        $text = $this->stripUtf8BomFromText($text);
         $sections = [];
         $cur = null;
         foreach (preg_split('/\R/', $text) as $line) {
@@ -1990,6 +2008,7 @@ class MarzbanService
      */
     private function wgcfGatherAllWireguardAddresses(string $text): array
     {
+        $text = $this->stripUtf8BomFromText($text);
         $addresses = [];
         foreach (preg_split('/\R/', $text) as $line) {
             $line = trim($line);
@@ -2026,6 +2045,51 @@ class MarzbanService
         return $unique;
     }
 
+    private function stripUtf8BomFromText(string $text): string
+    {
+        if (str_starts_with($text, "\xEF\xBB\xBF")) {
+            return substr($text, 3);
+        }
+
+        return $text;
+    }
+
+    /**
+     * @param  array<mixed>  $addrs
+     */
+    private function wireguardIfaceListHasIpv4(array $addrs): bool
+    {
+        foreach ($addrs as $a) {
+            if (! is_string($a)) {
+                continue;
+            }
+            $host = preg_replace('#/.*$#', '', trim($a));
+            if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Подмешивает PANEL_WARP_WG_ADDRESS (через запятую) к адресам интерфейса из снимка.
+     *
+     * @param  array<mixed>  $addrs
+     * @return list<string>
+     */
+    private function mergeWireguardSnapshotAddressesWithEnv(array $addrs): array
+    {
+        $extra = config('panel.warp_wireguard_address', []);
+        if (! is_array($extra) || $extra === []) {
+            return array_values(array_filter($addrs, static fn ($x) => is_string($x) && trim($x) !== ''));
+        }
+        $base = array_values(array_filter($addrs, static fn ($x) => is_string($x) && trim($x) !== ''));
+        $add = array_values(array_filter($extra, static fn ($x) => is_string($x) && trim($x) !== ''));
+
+        return array_values(array_unique(array_merge($base, $add)));
+    }
+
     /**
      * Нативный WireGuard в Xray: снимок панели (после автоимпорта) или PANEL_WARP_WG_* в .env.
      *
@@ -2052,25 +2116,7 @@ class MarzbanService
                 $reserved = array_values($snap['reserved']);
             }
         }
-        if ($sk !== '' && $addrs !== []) {
-            $hasIpv4Iface = false;
-            foreach ($addrs as $a) {
-                if (! is_string($a)) {
-                    continue;
-                }
-                $host = preg_replace('#/.*$#', '', trim($a));
-                if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-                    $hasIpv4Iface = true;
-                    break;
-                }
-            }
-            if (! $hasIpv4Iface) {
-                Log::warning('Marzban WARP: в снимке WireGuard нет IPv4 интерфейса из wgcf — в Xray лучше указать и 172.16.x/32. Обновите панель и снова «wgcf → панель», затем перепримените конфиг.', [
-                    'panel_id' => $panel->id,
-                ]);
-            }
-        }
-        if ($sk === '' || $addrs === [] || $peerPub === '') {
+        if ($sk === '' || $addrs === [] || trim($peerPub) === '') {
             $sk = trim((string) config('panel.warp_wireguard_secret_key', ''));
             $addrs = config('panel.warp_wireguard_address', []);
             if (! is_array($addrs)) {
@@ -2084,6 +2130,13 @@ class MarzbanService
         }
         if ($sk === '' || $addrs === [] || trim($peerPub) === '') {
             return null;
+        }
+
+        $addrs = $this->mergeWireguardSnapshotAddressesWithEnv($addrs);
+        if (! $this->wireguardIfaceListHasIpv4($addrs)) {
+            Log::warning('Marzban WARP: в конфигурации WG нет IPv4 интерфейса (нужен 172.16.x/32 из wgcf). Задайте PANEL_WARP_WG_ADDRESS=172.16.0.2/32 в .env панели и перепримените конфиг, либо снова «wgcf → панель» после обновления кода.', [
+                'panel_id' => $panel->id,
+            ]);
         }
 
         $endpointIpOverride = trim((string) config('panel.warp_wireguard_endpoint_ip', ''));
