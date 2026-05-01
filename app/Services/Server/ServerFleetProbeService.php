@@ -10,6 +10,7 @@ use Throwable;
 
 /**
  * Сводная проверка «рабочих» VPS: доступность заглушки, приманка, опционально полный /test-speed (скачивания + speedtest).
+ * Дополнительно: с машины, где крутится Laravel, задержка ICMP/HTTPS до панелей и до списка ваших доменов (config fleet_probe.php).
  */
 class ServerFleetProbeService
 {
@@ -118,13 +119,208 @@ class ServerFleetProbeService
         }
 
         $elapsed = round((microtime(true) - $started) * 1000);
+        $globalProbes = $this->gatherGlobalProbesFromAppHost();
 
         return [
             'summary' => $summary,
             'rows' => $rows,
             'elapsed_ms' => $elapsed,
-            'text_report' => $this->buildTextReport($rows, $summary, $elapsed, $includeTestSpeed),
+            'global_probes' => $globalProbes,
+            'text_report' => $this->buildTextReport($rows, $summary, $elapsed, $includeTestSpeed, $globalProbes),
         ];
+    }
+
+    /**
+     * Проверки с хоста приложения (до панелей и «своих» доменов): ICMP при наличии + HTTPS.
+     *
+     * @return array<string, mixed>
+     */
+    public function gatherGlobalProbesFromAppHost(): array
+    {
+        $cfg = config('fleet_probe', []);
+        $preferIcmp = (bool) ($cfg['prefer_icmp'] ?? true);
+        $resolver = app(FleetProbeTargetResolver::class);
+        $panelRaw = $resolver->mergedPanelHosts();
+        $domainsRaw = $resolver->mergedOurDomainHosts();
+
+        $icmpAvailable = $preferIcmp && $this->detectIcmpPingCli();
+
+        return [
+            'icmp_cli_available' => $icmpAvailable,
+            'meta' => [
+                'panels_target_count' => count($panelRaw),
+                'our_domains_target_count' => count($domainsRaw),
+                'merge_panels_from_db' => (bool) config('fleet_probe.merge_panels_from_db', true),
+                'merge_app_domain_hosts' => (bool) config('fleet_probe.merge_app_domain_hosts', true),
+            ],
+            'panel_hosts' => $this->probeTargetsList($panelRaw, $icmpAvailable),
+            'our_domains' => $this->probeTargetsList($domainsRaw, $icmpAvailable),
+        ];
+    }
+
+    /**
+     * @param  array<int, string>  $targets
+     * @return array<int, array<string, mixed>>
+     */
+    private function probeTargetsList(array $targets, bool $tryIcmp): array
+    {
+        $out = [];
+        foreach ($targets as $raw) {
+            $raw = trim((string) $raw);
+            if ($raw === '') {
+                continue;
+            }
+            $hostForPing = $this->extractHostForPing($raw);
+            $httpsUrl = $this->normalizeHttpsProbeUrl($raw);
+            $row = [
+                'raw' => $raw,
+                'host' => $hostForPing,
+                'icmp_ms' => null,
+                'icmp_error' => null,
+                'https' => $this->probeHttpUrlFlexible($httpsUrl),
+            ];
+            if ($tryIcmp && $hostForPing !== null && $this->isSafeProbeHosttoken($hostForPing)) {
+                $icmp = $this->icmpPingOnceMs($hostForPing);
+                $row['icmp_ms'] = $icmp['ms'];
+                $row['icmp_error'] = $icmp['error'];
+            } elseif ($tryIcmp && $hostForPing === null) {
+                $row['icmp_error'] = 'не удалось выделить хост для ICMP';
+            }
+
+            $out[] = $row;
+        }
+
+        return $out;
+    }
+
+    private function detectIcmpPingCli(): bool
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            return false;
+        }
+        foreach (['/bin/ping', '/sbin/ping', 'ping'] as $p) {
+            if (@is_executable($p)) {
+                return true;
+            }
+        }
+        $out = @shell_exec('command -v ping 2>/dev/null');
+
+        return is_string($out) && trim($out) !== '';
+    }
+
+    /**
+     * Только безопасные метки для shell; IPv4/IPv6 и hostname.
+     */
+    private function isSafeProbeHosttoken(string $host): bool
+    {
+        if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_IPV6)) {
+            return true;
+        }
+        if (str_starts_with($host, '[') && str_ends_with($host, ']')) {
+            $inner = substr($host, 1, -1);
+
+            return filter_var($inner, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+        }
+
+        return (bool) preg_match('/^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/', $host);
+    }
+
+    private function extractHostForPing(string $target): ?string
+    {
+        $t = trim($target);
+        if ($t === '') {
+            return null;
+        }
+        if (! str_contains($t, '://')) {
+            $t = 'https://'.$t;
+        }
+        $host = parse_url($t, PHP_URL_HOST);
+        if (! is_string($host) || $host === '') {
+            return null;
+        }
+        // Расшифровать punycode не требуем; для брекетов IPv6:
+        return strtolower($host);
+    }
+
+    private function normalizeHttpsProbeUrl(string $target): string
+    {
+        $t = trim($target);
+        if ($t === '') {
+            return '';
+        }
+        if (! str_contains($t, '://')) {
+            return 'https://'.$t.'/';
+        }
+        // Уже есть схема — как задано; без пути добавим /
+        $path = parse_url($t, PHP_URL_PATH);
+
+        return (is_string($path) && $path !== '' && $path !== '/') ? $t : rtrim($t, '/').'/';
+    }
+
+    /**
+     * @return array{ms: ?float, error: ?string}
+     */
+    private function icmpPingOnceMs(string $host): array
+    {
+        if (! $this->isSafeProbeHosttoken($host)) {
+            return ['ms' => null, 'error' => 'недопустимое имя хоста'];
+        }
+        $arg = $host;
+        if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)
+            && ! str_starts_with($host, '[')) {
+            $arg = '['.$host.']';
+        }
+        if (PHP_OS_FAMILY === 'Linux') {
+            $cmd = 'ping -c 1 -W 2 '.escapeshellarg($arg).' 2>/dev/null';
+        } elseif (PHP_OS_FAMILY === 'Darwin') {
+            $cmd = 'ping -c 1 -t 2 '.escapeshellarg($arg).' 2>/dev/null';
+        } else {
+            return ['ms' => null, 'error' => 'ICMP: ОС не поддерживается'];
+        }
+        $out = shell_exec($cmd);
+        if (! is_string($out) || $out === '') {
+            return ['ms' => null, 'error' => 'нет ответа ping'];
+        }
+        if (preg_match('/time[=<]([0-9]+(?:\.[0-9]+)?)\s*ms/i', $out, $m)) {
+            return ['ms' => round((float) $m[1], 2), 'error' => null];
+        }
+
+        return ['ms' => null, 'error' => 'разбор вывода ping'];
+    }
+
+    /**
+     * @return array{ok: bool, code: ?int, ms: ?float, error: ?string}
+     */
+    private function probeHttpUrlFlexible(string $url): array
+    {
+        if ($url === '') {
+            return ['ok' => false, 'code' => null, 'ms' => null, 'error' => 'пустой URL'];
+        }
+        $cfg = config('fleet_probe', []);
+        $t = max(3, min(60, (int) ($cfg['https_timeout'] ?? 12)));
+        $ct = max(2, min(20, (int) ($cfg['https_connect_timeout'] ?? 5)));
+
+        try {
+            $t0 = microtime(true);
+            $res = Http::withoutVerifying()
+                ->timeout($t)
+                ->withOptions([
+                    'connect_timeout' => $ct,
+                    'http_errors' => false,
+                ])
+                ->get($url);
+            $ms = round((microtime(true) - $t0) * 1000, 2);
+            $code = $res->status();
+
+            return [
+                'ok' => $code >= 200 && $code < 500,
+                'code' => $code,
+                'ms' => $ms,
+                'error' => $code >= 200 && $code < 500 ? null : ('HTTP '.$code),
+            ];
+        } catch (Throwable $e) {
+            return ['ok' => false, 'code' => null, 'ms' => null, 'error' => Str::limit($e->getMessage(), 300)];
+        }
     }
 
     /**
@@ -290,12 +486,14 @@ class ServerFleetProbeService
     /**
      * @param  array<int, array<string, mixed>>  $rows
      * @param  array<string, int>  $summary
+     * @param  array<string, mixed>  $globalProbes
      */
-    private function buildTextReport(array $rows, array $summary, float $elapsedMs, bool $includeTestSpeed): string
+    private function buildTextReport(array $rows, array $summary, float $elapsedMs, bool $includeTestSpeed, array $globalProbes = []): string
     {
         $lines = [];
         $lines[] = 'Сводная проверка VPS — '.now()->format('Y-m-d H:i:s');
         $lines[] = 'Обработано: '.$summary['total'].' серверов, время выполнения: '.number_format((float) $elapsedMs).' мс.';
+        $lines[] = $this->buildGlobalProbesTextBlock($globalProbes);
         $lines[] = 'HTTP OK: '.$summary['http_ok'].'  | HTTPS OK: '.$summary['https_ok'].'  | заглушка OK (БД): '.$summary['stub_ok_db'];
         if ($includeTestSpeed) {
             $lines[] = '/test-speed: успех '.$summary['test_speed_ok'].', ошибок '.$summary['test_speed_fail'].', пропуск '.$summary['test_speed_skipped'].'.';
@@ -339,6 +537,51 @@ class ServerFleetProbeService
                 }
             }
             $lines[] = '';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<string, mixed>  $globalProbes
+     */
+    private function buildGlobalProbesTextBlock(array $globalProbes): string
+    {
+        $lines = [];
+        $lines[] = '--- С хоста Laravel до панелей и доменов (таблица panel + .env FLEET_PROBE_* + опционально APP_URL/зеркала) ---';
+        $lines[] = 'ICMP через CLI: '.(! empty($globalProbes['icmp_cli_available']) ? 'да' : 'нет');
+        if (! empty($globalProbes['meta']) && is_array($globalProbes['meta'])) {
+            $m = $globalProbes['meta'];
+            $lines[] = sprintf(
+                'Целей: панели %d, домены %d; merge БД=%s, merge APP=%s',
+                (int) ($m['panels_target_count'] ?? 0),
+                (int) ($m['our_domains_target_count'] ?? 0),
+                ! empty($m['merge_panels_from_db']) ? 'да' : 'нет',
+                ! empty($m['merge_app_domain_hosts']) ? 'да' : 'нет'
+            );
+        }
+
+        foreach (['panel_hosts' => 'Панели', 'our_domains' => 'Наши домены'] as $key => $label) {
+            $list = $globalProbes[$key] ?? [];
+            if (! is_array($list) || $list === []) {
+                $lines[] = $label.': (список пуст)';
+
+                continue;
+            }
+            $lines[] = $label.':';
+            foreach ($list as $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
+                $raw = (string) ($item['raw'] ?? '');
+                $icmpMs = $item['icmp_ms'] ?? null;
+                $icmpErr = $item['icmp_error'] ?? null;
+                $h = $item['https'] ?? [];
+                $icmpPart = $icmpMs !== null
+                    ? ('ICMP ~'.(string) $icmpMs.' мс')
+                    : ('ICMP: '.($icmpErr !== null ? (string) $icmpErr : '—'));
+                $lines[] = '  '.$raw.' | '.$icmpPart.' | HTTPS '.$this->probeLineVerbose(is_array($h) ? $h : []);
+            }
         }
 
         return implode("\n", $lines);

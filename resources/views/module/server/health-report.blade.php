@@ -4,7 +4,80 @@
 @section('page-title', $pageTitle)
 
 @section('content')
+    @php
+        $fm = $fleetReportMeta ?? [
+            'panel_targets_count' => 0,
+            'our_domains_targets_count' => 0,
+            'merge_panels_from_db' => true,
+            'merge_app_domain_hosts' => true,
+            'panel_hosts_preview' => [],
+            'our_hosts_preview' => [],
+        ];
+    @endphp
     <div class="space-y-5">
+        <x-admin.card title="Цели проверки и инструменты">
+            <div class="text-sm text-slate-700 space-y-3">
+                <p>
+                    При нажатии «Запустить проверку» с сервера Laravel опрашиваются:
+                    <strong>все настроенные Marzban-панели из БД</strong> (поле <code class="text-xs bg-slate-100 px-1 rounded">panel_adress</code>),
+                    плюс строка <code class="text-xs bg-slate-100 px-1 rounded">FLEET_PROBE_PANEL_HOSTS</code>;
+                    домены — <code class="text-xs bg-slate-100 px-1 rounded">FLEET_PROBE_OUR_DOMAINS</code> и при включённом флаге —
+                    хосты из <code class="text-xs bg-slate-100 px-1 rounded">APP_URL</code>, <code class="text-xs bg-slate-100 px-1 rounded">APP_CONFIG_PUBLIC_URL</code>, <code class="text-xs bg-slate-100 px-1 rounded">APP_MIRROR_URLS</code>.
+                </p>
+                <ul class="list-disc pl-5 space-y-1 text-slate-800">
+                    <li>Панелей в списке ICMP/HTTPS сейчас: <strong>{{ (int) ($fm['panel_targets_count'] ?? 0) }}</strong>
+                        (подмешивание из БД: {{ !empty($fm['merge_panels_from_db']) ? 'да' : 'нет' }})</li>
+                    <li>Доменов в списке: <strong>{{ (int) ($fm['our_domains_targets_count'] ?? 0) }}</strong>
+                        (APP/*: {{ !empty($fm['merge_app_domain_hosts']) ? 'да' : 'нет' }})</li>
+                </ul>
+                @if(!empty($fm['panel_hosts_preview']) || !empty($fm['our_hosts_preview']))
+                    <div class="grid gap-3 md:grid-cols-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-md p-3">
+                        <div>
+                            <div class="font-semibold text-slate-900 mb-1">Первые URL панелей</div>
+                            @forelse($fm['panel_hosts_preview'] as $u)
+                                <div class="truncate text-slate-700" title="{{ $u }}">{{ $u }}</div>
+                            @empty
+                                <div class="text-slate-500">—</div>
+                            @endforelse
+                        </div>
+                        <div>
+                            <div class="font-semibold text-slate-900 mb-1">Первые домены / URL</div>
+                            @forelse($fm['our_hosts_preview'] as $u)
+                                <div class="truncate text-slate-700" title="{{ $u }}">{{ $u }}</div>
+                            @empty
+                                <div class="text-slate-500">—</div>
+                            @endforelse
+                        </div>
+                    </div>
+                @endif
+                <details class="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <summary class="cursor-pointer text-sm font-medium text-slate-800">Заглушка на VPS, Docker, лёгкий /server-probe-light</summary>
+                    <div class="mt-2 text-xs text-slate-600 space-y-2">
+                        <p>Статическая заглушка и nginx: каталог <code class="bg-slate-100 px-1 rounded">deploy/stub-assets</code>, конфиг <code class="bg-slate-100 px-1 rounded">deploy/nginx/panel-stub.default-server.conf</code>.</p>
+                        <p>Docker только для статики 80/443: <code class="bg-slate-100 px-1 rounded">deploy/docker-panel-stub/README.md</code> (полный <code>/test-speed</code> по-прежнему удобнее на хостовом nginx + fcgiwrap).</p>
+                        <p>Короткая самодиагностика исходящих с VPS: скрипт <code class="bg-slate-100 px-1 rounded">deploy/stub-assets/panel-stub-server-probe-light.sh</code> и пример include <code class="bg-slate-100 px-1 rounded">deploy/nginx/snippets/panel-stub-server-probe-light.inc.example</code> (если включён тот же token-файл, что для <code>/test-speed</code>).</p>
+                    </div>
+                </details>
+                <div class="flex flex-wrap items-end gap-2 pt-1">
+                    <div class="min-w-[12rem] flex-1">
+                        <label for="fleetClassifyHost" class="block text-xs font-medium text-slate-700 mb-1">Эвристика веб vs VPN</label>
+                        <input type="text" id="fleetClassifyHost" maxlength="512" placeholder="IP или домен"
+                               class="w-full text-sm rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" autocomplete="off">
+                    </div>
+                    <button type="button" id="fleetClassifyBtn"
+                            class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-slate-800 text-white hover:bg-slate-900 disabled:opacity-50">
+                        Проверить
+                    </button>
+                </div>
+                <pre id="fleetClassifyOut" class="hidden text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 overflow-x-auto max-h-64 overflow-y-auto"></pre>
+            </div>
+
+            <div id="globalProbePanel" class="hidden mt-4 rounded-md border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-sm">
+                <div class="text-xs font-semibold text-indigo-950 mb-1">Результат: с хоста Laravel (ICMP + HTTPS по целям выше)</div>
+                <div id="globalProbeBody" class="text-slate-800 space-y-2 font-mono text-xs"></div>
+            </div>
+        </x-admin.card>
+
         <x-admin.card title="Проверка">
             <div class="flex flex-wrap items-center gap-x-6 gap-y-3 mb-4">
                 <label class="inline-flex items-center gap-2 cursor-pointer text-sm text-slate-800">
@@ -57,6 +130,7 @@
                 var pingUrl = @json(route('netcheck.ping'));
                 var payloadUrl = @json(route('netcheck.payload', ['size' => '2mb']));
                 var fleetRunUrl = @json(route('admin.module.server-fleet.report.run'));
+                var classifyUrl = @json($classifyHostUrl ?? '');
                 var btn = document.getElementById('runCheckBtn');
                 var chk = document.getElementById('includeTestSpeed');
                 var st = document.getElementById('checkStatus');
@@ -66,6 +140,8 @@
                 var tbody = document.getElementById('fleetTableBody');
                 var sum = document.getElementById('fleetSummary');
                 var tableCard = document.getElementById('fleetTableCard');
+                var gpPanel = document.getElementById('globalProbePanel');
+                var gpBody = document.getElementById('globalProbeBody');
                 var meta = document.querySelector('meta[name="csrf-token"]');
                 var csrf = meta ? meta.getAttribute('content') : '';
 
@@ -241,13 +317,65 @@
                     return lines.join('\n');
                 }
 
+                function renderGlobalProbes(gp) {
+                    if (!gpBody || !gpPanel) return;
+                    gpBody.innerHTML = '';
+                    if (!gp || typeof gp !== 'object') {
+                        gpPanel.classList.add('hidden');
+                        return;
+                    }
+                    var icmp = gp.icmp_cli_available ? 'ICMP (ping): доступен' : 'ICMP: только HTTPS (ОС/права)';
+                    var div0 = document.createElement('div');
+                    div0.className = 'text-indigo-900/90';
+                    div0.textContent = icmp;
+                    gpBody.appendChild(div0);
+                    if (gp.meta) {
+                        var m = gp.meta;
+                        var dm = document.createElement('div');
+                        dm.className = 'text-indigo-950/90 mt-1';
+                        dm.textContent = 'Целей: панели ' + (m.panels_target_count != null ? m.panels_target_count : '—')
+                            + ', домены ' + (m.our_domains_target_count != null ? m.our_domains_target_count : '—')
+                            + (m.merge_panels_from_db ? ' · +БД панелей' : '')
+                            + (m.merge_app_domain_hosts ? ' · +APP_URL/зеркала' : '');
+                        gpBody.appendChild(dm);
+                    }
+
+                    function section(title, list) {
+                        var h = document.createElement('div');
+                        h.className = 'font-semibold text-slate-800 mt-2';
+                        h.textContent = title;
+                        gpBody.appendChild(h);
+                        if (!list || !list.length) {
+                            var empty = document.createElement('div');
+                            empty.className = 'pl-1 text-slate-500';
+                            empty.textContent = 'нет целей в списке';
+                            gpBody.appendChild(empty);
+                            return;
+                        }
+                        list.forEach(function (row) {
+                            var line = document.createElement('div');
+                            line.className = 'pl-1 border-l-2 border-indigo-200 ml-0.5';
+                            var https = row.https || {};
+                            var ic = row.icmp_ms != null ? ('~' + row.icmp_ms + ' мс') : (row.icmp_error || '—');
+                            line.innerHTML = esc(row.raw || '') + ': ICMP ' + esc(String(ic))
+                                + '; HTTPS ' + cellHttp(https);
+                            gpBody.appendChild(line);
+                        });
+                    }
+                    section('Панели', gp.panel_hosts || []);
+                    section('Наши домены', gp.our_domains || []);
+                    gpPanel.classList.remove('hidden');
+                }
+
                 function renderFleetTables(j) {
                     if (!j.success) {
                         sum.classList.add('hidden');
                         tableCard.classList.add('hidden');
+                        if (gpPanel) gpPanel.classList.add('hidden');
                         return;
                     }
                     var d = j.data || {};
+                    renderGlobalProbes(d.global_probes || null);
                     var s = d.summary || {};
                     sum.innerHTML =
                         kv('Всего', s.total)
@@ -306,6 +434,45 @@
                     tableCard.classList.remove('hidden');
                 }
 
+                var clBtn = document.getElementById('fleetClassifyBtn');
+                var clIn = document.getElementById('fleetClassifyHost');
+                var clOut = document.getElementById('fleetClassifyOut');
+                if (clBtn && clIn && clOut && classifyUrl) {
+                    clBtn.addEventListener('click', async function () {
+                        var v = (clIn.value || '').trim();
+                        if (!v) {
+                            clOut.classList.remove('hidden');
+                            clOut.textContent = 'Укажите IP или домен.';
+                            return;
+                        }
+                        clBtn.disabled = true;
+                        clOut.classList.remove('hidden');
+                        clOut.textContent = 'Запрос…';
+                        try {
+                            var res = await fetch(classifyUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': csrf,
+                                    'Accept': 'application/json',
+                                    'X-Requested-With': 'XMLHttpRequest'
+                                },
+                                body: JSON.stringify({ host: v })
+                            });
+                            var txt = await res.text();
+                            try {
+                                clOut.textContent = JSON.stringify(JSON.parse(txt), null, 2);
+                            } catch (e) {
+                                clOut.textContent = txt || res.status;
+                            }
+                        } catch (err) {
+                            clOut.textContent = String(err.message || err);
+                        } finally {
+                            clBtn.disabled = false;
+                        }
+                    });
+                }
+
                 btn.addEventListener('click', async function () {
                     btn.disabled = true;
                     saveBtn.disabled = true;
@@ -315,6 +482,8 @@
                     tableCard.classList.add('hidden');
                     tbody.innerHTML = '';
                     sum.innerHTML = '';
+                    if (gpBody) gpBody.innerHTML = '';
+                    if (gpPanel) gpPanel.classList.add('hidden');
 
                     function setPhase(msg) {
                         st.textContent = msg;

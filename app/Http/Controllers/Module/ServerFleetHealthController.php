@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
 use App\Models\Server\Server;
+use App\Services\Server\FleetProbeTargetResolver;
+use App\Services\Server\HostVpnWebClassifier;
 use App\Services\Server\ServerFleetProbeService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -24,12 +26,46 @@ class ServerFleetHealthController extends Controller
 
     /**
      * Страница сводной проверки VPS в статусе «Настроен».
+     *
+     * @see FleetProbeTargetResolver цели ICMP/HTTPS (БД панелей + .env + APP_*)
      */
     public function index(): View
     {
+        $resolver = app(FleetProbeTargetResolver::class);
+        $panelHosts = $resolver->mergedPanelHosts();
+        $ourHosts = $resolver->mergedOurDomainHosts();
+
         return view('module.server.health-report', [
             'title' => 'Проверка сети и серверов',
             'pageTitle' => 'Проверка сети и серверов',
+            'fleetReportMeta' => [
+                'panel_targets_count' => count($panelHosts),
+                'our_domains_targets_count' => count($ourHosts),
+                'merge_panels_from_db' => (bool) config('fleet_probe.merge_panels_from_db', true),
+                'merge_app_domain_hosts' => (bool) config('fleet_probe.merge_app_domain_hosts', true),
+                'panel_hosts_preview' => array_slice($panelHosts, 0, 15),
+                'our_hosts_preview' => array_slice($ourHosts, 0, 15),
+            ],
+            'classifyHostUrl' => route('admin.module.server-fleet.classify-host'),
+        ]);
+    }
+
+    /**
+     * Эвристика «веб / VPN» по хосту или IPv4 (без внешних скриптов).
+     */
+    public function classifyHost(Request $request, HostVpnWebClassifier $classifier): JsonResponse
+    {
+        $data = $request->validate([
+            'host' => ['required', 'string', 'max:512'],
+        ]);
+
+        $result = $classifier->classify($data['host']);
+        $ok = (bool) ($result['ok'] ?? false);
+
+        return response()->json([
+            'success' => $ok,
+            'result' => $result,
+            'message' => $ok ? null : ($result['error'] ?? 'Не удалось выполнить классификацию'),
         ]);
     }
 

@@ -1,0 +1,13 @@
+# Подключить в server { ... } заглушки (80 и при необходимости 443), рядом с test-speed:
+#
+#   location = /server-probe-light {
+#       gzip off;
+#       include fastcgi_params;
+#       fastcgi_param SCRIPT_FILENAME /var/www/panel-stub/panel-stub-server-probe-light.sh;
+#       fastcgi_param QUERY_STRING $query_string;
+#       fastcgi_param REQUEST_METHOD $request_method;
+#       fastcgi_pass unix:/run/fcgiwrap.socket;
+#   }
+#
+# Скрипт: deploy/stub-assets/panel-stub-server-probe-light.sh -> исполняемый в /var/www/panel-stub/
+# Токен: общий с /test-speed — файл /var/www/panel-stub/.test-speed-token (если пуст/нет — endpoint открыт).

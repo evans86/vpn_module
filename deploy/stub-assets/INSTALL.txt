@@ -39,3 +39,10 @@
    curl -sI http://IP_СЕРВЕРА/
    curl -k -sI https://IP_СЕРВЕРА/
    curl -O http://IP_СЕРВЕРА/123.rar
+
+7) Лёгкая самодиагностика с VPS (задержки до РФ/CF и др., без полного /test-speed):
+   Скопируйте deploy/stub-assets/panel-stub-server-probe-light.sh в /var/www/panel-stub/, chmod +x.
+   Пример include: deploy/nginx/snippets/panel-stub-server-probe-light.inc.example
+   Тот же файл токена .test-speed-token, что и для /test-speed (если нужна защита).
+
+8) Docker-обёртка только статики 80/443 (проще обновлять каталог stub-assets): deploy/docker-panel-stub/README.md

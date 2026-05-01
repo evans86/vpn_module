@@ -231,6 +231,9 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
                 Route::post('/report/run', [ServerFleetHealthController::class, 'run'])
                     ->middleware('throttle:8,1')
                     ->name('report.run');
+                Route::post('/classify-host', [ServerFleetHealthController::class, 'classifyHost'])
+                    ->middleware('throttle:30,1')
+                    ->name('classify-host');
             });
 
             // Панели

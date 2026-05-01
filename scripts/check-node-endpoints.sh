@@ -7,6 +7,7 @@
 #   ./check-node-endpoints.sh vpnserver.example.org
 #   ./check-node-endpoints.sh -p 8443,9443,2083 vpn1.example.org 31.58.171.215
 #   ./check-node-endpoints.sh -f targets.txt
+#   FLEET_PROBE_PANEL_HOSTS=admin.example.com,app.example.com ./check-node-endpoints.sh -E     # доп. пинги
 #
 # Формат targets.txt — по одному host или host:ports на строку:
 #   212.34.145.128
@@ -29,11 +30,13 @@ usage() {
   echo "  -p LIST   порты через запятую (по умолчанию: $DEFAULT_PORTS)"
   echo "  -f FILE   файл со списком хостов (см. комментарий в начале скрипта)"
   echo "  -t SEC    таймаут TCP в секундах (по умолчанию: $TIMEOUT)"
+  echo "  -E        после проверки целей: ICMP/HTTPS к FLEET_PROBE_PANEL_HOSTS и FLEET_PROBE_OUR_DOMAINS (env, через запятую)"
   echo "  -q        только итог: OK/FAIL без подробностей DNS"
   echo "  -h        эта справка"
 }
 
 QUIET=0
+FLEET_EXTRAS=0
 
 log() {
   [[ "$QUIET" -eq 1 ]] && return
@@ -147,6 +150,10 @@ while [[ $# -gt 0 ]]; do
       QUIET=1
       shift
       ;;
+    -E)
+      FLEET_EXTRAS=1
+      shift
+      ;;
     --)
       shift
       TARGETS+=("$@")
@@ -252,5 +259,83 @@ for raw in "${TARGETS[@]}"; do
     parse_ports "$PORTS"
   fi
 done
+
+ping_one() {
+  local h="$1"
+  if command -v ping >/dev/null 2>&1; then
+    if ping -c 1 -W 2 "$h" >/dev/null 2>&1; then
+      local ms
+      ms=$(ping -c 1 -W 2 "$h" 2>/dev/null | sed -n 's/.*time=\([0-9.]*\).*ms.*/\1/p' | head -1)
+      [[ -n "$ms" ]] && printf '%s' "$ms" && return 0
+    fi
+  fi
+  return 1
+}
+
+https_ms() {
+  local url="$1"
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "curl?"
+    return 1
+  fi
+  curl -gksS -o /dev/null -w '%{time_total}' --connect-timeout 4 -m 18 "$url" 2>/dev/null || echo "fail"
+}
+
+host_from_target() {
+  local t="$1"
+  if [[ "$t" != *"://"* ]]; then
+    t="https://${t}/"
+  fi
+  # убрать путь для извлечения хоста: грубо
+  local x="${t#*://}"
+  x="${x%%/*}"
+  x="${x%%:*}"
+  printf '%s' "$x"
+}
+
+run_fleet_extras() {
+  log ""
+  log "=== FLEET_EXTRAS: панели и домены (env FLEET_PROBE_*) ==="
+  local csv pan dom
+  pan="${FLEET_PROBE_PANEL_HOSTS:-}"
+  dom="${FLEET_PROBE_OUR_DOMAINS:-}"
+  if [[ -z "$pan" && -z "$dom" ]]; then
+    log "  (пусто: задайте FLEET_PROBE_PANEL_HOSTS и/или FLEET_PROBE_OUR_DOMAINS)"
+    return 0
+  fi
+  probe_csv_list() {
+    local title="$1"
+    local list="$2"
+    [[ -z "$list" ]] && return 0
+    log "  -- $title --"
+    IFS=',' read -r -a ARR <<< "$list"
+    local x
+    for x in "${ARR[@]}"; do
+      x="$(echo "$x" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+      [[ -z "$x" ]] && continue
+      local host url
+      host="$(host_from_target "$x")"
+      if [[ "$x" != *"://"* ]]; then
+        url="https://${x}/"
+      else
+        url="$x"
+      fi
+      local pout="" pms="" hms
+      if pms="$(ping_one "$host" 2>/dev/null)"; then
+        pout="${pms} ms"
+      else
+        pout="no/fail"
+      fi
+      hms="$(https_ms "$url")"
+      log "    $x  ping:$pout  https_s:${hms}"
+    done
+  }
+  probe_csv_list "Панели" "$pan"
+  probe_csv_list "Наши домены" "$dom"
+}
+
+if [[ "$FLEET_EXTRAS" -eq 1 ]]; then
+  run_fleet_extras
+fi
 
 exit "$exit_code"
