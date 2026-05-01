@@ -17,7 +17,6 @@ use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use App\Jobs\InstallMarzbanPanelJob;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use Illuminate\Http\JsonResponse;
@@ -158,25 +157,30 @@ class PanelController extends Controller
 
             Cache::put($lockKey, 1, now()->addSeconds(7200));
 
-            app()->terminating(function () use ($serverId, $lockKey) {
-                if (function_exists('set_time_limit')) {
-                    @set_time_limit(0);
-                }
-                app()->call([new InstallMarzbanPanelJob($serverId, $lockKey), 'handle']);
-            });
+            /*
+             * Важно: не запускать длинную установку через app()->terminating() под PHP‑FPM —
+             * ограничения max_execution_time / request_terminate_timeout часто режут процесс
+             * после строки Verifying..., и запись в БД не успевает сохраниться.
+             */
+            $this->launchDetachedMarzbanCliInstall($serverId);
 
-            $this->logger->info('Panel installation deferred until after HTTP response', [
+            $this->logger->info('Panel installation started detached CLI subprocess', [
                 'source' => 'panel',
                 'user_id' => auth()->id(),
                 'server_id' => $serverId,
             ]);
 
+            $logTail = PHP_OS_FAMILY === 'Windows'
+                ? 'storage/logs или вывод процесса'
+                : 'storage/logs/panel-install-server-'.$serverId.'.log';
+
             return redirect()->route('admin.module.panel.index')
                 ->with(
                     'success',
-                    'Установка панели запущена в фоне (обычно 5–20 минут). Запись появится в этом списке после завершения.'
-                    .' Раньше браузер мог показывать Cloudflare «524» из‑за долгого SSH — ответ теперь уходит сразу.'
-                    .' При сбое смотрите логи приложения. Порт из URL панели нужно открыть во внешнем фаерволе хостера.'
+                    'Установка панели запущена в отдельном PHP-процессе (обычно 5–20 минут). После сохранения в БД запись появится в списке.'
+                    .' Лог этого запуска: '.$logTail.' + общие логи Laravel.'
+                    .' Cloudflare ответ уже не ждёт конца SSH.'
+                    .' Порт из URL панели откройте во внешнем фаерволе хостера.'
                 );
 
         } catch (Exception $e) {
@@ -191,6 +195,45 @@ class PanelController extends Controller
             return redirect()->route('admin.module.panel.index')
                 ->withErrors(['msg' => 'Не удалось создать панель: ' . $e->getMessage()]);
         }
+    }
+
+    /**
+     * Запуск `php artisan panel:install-marzban` без ожидания (обход лимитов FPM сессией HTTP).
+     */
+    private function launchDetachedMarzbanCliInstall(int $serverId): void
+    {
+        $php = PHP_BINARY;
+        $artisan = base_path('artisan');
+        $arg = escapeshellarg((string) $serverId);
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            $cmd = sprintf(
+                'start /B "" %s %s panel:install-marzban %s',
+                escapeshellarg($php),
+                escapeshellarg($artisan),
+                $arg
+            );
+            @pclose(@popen($cmd, 'r'));
+
+            Log::info('Detached panel CLI (Windows)', ['server_id' => $serverId, 'cmd_profile' => 'start']);
+
+            return;
+        }
+
+        $log = escapeshellarg(storage_path('logs/panel-install-server-'.$serverId.'.log'));
+
+        exec(sprintf(
+            'nohup %s %s panel:install-marzban %s >> %s 2>&1 &',
+            escapeshellarg($php),
+            escapeshellarg($artisan),
+            $arg,
+            $log
+        ));
+
+        Log::info('Detached panel CLI (Unix)', [
+            'server_id' => $serverId,
+            'log_file' => 'logs/panel-install-server-'.$serverId.'.log',
+        ]);
     }
 
     /**

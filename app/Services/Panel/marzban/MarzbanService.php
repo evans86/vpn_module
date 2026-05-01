@@ -95,6 +95,36 @@ class MarzbanService
     }
 
     /**
+     * Marzban уже развёрнут на ноде, а строки в `panel` нет (прервали FPM/таймаут) —
+     * только проверки и сохранение учётной записи, без reinstall_marzban.sh.
+     *
+     * @throws Exception
+     */
+    public function registerPanelRecordIfInstalled(int $server_id): void
+    {
+        if (Panel::query()->where('server_id', $server_id)->exists()) {
+            throw new RuntimeException('Для server_id='.$server_id.' уже есть строка в таблице panel.');
+        }
+
+        $server = Server::query()->find($server_id);
+        if (! $server instanceof Server) {
+            throw new RuntimeException('Сервер не найден: server_id='.$server_id);
+        }
+
+        if (! $this->checkServerStatus($server)) {
+            throw new RuntimeException('Server is not ready for panel registration');
+        }
+
+        $ssh = $this->connectSshAdapter(ServerFactory::fromEntity($server));
+        $this->verifyAndCreatePanel($ssh, $server);
+
+        Log::info('Panel DB record synced from existing node install', [
+            'server_id' => $server_id,
+            'source' => 'panel',
+        ]);
+    }
+
+    /**
      * Проверка статуса сервера
      *
      * @param Server $server
@@ -241,9 +271,9 @@ class MarzbanService
             // На сервере: Caddy без дублей порта 443/80, фаервол ОС + проверка, что UI реально слушает порт.
             $this->finalizeMarzbanInstallOnHost($ssh);
 
-            Log::info('Panel installation completed successfully', [
+            Log::info('Marzban remote install script + finalize finished; verifying + saving Panel to DB next', [
                 'host' => $host,
-                'source' => 'panel'
+                'source' => 'panel',
             ]);
 
         } catch (Exception $e) {
