@@ -270,9 +270,10 @@ class MarzbanService
             $dockerNotFound = (stripos($startDockerOutput, 'not found') !== false || stripos($startDockerOutput, 'does not exist') !== false);
             if ($dockerNotFound) {
                 $this->waitForAptLock($ssh, 300);
-                $maxInstallAttempts = 2;
+                $maxInstallAttempts = 3;
                 $installStatus = -1;
                 $installOutput = '';
+                $dpkgRepairTried = false;
                 for ($attempt = 1; $attempt <= $maxInstallAttempts; $attempt++) {
                     Log::info('Docker install attempt ' . $attempt . '/' . $maxInstallAttempts, ['source' => 'panel']);
                     $installOutput = $ssh->exec('curl -fsSL https://get.docker.com | sudo sh 2>&1');
@@ -286,6 +287,25 @@ class MarzbanService
                     if ($installStatus === 0) {
                         break;
                     }
+
+                    // Прерванный ранее apt/dpkg не даёт ставить ca-certificates/curl до починки
+                    $dpkgBroken = stripos($installOutput, 'dpkg was interrupted') !== false
+                        || stripos($installOutput, 'dpkg --configure -a') !== false;
+                    if ($dpkgBroken && !$dpkgRepairTried) {
+                        $dpkgRepairTried = true;
+                        Log::warning('Docker install: interrupted dpkg state; running dpkg --configure -a once', ['source' => 'panel']);
+                        $dpkgFix = $ssh->exec('sudo DEBIAN_FRONTEND=noninteractive dpkg --configure -a 2>&1');
+                        Log::info('dpkg --configure -a finished', [
+                            'exit_status' => $ssh->getExitStatus(),
+                            'output_preview' => substr($dpkgFix, -800),
+                            'source' => 'panel',
+                        ]);
+                        $attempt--;
+                        $this->waitForAptLock($ssh, 120);
+
+                        continue;
+                    }
+
                     $isLockError = (stripos($installOutput, 'Could not get lock') !== false
                         || stripos($installOutput, 'Unable to acquire') !== false
                         || stripos($installOutput, 'is another process using it') !== false);
@@ -293,14 +313,19 @@ class MarzbanService
                         Log::warning('Docker install failed due to apt/dpkg lock, waiting 60s and retrying', ['source' => 'panel']);
                         sleep(60);
                         $this->waitForAptLock($ssh, 120);
-                    } else {
-                        break;
+
+                        continue;
                     }
+                    break;
                 }
                 if ($installStatus !== 0) {
+                    $hint = '';
+                    if (stripos($installOutput, 'dpkg was interrupted') !== false || stripos($installOutput, 'dpkg --configure -a') !== false) {
+                        $hint = ' На сервере по SSH выполните: sudo DEBIAN_FRONTEND=noninteractive dpkg --configure -a затем sudo apt-get update && sudo apt-get -y -f install';
+                    }
                     throw new RuntimeException(
-                        'Docker installation failed. Exit code: ' . $installStatus . '. ' .
-                        'Last output: ' . substr($installOutput, -800)
+                        'Docker installation failed. Exit code: ' . $installStatus . '.' . $hint .
+                        ' Last output: ' . substr($installOutput, -800)
                     );
                 }
                 sleep(5);
