@@ -169,6 +169,8 @@ class MarzbanService
             // Скрипт mozaroc дублирует глобальные https_port/http_port: после пары с ${HTTP_PORT}/10087 идут 443/80 —
             // в Caddy побеждают последние, из‑за чего панель не слушает случайный порт и ломается on_demand TLS.
             $ssh->exec('sed -i \'/^[[:space:]]*https_port 443$/d;/^[[:space:]]*http_port 80$/d\' install_marzban.sh 2>&1');
+            // Запасной вариант, если пробелы/табы отличались от ожидания выше:
+            $ssh->exec('sed -i \'/https_port[[:space:]]*443/d;/http_port[[:space:]]*80/d\' install_marzban.sh 2>&1');
             Log::info('Patched install script: removed duplicate Caddy https_port 443 / http_port 80', ['source' => 'panel']);
 
             // Команда 3: Запуск скрипта установки
@@ -234,6 +236,9 @@ class MarzbanService
                 }
             }
 
+            // На сервере: исправить уже записанный Caddyfile и открыть порт ОС (многие хостеры не трогают высокие порты вне панели)
+            $this->finalizeMarzbanInstallOnHost($ssh);
+
             Log::info('Panel installation completed successfully', [
                 'host' => $host,
                 'source' => 'panel'
@@ -248,6 +253,69 @@ class MarzbanService
             ]);
             throw new RuntimeException('Failed to install panel: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * После install_marzban.sh: убрать дубли https_port/http_port в уже созданном Caddyfile, перезапустить Caddy,
+     * открыть TCP-порт UI в iptables (IPv4/IPv6). Внешний фаервол панели хостера по-прежнему нужно проверить вручную.
+     */
+    private function finalizeMarzbanInstallOnHost(SSH2 $ssh): void
+    {
+        $fixCaddy = <<<'BASH'
+set +e
+test -f /etc/caddy/Caddyfile || exit 0
+cp -a /etc/caddy/Caddyfile /etc/caddy/Caddyfile.bak.marzban-panel 2>/dev/null
+sed -i '/^[[:space:]]*https_port 443$/d;/^[[:space:]]*http_port 80$/d' /etc/caddy/Caddyfile
+sed -i '/https_port[[:space:]]*443/d;/http_port[[:space:]]*80/d' /etc/caddy/Caddyfile
+systemctl restart caddy 2>&1
+exit 0
+BASH;
+        $bash = str_replace(["\r\n", "\r"], "\n", $fixCaddy);
+        $b64 = base64_encode($bash);
+        $out = (string) $ssh->exec('printf %s '.var_export($b64, true).' | base64 -d | /bin/bash 2>&1');
+        Log::info('finalizeMarzbanInstallOnHost: Caddyfile fix + restart', [
+            'ssh_exit' => $ssh->getExitStatus(),
+            'output' => Str::limit(trim($out), 800),
+            'source' => 'panel',
+        ]);
+
+        $envContent = (string) $ssh->exec('cat '.self::PANEL_ENV_PATH.' 2>/dev/null || true');
+        $port = null;
+        if (preg_match('#XRAY_SUBSCRIPTION_URL_PREFIX\s*=\s*\"https?://[^\"]+:(\d+)\"#', $envContent, $m)) {
+            $port = (int) $m[1];
+        }
+        if ($port === null || $port < 1 || $port > 65535) {
+            Log::warning('finalizeMarzbanInstallOnHost: could not parse UI port from Marzban .env', [
+                'source' => 'panel',
+            ]);
+
+            return;
+        }
+
+        $openFw = sprintf(
+            <<<'BASH'
+set +e
+PORT=%d
+if command -v iptables >/dev/null 2>&1; then
+  iptables -C INPUT -p tcp --dport "$PORT" -j ACCEPT 2>/dev/null || iptables -I INPUT 1 -p tcp --dport "$PORT" -j ACCEPT
+fi
+if command -v ip6tables >/dev/null 2>&1; then
+  ip6tables -C INPUT -p tcp --dport "$PORT" -j ACCEPT 2>/dev/null || ip6tables -I INPUT 1 -p tcp --dport "$PORT" -j ACCEPT
+fi
+echo "port=$PORT"
+exit 0
+BASH,
+            $port
+        );
+        $b64b = base64_encode(str_replace(["\r\n", "\r"], "\n", $openFw));
+        $outFw = (string) $ssh->exec('printf %s '.var_export($b64b, true).' | base64 -d | /bin/bash 2>&1');
+        Log::info('finalizeMarzbanInstallOnHost: attempted INPUT allow for panel HTTPS port', [
+            'port' => $port,
+            'ssh_exit' => $ssh->getExitStatus(),
+            'output' => Str::limit(trim($outFw), 400),
+            'source' => 'panel',
+            'hint' => 'Если с ПК всё ещё ERR_TIMED_OUT — откройте этот TCP-порт во внешнем фаерволе/Security Group панели VPS.',
+        ]);
     }
 
     /**
