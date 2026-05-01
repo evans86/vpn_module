@@ -1928,7 +1928,14 @@ class MarzbanService
             }
             if ($cur !== null && str_contains($line, '=')) {
                 $parts = explode('=', $line, 2);
-                $sections[$cur][trim($parts[0])] = trim($parts[1] ?? '');
+                $k = trim($parts[0]);
+                $v = trim($parts[1] ?? '');
+                // WireGuard / wgcf: несколько строк Address= или DNS= — не затирать предыдущую.
+                if (isset($sections[$cur][$k]) && $v !== '' && in_array($k, ['Address', 'DNS'], true)) {
+                    $sections[$cur][$k] = $sections[$cur][$k].','.$v;
+                } else {
+                    $sections[$cur][$k] = $v;
+                }
             }
         }
         $iface = $sections['Interface'] ?? null;
