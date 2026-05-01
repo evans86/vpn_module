@@ -143,6 +143,13 @@ class PanelController extends Controller
             ]);
 
             $serverId = (int) $validated['server_id'];
+            $this->logger->info('Panel store validated', [
+                'source' => 'panel',
+                'server_id' => $serverId,
+                'queue' => config('queue.default'),
+                'PHP_BINARY' => PHP_BINARY,
+                'CLI_RESOLVED' => $this->resolvedArtisanPhpBinary(),
+            ]);
             $lockKey = 'marzban_panel_install_lock_'.$serverId;
 
             if (Cache::has($lockKey)) {
@@ -182,8 +189,10 @@ class PanelController extends Controller
                 'popen_windows' => 'Запущен фоновый PHP (Windows).',
                 'symfony_process' => 'Запущен отдельный PHP через proc_open (Symfony Process).',
             ];
-            $queueMsg = 'Установка поставлена в очередь Laravel. Нужен воркер `php artisan queue:work --timeout=7200` '
-                .'(supervisor/cron). В .env `QUEUE_CONNECTION` не должен быть `sync`.';
+            $queueMsg = 'Установка поставлена в очередь Laravel: в мониторе очередей должно быть «В ожидании» ≥ 1 до запуска воркера. '
+                .'Запустите постоянный воркер (SSH/cron/supervisor), для хостингов без pcntl: '
+                .'`php artisan queue:work-safe --timeout=7200 --sleep=5 --tries=1`. '
+                .'Пока воркера нет — задание в таблице `jobs`, панель не создаётся.';
 
             $modeText = (strpos($mode, 'queue_') === 0) ? $queueMsg : ($modeHint[$mode] ?? 'Фоновый запуск.');
 
@@ -217,17 +226,24 @@ class PanelController extends Controller
      */
     private function startMarzbanInstallInBackground(int $serverId): string
     {
+        $asyncQueue = config('queue.default') !== 'sync';
+
+        /*
+         * На php-fpm PHP_BINARY почти всегда указывает на php-fpm, а artisan из фонового Process/exec вылетает.
+         * Если очередь уже НЕ sync — надёжнее сразу поставить задачу в БД и обработать её в queue:work / queue:work-safe.
+         */
         if (PHP_OS_FAMILY === 'Windows') {
             if ($this->isCallablePhpFunction('popen') && $this->isCallablePhpFunction('pclose')) {
                 $this->launchDetachedMarzbanCliInstallWindows($serverId);
 
                 return 'popen_windows';
             }
-            if ($this->tryLaunchInstallViaSymfonyProcess($serverId)) {
-                return 'symfony_process';
-            }
 
-            return $this->dispatchInstallViaQueueOrFail($serverId);
+            return $asyncQueue
+                ? $this->dispatchInstallViaQueueOrFail($serverId)
+                : ($this->tryLaunchInstallViaSymfonyProcess($serverId)
+                    ? 'symfony_process'
+                    : $this->dispatchInstallViaQueueOrFail($serverId));
         }
 
         if ($this->isCallablePhpFunction('exec')) {
@@ -236,11 +252,34 @@ class PanelController extends Controller
             return 'exec_nohup';
         }
 
-        if ($this->tryLaunchInstallViaSymfonyProcess($serverId)) {
-            return 'symfony_process';
+        if ($asyncQueue) {
+            return $this->dispatchInstallViaQueueOrFail($serverId);
         }
 
-        return $this->dispatchInstallViaQueueOrFail($serverId);
+        return $this->tryLaunchInstallViaSymfonyProcess($serverId)
+            ? 'symfony_process'
+            : $this->dispatchInstallViaQueueOrFail($serverId);
+    }
+
+    /**
+     * PHP CLI для вызова `artisan panel:install-marzban` из exec/Process под веб-сервером (php-fpm).
+     */
+    private function resolvedArtisanPhpBinary(): string
+    {
+        $configured = config('services.panel_artisan.php_cli');
+        if (is_string($configured) && $configured !== '') {
+            return $configured;
+        }
+
+        $binary = (string) PHP_BINARY;
+        if ($binary !== '' && stripos(@basename($binary), 'php-fpm') !== false && defined('PHP_BINDIR')) {
+            $try = PHP_BINDIR.'/php';
+            if (@is_executable($try)) {
+                return $try;
+            }
+        }
+
+        return $binary ?: 'php';
     }
 
     private function isCallablePhpFunction(string $name): bool
@@ -272,8 +311,12 @@ class PanelController extends Controller
         }
 
         try {
+            $phpCli = $this->resolvedArtisanPhpBinary();
+
+            Log::info('Panel install Symfony Process CLI', ['php' => $phpCli, 'PHP_BINARY' => PHP_BINARY]);
+
             $process = new Process(
-                [PHP_BINARY, base_path('artisan'), 'panel:install-marzban', (string) $serverId],
+                [$phpCli, base_path('artisan'), 'panel:install-marzban', (string) $serverId],
                 base_path(),
                 null,
                 null,
@@ -312,12 +355,14 @@ class PanelController extends Controller
 
         InstallMarzbanPanelJob::dispatch($serverId);
 
+        Log::info('InstallMarzbanPanelJob dispatched', ['server_id' => $serverId]);
+
         return 'queue_'.(string) config('queue.default');
     }
 
     private function launchDetachedMarzbanCliInstallWindows(int $serverId): void
     {
-        $php = PHP_BINARY;
+        $php = $this->resolvedArtisanPhpBinary();
         $artisan = base_path('artisan');
         $arg = escapeshellarg((string) $serverId);
         $cmd = sprintf(
@@ -333,7 +378,7 @@ class PanelController extends Controller
 
     private function launchDetachedMarzbanCliInstallUnixExec(int $serverId): void
     {
-        $php = PHP_BINARY;
+        $php = $this->resolvedArtisanPhpBinary();
         $artisan = base_path('artisan');
         $arg = escapeshellarg((string) $serverId);
         $log = escapeshellarg(storage_path('logs/panel-install-server-'.$serverId.'.log'));

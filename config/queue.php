@@ -38,7 +38,8 @@ return [
             'driver' => 'database',
             'table' => 'jobs',
             'queue' => 'default',
-            'retry_after' => 90,
+            // Дольше любого нашего долгого job (Marzban install 7200s), иначе воркер «отпускает» задачу слишком рано.
+            'retry_after' => (int) env('DATABASE_QUEUE_RETRY_AFTER', 7260),
         ],
 
         'beanstalkd' => [

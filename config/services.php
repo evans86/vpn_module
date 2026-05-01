@@ -81,4 +81,12 @@ return [
         'secret_key' => env('S3_LOGS_SECRET_KEY'),
         'bucket' => env('S3_LOGS_BUCKET', 's3://logsvpn'),
     ],
+
+    /**
+     * Под php-fpm PHP_BINARY часто указывает на php-fpm*, а artisan нужен именно CLI (обычно в PHP_BINDIR/php).
+     * Укажите полный путь в .env, если авто-детект не находит нужный интерпретатор.
+     */
+    'panel_artisan' => [
+        'php_cli' => env('PHP_CLI_BINARY'),
+    ],
 ];
