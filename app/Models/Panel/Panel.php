@@ -95,6 +95,8 @@ class Panel extends Model
         'warp_socks_port',
         'warp_routing_all',
         'warp_wireguard_snapshot',
+        'warp_bootstrap_dns_ips',
+        'warp_bootstrap_udp53_direct',
     ];
 
     protected $hidden = [
@@ -115,6 +117,7 @@ class Panel extends Model
         'use_tls' => 'boolean',
         'warp_routing_enabled' => 'boolean',
         'warp_routing_all' => 'boolean',
+        'warp_bootstrap_udp53_direct' => 'boolean',
         'warp_socks_port' => 'integer',
         'selection_scope_score' => 'float',
         'selection_scope_computed_at' => 'datetime',

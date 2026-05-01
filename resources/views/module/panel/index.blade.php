@@ -259,6 +259,10 @@
                                                     <form action="{{ route('admin.module.panel.warp-one-click', $panel) }}" method="POST"
                                                           onsubmit="return confirm('Запустить полную автонастройку WARP на {{ optional($panel->server)->ip ?? '—' }}? На сервере нужен доступ root по SSH. Продолжить?');">
                                                         @csrf
+                                                        <div class="space-y-2 mb-3 text-left rounded-lg border border-emerald-100 bg-white/80 px-2.5 py-2">
+                                                            <p class="text-[10px] font-medium text-emerald-900">Bootstrap маршрутизация перед WARP (сохраняется на панель)</p>
+                                                            @include('module.panel.partials.warp-bootstrap-routing-fields', ['panel' => $panel])
+                                                        </div>
                                                         <input type="hidden" name="warp_socks_port" value="{{ (int) ($panel->warp_socks_port ?? config('panel.warp_default_socks_port', 40000)) }}">
                                                         <button type="submit" class="w-full py-3 px-3 text-sm font-semibold rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 border border-emerald-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors">
                                                             Настроить WARP (всё автоматически)
@@ -363,6 +367,10 @@
                                                             <p class="text-[11px] font-medium text-violet-900 mb-2">Если sing-box / WARP на сервере уже стоит — только применить пресет Marzban (+ WARP):</p>
                                                             <form action="{{ route('admin.module.panel.update-config-mixed-warp', $panel) }}" method="POST">
                                                                 @csrf
+                                                                <div class="space-y-2 mb-2 text-left rounded-md border border-violet-200 bg-white/70 px-2 py-2">
+                                                                    <p class="text-[10px] font-medium text-violet-950">Bootstrap перед полным туннелем WARP</p>
+                                                                    @include('module.panel.partials.warp-bootstrap-routing-fields', ['panel' => $panel])
+                                                                </div>
                                                                 <button type="submit"
                                                                         class="w-full py-2 text-xs font-medium rounded-md text-violet-900 bg-white border border-violet-300 hover:bg-violet-100">
                                                                     Только конфигурация «+ WARP» (без SSH‑установки)
@@ -440,6 +448,10 @@
                                                                                        value="{{ old('warp_socks_port', $panel->warp_socks_port) }}"
                                                                                        class="w-full text-xs border border-cyan-200 rounded px-2 py-1.5" placeholder="{{ config('panel.warp_default_socks_port', 40000) }}">
                                                                             </div>
+                                                                        </div>
+                                                                        <div class="rounded-md border border-cyan-100 bg-cyan-50/60 px-2 py-2 space-y-1">
+                                                                            <p class="text-[10px] font-medium text-cyan-950">Bootstrap: <code class="text-[10px]">ip→DIRECT</code> + <code class="text-[10px]">UDP/53</code> до catch-all WARP</p>
+                                                                            @include('module.panel.partials.warp-bootstrap-routing-fields', ['panel' => $panel])
                                                                         </div>
                                                                         <button type="submit" class="w-full text-xs font-medium py-2 rounded-md text-white bg-cyan-600 hover:bg-cyan-700">Сохранить и переприменить</button>
                                                                     </form>

@@ -366,7 +366,7 @@ class PanelController extends Controller
     /**
      * Смешанные inbounds + полный WARP с узким списком DIRECT (как в пресете mixed_warp); включает WARP на панели.
      */
-    public function updateConfigMixedWarp(Panel $panel): RedirectResponse
+    public function updateConfigMixedWarp(Request $request, Panel $panel): RedirectResponse
     {
         if ($panel->panel !== Panel::MARZBAN) {
             return redirect()->route('admin.module.panel.index')
@@ -380,6 +380,8 @@ class PanelController extends Controller
                 'user_id' => auth()->id(),
                 'panel_id' => $panel->id,
             ]);
+
+            $this->persistMarzbanWarpBootstrapRouting($request, $panel);
 
             $panel->warp_routing_enabled = true;
             $panel->warp_routing_all = true;
@@ -425,6 +427,8 @@ class PanelController extends Controller
             'warp_socks_host' => ['nullable', 'string', 'max:64'],
             'warp_socks_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
         ]);
+
+        $this->persistMarzbanWarpBootstrapRouting($request, $panel);
 
         $rawPort = $request->input('warp_socks_port');
         if ($request->has('warp_routing_enabled')) {
@@ -672,6 +676,10 @@ class PanelController extends Controller
         $request->validate([
             'warp_socks_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
         ]);
+
+        $this->persistMarzbanWarpBootstrapRouting($request, $panel);
+        $panel->save();
+
         $raw = $request->input('warp_socks_port');
         $port = ($raw === null || $raw === '')
             ? (int) ($panel->warp_socks_port ?? config('panel.warp_default_socks_port', 40000))
@@ -1606,6 +1614,24 @@ class PanelController extends Controller
             return redirect()->route('admin.module.panel.index')
                 ->with('error', 'Ошибка при удалении панели: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Резолверы DIRECT и UDP/53 до catch-all WARP — из формы карточки панели (см. partial warp-bootstrap-routing-fields).
+     */
+    private function persistMarzbanWarpBootstrapRouting(Request $request, Panel $panel): void
+    {
+        if ($panel->panel !== Panel::MARZBAN || ! $request->boolean('warp_bootstrap_ack')) {
+            return;
+        }
+
+        $request->validate([
+            'warp_bootstrap_dns_ips' => ['nullable', 'string', 'max:4096'],
+        ]);
+
+        $dns = trim((string) $request->input('warp_bootstrap_dns_ips', ''));
+        $panel->warp_bootstrap_dns_ips = ($dns === '') ? null : $dns;
+        $panel->warp_bootstrap_udp53_direct = $request->boolean('warp_bootstrap_udp53_direct');
     }
 
 }

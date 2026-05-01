@@ -470,6 +470,13 @@ return [
     | Подмена endpoint WARP на IP:порт (см. PANEL_WARP_WG_ENDPOINT_IP), если Xray не резолвит engage…
     */
     'warp_wireguard_endpoint_ip' => trim((string) env('PANEL_WARP_WG_ENDPOINT_IP', '')),
+
+    /*
+    | Если в снимке wgcf указан engage.cloudflareclient.com:* и PANEL_WARP_WG_ENDPOINT_IP пуст —
+    | подставлять этот IPv4 при сборке Xray (иначе после «применить» снова домен и handshake часто не идёт).
+    | Пустая строка = не подставлять (оставить hostname как в wgcf).
+    */
+    'warp_wireguard_engage_replace_ipv4' => trim((string) env('PANEL_WARP_WG_ENGAGE_REPLACE_IPV4', '162.159.192.1')),
 ];
 
 

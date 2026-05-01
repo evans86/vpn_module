@@ -1631,6 +1631,33 @@ class MarzbanService
     }
 
     /**
+     * Только когда peer — hostname engage.cloudflareclient.com:* (IPv4 уже не считается).
+     */
+    private function isWireguardWarpEngageHostnameEndpoint(string $endpoint): bool
+    {
+        $endpoint = trim($endpoint);
+        if ($endpoint === '') {
+            return false;
+        }
+        $pos = strrpos($endpoint, ':');
+        if ($pos === false) {
+            return false;
+        }
+        $host = trim(substr($endpoint, 0, $pos));
+        if ($host === '') {
+            return false;
+        }
+        if (str_starts_with($host, '[') && str_ends_with($host, ']')) {
+            return false;
+        }
+        if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return false;
+        }
+
+        return strcasecmp(rtrim($host, '.'), 'engage.cloudflareclient.com') === 0;
+    }
+
+    /**
      * Адреса, которые перед catch-all 0/0→WARP должны идти через DIRECT:
      * публичные DNS, peer Cloudflare WG (handshake по IPv4), опции .env и снимка панели.
      *
@@ -1640,10 +1667,25 @@ class MarzbanService
     {
         $seen = [];
 
-        $combined = array_merge(
-            config('panel.warp_full_routing_dns_direct_ips', []) ?: [],
-            config('panel.warp_full_routing_extra_direct_ips', []) ?: []
-        );
+        $cfgDnsSeed = config('panel.warp_full_routing_dns_direct_ips', []) ?: [];
+        $extras = config('panel.warp_full_routing_extra_direct_ips', []) ?: [];
+        $panelSeed = [];
+        $hasStrongPanelDns = false;
+
+        if ($panel !== null && is_string($panel->warp_bootstrap_dns_ips ?? null)) {
+            $t = trim((string) $panel->warp_bootstrap_dns_ips);
+            if ($t !== '') {
+                foreach (preg_split('/[,\s;]+/', $t, -1, PREG_SPLIT_NO_EMPTY) as $chunk) {
+                    $ip = trim($chunk);
+                    if ($ip !== '' && filter_var($ip, FILTER_VALIDATE_IP)) {
+                        $panelSeed[] = $ip;
+                    }
+                }
+                $hasStrongPanelDns = ($panelSeed !== []);
+            }
+        }
+
+        $combined = $hasStrongPanelDns ? array_merge($panelSeed, $extras) : array_merge($cfgDnsSeed, $extras);
         if ($combined === []) {
             $combined = ['1.1.1.1', '8.8.8.8'];
         }
@@ -1672,6 +1714,19 @@ class MarzbanService
                 if ($h !== null && ! isset($seen[$h])) {
                     $seen[$h] = true;
                 }
+                $engageFb = '';
+                if ($h === null && trim((string) config('panel.warp_wireguard_endpoint_ip', '')) === '') {
+                    $engageFb = trim((string) config('panel.warp_wireguard_engage_replace_ipv4', '162.159.192.1'));
+                }
+                if (
+                    $h === null &&
+                    $engageFb !== '' &&
+                    $this->isWireguardWarpEngageHostnameEndpoint($snap['endpoint']) &&
+                    filter_var($engageFb, FILTER_VALIDATE_IP) &&
+                    ! isset($seen[$engageFb])
+                ) {
+                    $seen[$engageFb] = true;
+                }
             }
         }
 
@@ -1696,7 +1751,7 @@ class MarzbanService
             ];
         }
 
-        if (filter_var(config('panel.warp_full_routing_udp53_direct', true), FILTER_VALIDATE_BOOLEAN)) {
+        if (filter_var($this->panelBootstrapUdp53DirectEnabled($panel), FILTER_VALIDATE_BOOLEAN)) {
             $rules[] = [
                 'type' => 'field',
                 'network' => 'udp',
@@ -1706,6 +1761,15 @@ class MarzbanService
         }
 
         return $rules;
+    }
+
+    private function panelBootstrapUdp53DirectEnabled(?Panel $panel = null): bool
+    {
+        if ($panel !== null) {
+            return (bool) $panel->warp_bootstrap_udp53_direct;
+        }
+
+        return filter_var(config('panel.warp_full_routing_udp53_direct', true), FILTER_VALIDATE_BOOLEAN);
     }
 
     /**
@@ -1965,6 +2029,17 @@ class MarzbanService
                 $port = $em[1];
             }
             $endpoint = $endpointIpOverride.':'.$port;
+        } elseif (
+            $this->isWireguardWarpEngageHostnameEndpoint($endpoint)
+        ) {
+            $engageIp = trim((string) config('panel.warp_wireguard_engage_replace_ipv4', '162.159.192.1'));
+            if ($engageIp !== '' && filter_var($engageIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                $port = '2408';
+                if (preg_match('/:(\d+)\s*$/', $endpoint, $em)) {
+                    $port = $em[1];
+                }
+                $endpoint = $engageIp.':'.$port;
+            }
         }
 
         $settings = [
