@@ -668,10 +668,6 @@ class PanelController extends Controller
             return redirect()->route('admin.module.panel.index')
                 ->with('error', 'Привяжите к панели сервер с SSH (раздел Серверы), иначе установка недоступна.');
         }
-        if ((int) $panel->panel_status !== Panel::PANEL_CONFIGURED) {
-            return redirect()->route('admin.module.panel.index')
-                ->with('error', 'Дождитесь статуса панели «Настроена», затем снова нажмите кнопку WARP.');
-        }
 
         $request->validate([
             'warp_socks_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
@@ -707,8 +703,48 @@ class PanelController extends Controller
 
         return redirect()->route('admin.module.panel.index')
             ->with('success',
-                'Запущена полная настройка WARP в фоне: установка на сервер, импорт ключей и пресет «Смешанный + REALITY с WARP». Обычно 2–5 минут — обновите список панелей. Не закрывайте SSH: нужен root. Если веб-панель Marzban временно недоступна, подождите окончания работы скрипта и проверьте storage/logs/laravel.log.'
+                'Автонастройка с WARP запущена в фоне (2–5 мин). Обновите список панелей; при ошибке смотрите laravel.log.'
             );
+    }
+
+    /**
+     * Повторно отправить текущий пресет на Marzban (после обновления кода панели / шаблонов маршрутизации).
+     */
+    public function reapplyMarzbanConfiguration(Panel $panel): RedirectResponse
+    {
+        if ($panel->panel !== Panel::MARZBAN) {
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Действие доступно только для Marzban.');
+        }
+        if ((int) $panel->panel_status !== Panel::PANEL_CONFIGURED) {
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Панель ещё не в статусе «Настроена» — выберите сценарий «Смешанный» или «С WARP».');
+        }
+
+        try {
+            $this->logger->info('Повторная отправка конфига Marzban', [
+                'source' => 'panel',
+                'action' => 'reapply-marzban-config',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'config_type' => $panel->config_type,
+            ]);
+
+            $strategy = new PanelStrategy($panel->panel);
+            $strategy->reapplyCurrentConfiguration((int) $panel->id);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'Текущий пресет снова отправлен в Marzban.');
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка повторной отправки конфига Marzban', [
+                'source' => 'panel',
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', $e->getMessage());
+        }
     }
 
     /**
