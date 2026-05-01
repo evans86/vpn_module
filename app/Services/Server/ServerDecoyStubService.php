@@ -660,14 +660,19 @@ NGINX;
             throw new RuntimeException('Нет прав записи в /etc/nginx (нужен root): '.Str::limit($mv, 800));
         }
 
+        // Если раньше лежали пустые/битые PEM (не PEM: no start line), nginx -t падал —
+        // не доверяем только наличию файлов, проверяем openssl x509.
         $sslOut = trim((string) $ssh->exec(
-            'if test -f /etc/nginx/ssl/panel-stub.crt && test -f /etc/nginx/ssl/panel-stub.key; then echo ok; else '
+            'CERT=/etc/nginx/ssl/panel-stub.crt KEY=/etc/nginx/ssl/panel-stub.key; '
+            .'if [ -f "$CERT" ] && [ -f "$KEY" ] && openssl x509 -in "$CERT" -noout -subject >/dev/null 2>&1; '
+            .'&& openssl rsa -in "$KEY" -check -noout >/dev/null 2>&1; then echo panel-stub-ssl:ok; '
+            .'else rm -f "$CERT" "$KEY" 2>/dev/null || true; '
             .'openssl req -x509 -nodes -days 3650 -newkey rsa:2048 '
-            .'-keyout /etc/nginx/ssl/panel-stub.key -out /etc/nginx/ssl/panel-stub.crt '
-            .'-subj "/CN=localhost" 2>&1; fi'
+            .'-keyout "$KEY" -out "$CERT" -subj "/CN=localhost" 2>&1 || exit 2; '
+            .'fi'
         ));
-        if ($ssh->getExitStatus() !== 0 && ! str_contains($sslOut, 'writing') && $sslOut !== 'ok') {
-            throw new RuntimeException('openssl: '.Str::limit($sslOut, 800));
+        if ($ssh->getExitStatus() !== 0) {
+            throw new RuntimeException('openssl (panel-stub): '.Str::limit($sslOut, 800));
         }
 
         $this->suppressConflictingVanillaDefaultServer($ssh);
@@ -749,9 +754,12 @@ NGINX;
         }
 
         $ssl = $dc.' exec '.$c.' sh -c '.escapeshellarg(
-            'if test -f /etc/nginx/ssl/panel-stub.crt && test -f /etc/nginx/ssl/panel-stub.key; then exit 0; fi; '
+            'CERT=/etc/nginx/ssl/panel-stub.crt KEY=/etc/nginx/ssl/panel-stub.key; '
+            .'if [ -f "$CERT" ] && [ -f "$KEY" ] && openssl x509 -in "$CERT" -noout -subject >/dev/null 2>&1 '
+            .'&& openssl rsa -in "$KEY" -check -noout >/dev/null 2>&1; then exit 0; fi; '
+            .'rm -f "$CERT" "$KEY" 2>/dev/null || true; '
             .'openssl req -x509 -nodes -days 3650 -newkey rsa:2048 '
-            .'-keyout /etc/nginx/ssl/panel-stub.key -out /etc/nginx/ssl/panel-stub.crt -subj "/CN=localhost"'
+            .'-keyout "$KEY" -out "$CERT" -subj "/CN=localhost"'
         );
         $sslOut = trim((string) $ssh->exec($ssl.' 2>&1'));
         if ($ssh->getExitStatus() !== 0 && ! str_contains($sslOut, 'writing')) {
