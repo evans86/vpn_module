@@ -230,6 +230,22 @@
                                         <!-- WARP: один шаг по умолчанию; пресеты и ручные действия — ниже в «Дополнительно» -->
                                         @if($panel->panel === \App\Models\Panel\Panel::MARZBAN)
                                             @if($panel->server_id && $panel->panel_status === \App\Models\Panel\Panel::PANEL_CONFIGURED)
+                                                @if($panel->config_type === \App\Models\Panel\Panel::CONFIG_TYPE_MIXED_WARP && $panel->warp_routing_enabled)
+                                                    {{-- После успешного one-click конфиг уже mixed_warp + коридор WARP включён — крупную кнопку убираем, чтобы не гонять повторно без необходимости. --}}
+                                                    <div class="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2.5 flex items-start gap-2.5 shadow-sm">
+                                                        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-white text-sm mt-px">
+                                                            <i class="fas fa-check"></i>
+                                                        </span>
+                                                        <div class="min-w-0 space-y-1">
+                                                            <p class="text-xs font-semibold text-emerald-950">Одношаговый WARP уже активен</p>
+                                                            <p class="text-[10px] text-emerald-900 leading-snug">
+                                                                Конфиг: <strong class="font-medium">{{ $panel->config_type_label }}</strong>@if($panel->config_updated_at), обновлён {{ $panel->config_updated_at->format('d.m.Y H:i') }}@endif.
+                                                                SOCKS: порт {{ (int) ($panel->warp_socks_port ?? config('panel.warp_default_socks_port', 40000)) }}.
+                                                                Повторный запуск кнопкой обычно не нужен; переустановка по SSH или смена пресета — в «Дополнительно».
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                @else
                                                 <div class="rounded-xl border-2 border-emerald-300 bg-gradient-to-b from-emerald-50 to-white p-4 shadow-sm space-y-2">
                                                     <div class="flex items-center gap-2">
                                                         <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
@@ -250,6 +266,7 @@
                                                     </form>
                                                     <p class="text-[10px] text-emerald-800/90 leading-snug">После отправки можно закрыть страницу и подождать. Порт SOCKS по умолчанию: {{ (int) config('panel.warp_default_socks_port', 40000) }}. Другой порт — «Дополнительно» → блок WARP (ручная диагностика) → поля SOCKS в свёрнутом подразделе, там же SSH‑установка при необходимости.</p>
                                                 </div>
+                                                @endif
                                             @elseif($panel->server_id === null)
                                                 <p class="text-xs text-amber-800 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                                                     Автонастройка WARP: привяжите к панели сервер в карточке панели.
