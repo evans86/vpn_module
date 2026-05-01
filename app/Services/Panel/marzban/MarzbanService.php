@@ -534,7 +534,6 @@ class MarzbanService
         bool $enableWarpRouting,
         bool $applyMixedWarpFullPreset = false
     ): void {
-    {
         if (function_exists('set_time_limit')) {
             @set_time_limit(0);
         }
