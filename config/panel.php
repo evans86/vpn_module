@@ -373,6 +373,16 @@ return [
     ),
 
     /*
+    | При правиле 0.0.0.0/0 → WARP запросы к резолверу (1.1.1.1:53…) тоже шли через WARP: туннель ещё не готов —
+    | «connect udp …53: no route to host». Эти адреса маршрутизируются в DIRECT до catch-all WARP.
+    */
+    'warp_full_routing_dns_direct_ips' => array_values(
+        array_filter(
+            array_map('trim', explode(',', (string) env('PANEL_WARP_FULL_DNS_DIRECT_IPS', '1.1.1.1,8.8.8.8')))
+        )
+    ),
+
+    /*
     |--------------------------------------------------------------------------
     | Пресет mixed_warp: DIRECT для dest REALITY, остальное — WARP (Gemini и т.д. через WARP).
     | Правила Xray: две группы (как в Marzban) — full:google, затем domain:* для сервисов.

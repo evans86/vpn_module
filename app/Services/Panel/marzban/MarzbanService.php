@@ -1615,6 +1615,32 @@ class MarzbanService
     }
 
     /**
+     * Перед правилом 0.0.0.0/0 → WARP: исходящий DNS на публичные резолверы — DIRECT,
+     * иначе модуль dns гонится в WARP «на холодную» и WireGuard даёт «no route to host».
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function buildWarpFullRoutingDnsDirectRules(): array
+    {
+        $ips = config('panel.warp_full_routing_dns_direct_ips', []);
+        if (! is_array($ips) || $ips === []) {
+            $ips = ['1.1.1.1', '8.8.8.8'];
+        }
+        $ips = array_values(array_unique(array_filter(array_map(static function ($ip) {
+            return is_string($ip) ? trim($ip) : '';
+        }, $ips))));
+        if ($ips === []) {
+            return [];
+        }
+
+        return [[
+            'type' => 'field',
+            'ip' => $ips,
+            'outboundTag' => 'DIRECT',
+        ]];
+    }
+
+    /**
      * Маршрутизация для пресета mixed_warp: DIRECT для dest REALITY + служебных сетей, иначе весь трафик → WARP.
      *
      * @return list<array<string, mixed>>
@@ -1665,6 +1691,9 @@ class MarzbanService
                     'outboundTag' => 'DIRECT',
                 ];
             }
+        }
+        foreach ($this->buildWarpFullRoutingDnsDirectRules() as $r) {
+            $rules[] = $r;
         }
         $rules[] = [
             'type' => 'field',
@@ -1983,6 +2012,9 @@ class MarzbanService
                             'domain' => array_values($bypassGeos),
                             'outboundTag' => 'DIRECT',
                         ];
+                    }
+                    foreach ($this->buildWarpFullRoutingDnsDirectRules() as $r) {
+                        $routingRules[] = $r;
                     }
                     $routingRules[] = [
                         'type' => 'field',
