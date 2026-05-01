@@ -46,6 +46,15 @@ class QueueMonitorController extends Controller
                     ->get(['id', 'uuid', 'queue', 'job_name', 'processed_at']);
             }
             $ts = Cache::get('queue_worker_last_activity_at');
+            if (! $ts) {
+                $hbPath = storage_path('logs/queue-worker-heartbeat.txt');
+                if (is_readable($hbPath)) {
+                    $raw = trim((string) @file_get_contents($hbPath));
+                    if ($raw !== '' && ctype_digit($raw)) {
+                        $ts = (int) $raw;
+                    }
+                }
+            }
             if ($ts) {
                 $workerLastActivityAt = \Carbon\Carbon::createFromTimestamp($ts);
                 $minutesAgo = (int) $workerLastActivityAt->diffInMinutes(now());

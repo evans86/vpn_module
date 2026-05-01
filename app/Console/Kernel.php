@@ -108,6 +108,15 @@ class Kernel extends ConsoleKernel
                 ->withoutOverlapping()
                 ->appendOutputTo(storage_path('logs/panel-selection-scope.log'));
         }
+
+        // Очередь («database», «redis» и т.д.): cron с schedule:run не обрабатывает jobs сам — нужен воркер.
+        // Раз в минуту: обработать всё в очереди и выйти (--stop-when-empty), без долгого демона на shared-хостинге.
+        if (! in_array((string) config('queue.default'), ['sync'], true)) {
+            $schedule->command('queue:work-safe --stop-when-empty --timeout=7200 --sleep=3 --tries=1')
+                ->everyMinute()
+                ->withoutOverlapping(1440)
+                ->appendOutputTo(storage_path('logs/queue-runner.log'));
+        }
     }
 
     /**

@@ -66,14 +66,15 @@ class QueueWorkSafeCommand extends Command
     {
         $this->laravel['events']->listen(\Illuminate\Queue\Events\JobProcessing::class, function ($event) {
             $this->writeStatus($event->job, 'Processing', 'comment');
-            $this->laravel['cache']->put('queue_worker_last_activity_at', now()->timestamp, now()->addMinutes(15));
+            $this->touchWorkerMonitorHeartbeat();
         });
         $this->laravel['events']->listen(\Illuminate\Queue\Events\JobProcessed::class, function ($event) {
             $this->writeStatus($event->job, 'Processed', 'info');
-            $this->laravel['cache']->put('queue_worker_last_activity_at', now()->timestamp, now()->addMinutes(15));
+            $this->touchWorkerMonitorHeartbeat();
         });
         $this->laravel['events']->listen(\Illuminate\Queue\Events\JobFailed::class, function ($event) {
             $this->writeStatus($event->job, 'Failed', 'error');
+            $this->touchWorkerMonitorHeartbeat();
         });
     }
 
@@ -110,5 +111,16 @@ class QueueWorkSafeCommand extends Command
     protected function downForMaintenance(): bool
     {
         return $this->option('force') ? false : $this->laravel->isDownForMaintenance();
+    }
+
+    /**
+     * Монитор в админке читает кэш; при разных пользователях (cron vs php-fpm) виден общий файл в storage.
+     */
+    protected function touchWorkerMonitorHeartbeat(): void
+    {
+        $ts = now()->timestamp;
+        $this->laravel['cache']->put('queue_worker_last_activity_at', $ts, now()->addMinutes(15));
+        $path = storage_path('logs/queue-worker-heartbeat.txt');
+        @file_put_contents($path, (string) $ts, LOCK_EX);
     }
 }
