@@ -527,7 +527,12 @@
                                 include_test_speed: chk.checked
                             })
                         });
-                        var j = await res.json();
+                        var j = {};
+                        try {
+                            j = await res.json();
+                        } catch (parseErr) {
+                            j = {};
+                        }
 
                         var part2 = '';
                         if (j.success) {
@@ -542,11 +547,15 @@
                                 + fleetNote + (d.text_report || '');
                         } else {
                             renderFleetTables({ success: false });
-                            part2 = '\n\n' + '='.repeat(72) + '\n\n=== Узлы VPS ===\n\nОшибка: ' + (j.message != null ? String(j.message) : 'нет ответа');
+                            var fleetErr = (j.message != null && j.message !== '') ? String(j.message) : ('HTTP ' + res.status);
+                            if (res.status === 429 || /too many attempts/i.test(fleetErr)) {
+                                fleetErr = 'Слишком частые запросы (лимит защиты API). Подождите минуту и запустите снова — не жмите кнопку подряд и не держите несколько вкладок с одновременным прогоном.';
+                            }
+                            part2 = '\n\n' + '='.repeat(72) + '\n\n=== Узлы VPS ===\n\nОшибка: ' + fleetErr;
                         }
 
                         ta.value = part1 + part2;
-                        setPhase(j.success ? 'Готово.' : 'Частично готово (ошибка панели).');
+                        setPhase(j.success ? 'Готово.' : (res.status === 429 ? 'Лимит запросов.' : 'Частично готово (ошибка проверки флота).'));
                         saveBtn.disabled = false;
                         copyBtn.disabled = false;
                     } catch (err) {

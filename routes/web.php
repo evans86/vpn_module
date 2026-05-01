@@ -232,7 +232,7 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
             Route::prefix('server-fleet')->name('server-fleet.')->group(function () {
                 Route::get('/report', [ServerFleetHealthController::class, 'index'])->name('report');
                 Route::post('/report/run', [ServerFleetHealthController::class, 'run'])
-                    ->middleware('throttle:8,1')
+                    ->middleware('throttle:120,1')
                     ->name('report.run');
                 Route::post('/classify-host', [ServerFleetHealthController::class, 'classifyHost'])
                     ->middleware('throttle:30,1')
