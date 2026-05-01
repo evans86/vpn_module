@@ -193,9 +193,30 @@ class ServerFleetProbeService
         return $out;
     }
 
+    /**
+     * CLI ping вызывается только через shell_exec; при disable_functions ICMP отключаем целиком.
+     */
+    private function isShellExecAllowed(): bool
+    {
+        if (! function_exists('shell_exec')) {
+            return false;
+        }
+        $disabled = ini_get('disable_functions');
+        if ($disabled === false || trim($disabled) === '') {
+            return true;
+        }
+        foreach (array_map('trim', explode(',', strtolower($disabled))) as $fn) {
+            if ($fn === 'shell_exec') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private function detectIcmpPingCli(): bool
     {
-        if (PHP_OS_FAMILY === 'Windows') {
+        if (PHP_OS_FAMILY === 'Windows' || ! $this->isShellExecAllowed()) {
             return false;
         }
         foreach (['/bin/ping', '/sbin/ping', 'ping'] as $p) {
@@ -262,6 +283,9 @@ class ServerFleetProbeService
      */
     private function icmpPingOnceMs(string $host): array
     {
+        if (! $this->isShellExecAllowed()) {
+            return ['ms' => null, 'error' => 'ICMP недоступен: shell_exec отключён'];
+        }
         if (! $this->isSafeProbeHosttoken($host)) {
             return ['ms' => null, 'error' => 'недопустимое имя хоста'];
         }

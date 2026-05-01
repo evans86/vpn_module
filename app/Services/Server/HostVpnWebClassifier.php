@@ -89,6 +89,14 @@ class HostVpnWebClassifier
             $verdict = 'web';
         }
 
+        if ($verdict === 'vpn') {
+            $verdictLabel = 'Скорее VPN/прокси-нода';
+        } elseif ($verdict === 'web') {
+            $verdictLabel = 'Скорее обычный веб (80/443, типичные заголовки)';
+        } else {
+            $verdictLabel = 'Неоднозначно — смотрите порты и HTTPS';
+        }
+
         return [
             'ok' => true,
             'input' => $trim,
@@ -98,11 +106,7 @@ class HostVpnWebClassifier
             'score_vpn' => $scoreVpn,
             'score_web' => $scoreWeb,
             'verdict' => $verdict,
-            'verdict_label' => match ($verdict) {
-                'vpn' => 'Скорее VPN/прокси-нода',
-                'web' => 'Скорее обычный веб (80/443, типичные заголовки)',
-                default => 'Неоднозначно — смотрите порты и HTTPS',
-            },
+            'verdict_label' => $verdictLabel,
             'https' => $httpsProbe,
         ];
     }
