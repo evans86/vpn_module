@@ -32,6 +32,10 @@ class RouteServiceProvider extends ServiceProvider
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
 
+            // Имя admin.module.panel.reapply-marzban-config — отдельный файл, см. админ-панели Marzban («Переконфигурировать»).
+            Route::middleware('web')
+                ->group(base_path('routes/admin-marzban-panel-reapply.php'));
+
             Route::middleware('config_public')
                 ->group(base_path('routes/config-public.php'));
 
