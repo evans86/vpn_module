@@ -664,7 +664,7 @@ NGINX;
         // не доверяем только наличию файлов, проверяем openssl x509.
         $sslOut = trim((string) $ssh->exec(
             'CERT=/etc/nginx/ssl/panel-stub.crt KEY=/etc/nginx/ssl/panel-stub.key; '
-            .'if [ -f "$CERT" ] && [ -f "$KEY" ] && openssl x509 -in "$CERT" -noout -subject >/dev/null 2>&1; '
+            .'if [ -f "$CERT" ] && [ -f "$KEY" ] && openssl x509 -in "$CERT" -noout -subject >/dev/null 2>&1 '
             .'&& openssl rsa -in "$KEY" -check -noout >/dev/null 2>&1; then echo panel-stub-ssl:ok; '
             .'else rm -f "$CERT" "$KEY" 2>/dev/null || true; '
             .'openssl req -x509 -nodes -days 3650 -newkey rsa:2048 '
@@ -681,9 +681,16 @@ NGINX;
         if ($ssh->getExitStatus() !== 0) {
             throw new RuntimeException('nginx -t: '.Str::limit($nt, 800));
         }
-        $re = trim((string) $ssh->exec('( systemctl reload nginx 2>&1 || service nginx reload 2>&1 )'));
+        $re = trim((string) $ssh->exec(
+            '('
+            .'systemctl reload nginx 2>&1 '
+            .'|| service nginx reload 2>&1 '
+            .'|| systemctl start nginx 2>&1 '
+            .'|| service nginx start 2>&1'
+            .')'
+        ));
         if ($ssh->getExitStatus() !== 0) {
-            throw new RuntimeException('reload nginx: '.Str::limit($re, 800));
+            throw new RuntimeException('reload/start nginx: '.Str::limit($re, 800));
         }
     }
 
