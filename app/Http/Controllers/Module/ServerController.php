@@ -8,6 +8,7 @@ use App\Models\Server\Server;
 use App\Services\Server\ServerStrategy;
 use App\Services\Server\LogUploadService;
 use App\Services\Server\ServerDecoyStubService;
+use App\Services\Server\ServerSpeedtestCliInstaller;
 use App\Services\Cloudflare\CloudflareService;
 use App\Repositories\Panel\PanelRepository;
 use App\Repositories\Server\ServerRepository;
@@ -49,12 +50,18 @@ class ServerController extends Controller
      */
     private ServerDecoyStubService $decoyStubService;
 
+    /**
+     * @var ServerSpeedtestCliInstaller
+     */
+    private ServerSpeedtestCliInstaller $speedtestCliInstaller;
+
     public function __construct(
         ServerRepository $serverRepository,
         DatabaseLogger   $logger,
         LogUploadService $logUploadService,
         PanelRepository $panelRepository,
-        ServerDecoyStubService $decoyStubService
+        ServerDecoyStubService $decoyStubService,
+        ServerSpeedtestCliInstaller $speedtestCliInstaller
     )
     {
         $this->serverRepository = $serverRepository;
@@ -62,6 +69,7 @@ class ServerController extends Controller
         $this->logUploadService = $logUploadService;
         $this->panelRepository = $panelRepository;
         $this->decoyStubService = $decoyStubService;
+        $this->speedtestCliInstaller = $speedtestCliInstaller;
     }
 
     /**
@@ -825,5 +833,95 @@ class ServerController extends Controller
                 'message' => 'Ошибка: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Массовая установка speedtest-cli по SSH (для опционального блока в /test-speed на заглушке).
+     */
+    public function bulkInstallSpeedtestCli(Request $request): JsonResponse
+    {
+        if (function_exists('set_time_limit')) {
+            /** @see ServerSpeedtestCliInstaller таймаут SSH до 900 с на каждый узел */
+            set_time_limit(0);
+        }
+
+        $onlyConfigured = $request->boolean('only_configured', true);
+
+        $q = Server::query()->where('server_status', '!=', Server::SERVER_DELETED);
+        if ($onlyConfigured) {
+            $q->where('server_status', Server::SERVER_CONFIGURED);
+        }
+        $servers = $q->whereNotNull('ip')
+            ->where('ip', '!=', '')
+            ->orderBy('id')
+            ->get();
+
+        $results = [];
+        $ok = 0;
+        $fail = 0;
+        $skipped = 0;
+        $attempted = 0;
+
+        foreach ($servers as $server) {
+            if (empty($server->login) || $server->password === null || $server->password === '') {
+                $skipped++;
+                $results[] = [
+                    'id' => $server->id,
+                    'name' => $server->name,
+                    'success' => false,
+                    'skipped' => true,
+                    'message' => 'Пропуск: нет SSH логина/пароля.',
+                    'output' => '',
+                ];
+
+                continue;
+            }
+
+            $attempted++;
+            $r = $this->speedtestCliInstaller->install($server);
+            if ($r['success']) {
+                $ok++;
+            } else {
+                $fail++;
+            }
+            $results[] = [
+                'id' => $server->id,
+                'name' => $server->name,
+                'success' => $r['success'],
+                'skipped' => false,
+                'message' => $r['message'],
+                'output' => $r['output'] ?? '',
+            ];
+        }
+
+        $allSucceeded = ($attempted === 0 ? true : ($fail === 0));
+        $message = sprintf(
+            'Обработано серверов: %d · попытка установки: %d · успех: %d · ошибок: %d · пропуск (нет SSH): %d.',
+            $servers->count(),
+            $attempted,
+            $ok,
+            $fail,
+            $skipped
+        );
+
+        $this->logger->info('Bulk speedtest-cli install', [
+            'source' => 'server',
+            'user_id' => auth()->id(),
+            'only_configured' => $onlyConfigured,
+            'summary' => compact('ok', 'fail', 'skipped', 'attempted'),
+        ]);
+
+        return response()->json([
+            'success' => $allSucceeded,
+            'message' => $message,
+            'summary' => [
+                'total' => $servers->count(),
+                'attempted' => $attempted,
+                'ok' => $ok,
+                'fail' => $fail,
+                'skipped' => $skipped,
+            ],
+            'results' => $results,
+        ]);
     }
 }

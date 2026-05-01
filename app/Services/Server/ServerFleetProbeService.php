@@ -335,12 +335,20 @@ class ServerFleetProbeService
                 ->get($url);
             $ms = round((microtime(true) - $t0) * 1000, 2);
             $code = $res->status();
+            // Как probeHttpUrl для узлов: успех — 2xx–3xx. 4xx считаем «ответ есть», но не OK (часто корень с 401).
+            $okStrict = $code >= 200 && $code < 400;
+            $error = null;
+            if ($code < 200 || $code >= 500) {
+                $error = 'HTTP '.$code;
+            } elseif ($code >= 400) {
+                $error = 'HTTP '.$code.' (хост отвечает; для корня сайта часто ожидаемо)';
+            }
 
             return [
-                'ok' => $code >= 200 && $code < 500,
+                'ok' => $okStrict,
                 'code' => $code,
                 'ms' => $ms,
-                'error' => $code >= 200 && $code < 500 ? null : ('HTTP '.$code),
+                'error' => $error,
             ];
         } catch (Throwable $e) {
             return ['ok' => false, 'code' => null, 'ms' => null, 'error' => Str::limit($e->getMessage(), 300)];
@@ -516,9 +524,10 @@ class ServerFleetProbeService
     {
         $lines = [];
         $lines[] = 'Сводная проверка VPS — '.now()->format('Y-m-d H:i:s');
-        $lines[] = 'Обработано: '.$summary['total'].' серверов, время выполнения: '.number_format((float) $elapsedMs).' мс.';
+        $lines[] = 'Обработано: '.$summary['total'].' серверов, время выполнения на сервере Laravel: '.number_format((float) $elapsedMs).' мс.';
         $lines[] = $this->buildGlobalProbesTextBlock($globalProbes);
         $lines[] = 'HTTP OK: '.$summary['http_ok'].'  | HTTPS OK: '.$summary['https_ok'].'  | заглушка OK (БД): '.$summary['stub_ok_db'];
+        $lines[] = '(Эти счётчики — только узлы VPS ниже; блок «панели и домены» сверху считается отдельно.)';
         if ($includeTestSpeed) {
             $lines[] = '/test-speed: успех '.$summary['test_speed_ok'].', ошибок '.$summary['test_speed_fail'].', пропуск '.$summary['test_speed_skipped'].'.';
         } else {
@@ -616,9 +625,16 @@ class ServerFleetProbeService
      */
     private function probeLineVerbose(array $p): string
     {
-        $code = isset($p['code']) ? (string) $p['code'] : '?';
+        $ci = isset($p['code']) ? (int) $p['code'] : null;
+        $code = $ci !== null ? (string) $ci : '?';
         $ms = isset($p['ms']) ? (string) $p['ms'].' мс' : '';
-        $st = ($p['ok'] ?? false) ? 'OK' : 'нет';
+        if ($p['ok'] ?? false) {
+            $st = 'OK';
+        } elseif ($ci !== null && $ci >= 400 && $ci < 500) {
+            $st = 'есть ответ';
+        } else {
+            $st = 'нет';
+        }
 
         return $st.' код '.$code.($ms !== '' ? ' ('.$ms.')' : '').(isset($p['error']) && $p['error'] !== null ? ', '.$p['error'] : '');
     }

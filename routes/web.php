@@ -215,6 +215,9 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
                 Route::get('/{server}', [ServerController::class, 'show'])->name('show');
                 Route::post('/', [ServerController::class, 'store'])->name('store');
                 Route::post('/store-manual', [ServerController::class, 'storeManual'])->name('store-manual');
+                Route::post('/bulk-install-speedtest-cli', [ServerController::class, 'bulkInstallSpeedtestCli'])
+                    ->middleware('throttle:12,10')
+                    ->name('bulk-install-speedtest-cli');
                 Route::post('/{server}/setup-dns', [ServerController::class, 'setupDns'])->name('setup-dns');
                 Route::post('/{server}/ping-and-configure', [ServerController::class, 'pingAndConfigure'])->name('ping-and-configure');
                 Route::post('/{server}/reboot', [ServerController::class, 'reboot'])->name('reboot');

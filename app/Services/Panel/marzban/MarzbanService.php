@@ -1430,14 +1430,14 @@ class MarzbanService
         // Если указана панель и у неё есть свои сертификаты - используем их
         if ($panel && $panel->tls_certificate_path && $panel->tls_key_path) {
             // Проверяем, является ли путь локальным (на сервере Laravel) или удаленным (на сервере Marzban)
-            $isLocalPath = str_starts_with($panel->tls_certificate_path, storage_path()) || 
+            $isLocalPath = str_starts_with($panel->tls_certificate_path, storage_path()) ||
                           str_starts_with($panel->tls_certificate_path, base_path());
-            
+
             if ($isLocalPath) {
                 // Для локальных путей проверяем существование файлов
                 $certExists = @file_exists($panel->tls_certificate_path);
                 $keyExists = @file_exists($panel->tls_key_path);
-                
+
                 // Если файлы существуют - используем их
                 if ($certExists && $keyExists) {
                     return [
@@ -1478,7 +1478,7 @@ class MarzbanService
             if ($forceTls && !$panel->use_tls) {
                 $certPaths = $this->getTlsCertificatePaths($panel);
                 // Если сертификаты не найдены, возвращаем none (протокол не будет работать)
-                $isLocalPath = str_starts_with($certPaths['cert'], storage_path()) || 
+                $isLocalPath = str_starts_with($certPaths['cert'], storage_path()) ||
                               str_starts_with($certPaths['cert'], base_path());
                 if ($isLocalPath) {
                     $certExists = @file_exists($certPaths['cert']);
@@ -1488,18 +1488,18 @@ class MarzbanService
                     }
                 }
             }
-            
+
             $certPaths = $this->getTlsCertificatePaths($panel);
-            
+
             // Проверяем, является ли путь локальным или удаленным
-            $isLocalPath = str_starts_with($certPaths['cert'], storage_path()) || 
+            $isLocalPath = str_starts_with($certPaths['cert'], storage_path()) ||
                           str_starts_with($certPaths['cert'], base_path());
-            
+
             if ($isLocalPath) {
                 // Для локальных путей проверяем существование файлов
                 $certExists = @file_exists($certPaths['cert']);
                 $keyExists = @file_exists($certPaths['key']);
-                
+
                 if (!$certExists || !$keyExists) {
                     Log::error('TLS сертификаты не найдены по указанным путям', [
                         'panel_id' => $panel->id,
@@ -1509,14 +1509,14 @@ class MarzbanService
                         'key_exists' => $keyExists,
                         'source' => 'panel'
                     ]);
-                    
+
                     // Возвращаем none вместо TLS, если файлы не найдены
                     return [
                         'security' => 'none'
                     ];
                 }
             }
-            
+
             // Получаем домен из адреса панели для SNI
             $sni = null;
             if ($panel && $panel->panel_adress) {
@@ -1533,7 +1533,7 @@ class MarzbanService
                     $sni = trim($sni, '/');
                 }
             }
-            
+
             $tlsSettings = [
                 'allowInsecure' => false, // false для валидных сертификатов (Let's Encrypt)
                 'minVersion' => '1.2',
@@ -1544,12 +1544,12 @@ class MarzbanService
                     ]
                 ]
             ];
-            
+
             // Добавляем SNI, если домен определен
             if ($sni) {
                 $tlsSettings['serverName'] = $sni;
             }
-            
+
             return [
                 'security' => 'tls',
                 'tlsSettings' => $tlsSettings
@@ -1557,7 +1557,7 @@ class MarzbanService
         }
 
         // По умолчанию используем none для обратной совместимости
-        
+
         return [
             'security' => 'none'
         ];

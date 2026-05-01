@@ -56,6 +56,7 @@
                         <p>Статическая заглушка и nginx: каталог <code class="bg-slate-100 px-1 rounded">deploy/stub-assets</code>, конфиг <code class="bg-slate-100 px-1 rounded">deploy/nginx/panel-stub.default-server.conf</code>.</p>
                         <p>Docker только для статики 80/443: <code class="bg-slate-100 px-1 rounded">deploy/docker-panel-stub/README.md</code> (полный <code>/test-speed</code> по-прежнему удобнее на хостовом nginx + fcgiwrap).</p>
                         <p>Короткая самодиагностика исходящих с VPS: скрипт <code class="bg-slate-100 px-1 rounded">deploy/stub-assets/panel-stub-server-probe-light.sh</code> и пример include <code class="bg-slate-100 px-1 rounded">deploy/nginx/snippets/panel-stub-server-probe-light.inc.example</code> (если включён тот же token-файл, что для <code>/test-speed</code>).</p>
+                        <p class="mt-2">Блок <strong>speedtest</strong> в полном отчёте опционален (пакет <code class="bg-slate-100 px-1 rounded">speedtest-cli</code> в ОС). Массовая установка из админки: <strong>Серверы</strong> → кнопка «speedtest-cli на всех «Настроен»».</p>
                     </div>
                 </details>
                 <div class="flex flex-wrap items-end gap-2 pt-1">
@@ -177,6 +178,22 @@
                         : '<span class="text-rose-700 font-medium">нет</span>';
                 }
 
+                function cellHttpsFleetGlobal(h) {
+                    if (!h) return '—';
+                    var c = h.code != null ? h.code : '—';
+                    var ms = h.ms != null ? (' ' + h.ms + ' мс') : '';
+                    var err = h.error ? (' <span class="text-slate-500">' + esc(h.error) + '</span>') : '';
+                    var b;
+                    if (h.ok) {
+                        b = badge(true);
+                    } else if (h.code != null && h.code >= 400 && h.code < 500) {
+                        b = '<span class="text-amber-700 font-medium">ответ 4xx</span>';
+                    } else {
+                        b = badge(false);
+                    }
+                    return b + ' <span class="text-slate-600">' + c + ms + '</span>' + err;
+                }
+
                 function cellHttp(h) {
                     if (!h) return '—';
                     var c = h.code != null ? h.code : '—';
@@ -278,7 +295,11 @@
                                     lines.push('Провайдер: ' + (g.connection.isp || '—') + ', ASN: ' + (g.connection.asn || '—'));
                                 }
                             } else {
-                                lines.push('GeoIP: ' + (g.message || 'нет данных'));
+                                var gm = g.message || 'нет данных';
+                                if (/cors/i.test(gm) || /free plan/i.test(gm)) {
+                                    gm += ' — типично для бесплатного плана ipwho: браузерный запрос без ключа; на проверку VPS не влияет.';
+                                }
+                                lines.push('GeoIP: ' + gm);
                             }
                         } catch (e) {
                             lines.push('GeoIP (ipwho): ' + e.message);
@@ -358,7 +379,7 @@
                             var https = row.https || {};
                             var ic = row.icmp_ms != null ? ('~' + row.icmp_ms + ' мс') : (row.icmp_error || '—');
                             line.innerHTML = esc(row.raw || '') + ': ICMP ' + esc(String(ic))
-                                + '; HTTPS ' + cellHttp(https);
+                                + '; HTTPS ' + cellHttpsFleetGlobal(https);
                             gpBody.appendChild(line);
                         });
                     }
@@ -513,8 +534,9 @@
                             renderFleetTables(j);
                             var d = j.data || {};
                             var fleetNote = '';
-                            fleetNote += 'Время панели: ' + (d.elapsed_ms != null ? (d.elapsed_ms + ' мс') : '—')
-                                + ' · Серверов: ' + (j.included_count != null ? j.included_count : '—')
+                            fleetNote += 'Время прогона на сервере (Laravel, все узлы + глобальные цели): '
+                                + (d.elapsed_ms != null ? (d.elapsed_ms + ' мс') : '—')
+                                + ' · Узлов VPS: ' + (j.included_count != null ? j.included_count : '—')
                                 + '\n\n';
                             part2 = '\n\n' + '='.repeat(72) + '\n\n=== Узлы VPS (хост панели) ===\n\n'
                                 + fleetNote + (d.text_report || '');

@@ -115,7 +115,15 @@
                         <i class="fas fa-server mr-2"></i>
                         Добавить вручную (без API)
                     </button>
+                    <button type="button" id="bulkInstallSpeedtestCliBtn"
+                            class="inline-flex items-center px-3 py-1.5 border border-amber-400 text-sm font-medium rounded-md shadow-sm text-amber-900 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400"
+                            title="По SSH ставит пакет speedtest-cli на серверы со статусом «Настроен» (нужен sudo или root)">
+                        <i class="fas fa-tachometer-alt mr-2"></i>
+                        speedtest-cli на всех «Настроен»
+                    </button>
                 </div>
+                <pre id="bulkInstallSpeedtestCliOut"
+                     class="hidden mb-4 w-full text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 max-h-72 overflow-auto border border-slate-700"></pre>
                 <!-- Cards Grid -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     @foreach($servers as $server)
@@ -1013,6 +1021,59 @@
                     }
                 });
             }
+
+            $('#bulkInstallSpeedtestCliBtn').on('click', function () {
+                if (!confirm('Установить speedtest-cli по SSH на все серверы со статусом «Настроен»?\n\nНа каждый узел по очереди: apt/dnf/yum/apk (как в ОС). Нужны логин/пароль SSH в карточке и root или sudo без запроса пароля. Может занять несколько минут.')) {
+                    return;
+                }
+                var btn = $(this);
+                var out = document.getElementById('bulkInstallSpeedtestCliOut');
+                btn.prop('disabled', true);
+                if (out) {
+                    out.classList.remove('hidden');
+                    out.textContent = 'Выполняется…';
+                }
+                $.ajax({
+                    url: '{{ route('admin.module.server.bulk-install-speedtest-cli') }}',
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        only_configured: 1
+                    },
+                    success: function (response) {
+                        var lines = [(response.message || '')];
+                        (response.results || []).forEach(function (r) {
+                            var prefix = '#' + r.id + ' ' + (r.name || '');
+                            if (r.skipped) {
+                                lines.push(prefix + ' — пропуск: ' + (r.message || ''));
+                            } else {
+                                lines.push(prefix + ' — ' + (r.success ? 'OK' : 'ошибка') + ': ' + (r.message || ''));
+                            }
+                        });
+                        if (out) {
+                            out.textContent = lines.join('\n');
+                        }
+                        if (response.success) {
+                            toastr.success(response.message || 'Готово');
+                        } else {
+                            toastr.warning(response.message || 'Есть ошибки — см. лог ниже страницы');
+                        }
+                    },
+                    error: function (xhr) {
+                        var msg = 'Запрос не выполнен';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            msg = xhr.responseJSON.message;
+                        }
+                        toastr.error(msg);
+                        if (out) {
+                            out.textContent = msg;
+                        }
+                    },
+                    complete: function () {
+                        btn.prop('disabled', false);
+                    }
+                });
+            });
         </script>
     @endpush
 
