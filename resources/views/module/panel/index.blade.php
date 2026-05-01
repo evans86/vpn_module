@@ -254,18 +254,59 @@
                                                 <p class="text-xs text-amber-800 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                                                     Автонастройка WARP: привяжите к панели сервер в карточке панели.
                                                 </p>
+                                            @elseif(in_array((int) $panel->panel_status, [\App\Models\Panel\Panel::PANEL_CREATED, \App\Models\Panel\Panel::PANEL_ERROR], true))
+                                                {{-- Иначе тупик: статус «Настроена» ставится только после applyConfiguration через API, а пресеты были скрыты при «Создана». --}}
+                                                <div class="rounded-lg border border-indigo-200 bg-gradient-to-b from-indigo-50 to-white p-4 space-y-2 shadow-sm">
+                                                    <div class="flex items-start gap-2">
+                                                        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-indigo-600 text-white text-sm">
+                                                            <i class="fas fa-bolt"></i>
+                                                        </span>
+                                                        <div class="space-y-1">
+                                                            <p class="text-sm font-semibold text-indigo-950">Первое применение конфига в Marzban</p>
+                                                            <p class="text-[11px] text-indigo-900 leading-snug">
+                                                                Пока статус не «Настроена», зелёная кнопка WARP недоступна.
+                                                                Выберите пресет в блоке <strong class="font-semibold">«Дополнительно»</strong> ниже (он открыт по умолчанию) или выполните быстрый вариант — передача конфига <strong class="font-semibold">REALITY</strong> через действие legacy.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <form action="{{ route('admin.module.panel.configure', $panel) }}" method="POST" class="pt-1">
+                                                        @csrf
+                                                        <button type="submit" class="w-full py-2.5 px-3 text-xs font-semibold rounded-md text-white bg-indigo-600 hover:bg-indigo-700 border border-indigo-700 shadow-sm">
+                                                            Быстро: отправить конфиг REALITY → статус «Настроена»
+                                                        </button>
+                                                    </form>
+                                                    <p class="text-[10px] text-indigo-800/90 leading-snug">
+                                                        Если нужен именно стабильный без REALITY — в «Дополнительно» нажмите «Стабильный». После успешного запроса к API Marzban статус станет «Настроена», затем можно «Настроить WARP».
+                                                    </p>
+                                                </div>
                                             @elseif($panel->panel_status !== \App\Models\Panel\Panel::PANEL_CONFIGURED)
                                                 <p class="text-xs text-amber-800 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                                                    Кнопка WARP доступна после того, как панель станет со статусом «Настроена» (завершите первичную настройку Marzban).
+                                                    Завершите настройку панели или примените пресет в «Дополнительно», чтобы статус стал «Настроена» и открылась автонастройка WARP.
                                                 </p>
                                             @endif
 
-                                            @if($panel->panel_status === \App\Models\Panel\Panel::PANEL_CONFIGURED)
-                                                <details class="rounded-lg border border-gray-200 bg-gray-50/80">
+                                            @if(in_array((int) $panel->panel_status, [
+                                                \App\Models\Panel\Panel::PANEL_CREATED,
+                                                \App\Models\Panel\Panel::PANEL_ERROR,
+                                                \App\Models\Panel\Panel::PANEL_CONFIGURED,
+                                            ], true))
+                                                <details class="rounded-lg border border-gray-200 bg-gray-50/80"
+                                                    @if(in_array((int) $panel->panel_status, [\App\Models\Panel\Panel::PANEL_CREATED, \App\Models\Panel\Panel::PANEL_ERROR], true)) open @endif>
                                                     <summary class="px-3 py-2.5 text-xs font-semibold text-gray-800 cursor-pointer select-none">
-                                                        Дополнительно: пресеты без WARP, только конфиг «+ WARP», ручная настройка SOCKS
+                                                        Дополнительно:
+                                                        @if((int) $panel->panel_status === \App\Models\Panel\Panel::PANEL_CONFIGURED)
+                                                            пресеты без WARP, только конфиг «+ WARP», ручная настройка SOCKS
+                                                        @else
+                                                            выберите пресет → статус «Настроена», затем WARP
+                                                        @endif
                                                     </summary>
                                                     <div class="px-3 pb-4 pt-0 space-y-4 border-t border-gray-100">
+                                                        @if((int) $panel->panel_status !== \App\Models\Panel\Panel::PANEL_CONFIGURED)
+                                                            <p class="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-2 leading-snug">
+                                                                Статус ещё не «Настроена»: любой успешный пресет отправит конфиг через API и обновит статус.
+                                                                Подпись «Конфиг» на карточке может быть из шаблона — решает то, что реально записано после ответа Marzban.
+                                                            </p>
+                                                        @endif
                                                         <div>
                                                             <p class="text-[11px] text-gray-600 mb-2">Пресеты входящих (без авто‑установки WARP по SSH).</p>
                                                             <div class="grid grid-cols-2 gap-2">
@@ -320,7 +361,14 @@
                                                                     <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200">Выключен</span>
                                                                 @endif
                                                             </div>
-                                                            <p class="text-[11px] text-cyan-800 leading-snug">Раздел для отладки. Для типового сценария используйте зелёную кнопку выше «Настроить WARP».</p>
+                                                            <p class="text-[11px] text-cyan-800 leading-snug">
+                                                                Раздел для отладки.
+                                                                @if((int) $panel->panel_status === \App\Models\Panel\Panel::PANEL_CONFIGURED)
+                                                                    Для типового сценария используйте зелёную кнопку выше «Настроить WARP».
+                                                                @else
+                                                                    Сначала доведите панель до статуса «Настроена», затем появится зелёная кнопка WARP на карточке.
+                                                                @endif
+                                                            </p>
                                                             <div class="flex flex-wrap gap-2">
                                                                 @if($panel->warp_routing_enabled)
                                                                     <form action="{{ route('admin.module.panel.toggle-warp-routing', $panel) }}" method="POST" class="inline">
