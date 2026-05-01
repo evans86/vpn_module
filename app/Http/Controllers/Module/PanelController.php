@@ -630,7 +630,7 @@ class PanelController extends Controller
 
         app()->terminating(function () use ($panelId, $port, $enableWarp) {
             try {
-                app(MarzbanService::class)->installWarpSocksOnNodeAndReapplyConfig($panelId, $port, $enableWarp);
+                app(MarzbanService::class)->installWarpSocksOnNodeAndReapplyConfig($panelId, $port, $enableWarp, false);
             } catch (Exception $e) {
                 Log::error('WARP (фон): непредвиденная ошибка', [
                     'source' => 'panel',
@@ -648,6 +648,59 @@ class PanelController extends Controller
 
         return redirect()->route('admin.module.panel.index')
             ->with('success', 'Установка WARP на ноду запущена в фоне — ответ отправлен сразу, Cloudflare больше не ждёт завершения SSH. Подождите 1–3 минуты и обновите страницу. Итог смотрите в storage/logs/laravel.log; при сбое там будет причина.');
+    }
+
+    /**
+     * Один шаг: SSH‑установка WARP на ноде → импорт wgcf → пресет «Смешанный + REALITY» + полный коридор WARP (mixed_warp).
+     * То же самое без лишних кнопок; выполняется в фоне после ответа HTTP.
+     */
+    public function warpOneClickSetup(Request $request, Panel $panel): RedirectResponse
+    {
+        if ($panel->panel !== Panel::MARZBAN) {
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Автонастройка WARP доступна только для Marzban.');
+        }
+        if (! $panel->server_id) {
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Привяжите к панели сервер с SSH (раздел Серверы), иначе установка недоступна.');
+        }
+        if ((int) $panel->panel_status !== Panel::PANEL_CONFIGURED) {
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Дождитесь статуса панели «Настроена», затем снова нажмите кнопку WARP.');
+        }
+
+        $request->validate([
+            'warp_socks_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+        ]);
+        $raw = $request->input('warp_socks_port');
+        $port = ($raw === null || $raw === '')
+            ? (int) ($panel->warp_socks_port ?? config('panel.warp_default_socks_port', 40000))
+            : (int) $raw;
+
+        $panelId = (int) $panel->id;
+
+        app()->terminating(function () use ($panelId, $port) {
+            try {
+                app(MarzbanService::class)->installWarpSocksOnNodeAndReapplyConfig($panelId, $port, true, true);
+            } catch (\Throwable $e) {
+                Log::error('WARP one-click (фон): ошибка', [
+                    'source' => 'panel',
+                    'panel_id' => $panelId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        });
+
+        $this->logger->info('WARP one-click: фон постановка', [
+            'source' => 'panel',
+            'panel_id' => $panelId,
+            'port' => $port,
+        ]);
+
+        return redirect()->route('admin.module.panel.index')
+            ->with('success',
+                'Запущена полная настройка WARP в фоне: установка на сервер, импорт ключей и пресет «Смешанный + REALITY с WARP». Обычно 2–5 минут — обновите список панелей. Не закрывайте SSH: нужен root. Если веб-панель Marzban временно недоступна, подождите окончания работы скрипта и проверьте storage/logs/laravel.log.'
+            );
     }
 
     /**

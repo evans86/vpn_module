@@ -523,10 +523,17 @@ class MarzbanService
     }
 
     /**
-     * Установка WARP (SOCKS) на ноде, сохранение полей панели и переприменение Xray-конфига.
-     * Предполагается вызов из app()->terminating() после HTTP-ответа, чтобы не держать Cloudflare/браузер минуты.
+     * Установка WARP (SOCKS) на ноде, сохранение полей панели и финальное применение конфига.
+     * Если $applyMixedWarpFullPreset=true — включается полный пресет {@see Panel::CONFIG_TYPE_MIXED_WARP} и маршрутизация WARP-коридора вместо reapply текущего пресета («одной кнопкой» из админки).
+     *
+     * Предполагается вызов из app()->terminating() после HTTP-ответа, чтобы не держать браузер на SSH‑установке.
      */
-    public function installWarpSocksOnNodeAndReapplyConfig(int $panelId, int $port, bool $enableWarpRouting): void
+    public function installWarpSocksOnNodeAndReapplyConfig(
+        int $panelId,
+        int $port,
+        bool $enableWarpRouting,
+        bool $applyMixedWarpFullPreset = false
+    ): void {
     {
         if (function_exists('set_time_limit')) {
             @set_time_limit(0);
@@ -564,11 +571,19 @@ class MarzbanService
             $panel->warp_socks_port = $port;
             if ($enableWarpRouting) {
                 $panel->warp_routing_enabled = true;
-                // Как раньше: узкий маршрут Marzban по умолчанию; «весь трафик через WARP» — только при явной настройке в админке / пресете mixed_warp.
-                $panel->warp_routing_all = false;
+                if ($applyMixedWarpFullPreset) {
+                    $panel->warp_routing_all = true;
+                } else {
+                    $panel->warp_routing_all = false;
+                }
             }
             $panel->save();
-            (new PanelStrategy($panel->panel))->reapplyCurrentConfiguration($panel->id);
+            if ($applyMixedWarpFullPreset && $enableWarpRouting) {
+                $strategy = new PanelStrategy($panel->panel);
+                $strategy->updateConfigurationMixedWarp((int) $panel->id);
+            } else {
+                (new PanelStrategy($panel->panel))->reapplyCurrentConfiguration($panel->id);
+            }
         } catch (\Throwable $e) {
             Log::error('WARP (фон): переприменение конфига Marzban', [
                 'source' => 'panel',

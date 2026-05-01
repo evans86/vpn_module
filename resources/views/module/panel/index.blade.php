@@ -227,133 +227,175 @@
                                             @endif
                                         </div>
 
-                                        <!-- Config Type Buttons -->
-                                        <div class="grid grid-cols-2 gap-2">
-                                            <form action="{{ route('admin.module.panel.update-config-stable', $panel) }}" method="POST" class="min-w-0">
-                                                @csrf
-                                                <button type="submit" 
-                                                        class="w-full min-h-[3.25rem] flex flex-col items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors
-                                                        {{ $panel->config_type === 'stable' ? 'ring-2 ring-blue-500 shadow-sm' : '' }}"
-                                                        title="Стабильный конфиг (без REALITY)">
-                                                    <i class="fas fa-shield-alt text-sm shrink-0"></i>
-                                                    <span class="leading-tight text-center break-words">Стабильный</span>
-                                                </button>
-                                            </form>
-                                            <form action="{{ route('admin.module.panel.update-config-reality', $panel) }}" method="POST" class="min-w-0">
-                                                @csrf
-                                                <button type="submit" 
-                                                        class="w-full min-h-[3.25rem] flex flex-col items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 transition-colors
-                                                        {{ $panel->config_type === 'reality' ? 'ring-2 ring-green-500 shadow-sm' : '' }}"
-                                                        title="Конфиг с REALITY - все протоколы">
-                                                    <i class="fas fa-rocket text-sm shrink-0"></i>
-                                                    <span class="leading-tight text-center break-words">REALITY</span>
-                                                </button>
-                                            </form>
-                                            <form action="{{ route('admin.module.panel.update-config-mixed-warp', $panel) }}" method="POST" class="min-w-0">
-                                                @csrf
-                                                <button type="submit" 
-                                                        class="w-full min-h-[3.25rem] flex flex-col items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-md text-violet-800 bg-violet-50 hover:bg-violet-100 border border-violet-200 transition-colors
-                                                        {{ $panel->config_type === 'mixed_warp' ? 'ring-2 ring-violet-500 shadow-sm' : '' }}"
-                                                        title="SS + Trojan + 3 REALITY + полный WARP; DIRECT только для dest REALITY и списка в config, Gemini через WARP">
-                                                    <i class="fas fa-bolt text-sm shrink-0"></i>
-                                                    <span class="leading-tight text-center break-words">+ WARP<br>(пресет)</span>
-                                                </button>
-                                            </form>
-                                            <form action="{{ route('admin.module.panel.update-config-mixed', $panel) }}" method="POST" class="min-w-0">
-                                                @csrf
-                                                <button type="submit" 
-                                                        class="w-full min-h-[3.25rem] flex flex-col items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-md text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors
-                                                        {{ $panel->config_type === 'mixed' ? 'ring-2 ring-amber-500 shadow-sm' : '' }}"
-                                                        title="SS + Trojan + 3 VLESS REALITY">
-                                                    <i class="fas fa-layer-group text-sm shrink-0"></i>
-                                                    <span class="leading-tight text-center break-words">Смешанный</span>
-                                                </button>
-                                            </form>
-                                        </div>
-
+                                        <!-- WARP: один шаг по умолчанию; пресеты и ручные действия — ниже в «Дополнительно» -->
                                         @if($panel->panel === \App\Models\Panel\Panel::MARZBAN)
-                                            <div class="border border-cyan-200 bg-cyan-50/80 rounded-lg p-3 space-y-2">
-                                                <div class="flex flex-wrap items-center gap-2">
-                                                    <span class="text-xs font-semibold text-cyan-900">WARP</span>
-                                                    @if($panel->warp_routing_enabled)
-                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-900 border border-emerald-200" title="Трафик панели через WARP (SOCKS/WireGuard)">Включён</span>
-                                                    @else
-                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200" title="Без WARP">Выключен</span>
-                                                    @endif
+                                            @if($panel->server_id && $panel->panel_status === \App\Models\Panel\Panel::PANEL_CONFIGURED)
+                                                <div class="rounded-xl border-2 border-emerald-300 bg-gradient-to-b from-emerald-50 to-white p-4 shadow-sm space-y-2">
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
+                                                            <i class="fas fa-magic"></i>
+                                                        </span>
+                                                        <div>
+                                                            <p class="text-sm font-semibold text-emerald-950">WARP за один шаг</p>
+                                                            <p class="text-[11px] text-emerald-900 leading-snug">По SSH (root): sing-box/wgcf → импорт ключей в панель → пресет <strong>Смешанный + REALITY с WARP</strong> для рабочих клиентских линков. Длительность обычно 2–5 минут.</p>
+                                                        </div>
+                                                    </div>
+                                                    <form action="{{ route('admin.module.panel.warp-one-click', $panel) }}" method="POST"
+                                                          onsubmit="return confirm('Запустить полную автонастройку WARP на {{ optional($panel->server)->ip ?? '—' }}? На сервере нужен доступ root по SSH. Продолжить?');">
+                                                        @csrf
+                                                        <input type="hidden" name="warp_socks_port" value="{{ (int) ($panel->warp_socks_port ?? config('panel.warp_default_socks_port', 40000)) }}">
+                                                        <button type="submit" class="w-full py-3 px-3 text-sm font-semibold rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 border border-emerald-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors">
+                                                            Настроить WARP (всё автоматически)
+                                                        </button>
+                                                    </form>
+                                                    <p class="text-[10px] text-emerald-800/90 leading-snug">После отправки можно закрыть страницу и подождать. Порт SOCKS по умолчанию: {{ (int) config('panel.warp_default_socks_port', 40000) }}. Другой порт — «Дополнительно» → блок WARP (ручная диагностика) → поля SOCKS в свёрнутом подразделе, там же SSH‑установка при необходимости.</p>
                                                 </div>
-                                                <p class="text-[11px] text-cyan-800 leading-snug">Нужен, если внешний трафик Xray (например, под Gemini) должен выходить через Cloudflare. Панель Marzban без WARP тоже работает.</p>
-                                                <div class="flex flex-wrap gap-2">
-                                                    @if($panel->warp_routing_enabled)
-                                                        <form action="{{ route('admin.module.panel.toggle-warp-routing', $panel) }}" method="POST" class="inline">
-                                                            @csrf
-                                                            <input type="hidden" name="warp_on" value="0">
-                                                            <button type="submit" class="inline-flex items-center justify-center px-2.5 py-1.5 text-[11px] font-medium rounded-md text-slate-800 bg-white border border-slate-300 hover:bg-slate-50">Отключить WARP</button>
-                                                        </form>
-                                                    @else
-                                                        <form action="{{ route('admin.module.panel.toggle-warp-routing', $panel) }}" method="POST" class="inline">
-                                                            @csrf
-                                                            <input type="hidden" name="warp_on" value="1">
-                                                            <button type="submit" class="inline-flex items-center justify-center px-2.5 py-1.5 text-[11px] font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700">Включить WARP</button>
-                                                        </form>
-                                                    @endif
-                                                    @if($panel->server_id)
-                                                        <form action="{{ route('admin.module.panel.check-warp-socks', $panel) }}" method="POST" class="inline">
-                                                            @csrf
-                                                            <button type="submit" class="inline-flex items-center justify-center px-2.5 py-1.5 text-[11px] font-medium rounded-md text-cyan-900 bg-cyan-100 border border-cyan-300 hover:bg-cyan-200">Проверить</button>
-                                                        </form>
-                                                        <form action="{{ route('admin.module.panel.import-warp-wireguard-snapshot', $panel) }}" method="POST" class="inline" onsubmit="return confirm('Считать wgcf с ноды в панель?');">
-                                                            @csrf
-                                                            <button type="submit" class="inline-flex items-center justify-center px-2.5 py-1.5 text-[11px] font-medium rounded-md text-slate-800 bg-white border border-slate-300 hover:bg-slate-50">wgcf → панель</button>
-                                                        </form>
-                                                    @endif
-                                                </div>
-                                                <details class="mt-1 rounded border border-cyan-200/80 bg-white/60" id="warpDetails{{ (int) $panel->id }}">
-                                                    <summary class="px-2 py-2 text-[11px] font-medium text-cyan-900 cursor-pointer select-none list-none">
-                                                        <span class="inline-flex items-center gap-1"><i class="fas fa-sliders-h text-cyan-600 text-[10px]"></i> Адрес SOCKS, узкий режим, установка</span>
+                                            @elseif($panel->server_id === null)
+                                                <p class="text-xs text-amber-800 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                                                    Автонастройка WARP: привяжите к панели сервер в карточке панели.
+                                                </p>
+                                            @elseif($panel->panel_status !== \App\Models\Panel\Panel::PANEL_CONFIGURED)
+                                                <p class="text-xs text-amber-800 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                                                    Кнопка WARP доступна после того, как панель станет со статусом «Настроена» (завершите первичную настройку Marzban).
+                                                </p>
+                                            @endif
+
+                                            @if($panel->panel_status === \App\Models\Panel\Panel::PANEL_CONFIGURED)
+                                                <details class="rounded-lg border border-gray-200 bg-gray-50/80">
+                                                    <summary class="px-3 py-2.5 text-xs font-semibold text-gray-800 cursor-pointer select-none">
+                                                        Дополнительно: пресеты без WARP, только конфиг «+ WARP», ручная настройка SOCKS
                                                     </summary>
-                                                    <div class="px-2 pb-3 pt-0 space-y-2 border-t border-cyan-100">
-                                                        <p class="text-[10px] text-cyan-800 leading-snug pt-2">
-                                                            По умолчанию весь внешний трафик идёт в WARP; узкий режим — только отдельные сервисы. Исходящий протокол (SOCKS/WireGuard): в приложении (auto) — см. <a href="https://marzban-docs.sm1ky.com/tutorials/cloudflare-warp/" class="text-cyan-700 underline" target="_blank" rel="noopener">доку Marzban</a>.
-                                                        </p>
-                                                        <form action="{{ route('admin.module.panel.update-warp-routing', $panel) }}" method="POST" class="space-y-2">
-                                                            @csrf
-                                                            <input type="hidden" name="warp_routing_touched" value="1">
-                                                            <input type="hidden" name="warp_routing_enabled" value="{{ $panel->warp_routing_enabled ? 1 : 0 }}">
-                                                            <label class="flex items-start gap-2 text-[11px] text-cyan-900 cursor-pointer">
-                                                                <input type="checkbox" name="warp_selective" value="1" class="rounded mt-0.5"
-                                                                       @checked((bool) old('warp_selective', ! (bool) ($panel->warp_routing_all ?? true)))>
-                                                                <span>Узкий маршрут (не весь трафик через WARP — списки в <code class="text-[10px] bg-cyan-50 px-0.5 rounded">config/vpn.php</code>)</span>
-                                                            </label>
-                                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                                <div>
-                                                                    <label class="block text-[10px] text-cyan-800 mb-0.5">SOCKS хост</label>
-                                                                    <input type="text" name="warp_socks_host" value="{{ old('warp_socks_host', $panel->warp_socks_host ?? config('panel.warp_default_socks_host', '172.17.0.1')) }}"
-                                                                           class="w-full text-xs border border-cyan-200 rounded px-2 py-1.5" placeholder="{{ config('panel.warp_default_socks_host', '172.17.0.1') }}">
-                                                                </div>
-                                                                <div>
-                                                                    <label class="block text-[10px] text-cyan-800 mb-0.5">Порт (пусто = {{ config('panel.warp_default_socks_port', 40000) }})</label>
-                                                                    <input type="number" name="warp_socks_port" id="marzban-warp-socks-port-{{ (int) $panel->id }}" min="1" max="65535"
-                                                                           value="{{ old('warp_socks_port', $panel->warp_socks_port) }}"
-                                                                           class="w-full text-xs border border-cyan-200 rounded px-2 py-1.5" placeholder="{{ config('panel.warp_default_socks_port', 40000) }}">
-                                                                </div>
+                                                    <div class="px-3 pb-4 pt-0 space-y-4 border-t border-gray-100">
+                                                        <div>
+                                                            <p class="text-[11px] text-gray-600 mb-2">Пресеты входящих (без авто‑установки WARP по SSH).</p>
+                                                            <div class="grid grid-cols-2 gap-2">
+                                                                <form action="{{ route('admin.module.panel.update-config-stable', $panel) }}" method="POST" class="min-w-0">
+                                                                    @csrf
+                                                                    <button type="submit"
+                                                                            class="w-full min-h-[3.25rem] flex flex-col items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors
+                                                                        {{ $panel->config_type === 'stable' ? 'ring-2 ring-blue-500 shadow-sm' : '' }}"
+                                                                            title="Стабильный конфиг (без REALITY)">
+                                                                        <i class="fas fa-shield-alt text-sm shrink-0"></i>
+                                                                        <span class="leading-tight text-center break-words">Стабильный</span>
+                                                                    </button>
+                                                                </form>
+                                                                <form action="{{ route('admin.module.panel.update-config-reality', $panel) }}" method="POST" class="min-w-0">
+                                                                    @csrf
+                                                                    <button type="submit"
+                                                                            class="w-full min-h-[3.25rem] flex flex-col items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 transition-colors
+                                                                        {{ $panel->config_type === 'reality' ? 'ring-2 ring-green-500 shadow-sm' : '' }}"
+                                                                            title="Конфиг с REALITY - все протоколы">
+                                                                        <i class="fas fa-rocket text-sm shrink-0"></i>
+                                                                        <span class="leading-tight text-center break-words">REALITY</span>
+                                                                    </button>
+                                                                </form>
+                                                                <form action="{{ route('admin.module.panel.update-config-mixed', $panel) }}" method="POST" class="min-w-0 col-span-2">
+                                                                    @csrf
+                                                                    <button type="submit"
+                                                                            class="w-full min-h-[3.25rem] flex flex-col items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-md text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors
+                                                                        {{ $panel->config_type === 'mixed' ? 'ring-2 ring-amber-500 shadow-sm' : '' }}"
+                                                                            title="SS + Trojan + 3 VLESS REALITY">
+                                                                        <i class="fas fa-layer-group text-sm shrink-0"></i>
+                                                                        <span class="leading-tight text-center break-words">Смешанный (без WARP)</span>
+                                                                    </button>
+                                                                </form>
                                                             </div>
-                                                            <button type="submit" class="w-full text-xs font-medium py-2 rounded-md text-white bg-cyan-600 hover:bg-cyan-700">Сохранить и переприменить</button>
-                                                        </form>
-                                                        @if($panel->server_id)
-                                                            <form action="{{ route('admin.module.panel.install-warp-socks', $panel) }}" method="POST" class="space-y-2 pt-1 border-t border-cyan-100"
-                                                                  onsubmit="(function(){var p=document.getElementById('marzban-warp-socks-port-{{ (int) $panel->id }}');var d={{ (int) config('panel.warp_default_socks_port', 40000) }};var t=p&&p.value.trim()!==''?p.value.trim():d;document.getElementById('warp-install-socks-port-{{ (int) $panel->id }}').value=t;return true;})(); return confirm('Установка на {{ optional($panel->server)->ip ?? "—" }} по SSH (нужен root). Продолжить?');">
+                                                        </div>
+                                                        <div class="rounded-lg border border-violet-200 bg-violet-50/50 p-3">
+                                                            <p class="text-[11px] font-medium text-violet-900 mb-2">Если sing-box / WARP на сервере уже стоит — только применить пресет Marzban (+ WARP):</p>
+                                                            <form action="{{ route('admin.module.panel.update-config-mixed-warp', $panel) }}" method="POST">
                                                                 @csrf
-                                                                <input type="hidden" name="warp_socks_port" id="warp-install-socks-port-{{ (int) $panel->id }}" value="{{ (int) ($panel->warp_socks_port ?? config('panel.warp_default_socks_port', 40000)) }}">
-                                                                <input type="hidden" name="enable_warp_routing" value="1">
-                                                                <button type="submit" class="w-full text-xs font-medium py-2 rounded-md text-cyan-900 bg-cyan-100 hover:bg-cyan-200 border border-cyan-300">Установить WARP (SOCKS) на сервер</button>
-                                                                <p class="text-[10px] text-cyan-700">Порт — из поля выше. После установки WARP будет включён (полный туннель).</p>
+                                                                <button type="submit"
+                                                                        class="w-full py-2 text-xs font-medium rounded-md text-violet-900 bg-white border border-violet-300 hover:bg-violet-100">
+                                                                    Только конфигурация «+ WARP» (без SSH‑установки)
+                                                                </button>
                                                             </form>
-                                                        @else
-                                                            <p class="text-[10px] text-amber-800 pt-1">Для автоустановки привяжите к панели сервер с SSH.</p>
-                                                        @endif
+                                                        </div>
+                                                        <div class="border border-cyan-200 bg-cyan-50/80 rounded-lg p-3 space-y-2">
+                                                            <div class="flex flex-wrap items-center gap-2">
+                                                                <span class="text-xs font-semibold text-cyan-900">WARP (ручная диагностика)</span>
+                                                                @if($panel->warp_routing_enabled)
+                                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-900 border border-emerald-200">Включён</span>
+                                                                @else
+                                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200">Выключен</span>
+                                                                @endif
+                                                            </div>
+                                                            <p class="text-[11px] text-cyan-800 leading-snug">Раздел для отладки. Для типового сценария используйте зелёную кнопку выше «Настроить WARP».</p>
+                                                            <div class="flex flex-wrap gap-2">
+                                                                @if($panel->warp_routing_enabled)
+                                                                    <form action="{{ route('admin.module.panel.toggle-warp-routing', $panel) }}" method="POST" class="inline">
+                                                                        @csrf
+                                                                        <input type="hidden" name="warp_on" value="0">
+                                                                        <button type="submit" class="inline-flex items-center justify-center px-2.5 py-1.5 text-[11px] font-medium rounded-md text-slate-800 bg-white border border-slate-300 hover:bg-slate-50">Отключить WARP</button>
+                                                                    </form>
+                                                                @else
+                                                                    <form action="{{ route('admin.module.panel.toggle-warp-routing', $panel) }}" method="POST" class="inline">
+                                                                        @csrf
+                                                                        <input type="hidden" name="warp_on" value="1">
+                                                                        <button type="submit" class="inline-flex items-center justify-center px-2.5 py-1.5 text-[11px] font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700">Включить WARP</button>
+                                                                    </form>
+                                                                @endif
+                                                                @if($panel->server_id)
+                                                                    <form action="{{ route('admin.module.panel.check-warp-socks', $panel) }}" method="POST" class="inline">
+                                                                        @csrf
+                                                                        <button type="submit" class="inline-flex items-center justify-center px-2.5 py-1.5 text-[11px] font-medium rounded-md text-cyan-900 bg-cyan-100 border border-cyan-300 hover:bg-cyan-200">Проверить</button>
+                                                                    </form>
+                                                                    <form action="{{ route('admin.module.panel.import-warp-wireguard-snapshot', $panel) }}" method="POST" class="inline" onsubmit="return confirm('Считать wgcf с ноды в панель?');">
+                                                                        @csrf
+                                                                        <button type="submit" class="inline-flex items-center justify-center px-2.5 py-1.5 text-[11px] font-medium rounded-md text-slate-800 bg-white border border-slate-300 hover:bg-slate-50">wgcf → панель</button>
+                                                                    </form>
+                                                                @endif
+                                                            </div>
+                                                            <details class="mt-1 rounded border border-cyan-200/80 bg-white/60" id="warpDetails{{ (int) $panel->id }}">
+                                                                <summary class="px-2 py-2 text-[11px] font-medium text-cyan-900 cursor-pointer select-none list-none">
+                                                                    <span class="inline-flex items-center gap-1"><i class="fas fa-sliders-h text-cyan-600 text-[10px]"></i> Адрес SOCKS, узкий режим, установка по SSH</span>
+                                                                </summary>
+                                                                <div class="px-2 pb-3 pt-0 space-y-2 border-t border-cyan-100">
+                                                                    <p class="text-[10px] text-cyan-800 leading-snug pt-2">
+                                                                        Уже редко нужно после «Настроить WARP». <a href="https://marzban-docs.sm1ky.com/tutorials/cloudflare-warp/" class="text-cyan-700 underline" target="_blank" rel="noopener">Доку Marzban (WARP)</a>.
+                                                                    </p>
+                                                                    <form action="{{ route('admin.module.panel.update-warp-routing', $panel) }}" method="POST" class="space-y-2">
+                                                                        @csrf
+                                                                        <input type="hidden" name="warp_routing_touched" value="1">
+                                                                        <input type="hidden" name="warp_routing_enabled" value="{{ $panel->warp_routing_enabled ? 1 : 0 }}">
+                                                                        <label class="flex items-start gap-2 text-[11px] text-cyan-900 cursor-pointer">
+                                                                            <input type="checkbox" name="warp_selective" value="1" class="rounded mt-0.5"
+                                                                                   @checked((bool) old('warp_selective', ! (bool) ($panel->warp_routing_all ?? true)))>
+                                                                            <span>Узкий маршрут вместо полного через WARP (списки в <code class="text-[10px] bg-cyan-50 px-0.5 rounded">config/vpn.php</code>)</span>
+                                                                        </label>
+                                                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                                            <div>
+                                                                                <label class="block text-[10px] text-cyan-800 mb-0.5">SOCKS хост</label>
+                                                                                <input type="text" name="warp_socks_host" value="{{ old('warp_socks_host', $panel->warp_socks_host ?? config('panel.warp_default_socks_host', '172.17.0.1')) }}"
+                                                                                       class="w-full text-xs border border-cyan-200 rounded px-2 py-1.5" placeholder="{{ config('panel.warp_default_socks_host', '172.17.0.1') }}">
+                                                                            </div>
+                                                                            <div>
+                                                                                <label class="block text-[10px] text-cyan-800 mb-0.5">Порт (пусто = {{ config('panel.warp_default_socks_port', 40000) }})</label>
+                                                                                <input type="number" name="warp_socks_port" id="marzban-warp-socks-port-{{ (int) $panel->id }}" min="1" max="65535"
+                                                                                       value="{{ old('warp_socks_port', $panel->warp_socks_port) }}"
+                                                                                       class="w-full text-xs border border-cyan-200 rounded px-2 py-1.5" placeholder="{{ config('panel.warp_default_socks_port', 40000) }}">
+                                                                            </div>
+                                                                        </div>
+                                                                        <button type="submit" class="w-full text-xs font-medium py-2 rounded-md text-white bg-cyan-600 hover:bg-cyan-700">Сохранить и переприменить</button>
+                                                                    </form>
+                                                                    @if($panel->server_id)
+                                                                        <form action="{{ route('admin.module.panel.install-warp-socks', $panel) }}" method="POST" class="space-y-2 pt-1 border-t border-cyan-100"
+                                                                              onsubmit="(function(){var p=document.getElementById('marzban-warp-socks-port-{{ (int) $panel->id }}');var d={{ (int) config('panel.warp_default_socks_port', 40000) }};var t=p&&p.value.trim()!==''?p.value.trim():d;document.getElementById('warp-install-socks-port-{{ (int) $panel->id }}').value=t;return true;})(); return confirm('Установка на {{ optional($panel->server)->ip ?? "—" }} по SSH (нужен root). Продолжить?');">
+                                                                            @csrf
+                                                                            <input type="hidden" name="warp_socks_port" id="warp-install-socks-port-{{ (int) $panel->id }}" value="{{ (int) ($panel->warp_socks_port ?? config('panel.warp_default_socks_port', 40000)) }}">
+                                                                            <input type="hidden" name="enable_warp_routing" value="1">
+                                                                            <button type="submit" class="w-full text-xs font-medium py-2 rounded-md text-cyan-900 bg-cyan-100 hover:bg-cyan-200 border border-cyan-300">Только установка на сервер (без пресета +WARP)</button>
+                                                                            <p class="text-[10px] text-cyan-700">Не нажимайте, если уже есть зелёная автонастройка — возможен конфликт портов.</p>
+                                                                        </form>
+                                                                    @else
+                                                                        <p class="text-[10px] text-amber-800 pt-1">Для автоустановки привяжите к панели сервер с SSH.</p>
+                                                                    @endif
+                                                                </div>
+                                                            </details>
+                                                        </div>
                                                     </div>
                                                 </details>
-                                            </div>
+                                            @endif
                                         @endif
 
                                         <!-- TLS Actions -->
