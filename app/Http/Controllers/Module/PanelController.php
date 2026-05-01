@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\InstallMarzbanPanelJob;
 use App\Models\Panel\Panel;
 use App\Models\Server\Server;
 use App\Services\Panel\marzban\MarzbanService;
@@ -22,6 +23,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Symfony\Component\Process\Process;
 
 class PanelController extends Controller
 {
@@ -157,29 +159,40 @@ class PanelController extends Controller
 
             Cache::put($lockKey, 1, now()->addSeconds(7200));
 
-            /*
-             * Важно: не запускать длинную установку через app()->terminating() под PHP‑FPM —
-             * ограничения max_execution_time / request_terminate_timeout часто режут процесс
-             * после строки Verifying..., и запись в БД не успевает сохраниться.
-             */
-            $this->launchDetachedMarzbanCliInstall($serverId);
+            try {
+                $mode = $this->startMarzbanInstallInBackground($serverId);
+            } catch (\Throwable $e) {
+                Cache::forget($lockKey);
+                throw $e;
+            }
 
-            $this->logger->info('Panel installation started detached CLI subprocess', [
+            $this->logger->info('Panel installation background start', [
                 'source' => 'panel',
                 'user_id' => auth()->id(),
                 'server_id' => $serverId,
+                'mode' => $mode,
             ]);
 
             $logTail = PHP_OS_FAMILY === 'Windows'
                 ? 'storage/logs или вывод процесса'
                 : 'storage/logs/panel-install-server-'.$serverId.'.log';
 
+            $modeHint = [
+                'exec_nohup' => 'Запущен отдельный PHP через nohup (см. файл лога).',
+                'popen_windows' => 'Запущен фоновый PHP (Windows).',
+                'symfony_process' => 'Запущен отдельный PHP через proc_open (Symfony Process).',
+            ];
+            $queueMsg = 'Установка поставлена в очередь Laravel. Нужен воркер `php artisan queue:work --timeout=7200` '
+                .'(supervisor/cron). В .env `QUEUE_CONNECTION` не должен быть `sync`.';
+
+            $modeText = (strpos($mode, 'queue_') === 0) ? $queueMsg : ($modeHint[$mode] ?? 'Фоновый запуск.');
+
             return redirect()->route('admin.module.panel.index')
                 ->with(
                     'success',
-                    'Установка панели запущена в отдельном PHP-процессе (обычно 5–20 минут). После сохранения в БД запись появится в списке.'
-                    .' Лог этого запуска: '.$logTail.' + общие логи Laravel.'
-                    .' Cloudflare ответ уже не ждёт конца SSH.'
+                    'Установка панели запущена в фоне (обычно 5–20 минут). Запись появится в списке после завершения.'
+                    .' '.$modeText
+                    .' Лог: '.$logTail.' + laravel.log.'
                     .' Порт из URL панели откройте во внешнем фаерволе хостера.'
                 );
 
@@ -198,28 +211,131 @@ class PanelController extends Controller
     }
 
     /**
-     * Запуск `php artisan panel:install-marzban` без ожидания (обход лимитов FPM сессией HTTP).
+     * Фоновая установка: exec → Symfony Process → очередь (если на хостинге отключён exec).
+     *
+     * @return string метка режима для логов
      */
-    private function launchDetachedMarzbanCliInstall(int $serverId): void
+    private function startMarzbanInstallInBackground(int $serverId): string
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            if ($this->isCallablePhpFunction('popen') && $this->isCallablePhpFunction('pclose')) {
+                $this->launchDetachedMarzbanCliInstallWindows($serverId);
+
+                return 'popen_windows';
+            }
+            if ($this->tryLaunchInstallViaSymfonyProcess($serverId)) {
+                return 'symfony_process';
+            }
+
+            return $this->dispatchInstallViaQueueOrFail($serverId);
+        }
+
+        if ($this->isCallablePhpFunction('exec')) {
+            $this->launchDetachedMarzbanCliInstallUnixExec($serverId);
+
+            return 'exec_nohup';
+        }
+
+        if ($this->tryLaunchInstallViaSymfonyProcess($serverId)) {
+            return 'symfony_process';
+        }
+
+        return $this->dispatchInstallViaQueueOrFail($serverId);
+    }
+
+    private function isCallablePhpFunction(string $name): bool
+    {
+        if (! function_exists($name)) {
+            return false;
+        }
+        $ini = strtolower((string) ini_get('disable_functions'));
+        if ($ini === '') {
+            return true;
+        }
+        $needle = strtolower($name);
+        foreach (preg_split('/\s*,\s*/', $ini) as $token) {
+            if ($token === $needle) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function tryLaunchInstallViaSymfonyProcess(int $serverId): bool
+    {
+        if (! class_exists(Process::class)) {
+            return false;
+        }
+        if (! $this->isCallablePhpFunction('proc_open') || ! $this->isCallablePhpFunction('proc_close')) {
+            return false;
+        }
+
+        try {
+            $process = new Process(
+                [PHP_BINARY, base_path('artisan'), 'panel:install-marzban', (string) $serverId],
+                base_path(),
+                null,
+                null,
+                null
+            );
+            $process->setTimeout(null);
+            $process->disableOutput();
+            $process->start();
+
+            Log::info('Panel install: Symfony Process started', ['server_id' => $serverId]);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('Panel install: Symfony Process failed to start', [
+                'server_id' => $serverId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * @throws \RuntimeException
+     */
+    private function dispatchInstallViaQueueOrFail(int $serverId): string
+    {
+        if (config('queue.default') === 'sync') {
+            throw new \RuntimeException(
+                'На хостинге отключён exec() и не удалось запустить фоновый PHP (proc_open). '
+                .'Варианты: 1) убрать exec из disable_functions в php.ini; 2) включить очередь: в .env '
+                .'`QUEUE_CONNECTION=database` (или redis), `php artisan queue:table` + migrate, постоянно '
+                .'запускать `php artisan queue:work --timeout=7200 --tries=1`.'
+            );
+        }
+
+        InstallMarzbanPanelJob::dispatch($serverId);
+
+        return 'queue_'.(string) config('queue.default');
+    }
+
+    private function launchDetachedMarzbanCliInstallWindows(int $serverId): void
     {
         $php = PHP_BINARY;
         $artisan = base_path('artisan');
         $arg = escapeshellarg((string) $serverId);
+        $cmd = sprintf(
+            'start /B "" %s %s panel:install-marzban %s',
+            escapeshellarg($php),
+            escapeshellarg($artisan),
+            $arg
+        );
+        @pclose(@popen($cmd, 'r'));
 
-        if (PHP_OS_FAMILY === 'Windows') {
-            $cmd = sprintf(
-                'start /B "" %s %s panel:install-marzban %s',
-                escapeshellarg($php),
-                escapeshellarg($artisan),
-                $arg
-            );
-            @pclose(@popen($cmd, 'r'));
+        Log::info('Detached panel CLI (Windows)', ['server_id' => $serverId, 'cmd_profile' => 'start']);
+    }
 
-            Log::info('Detached panel CLI (Windows)', ['server_id' => $serverId, 'cmd_profile' => 'start']);
-
-            return;
-        }
-
+    private function launchDetachedMarzbanCliInstallUnixExec(int $serverId): void
+    {
+        $php = PHP_BINARY;
+        $artisan = base_path('artisan');
+        $arg = escapeshellarg((string) $serverId);
         $log = escapeshellarg(storage_path('logs/panel-install-server-'.$serverId.'.log'));
 
         exec(sprintf(
