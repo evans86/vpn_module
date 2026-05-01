@@ -1890,7 +1890,9 @@ class MarzbanService
         $ssh->setTimeout(60);
         try {
             $dir = self::WARP_WGCF_REMOTE_DIR;
-            $cat = "( test -f {$dir}/wgcf-profile.conf && cat {$dir}/wgcf-profile.conf ) || ( test -f {$dir}/wgcf.conf && cat {$dir}/wgcf.conf ) || echo ''";
+            // Сначала profile, затем wgcf.conf — в profile часто один Address (только IPv6),
+            // полный список (две строки Address=) лежит в wgcf.conf; склеиваем оба.
+            $cat = "( cat {$dir}/wgcf-profile.conf 2>/dev/null; cat {$dir}/wgcf.conf 2>/dev/null )";
             $text = trim((string) $ssh->exec($cat.' 2>&1'));
         } finally {
             $ssh->setTimeout($oldTimeout);
@@ -1955,6 +1957,7 @@ class MarzbanService
                 $addresses[] = $a;
             }
         }
+        $addresses = array_values(array_unique($addresses));
         if ($addresses === []) {
             return null;
         }
