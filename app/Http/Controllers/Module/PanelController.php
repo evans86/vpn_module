@@ -17,7 +17,8 @@ use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Jobs\InstallMarzbanPanelJob;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -140,40 +141,45 @@ class PanelController extends Controller
                 ]
             ]);
 
-            // Используем DB::transaction() для автоматического rollback при ошибках
-            DB::transaction(function () use ($validated) {
-                // Получаем сервер для определения типа панели
-                $server = Server::find($validated['server_id']);
-                if (!$server) {
-                    throw new \RuntimeException('Server not found');
+            $serverId = (int) $validated['server_id'];
+            $lockKey = 'marzban_panel_install_lock_'.$serverId;
+
+            if (Cache::has($lockKey)) {
+                return redirect()->route('admin.module.panel.index')
+                    ->with('warning', 'Установка панели для этого сервера уже выполняется. Подождите 10–20 минут и обновите список.');
+            }
+
+            $panelStrategyFactory = new \App\Services\Panel\PanelStrategyFactory();
+            $availablePanelTypes = $panelStrategyFactory->getAvailablePanelTypes();
+
+            if (empty($availablePanelTypes)) {
+                throw new \DomainException('No panel types available');
+            }
+
+            Cache::put($lockKey, 1, now()->addSeconds(7200));
+
+            app()->terminating(function () use ($serverId, $lockKey) {
+                if (function_exists('set_time_limit')) {
+                    @set_time_limit(0);
                 }
-                
-                // Получаем тип панели из запроса или используем первый доступный тип
-                $panelStrategyFactory = new \App\Services\Panel\PanelStrategyFactory();
-                $availablePanelTypes = $panelStrategyFactory->getAvailablePanelTypes();
-                
-                if (empty($availablePanelTypes)) {
-                    throw new \DomainException('No panel types available');
-                }
-                
-                // Используем первый доступный тип панели (в будущем можно добавить выбор в форму)
-                $panelType = $availablePanelTypes[0];
-                
-                // Создаем панель через стратегию
-                $strategy = new PanelStrategy($panelType);
-                $strategy->create($validated['server_id']);
+                app()->call([new InstallMarzbanPanelJob($serverId, $lockKey), 'handle']);
             });
 
-            $this->logger->info('Panel created successfully', [
+            $this->logger->info('Panel installation deferred until after HTTP response', [
                 'source' => 'panel',
                 'user_id' => auth()->id(),
+                'server_id' => $serverId,
             ]);
 
             return redirect()->route('admin.module.panel.index')
-                ->with('success', 'Панель создана и прошла проверку на сервере. Если с вашей сети URL не открывается, добавьте тот же TCP-порт во внешнем фаерволе хостера (как для остальных нод на высоких портах).');
+                ->with(
+                    'success',
+                    'Установка панели запущена в фоне (обычно 5–20 минут). Запись появится в этом списке после завершения.'
+                    .' Раньше браузер мог показывать Cloudflare «524» из‑за долгого SSH — ответ теперь уходит сразу.'
+                    .' При сбое смотрите логи приложения. Порт из URL панели нужно открыть во внешнем фаерволе хостера.'
+                );
 
         } catch (Exception $e) {
-            // Rollback выполняется автоматически в DB::transaction()
             $this->logger->error('Error creating panel', [
                 'source' => 'panel',
                 'error' => $e->getMessage(),
