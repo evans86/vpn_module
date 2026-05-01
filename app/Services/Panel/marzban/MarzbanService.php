@@ -62,8 +62,22 @@ class MarzbanService
 
             $ssh_connect = $this->connectSshAdapter(ServerFactory::fromEntity($server));
 
+            $host = trim((string) $server->host);
+            if ($host === '') {
+                throw new RuntimeException(
+                    'В карточке сервера пустое поле «Хост». Укажите FQDN панели (например hostvds-fi-nl.example.com), как в DNS A-записи — его получает install_marzban.sh.'
+                );
+            }
+            if (strpos($host, '.') === false) {
+                Log::warning('Panel install: server host looks like a short name, not FQDN; TLS/Let\'s Encrypt may fail', [
+                    'server_id' => $server_id,
+                    'host' => $host,
+                    'source' => 'panel',
+                ]);
+            }
+
             // Установка панели
-            $this->installPanel($ssh_connect, $server->host);
+            $this->installPanel($ssh_connect, $host);
 
             // Проверка установки и создание панели
             $this->verifyAndCreatePanel($ssh_connect, $server);
@@ -151,6 +165,11 @@ class MarzbanService
             $patchCmd = "sed -i '/File saved in.*docker-compose.yml/a sed -i '\\''s|gozargah/marzban|ghcr.io/gozargah/marzban|g'\\'' \"\$APP_DIR/docker-compose.yml\"' install_marzban.sh";
             $ssh->exec($patchCmd);
             Log::info('Patched install script to use ghcr.io image', ['source' => 'panel']);
+
+            // Скрипт mozaroc дублирует глобальные https_port/http_port: после пары с ${HTTP_PORT}/10087 идут 443/80 —
+            // в Caddy побеждают последние, из‑за чего панель не слушает случайный порт и ломается on_demand TLS.
+            $ssh->exec('sed -i \'/^[[:space:]]*https_port 443$/d;/^[[:space:]]*http_port 80$/d\' install_marzban.sh 2>&1');
+            Log::info('Patched install script: removed duplicate Caddy https_port 443 / http_port 80', ['source' => 'panel']);
 
             // Команда 3: Запуск скрипта установки
             Log::info('Running installation script', [
