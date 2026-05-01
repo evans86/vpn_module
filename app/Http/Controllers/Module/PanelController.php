@@ -170,7 +170,7 @@ class PanelController extends Controller
             ]);
 
             return redirect()->route('admin.module.panel.index')
-                ->with('success', 'Panel created successfully');
+                ->with('success', 'Панель создана и прошла проверку на сервере. Если с вашей сети URL не открывается, добавьте тот же TCP-порт во внешнем фаерволе хостера (как для остальных нод на высоких портах).');
 
         } catch (Exception $e) {
             // Rollback выполняется автоматически в DB::transaction()
@@ -183,7 +183,7 @@ class PanelController extends Controller
             ]);
 
             return redirect()->route('admin.module.panel.index')
-                ->withErrors(['msg' => 'Error creating panel: ' . $e->getMessage()]);
+                ->withErrors(['msg' => 'Не удалось создать панель: ' . $e->getMessage()]);
         }
     }
 

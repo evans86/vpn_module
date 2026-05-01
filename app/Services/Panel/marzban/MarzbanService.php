@@ -166,6 +166,8 @@ class MarzbanService
             $ssh->exec($patchCmd);
             Log::info('Patched install script to use ghcr.io image', ['source' => 'panel']);
 
+            // Скрипт mozaroc: HTTP_PORT — случайный 50000–65535 (схема хостера / инфраструктуры).
+
             // Скрипт mozaroc дублирует глобальные https_port/http_port: после пары с ${HTTP_PORT}/10087 идут 443/80 —
             // в Caddy побеждают последние, из‑за чего панель не слушает случайный порт и ломается on_demand TLS.
             $ssh->exec('sed -i \'/^[[:space:]]*https_port 443$/d;/^[[:space:]]*http_port 80$/d\' install_marzban.sh 2>&1');
@@ -236,7 +238,7 @@ class MarzbanService
                 }
             }
 
-            // На сервере: исправить уже записанный Caddyfile и открыть порт ОС (многие хостеры не трогают высокие порты вне панели)
+            // На сервере: Caddy без дублей порта 443/80, фаервол ОС + проверка, что UI реально слушает порт.
             $this->finalizeMarzbanInstallOnHost($ssh);
 
             Log::info('Panel installation completed successfully', [
@@ -256,66 +258,193 @@ class MarzbanService
     }
 
     /**
-     * После install_marzban.sh: убрать дубли https_port/http_port в уже созданном Caddyfile, перезапустить Caddy,
-     * открыть TCP-порт UI в iptables (IPv4/IPv6). Внешний фаервол панели хостера по-прежнему нужно проверить вручную.
+     * После install_marzban.sh: убрать дубли https_port 443/http_port 80 в Caddyfile, перезапустить Caddy,
+     * открыть UI-порт (iptables/ip6tables, при необходимости firewalld/ufw), убедиться что сервис активен и порт слушается.
+     *
+     * @throws RuntimeException
      */
     private function finalizeMarzbanInstallOnHost(SSH2 $ssh): void
     {
-        $fixCaddy = <<<'BASH'
-set +e
-test -f /etc/caddy/Caddyfile || exit 0
-cp -a /etc/caddy/Caddyfile /etc/caddy/Caddyfile.bak.marzban-panel 2>/dev/null
-sed -i '/^[[:space:]]*https_port 443$/d;/^[[:space:]]*http_port 80$/d' /etc/caddy/Caddyfile
-sed -i '/https_port[[:space:]]*443/d;/http_port[[:space:]]*80/d' /etc/caddy/Caddyfile
-systemctl restart caddy 2>&1
-exit 0
-BASH;
-        $bash = str_replace(["\r\n", "\r"], "\n", $fixCaddy);
-        $b64 = base64_encode($bash);
-        $out = (string) $ssh->exec('printf %s '.var_export($b64, true).' | base64 -d | /bin/bash 2>&1');
-        Log::info('finalizeMarzbanInstallOnHost: Caddyfile fix + restart', [
-            'ssh_exit' => $ssh->getExitStatus(),
-            'output' => Str::limit(trim($out), 800),
-            'source' => 'panel',
-        ]);
-
         $envContent = (string) $ssh->exec('cat '.self::PANEL_ENV_PATH.' 2>/dev/null || true');
         $port = null;
         if (preg_match('#XRAY_SUBSCRIPTION_URL_PREFIX\s*=\s*\"https?://[^\"]+:(\d+)\"#', $envContent, $m)) {
             $port = (int) $m[1];
         }
         if ($port === null || $port < 1 || $port > 65535) {
-            Log::warning('finalizeMarzbanInstallOnHost: could not parse UI port from Marzban .env', [
-                'source' => 'panel',
-            ]);
-
-            return;
+            throw new RuntimeException(
+                'Не удалось определить порт панели из '.self::PANEL_ENV_PATH.'. Ожидается XRAY_SUBSCRIPTION_URL_PREFIX вида https://FQDN:ПОРТ.'
+            );
         }
 
-        $openFw = sprintf(
-            <<<'BASH'
+        $script = sprintf(
+            <<<'EOS'
 set +e
-PORT=%d
-if command -v iptables >/dev/null 2>&1; then
-  iptables -C INPUT -p tcp --dport "$PORT" -j ACCEPT 2>/dev/null || iptables -I INPUT 1 -p tcp --dport "$PORT" -j ACCEPT
+IPT() { iptables "$@" 2>/dev/null || sudo iptables "$@" 2>/dev/null || true; }
+IP6() { ip6tables "$@" 2>/dev/null || sudo ip6tables "$@" 2>/dev/null || true; }
+SC() { systemctl "$@" 2>/dev/null || sudo systemctl "$@" 2>/dev/null; }
+PORT=%1$d
+
+if test ! -f /etc/caddy/Caddyfile; then
+  echo "MARZBAN_FINALIZE_RESULT=FAIL:no_caddyfile"
+  exit 0
 fi
-if command -v ip6tables >/dev/null 2>&1; then
-  ip6tables -C INPUT -p tcp --dport "$PORT" -j ACCEPT 2>/dev/null || ip6tables -I INPUT 1 -p tcp --dport "$PORT" -j ACCEPT
+
+if touch /etc/caddy/.marzban_write_test 2>/dev/null; then
+  rm -f /etc/caddy/.marzban_write_test 2>/dev/null
+  cp -a /etc/caddy/Caddyfile /etc/caddy/Caddyfile.bak.marzban-panel 2>/dev/null
+  sed -i '/^[[:space:]]*https_port 443$/d;/^[[:space:]]*http_port 80$/d' /etc/caddy/Caddyfile
+  sed -i '/https_port[[:space:]]*443$/d;/http_port[[:space:]]*80$/d' /etc/caddy/Caddyfile
+else
+  sudo cp -a /etc/caddy/Caddyfile /etc/caddy/Caddyfile.bak.marzban-panel 2>/dev/null || true
+  sudo sed -i '/^[[:space:]]*https_port 443$/d;/^[[:space:]]*http_port 80$/d' /etc/caddy/Caddyfile
+  sudo sed -i '/https_port[[:space:]]*443$/d;/http_port[[:space:]]*80$/d' /etc/caddy/Caddyfile
 fi
-echo "port=$PORT"
+
+SC restart caddy
+sleep 2
+
+IPT -C INPUT -p tcp --dport "$PORT" -j ACCEPT 2>/dev/null || IPT -I INPUT 1 -p tcp --dport "$PORT" -j ACCEPT
+IP6 -C INPUT -p tcp --dport "$PORT" -j ACCEPT 2>/dev/null || IP6 -I INPUT 1 -p tcp --dport "$PORT" -j ACCEPT
+
+if SC is-active firewalld >/dev/null 2>&1; then
+  (firewall-cmd --permanent --add-port="$PORT/tcp" >/dev/null 2>&1 && firewall-cmd --reload >/dev/null 2>&1) || \
+    (sudo firewall-cmd --permanent --add-port="$PORT/tcp" >/dev/null 2>&1 && sudo firewall-cmd --reload >/dev/null 2>&1) || true
+fi
+
+if command -v ufw >/dev/null 2>&1; then
+  if ufw status 2>/dev/null | grep -qi 'Status: active' || sudo ufw status 2>/dev/null | grep -qi 'Status: active'; then
+    sudo ufw allow "$PORT/tcp" comment marzban-panel >/dev/null 2>&1 || ufw allow "$PORT/tcp" comment marzban-panel >/dev/null 2>&1 || true
+    sudo ufw reload >/dev/null 2>&1 || ufw reload >/dev/null 2>&1 || true
+  fi
+fi
+
+ACTIVE=1
+SC is-active --quiet caddy || ACTIVE=0
+
+HAS=0
+if command -v ss >/dev/null 2>&1; then
+  if ss -ltn "sport = :$PORT" 2>/dev/null | grep -q LISTEN; then HAS=1; fi
+  if test "$HAS" != 1; then
+    ss -ltn 2>/dev/null | grep -qe ":${PORT}\\b" && HAS=1
+  fi
+elif command -v netstat >/dev/null 2>&1 && netstat -ltn 2>/dev/null | grep -qe ":${PORT}\\b"; then
+  HAS=1
+fi
+
+if test "$ACTIVE" != 1; then MSG="caddy_inactive"; else MSG=""; fi
+if test "$HAS" != 1; then
+  MSG="${MSG:+${MSG},}port_${PORT}_not_listening"
+fi
+
+if test "$ACTIVE" != 1 || test "$HAS" != 1; then
+  echo "MARZBAN_FINALIZE_RESULT=FAIL:${MSG}"
+  JC=$(journalctl -u caddy --no-pager -n 12 2>/dev/null || sudo journalctl -u caddy --no-pager -n 12 2>/dev/null || true)
+  echo "$JC"
+  exit 0
+fi
+
+echo "MARZBAN_FINALIZE_RESULT=OK"
+echo "MARZBAN_FINALIZE_PORT=${PORT}"
 exit 0
-BASH,
+EOS,
             $port
         );
-        $b64b = base64_encode(str_replace(["\r\n", "\r"], "\n", $openFw));
-        $outFw = (string) $ssh->exec('printf %s '.var_export($b64b, true).' | base64 -d | /bin/bash 2>&1');
-        Log::info('finalizeMarzbanInstallOnHost: attempted INPUT allow for panel HTTPS port', [
-            'port' => $port,
+
+        $bash = str_replace(["\r\n", "\r"], "\n", $script);
+        $b64 = base64_encode($bash);
+        $out = (string) $ssh->exec('printf %s '.var_export($b64, true).' | base64 -d | /bin/bash 2>&1');
+
+        Log::info('finalizeMarzbanInstallOnHost', [
+            'ui_port' => $port,
             'ssh_exit' => $ssh->getExitStatus(),
-            'output' => Str::limit(trim($outFw), 400),
+            'output' => Str::limit(trim($out), 2500),
             'source' => 'panel',
-            'hint' => 'Если с ПК всё ещё ERR_TIMED_OUT — откройте этот TCP-порт во внешнем фаерволе/Security Group панели VPS.',
         ]);
+
+        if (! preg_match('/MARZBAN_FINALIZE_RESULT=OK\b/m', $out)) {
+            $failDetail = preg_match('/MARZBAN_FINALIZE_RESULT=FAIL:([^\n]+)/', $out, $fm) ? trim($fm[1]) : Str::limit($out, 1200);
+
+            throw new RuntimeException(
+                'Marzban установлен, но проверка Caddy не прошла (порт '.$port.'): '.$failDetail
+            );
+        }
+    }
+
+    /**
+     * Контейнеры Marzban и ответ /dashboard по HTTPS с loopback (--resolve домен→127.0.0.1).
+     *
+     * @throws RuntimeException
+     */
+    private function verifyMarzbanRuntimeOnHost(SSH2 $ssh, string $subscriptionPrefixRaw): void
+    {
+        $u = trim($subscriptionPrefixRaw, " \t\n\r\v\"'");
+        $parts = parse_url($u);
+        if (empty($parts['host']) || empty($parts['scheme']) || empty($parts['port'])) {
+            throw new RuntimeException(
+                'Некорректный XRAY_SUBSCRIPTION_URL_PREFIX: нужно https://FQDN:ПОРТ. Текущее: '.Str::limit($subscriptionPrefixRaw, 200)
+            );
+        }
+
+        $host = $parts['host'];
+        $port = (int) $parts['port'];
+        $dashUrl = $parts['scheme'].'://'.$host.':'.$port.'/dashboard/';
+        $script = sprintf(
+            <<<'EOS'
+set +e
+H=%1$s
+P=%2$d
+U=%3$s
+cd /opt/marzban 2>/dev/null || { echo MARZBAN_RT_FAIL=no_app_dir; exit 71; }
+
+RUNDC() {
+  sudo docker compose -p marzban "$@" 2>/dev/null || docker compose -p marzban "$@" 2>/dev/null || true;
+}
+
+DOCKER_OK=0
+for i in $(seq 1 24); do
+  if RUNDC ps -q --status running | grep -qE '[[:alnum:]]'; then DOCKER_OK=1; break; fi
+  sleep 3
+done
+if test "$DOCKER_OK" != 1; then echo MARZBAN_RT_FAIL=docker_containers_down; exit 73; fi
+
+LAST=000
+for j in $(seq 1 16); do
+  LAST=$(curl -sk -o /dev/null -w '%%{http_code}' --connect-timeout 14 --max-time 24 --resolve "${H}:${P}:127.0.0.1" "${U}" 2>/dev/null || printf '000')
+  case "$LAST" in
+    2??|3??|401|403|404|502|503)
+      echo "MARZBAN_RT_OK=http_${LAST}"
+      exit 0
+      ;;
+    *) ;;
+  esac
+  sleep 4
+done
+echo "MARZBAN_RT_FAIL=http_${LAST}"
+exit 72
+EOS,
+            escapeshellarg($host),
+            $port,
+            escapeshellarg($dashUrl)
+        );
+
+        $bash = str_replace(["\r\n", "\r"], "\n", $script);
+        $b64 = base64_encode($bash);
+        $out = (string) $ssh->exec('printf %s '.var_export($b64, true).' | base64 -d | /bin/bash 2>&1');
+
+        Log::info('verifyMarzbanRuntimeOnHost', [
+            'ssh_exit' => $ssh->getExitStatus(),
+            'output' => Str::limit(trim($out), 2000),
+            'source' => 'panel',
+        ]);
+
+        if (! preg_match('/MARZBAN_RT_OK=/', $out)) {
+            preg_match('/MARZBAN_RT_FAIL=([^\n]+)/', $out, $fm);
+            $detail = isset($fm[1]) ? trim($fm[1]) : Str::limit($out, 800);
+
+            throw new RuntimeException(
+                'Стек Marzban не прошёл проверку (docker/curl локально по HTTPS на порту '.$port.'): '.$detail
+            );
+        }
     }
 
     /**
@@ -495,10 +624,11 @@ BASH,
         $envContent = $ssh->exec('cat ' . self::PANEL_ENV_PATH);
         $config = $this->parseEnvFile($envContent);
 
-        if (empty($config['SUDO_USERNAME']) || empty($config['SUDO_PASSWORD'])) {
-            throw new RuntimeException('Invalid panel configuration');
+        if (empty($config['SUDO_USERNAME']) || empty($config['SUDO_PASSWORD']) || empty($config['XRAY_SUBSCRIPTION_URL_PREFIX'])) {
+            throw new RuntimeException('Invalid panel configuration (.env без логина/пароля или XRAY_SUBSCRIPTION_URL_PREFIX)');
         }
 
+        $this->verifyMarzbanRuntimeOnHost($ssh, $config['XRAY_SUBSCRIPTION_URL_PREFIX']);
         $panel = new Panel();
         $panel->server_id = $server->id;
         $panel->panel = Panel::MARZBAN;
