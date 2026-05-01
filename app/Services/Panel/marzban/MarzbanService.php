@@ -1949,15 +1949,7 @@ class MarzbanService
         if (trim($priv) === '') {
             return null;
         }
-        $addrRaw = (string) ($iface['Address'] ?? '');
-        $addresses = [];
-        foreach (preg_split('/[,\s]+/', $addrRaw, -1, PREG_SPLIT_NO_EMPTY) as $a) {
-            $a = trim($a);
-            if ($a !== '') {
-                $addresses[] = $a;
-            }
-        }
-        $addresses = array_values(array_unique($addresses));
+        $addresses = $this->wgcfGatherAllWireguardAddresses($text);
         if ($addresses === []) {
             return null;
         }
@@ -1991,6 +1983,50 @@ class MarzbanService
     }
 
     /**
+     * Все строки вида Address= из текста wgcf (оба блока Interface и два файла в одном буфере).
+     * Так не теряется IPv4 из wgcf.conf, когда profile перезатирал ключ в ассоциативном массиве.
+     *
+     * @return list<string>
+     */
+    private function wgcfGatherAllWireguardAddresses(string $text): array
+    {
+        $addresses = [];
+        foreach (preg_split('/\R/', $text) as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+            if (! preg_match('/^Address\s*=/i', $line)) {
+                continue;
+            }
+            $parts = explode('=', $line, 2);
+            $value = isset($parts[1]) ? trim($parts[1]) : '';
+            if ($value === '') {
+                continue;
+            }
+            foreach (preg_split('/[,\s]+/', $value, -1, PREG_SPLIT_NO_EMPTY) as $a) {
+                $a = trim($a);
+                if ($a !== '') {
+                    $addresses[] = $a;
+                }
+            }
+        }
+
+        $unique = array_values(array_unique($addresses));
+        usort($unique, static function (string $x, string $y): int {
+            $vx = preg_match('/^\d+\.\d+\.\d+\.\d+/', trim($x, " \t\"")) === 1;
+            $vy = preg_match('/^\d+\.\d+\.\d+\.\d+/', trim($y, " \t\"")) === 1;
+            if ($vx === $vy) {
+                return 0;
+            }
+
+            return $vx ? -1 : 1;
+        });
+
+        return $unique;
+    }
+
+    /**
      * Нативный WireGuard в Xray: снимок панели (после автоимпорта) или PANEL_WARP_WG_* в .env.
      *
      * @return array<string, mixed>|null
@@ -2014,6 +2050,24 @@ class MarzbanService
             }
             if (isset($snap['reserved']) && is_array($snap['reserved']) && count($snap['reserved']) === 3) {
                 $reserved = array_values($snap['reserved']);
+            }
+        }
+        if ($sk !== '' && $addrs !== []) {
+            $hasIpv4Iface = false;
+            foreach ($addrs as $a) {
+                if (! is_string($a)) {
+                    continue;
+                }
+                $host = preg_replace('#/.*$#', '', trim($a));
+                if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                    $hasIpv4Iface = true;
+                    break;
+                }
+            }
+            if (! $hasIpv4Iface) {
+                Log::warning('Marzban WARP: в снимке WireGuard нет IPv4 интерфейса из wgcf — в Xray лучше указать и 172.16.x/32. Обновите панель и снова «wgcf → панель», затем перепримените конфиг.', [
+                    'panel_id' => $panel->id,
+                ]);
             }
         }
         if ($sk === '' || $addrs === [] || $peerPub === '') {
