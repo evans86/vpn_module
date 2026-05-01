@@ -1615,29 +1615,97 @@ class MarzbanService
     }
 
     /**
-     * Перед правилом 0.0.0.0/0 → WARP: исходящий DNS на публичные резолверы — DIRECT,
-     * иначе модуль dns гонится в WARP «на холодную» и WireGuard даёт «no route to host».
+     * Упрощённо: только IPv4 «host» из строки вида «162.159.192.1:2408» (для DIRECT на peer WG).
+     */
+    private function extractIpv4HostFromWireguardEndpoint(?string $endpoint): ?string
+    {
+        $e = trim((string) $endpoint);
+        if ($e === '') {
+            return null;
+        }
+        if (preg_match('/^(\d{1,3}(?:\.\d{1,3}){3}):\d+\s*$/', $e, $m)) {
+            return filter_var($m[1], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? $m[1] : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Адреса, которые перед catch-all 0/0→WARP должны идти через DIRECT:
+     * публичные DNS, peer Cloudflare WG (handshake по IPv4), опции .env и снимка панели.
+     *
+     * @return list<string>
+     */
+    private function collectWarpBootstrapDirectIps(?Panel $panel = null): array
+    {
+        $seen = [];
+
+        $combined = array_merge(
+            config('panel.warp_full_routing_dns_direct_ips', []) ?: [],
+            config('panel.warp_full_routing_extra_direct_ips', []) ?: []
+        );
+        if ($combined === []) {
+            $combined = ['1.1.1.1', '8.8.8.8'];
+        }
+        foreach ($combined as $raw) {
+            if (! is_string($raw)) {
+                continue;
+            }
+            $ip = trim($raw);
+            if ($ip === '' || isset($seen[$ip])) {
+                continue;
+            }
+            if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                $seen[$ip] = true;
+            }
+        }
+
+        $epOverride = trim((string) config('panel.warp_wireguard_endpoint_ip', ''));
+        if ($epOverride !== '' && filter_var($epOverride, FILTER_VALIDATE_IP) && ! isset($seen[$epOverride])) {
+            $seen[$epOverride] = true;
+        }
+
+        if ($panel !== null && is_array($panel->warp_wireguard_snapshot ?? null)) {
+            $snap = $panel->warp_wireguard_snapshot;
+            if (! empty($snap['endpoint']) && is_string($snap['endpoint'])) {
+                $h = $this->extractIpv4HostFromWireguardEndpoint($snap['endpoint']);
+                if ($h !== null && ! isset($seen[$h])) {
+                    $seen[$h] = true;
+                }
+            }
+        }
+
+        return array_keys($seen);
+    }
+
+    /**
+     * Одно правило «ip→DIRECT» (если список не пустой) + опционально UDP/53→DIRECT.
      *
      * @return list<array<string, mixed>>
      */
-    private function buildWarpFullRoutingDnsDirectRules(): array
+    private function buildWarpFullRoutingBootstrapDirectRules(?Panel $panel = null): array
     {
-        $ips = config('panel.warp_full_routing_dns_direct_ips', []);
-        if (! is_array($ips) || $ips === []) {
-            $ips = ['1.1.1.1', '8.8.8.8'];
-        }
-        $ips = array_values(array_unique(array_filter(array_map(static function ($ip) {
-            return is_string($ip) ? trim($ip) : '';
-        }, $ips))));
-        if ($ips === []) {
-            return [];
+        $rules = [];
+
+        $ips = $this->collectWarpBootstrapDirectIps($panel);
+        if ($ips !== []) {
+            $rules[] = [
+                'type' => 'field',
+                'ip' => $ips,
+                'outboundTag' => 'DIRECT',
+            ];
         }
 
-        return [[
-            'type' => 'field',
-            'ip' => $ips,
-            'outboundTag' => 'DIRECT',
-        ]];
+        if (filter_var(config('panel.warp_full_routing_udp53_direct', true), FILTER_VALIDATE_BOOLEAN)) {
+            $rules[] = [
+                'type' => 'field',
+                'network' => 'udp',
+                'port' => '53',
+                'outboundTag' => 'DIRECT',
+            ];
+        }
+
+        return $rules;
     }
 
     /**
@@ -1645,7 +1713,7 @@ class MarzbanService
      *
      * @return list<array<string, mixed>>
      */
-    private function buildRealityFullWarpRoutingRules(): array
+    private function buildRealityFullWarpRoutingRules(?Panel $panel = null): array
     {
         $rules = [
             [
@@ -1692,7 +1760,7 @@ class MarzbanService
                 ];
             }
         }
-        foreach ($this->buildWarpFullRoutingDnsDirectRules() as $r) {
+        foreach ($this->buildWarpFullRoutingBootstrapDirectRules($panel) as $r) {
             $rules[] = $r;
         }
         $rules[] = [
@@ -1995,7 +2063,7 @@ class MarzbanService
 
             if (! empty($panel->warp_routing_all)) {
                 if (isset($panel->config_type) && $panel->config_type === Panel::CONFIG_TYPE_MIXED_WARP) {
-                    $routingRules = $this->buildRealityFullWarpRoutingRules();
+                    $routingRules = $this->buildRealityFullWarpRoutingRules($panel);
                 } else {
                     $bypassIps = config('panel.warp_routing_full_bypass_ip_cidr', []);
                     if (is_array($bypassIps) && $bypassIps !== []) {
@@ -2013,7 +2081,7 @@ class MarzbanService
                             'outboundTag' => 'DIRECT',
                         ];
                     }
-                    foreach ($this->buildWarpFullRoutingDnsDirectRules() as $r) {
+                    foreach ($this->buildWarpFullRoutingBootstrapDirectRules($panel) as $r) {
                         $routingRules[] = $r;
                     }
                     $routingRules[] = [

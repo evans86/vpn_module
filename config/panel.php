@@ -382,6 +382,19 @@ return [
         )
     ),
 
+    // Доп. IPv4/v6 перед catch-all WARP (bootstrap: peer WG и т.д.), через запятую.
+    'warp_full_routing_extra_direct_ips' => array_values(
+        array_filter(
+            array_map('trim', explode(',', (string) env('PANEL_WARP_FULL_EXTRA_DIRECT_IPS', '')))
+        )
+    ),
+
+    // Исходящий UDP на порт 53 — DIRECT до WARP-tun (резерв, если резолверы не из списка выше).
+    'warp_full_routing_udp53_direct' => filter_var(
+        env('PANEL_WARP_FULL_UDP53_DIRECT', true),
+        FILTER_VALIDATE_BOOLEAN
+    ),
+
     /*
     |--------------------------------------------------------------------------
     | Пресет mixed_warp: DIRECT для dest REALITY, остальное — WARP (Gemini и т.д. через WARP).
