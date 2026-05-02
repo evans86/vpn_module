@@ -14,39 +14,16 @@ class RedirectPersonalToConfigPublicHost
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $base = rtrim((string) config('app.config_public_url'), '/');
-        $targetHost = parse_url($this->normalizeUrl($base), PHP_URL_HOST);
-
-        $requestHost = $this->originalHost($request);
-        if (!$targetHost || strcasecmp($requestHost, (string) $targetHost) === 0) {
-            return $next($request);
-        }
-
-        $url = $base . '/' . ltrim($request->path(), '/');
-        $qs = $request->getQueryString();
-        if ($qs !== null && $qs !== '') {
-            $url .= '?' . $qs;
-        }
-
-        // 302 превращает POST в GET при следовании редиректу — формы ЛК (POST) давали 405 на целевом хосте.
-        return redirect()->away($url, 307);
-    }
-
-    private function originalHost(Request $request): string
-    {
-        $forwardedHost = (string) $request->headers->get('x-forwarded-host', '');
-        if ($forwardedHost !== '') {
-            $first = trim(explode(',', $forwardedHost)[0]);
-            if ($first !== '') {
-                return strtolower($first);
-            }
-        }
-
-        return strtolower((string) $request->getHost());
-    }
-
-    private function normalizeUrl(string $url): string
-    {
-        return strpos($url, '://') !== false ? $url : 'https://' . $url;
+        /*
+         * Не редиректим host внутри Laravel.
+         *
+         * На проде vpnhigh.su может проксироваться в тот же backend с внутренним Host
+         * основного сайта. В таком случае Laravel видит "не тот" host и бесконечно
+         * редиректит браузер обратно на vpnhigh.su, хотя браузер уже там.
+         *
+         * Ссылки внутри ЛК в основном относительные через UrlHelper::personalRoute(),
+         * поэтому безопаснее обработать запрос на текущем origin, чем канонизировать host.
+         */
+        return $next($request);
     }
 }
