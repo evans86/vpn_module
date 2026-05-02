@@ -149,148 +149,14 @@ class MarzbanService
         try {
             Log::info('Installing panel', ['host' => $host, 'source' => 'panel']);
 
-            // Проверка и запуск Docker daemon
+            /*
+             * Ставим официальный Docker-вариант Marzban без внешнего mozaroc/Caddy.
+             * HTTPS на высоком порту делаем валидным сертификатом Let's Encrypt через DNS-01 Cloudflare.
+             */
             $this->ensureDockerRunning($ssh);
+            $this->installOfficialMarzbanDockerStack($ssh, $host);
 
-            // Команда 1: Скачивание скрипта
-            Log::info('Downloading installation script', [
-                'url' => self::INSTALL_SCRIPT_URL,
-                'source' => 'panel'
-            ]);
-
-            $wgetOutput = $ssh->exec('wget -O install_marzban.sh ' . self::INSTALL_SCRIPT_URL . ' 2>&1');
-            $wgetExitStatus = $ssh->getExitStatus();
-
-            Log::info('Wget command executed', [
-                'exit_status' => $wgetExitStatus,
-                'output' => substr($wgetOutput, 0, 500), // Первые 500 символов
-                'source' => 'panel'
-            ]);
-
-            if ($wgetExitStatus !== 0) {
-                throw new RuntimeException("Failed to download installation script. Exit code: {$wgetExitStatus}. Output: " . substr($wgetOutput, 0, 1000));
-            }
-
-            // Команда 2: Установка прав на выполнение
-            Log::info('Setting execute permissions', ['source' => 'panel']);
-
-            $chmodOutput = $ssh->exec('chmod +x install_marzban.sh 2>&1');
-            $chmodExitStatus = $ssh->getExitStatus();
-
-            Log::info('Chmod command executed', [
-                'exit_status' => $chmodExitStatus,
-                'output' => substr($chmodOutput, 0, 500),
-                'source' => 'panel'
-            ]);
-
-            if ($chmodExitStatus !== 0) {
-                throw new RuntimeException("Failed to set execute permissions. Exit code: {$chmodExitStatus}. Output: " . substr($chmodOutput, 0, 1000));
-            }
-
-            // Патчим скрипт: ufw выполнять только если установлен (на CentOS/минимальных образах ufw нет)
-            $ssh->exec("sed -i 's/^ufw disable$/command -v ufw \\&>\\/dev\\/null \\&\\& ufw disable \\|\\| true/' install_marzban.sh 2>&1");
-            Log::info('Patched install script to make ufw optional', ['source' => 'panel']);
-
-            // Патчим скрипт: после загрузки docker-compose.yml подменяем образ на ghcr.io (обход лимита Docker Hub)
-            $patchCmd = "sed -i '/File saved in.*docker-compose.yml/a sed -i '\\''s|gozargah/marzban|ghcr.io/gozargah/marzban|g'\\'' \"\$APP_DIR/docker-compose.yml\"' install_marzban.sh";
-            $ssh->exec($patchCmd);
-            Log::info('Patched install script to use ghcr.io image', ['source' => 'panel']);
-
-            // Скрипт mozaroc: HTTP_PORT — случайный 50000–65535 (схема хостера / инфраструктуры).
-
-            // Скрипт mozaroc дублирует глобальные https_port/http_port: после пары с ${HTTP_PORT}/10087 идут 443/80 —
-            // в Caddy побеждают последние, из‑за чего панель не слушает случайный порт и ломается on_demand TLS.
-            $ssh->exec('sed -i \'/^[[:space:]]*https_port 443$/d;/^[[:space:]]*http_port 80$/d\' install_marzban.sh 2>&1');
-            // Запасной вариант, если пробелы/табы отличались от ожидания выше:
-            $ssh->exec('sed -i \'/https_port[[:space:]]*443/d;/http_port[[:space:]]*80/d\' install_marzban.sh 2>&1');
-            Log::info('Patched install script: removed duplicate Caddy https_port 443 / http_port 80', ['source' => 'panel']);
-
-            // Команда 3: Запуск скрипта установки (несколько попыток из‑за apt/dpkg lock и unattended‑upgrades).
-            Log::info('Running installation script', ['host' => $host, 'source' => 'panel']);
-
-            $maxAttempts = 4;
-            $installExitStatus = -1;
-            $installOutput = '';
-
-            for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
-                Log::info('Marzban install script attempt', [
-                    'attempt' => $attempt,
-                    'max' => $maxAttempts,
-                    'host' => $host,
-                    'source' => 'panel',
-                ]);
-
-                $this->waitForAptLock($ssh, 660);
-
-                $ssh->setTimeout(600); // 10 минут на попытку
-                $installOutput = $ssh->exec('./install_marzban.sh ' . escapeshellarg($host) . ' 2>&1');
-                $installExitStatus = (int) $ssh->getExitStatus();
-
-                Log::info('Installation script executed', [
-                    'attempt' => $attempt,
-                    'exit_status' => $installExitStatus,
-                    'output_length' => strlen($installOutput),
-                    'output_preview' => substr($installOutput, 0, 2000),
-                    'output_end' => substr($installOutput, -1000),
-                    'source' => 'panel',
-                ]);
-
-                if ($installExitStatus === 0) {
-                    break;
-                }
-
-                if ($this->isDockerDaemonInstallFailureMessage($installOutput)) {
-                    Log::error('Docker daemon issue detected during installation', [
-                        'host' => $host,
-                        'source' => 'panel',
-                    ]);
-
-                    $this->ensureDockerRunning($ssh);
-                    $this->waitForAptLock($ssh, 420);
-                    $ssh->setTimeout(600);
-                    $installOutput = $ssh->exec('./install_marzban.sh ' . escapeshellarg($host) . ' 2>&1');
-                    $installExitStatus = (int) $ssh->getExitStatus();
-
-                    Log::info('Installation script re-run after Docker', [
-                        'exit_status' => $installExitStatus,
-                        'output_end' => substr($installOutput, -800),
-                        'source' => 'panel',
-                    ]);
-
-                    if ($installExitStatus === 0) {
-                        break;
-                    }
-                }
-
-                if ($this->isAptDpkgLockInstallFailureMessage($installOutput) && $attempt < $maxAttempts) {
-                    Log::warning('dpkg/apt lock during install_marzban.sh; backoff and retry', [
-                        'attempt' => $attempt,
-                        'source' => 'panel',
-                    ]);
-                    sleep(60);
-
-                    continue;
-                }
-
-                break;
-            }
-
-            $ssh->setTimeout(100000);
-
-            if ($installExitStatus !== 0) {
-                $errorDetails = $ssh->exec('tail -n 50 /var/log/marzban-install.log 2>&1 || echo "Log file not found"');
-
-                throw new RuntimeException(
-                    "Installation script failed. Exit code: {$installExitStatus}. " .
-                    'Output (last 2000 chars): ' . substr($installOutput, -2000) . '. ' .
-                    'Install log: ' . substr($errorDetails, 0, 1000)
-                );
-            }
-
-            // На сервере: Caddy без дублей порта 443/80, фаервол ОС + проверка, что UI реально слушает порт.
-            $this->finalizeMarzbanInstallOnHost($ssh);
-
-            Log::info('Marzban remote install script + finalize finished; verifying + saving Panel to DB next', [
+            Log::info('Official Marzban Docker stack installed; verifying + saving Panel to DB next', [
                 'host' => $host,
                 'source' => 'panel',
             ]);
@@ -303,6 +169,224 @@ class MarzbanService
                 'source' => 'panel'
             ]);
             throw new RuntimeException('Failed to install panel: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Официальный Docker-вариант Marzban без Caddy: host-network + высокий HTTPS-порт.
+     * Сертификат берём через acme.sh DNS-01 Cloudflare, поэтому 80/443 на VPS не нужны.
+     *
+     * @throws RuntimeException
+     */
+    private function installOfficialMarzbanDockerStack(SSH2 $ssh, string $host): void
+    {
+        $cloudflareEmail = trim((string) config('services.cloudflare.email'));
+        $cloudflareApiKey = trim((string) config('services.cloudflare.api_key'));
+
+        if ($cloudflareEmail === '' || $cloudflareApiKey === '') {
+            throw new RuntimeException('Для HTTPS на высоком порту нужны CLOUDFLARE_EMAIL и CLOUDFLARE_API_KEY (DNS-01 сертификат).');
+        }
+
+        $script = str_replace(
+            ['__MARZBAN_HOST__', '__CF_EMAIL__', '__CF_KEY__'],
+            [escapeshellarg($host), escapeshellarg($cloudflareEmail), escapeshellarg($cloudflareApiKey)],
+            <<<'EOS'
+set +e
+HOST=__MARZBAN_HOST__
+CF_EMAIL=__CF_EMAIL__
+CF_KEY=__CF_KEY__
+APP_DIR=/opt/marzban
+DATA_DIR=/var/lib/marzban
+CERT_DIR="${DATA_DIR}/certs/${HOST}"
+TS=$(date +%Y%m%d%H%M%S)
+
+DC() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose "$@"
+  elif docker-compose version >/dev/null 2>&1; then
+    docker-compose "$@"
+  else
+    return 127
+  fi
+}
+
+need_root_cmd() {
+  "$@" 2>/dev/null || sudo "$@" 2>/dev/null
+}
+
+is_port_free() {
+  P="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ! ss -ltn 2>/dev/null | grep -Eq "[:.]${P}\b"
+  elif command -v netstat >/dev/null 2>&1; then
+    ! netstat -ltn 2>/dev/null | grep -Eq "[:.]${P}\b"
+  else
+    return 0
+  fi
+}
+
+PORT=""
+for i in $(seq 1 80); do
+  R=$(od -An -N2 -tu2 /dev/urandom 2>/dev/null | tr -d ' ')
+  test -n "$R" || R=$((RANDOM + i))
+  CAND=$((50000 + (R % 15000)))
+  if is_port_free "$CAND"; then
+    PORT="$CAND"
+    break
+  fi
+done
+if test -z "$PORT"; then
+  echo "MARZBAN_OFFICIAL_INSTALL_FAIL=no_free_high_port"
+  exit 41
+fi
+
+ADMIN_USER=admin
+ADMIN_PASS=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 28)
+test -n "$ADMIN_PASS" || ADMIN_PASS="admin$(date +%s)"
+PANEL_URL="https://${HOST}:${PORT}"
+
+if test -d "$APP_DIR"; then
+  (cd "$APP_DIR" && (DC -p marzban down >/dev/null 2>&1 || DC down >/dev/null 2>&1 || true))
+  mv "$APP_DIR" "${APP_DIR}.bak.${TS}" 2>/dev/null || need_root_cmd mv "$APP_DIR" "${APP_DIR}.bak.${TS}" || true
+fi
+if test -d "$DATA_DIR"; then
+  mv "$DATA_DIR" "${DATA_DIR}.bak.${TS}" 2>/dev/null || need_root_cmd mv "$DATA_DIR" "${DATA_DIR}.bak.${TS}" || true
+fi
+
+need_root_cmd mkdir -p "$APP_DIR" "$DATA_DIR" "$CERT_DIR"
+need_root_cmd chown "$(id -u):$(id -g)" "$CERT_DIR" "$DATA_DIR/certs" "$DATA_DIR" 2>/dev/null || true
+
+export CF_Email="$CF_EMAIL"
+export CF_Key="$CF_KEY"
+
+if test ! -x "$HOME/.acme.sh/acme.sh"; then
+  curl -fsSL https://get.acme.sh | sh -s email="$CF_EMAIL"
+fi
+
+ACME="$HOME/.acme.sh/acme.sh"
+if test ! -x "$ACME" && test -x "/root/.acme.sh/acme.sh"; then ACME="/root/.acme.sh/acme.sh"; fi
+if test ! -x "$ACME"; then
+  echo "MARZBAN_OFFICIAL_INSTALL_FAIL=acme_sh_not_found"
+  exit 46
+fi
+
+"$ACME" --set-default-ca --server letsencrypt >/dev/null 2>&1 || true
+"$ACME" --issue --dns dns_cf -d "$HOST" --keylength ec-256 --server letsencrypt --force 2>&1
+ACME_STATUS=$?
+if test "$ACME_STATUS" != 0; then
+  echo "MARZBAN_OFFICIAL_INSTALL_FAIL=acme_dns_issue_failed"
+  exit 47
+fi
+
+"$ACME" --install-cert -d "$HOST" --ecc \
+  --fullchain-file "$CERT_DIR/fullchain.pem" \
+  --key-file "$CERT_DIR/key.pem" 2>&1
+INSTALL_CERT_STATUS=$?
+if test "$INSTALL_CERT_STATUS" != 0 || test ! -s "$CERT_DIR/fullchain.pem" || test ! -s "$CERT_DIR/key.pem"; then
+  echo "MARZBAN_OFFICIAL_INSTALL_FAIL=acme_install_cert_failed"
+  exit 48
+fi
+need_root_cmd chmod 644 "$CERT_DIR/fullchain.pem" "$CERT_DIR/key.pem" || true
+
+cat > /tmp/marzban-compose.yml <<'YML'
+services:
+  marzban:
+    image: gozargah/marzban:latest
+    restart: always
+    env_file: .env
+    network_mode: host
+    volumes:
+      - /var/lib/marzban:/var/lib/marzban
+YML
+
+cat > /tmp/marzban.env <<ENV
+UVICORN_HOST = "0.0.0.0"
+UVICORN_PORT = ${PORT}
+UVICORN_SSL_CERTFILE = "/var/lib/marzban/certs/${HOST}/fullchain.pem"
+UVICORN_SSL_KEYFILE = "/var/lib/marzban/certs/${HOST}/key.pem"
+SUDO_USERNAME = "${ADMIN_USER}"
+SUDO_PASSWORD = "${ADMIN_PASS}"
+SQLALCHEMY_DATABASE_URL = "sqlite:////var/lib/marzban/db.sqlite3"
+XRAY_SUBSCRIPTION_URL_PREFIX = "${PANEL_URL}"
+DOCS = False
+ENV
+
+need_root_cmd cp /tmp/marzban-compose.yml "$APP_DIR/docker-compose.yml"
+need_root_cmd cp /tmp/marzban.env "$APP_DIR/.env"
+
+cd "$APP_DIR" || { echo "MARZBAN_OFFICIAL_INSTALL_FAIL=no_app_dir_after_create"; exit 42; }
+
+DC -p marzban pull 2>&1
+PULL_STATUS=$?
+if test "$PULL_STATUS" != 0; then
+  echo "MARZBAN_OFFICIAL_INSTALL_FAIL=docker_pull_failed"
+  exit 43
+fi
+
+DC -p marzban up -d 2>&1
+UP_STATUS=$?
+if test "$UP_STATUS" != 0; then
+  echo "MARZBAN_OFFICIAL_INSTALL_FAIL=docker_up_failed"
+  exit 44
+fi
+
+need_root_cmd iptables -C INPUT -p tcp --dport "$PORT" -j ACCEPT 2>/dev/null || need_root_cmd iptables -I INPUT 1 -p tcp --dport "$PORT" -j ACCEPT || true
+need_root_cmd ip6tables -C INPUT -p tcp --dport "$PORT" -j ACCEPT 2>/dev/null || need_root_cmd ip6tables -I INPUT 1 -p tcp --dport "$PORT" -j ACCEPT || true
+
+if systemctl is-active firewalld >/dev/null 2>&1 || sudo systemctl is-active firewalld >/dev/null 2>&1; then
+  need_root_cmd firewall-cmd --permanent --add-port="${PORT}/tcp" >/dev/null 2>&1 || true
+  need_root_cmd firewall-cmd --reload >/dev/null 2>&1 || true
+fi
+
+if command -v ufw >/dev/null 2>&1; then
+  if ufw status 2>/dev/null | grep -qi 'Status: active' || sudo ufw status 2>/dev/null | grep -qi 'Status: active'; then
+    need_root_cmd ufw allow "${PORT}/tcp" comment marzban-panel >/dev/null 2>&1 || true
+    need_root_cmd ufw reload >/dev/null 2>&1 || true
+  fi
+fi
+
+READY=0
+for i in $(seq 1 36); do
+  if curl -skf --max-time 5 --resolve "${HOST}:${PORT}:127.0.0.1" "https://${HOST}:${PORT}/dashboard/" >/dev/null 2>&1 \
+    || wget --no-check-certificate -q -T 5 -O- --header="Host: ${HOST}" "https://127.0.0.1:${PORT}/dashboard/" >/dev/null 2>&1; then
+    READY=1
+    break
+  fi
+  sleep 5
+done
+
+if test "$READY" != 1; then
+  echo "MARZBAN_OFFICIAL_INSTALL_FAIL=dashboard_not_ready"
+  DC -p marzban ps 2>&1 || true
+  DC -p marzban logs --tail=80 marzban 2>&1 || true
+  exit 45
+fi
+
+echo "MARZBAN_OFFICIAL_INSTALL_OK=1"
+echo "MARZBAN_OFFICIAL_INSTALL_PORT=${PORT}"
+echo "MARZBAN_OFFICIAL_INSTALL_URL=${PANEL_URL}/dashboard"
+exit 0
+EOS
+        );
+
+        $bash = str_replace(["\r\n", "\r"], "\n", $script);
+        $b64 = base64_encode($bash);
+        $ssh->setTimeout(900);
+        $out = (string) $ssh->exec('printf %s '.var_export($b64, true).' | base64 -d | /bin/bash 2>&1');
+        $ssh->setTimeout(100000);
+
+        Log::info('installOfficialMarzbanDockerStack', [
+            'ssh_exit' => $ssh->getExitStatus(),
+            'output' => Str::limit(trim($out), 4000),
+            'source' => 'panel',
+        ]);
+
+        if (! preg_match('/MARZBAN_OFFICIAL_INSTALL_OK=1\b/m', $out)) {
+            $detail = preg_match('/MARZBAN_OFFICIAL_INSTALL_FAIL=([^\n]+)/', $out, $m)
+                ? trim($m[1])
+                : Str::limit($out, 1200);
+
+            throw new RuntimeException('Официальная Docker-установка Marzban не завершилась: '.$detail);
         }
     }
 
@@ -435,17 +519,19 @@ EOS,
         }
 
         $host = $parts['host'];
+        $scheme = strtolower((string) $parts['scheme']);
         $port = (int) $parts['port'];
         $dashUrl = $parts['scheme'].'://'.$host.':'.$port.'/dashboard/';
         // Не использовать sprintf() для всего скрипта: внутри есть printf '%s' и sed с «%» — PHP съест спецификаторы и сломает bash.
         // Проверка backend :8000 — только через отдельные функции (без длинного if CMD1||CMD2).
         $script = str_replace(
-            ['__MARZBAN_RT_HOST__', '__MARZBAN_RT_PORT__', '__MARZBAN_RT_DASHURL__'],
-            [escapeshellarg($host), (string) $port, escapeshellarg($dashUrl)],
+            ['__MARZBAN_RT_HOST__', '__MARZBAN_RT_SCHEME__', '__MARZBAN_RT_PORT__', '__MARZBAN_RT_DASHURL__'],
+            [escapeshellarg($host), escapeshellarg($scheme), (string) $port, escapeshellarg($dashUrl)],
             <<<'EOS'
 set +e
 # MARZBAN_RT_VERIFY_V4_FUNCTIONS
 H=__MARZBAN_RT_HOST__
+S=__MARZBAN_RT_SCHEME__
 P=__MARZBAN_RT_PORT__
 U=__MARZBAN_RT_DASHURL__
 cd /opt/marzban 2>/dev/null || { echo MARZBAN_RT_FAIL=no_app_dir; exit 71; }
@@ -496,8 +582,10 @@ probe_https_dashboard() {
   fi
   # Fallback без --resolve (старый curl / сбои TLS-сокета через --resolve)
   if command -v wget >/dev/null 2>&1; then
-    hdr=$(wget --no-check-certificate -S -q -O /dev/null \
-      --header="Host: ${H}" "https://127.0.0.1:${P}/dashboard/" 2>&1 || true)
+    WGET_TLS_FLAG=""
+    if test "$S" = "https"; then WGET_TLS_FLAG="--no-check-certificate"; fi
+    hdr=$(wget $WGET_TLS_FLAG -S -q -O /dev/null \
+      --header="Host: ${H}" "${S}://127.0.0.1:${P}/dashboard/" 2>&1 || true)
     last=$(printf '%s' "$hdr" | sed -n 's/.*HTTP\\/[0-9][0-9]*\\.[0-9][0-9]* \\([0123456789][0123456789][0123456789]\\).*/\\1/p' | tail -n 1 || true)
     if test -n "$last"; then
       echo "${last} wget_proxy"
@@ -588,7 +676,7 @@ EOS
             $detail = isset($fm[1]) ? trim($fm[1]) : Str::limit($out, 800);
 
             throw new RuntimeException(
-                'Стек Marzban не прошёл проверку (docker/curl локально по HTTPS на порту '.$port.'): '.$detail
+                'Стек Marzban не прошёл проверку (docker/curl локально по '.$scheme.' на порту '.$port.'): '.$detail
             );
         }
     }
@@ -749,22 +837,42 @@ EOS
      */
     private function waitForAptLock(SSH2 $ssh, int $timeoutSeconds = 300): void
     {
-        $interval = 15;
+        $interval = 45;
         $elapsed = 0;
+        $loggedStart = false;
+
         while ($elapsed < $timeoutSeconds) {
             $innerCheck = 'fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock >/dev/null 2>&1; echo APTLOCKEXIT:$?';
             $out = trim((string) $ssh->exec('sudo sh -c ' . escapeshellarg($innerCheck)));
             $lockHeld = (bool) preg_match('/APTLOCKEXIT:0\s*$/', $out);
+
             if (! $lockHeld) {
-                Log::info('Apt/dpkg lock is free', ['source' => 'panel', 'waited' => $elapsed]);
+                if ($loggedStart) {
+                    Log::info('Apt/dpkg lock освободился', ['source' => 'panel', 'waited_sec' => $elapsed]);
+                }
 
                 return;
             }
-            Log::info('Waiting for apt/dpkg lock', ['source' => 'panel', 'elapsed' => $elapsed, 'timeout' => $timeoutSeconds, 'probe' => $out]);
+
+            if (! $loggedStart) {
+                Log::info(
+                    'Блокировка apt/dpkg занята (часто unattended-upgrades или apt); ждём до '.$timeoutSeconds.' сек., проверка каждые '.$interval.' сек.',
+                    ['source' => 'panel']
+                );
+                $loggedStart = true;
+            } else {
+                Log::debug('Всё ещё занят apt/dpkg lock', [
+                    'source' => 'panel',
+                    'elapsed_sec' => $elapsed,
+                    'probe' => $out,
+                ]);
+            }
+
             sleep($interval);
             $elapsed += $interval;
         }
-        Log::warning('Apt lock wait timeout reached, proceeding anyway', ['source' => 'panel', 'timeout' => $timeoutSeconds]);
+
+        Log::warning('Истекло время ожидания apt/dpkg lock — продолжаем выполнение', ['source' => 'panel', 'timeout' => $timeoutSeconds]);
     }
 
     /**
