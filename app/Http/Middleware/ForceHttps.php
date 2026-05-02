@@ -42,6 +42,10 @@ class ForceHttps
             return true;
         }
 
+        if ($this->hostIsConfiguredHttpsPublicHost($request)) {
+            return true;
+        }
+
         $forwardedProto = strtolower((string) $request->headers->get('x-forwarded-proto', ''));
         if ($forwardedProto !== '') {
             $first = trim(explode(',', $forwardedProto)[0]);
@@ -58,5 +62,34 @@ class ForceHttps
         return strtolower((string) $request->headers->get('x-forwarded-ssl', '')) === 'on'
             || strtolower((string) $request->headers->get('front-end-https', '')) === 'on'
             || strtolower((string) $request->server('HTTPS', '')) === 'on';
+    }
+
+    private function hostIsConfiguredHttpsPublicHost(Request $request): bool
+    {
+        $host = strtolower((string) $request->getHost());
+        if ($host === '') {
+            return false;
+        }
+
+        $urls = array_filter(array_merge(
+            [(string) config('app.url'), (string) config('app.config_public_url'), (string) config('app.public_url')],
+            is_array(config('app.mirror_urls')) ? config('app.mirror_urls') : []
+        ));
+
+        foreach ($urls as $url) {
+            $url = trim((string) $url);
+            if ($url === '') {
+                continue;
+            }
+
+            $scheme = strtolower((string) parse_url(str_contains($url, '://') ? $url : 'https://' . $url, PHP_URL_SCHEME));
+            $configuredHost = strtolower((string) parse_url(str_contains($url, '://') ? $url : 'https://' . $url, PHP_URL_HOST));
+
+            if ($scheme === 'https' && $configuredHost !== '' && $host === $configuredHost) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

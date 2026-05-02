@@ -17,7 +17,8 @@ class RedirectPersonalToConfigPublicHost
         $base = rtrim((string) config('app.config_public_url'), '/');
         $targetHost = parse_url(str_contains($base, '://') ? $base : 'https://' . $base, PHP_URL_HOST);
 
-        if (!$targetHost || strcasecmp((string) $request->getHost(), (string) $targetHost) === 0) {
+        $requestHost = $this->originalHost($request);
+        if (!$targetHost || strcasecmp($requestHost, (string) $targetHost) === 0) {
             return $next($request);
         }
 
@@ -29,5 +30,18 @@ class RedirectPersonalToConfigPublicHost
 
         // 302 превращает POST в GET при следовании редиректу — формы ЛК (POST) давали 405 на целевом хосте.
         return redirect()->away($url, 307);
+    }
+
+    private function originalHost(Request $request): string
+    {
+        $forwardedHost = (string) $request->headers->get('x-forwarded-host', '');
+        if ($forwardedHost !== '') {
+            $first = trim(explode(',', $forwardedHost)[0]);
+            if ($first !== '') {
+                return strtolower($first);
+            }
+        }
+
+        return strtolower((string) $request->getHost());
     }
 }
