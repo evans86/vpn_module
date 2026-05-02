@@ -151,17 +151,13 @@ class SalesmanController extends Controller
         if ($publicUrl === '') {
             $publicUrl = rtrim((string) config('app.url'), '/');
         }
-        $defaultRoot = rtrim((string) config('app.url'), '/');
-        URL::forceRootUrl($publicUrl);
-        try {
-            $target = URL::temporarySignedRoute(
-                'personal.auth.impersonate',
-                now()->addMinutes(10),
-                ['salesman' => $salesman->id, 'admin' => auth()->id()]
-            );
-        } finally {
-            URL::forceRootUrl($defaultRoot);
-        }
+        $relativeTarget = URL::temporarySignedRoute(
+            'personal.auth.impersonate',
+            now()->addMinutes(10),
+            ['salesman' => $salesman->id, 'admin' => auth()->id()],
+            false
+        );
+        $target = $publicUrl . '/' . ltrim($relativeTarget, '/');
 
         return redirect()->away($target);
     }

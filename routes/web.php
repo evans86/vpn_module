@@ -98,7 +98,7 @@ Route::prefix('personal')
     Route::get('/auth/telegram/callback', [SalesmanAuthController::class, 'callback'])->name('auth.telegram.callback');
     // Вход в ЛК по подписанной ссылке из админки (другой домен / APP_CONFIG_PUBLIC_URL)
     Route::get('/auth/impersonate', [SalesmanAuthController::class, 'impersonateConsume'])
-        ->middleware('signed')
+        ->middleware('signed:relative')
         ->name('auth.impersonate');
 
     // Защищенные маршруты (auth.salesman = SalesmanOnly, см. Kernel)
