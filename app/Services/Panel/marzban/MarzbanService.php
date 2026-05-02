@@ -205,67 +205,86 @@ class MarzbanService
             $ssh->exec('sed -i \'/https_port[[:space:]]*443/d;/http_port[[:space:]]*80/d\' install_marzban.sh 2>&1');
             Log::info('Patched install script: removed duplicate Caddy https_port 443 / http_port 80', ['source' => 'panel']);
 
-            // Команда 3: Запуск скрипта установки
-            Log::info('Running installation script', [
-                'host' => $host,
-                'source' => 'panel'
-            ]);
+            // Команда 3: Запуск скрипта установки (несколько попыток из‑за apt/dpkg lock и unattended‑upgrades).
+            Log::info('Running installation script', ['host' => $host, 'source' => 'panel']);
 
-            // Увеличиваем таймаут для длительной операции установки
-            $ssh->setTimeout(600); // 10 минут
+            $maxAttempts = 4;
+            $installExitStatus = -1;
+            $installOutput = '';
 
-            $installOutput = $ssh->exec('./install_marzban.sh ' . escapeshellarg($host) . ' 2>&1');
-            $installExitStatus = $ssh->getExitStatus();
+            for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+                Log::info('Marzban install script attempt', [
+                    'attempt' => $attempt,
+                    'max' => $maxAttempts,
+                    'host' => $host,
+                    'source' => 'panel',
+                ]);
 
-            // Восстанавливаем таймаут
-            $ssh->setTimeout(100000);
+                $this->waitForAptLock($ssh, 660);
 
-            // Логируем полный вывод (может быть длинным)
-            Log::info('Installation script executed', [
-                'exit_status' => $installExitStatus,
-                'output_length' => strlen($installOutput),
-                'output_preview' => substr($installOutput, 0, 2000), // Первые 2000 символов
-                'output_end' => substr($installOutput, -1000), // Последние 1000 символов
-                'source' => 'panel'
-            ]);
+                $ssh->setTimeout(600); // 10 минут на попытку
+                $installOutput = $ssh->exec('./install_marzban.sh ' . escapeshellarg($host) . ' 2>&1');
+                $installExitStatus = (int) $ssh->getExitStatus();
 
-            if ($installExitStatus !== 0) {
-                // Проверяем, связана ли ошибка с Docker daemon
-                if (strpos($installOutput, 'Cannot connect to the Docker daemon') !== false ||
-                    strpos($installOutput, 'docker daemon running') !== false) {
+                Log::info('Installation script executed', [
+                    'attempt' => $attempt,
+                    'exit_status' => $installExitStatus,
+                    'output_length' => strlen($installOutput),
+                    'output_preview' => substr($installOutput, 0, 2000),
+                    'output_end' => substr($installOutput, -1000),
+                    'source' => 'panel',
+                ]);
+
+                if ($installExitStatus === 0) {
+                    break;
+                }
+
+                if ($this->isDockerDaemonInstallFailureMessage($installOutput)) {
                     Log::error('Docker daemon issue detected during installation', [
                         'host' => $host,
-                        'source' => 'panel'
+                        'source' => 'panel',
                     ]);
 
-                    // Пытаемся запустить Docker и повторить
                     $this->ensureDockerRunning($ssh);
+                    $this->waitForAptLock($ssh, 420);
+                    $ssh->setTimeout(600);
+                    $installOutput = $ssh->exec('./install_marzban.sh ' . escapeshellarg($host) . ' 2>&1');
+                    $installExitStatus = (int) $ssh->getExitStatus();
 
-                    // Повторяем установку
-                    Log::info('Retrying installation after Docker restart', [
-                        'host' => $host,
-                        'source' => 'panel'
+                    Log::info('Installation script re-run after Docker', [
+                        'exit_status' => $installExitStatus,
+                        'output_end' => substr($installOutput, -800),
+                        'source' => 'panel',
                     ]);
 
-                    $installOutput = $ssh->exec('./install_marzban.sh ' . escapeshellarg($host) . ' 2>&1');
-                    $installExitStatus = $ssh->getExitStatus();
-
-                    if ($installExitStatus !== 0) {
-                        throw new RuntimeException(
-                            "Installation script failed after Docker restart. Exit code: {$installExitStatus}. " .
-                            "Output (last 2000 chars): " . substr($installOutput, -2000)
-                        );
+                    if ($installExitStatus === 0) {
+                        break;
                     }
-                } else {
-                    // Пытаемся получить более подробную информацию об ошибке
-                    $errorDetails = $ssh->exec('tail -n 50 /var/log/marzban-install.log 2>&1 || echo "Log file not found"');
-
-                    throw new RuntimeException(
-                        "Installation script failed. Exit code: {$installExitStatus}. " .
-                        "Output (last 2000 chars): " . substr($installOutput, -2000) . ". " .
-                        "Install log: " . substr($errorDetails, 0, 1000)
-                    );
                 }
+
+                if ($this->isAptDpkgLockInstallFailureMessage($installOutput) && $attempt < $maxAttempts) {
+                    Log::warning('dpkg/apt lock during install_marzban.sh; backoff and retry', [
+                        'attempt' => $attempt,
+                        'source' => 'panel',
+                    ]);
+                    sleep(60);
+
+                    continue;
+                }
+
+                break;
+            }
+
+            $ssh->setTimeout(100000);
+
+            if ($installExitStatus !== 0) {
+                $errorDetails = $ssh->exec('tail -n 50 /var/log/marzban-install.log 2>&1 || echo "Log file not found"');
+
+                throw new RuntimeException(
+                    "Installation script failed. Exit code: {$installExitStatus}. " .
+                    'Output (last 2000 chars): ' . substr($installOutput, -2000) . '. ' .
+                    'Install log: ' . substr($errorDetails, 0, 1000)
+                );
             }
 
             // На сервере: Caddy без дублей порта 443/80, фаервол ОС + проверка, что UI реально слушает порт.
@@ -706,6 +725,21 @@ EOS
         }
     }
 
+    private function isDockerDaemonInstallFailureMessage(string $installOutput): bool
+    {
+        return stripos($installOutput, 'Cannot connect to the Docker daemon') !== false
+            || stripos($installOutput, 'docker daemon running') !== false;
+    }
+
+    private function isAptDpkgLockInstallFailureMessage(string $installOutput): bool
+    {
+        return stripos($installOutput, 'Could not get lock') !== false
+            || stripos($installOutput, 'Unable to acquire the dpkg frontend lock') !== false
+            || stripos($installOutput, 'lock-frontend') !== false
+            || stripos($installOutput, 'unattended-upgr') !== false
+            || stripos($installOutput, 'is another process using it') !== false;
+    }
+
     /**
      * Ожидание освобождения блокировки apt/dpkg на сервере (другой процесс apt может обновлять пакеты).
      *
@@ -718,14 +752,15 @@ EOS
         $interval = 15;
         $elapsed = 0;
         while ($elapsed < $timeoutSeconds) {
-            // fuser возвращает 0, если процесс держит файл; 1 — если никто не держит
-            $check = trim($ssh->exec('sudo fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock 2>/dev/null; echo $?'));
-            $lockHeld = ($check === '0');
-            if (!$lockHeld) {
+            $innerCheck = 'fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock >/dev/null 2>&1; echo APTLOCKEXIT:$?';
+            $out = trim((string) $ssh->exec('sudo sh -c ' . escapeshellarg($innerCheck)));
+            $lockHeld = (bool) preg_match('/APTLOCKEXIT:0\s*$/', $out);
+            if (! $lockHeld) {
                 Log::info('Apt/dpkg lock is free', ['source' => 'panel', 'waited' => $elapsed]);
+
                 return;
             }
-            Log::info('Waiting for apt/dpkg lock', ['source' => 'panel', 'elapsed' => $elapsed, 'timeout' => $timeoutSeconds]);
+            Log::info('Waiting for apt/dpkg lock', ['source' => 'panel', 'elapsed' => $elapsed, 'timeout' => $timeoutSeconds, 'probe' => $out]);
             sleep($interval);
             $elapsed += $interval;
         }
