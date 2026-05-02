@@ -127,8 +127,9 @@ class SalesmanAuthController extends Controller
             'impersonation_salesman_id' => $salesman->id,
         ]);
         Auth::guard('salesman')->login($salesman);
+        $request->session()->regenerate();
 
-        return redirect()->away($this->currentOrigin() . '/personal/dashboard')
+        return redirect()->away($this->callbackOrigin($request) . '/personal/dashboard?impersonate=ok')
             ->with('success', 'Режим администратора: вы видите личный кабинет как этот продавец.');
     }
 

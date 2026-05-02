@@ -154,7 +154,12 @@ class SalesmanController extends Controller
         $relativeTarget = URL::temporarySignedRoute(
             'personal.auth.impersonate',
             now()->addMinutes(10),
-            ['salesman' => $salesman->id, 'admin' => auth()->id()],
+            [
+                'salesman' => $salesman->id,
+                'admin' => auth()->id(),
+                // Backend может видеть внутренний Host, поэтому целевой origin ЛК фиксируем в ссылке.
+                'origin' => $publicUrl,
+            ],
             false
         );
         $target = $publicUrl . '/' . ltrim($relativeTarget, '/');
