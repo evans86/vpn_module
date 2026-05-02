@@ -42,7 +42,8 @@ class WebhookController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'Invalid token'], ResponseAlias::HTTP_FORBIDDEN);
             }
 
-            $bot = new FatherBotController($token);
+            // Webhook уже должен быть установлен командой telegram:webhook; не переустанавливаем его на каждый update.
+            $bot = new FatherBotController($token, false);
             $bot->init();
 
             return response()->json(['status' => 'success']);

@@ -176,7 +176,7 @@ abstract class AbstractTelegramBot
         $dataCheckString = implode("\n", $dataCheckArr);
 
         // 4. Генерация секретного ключа
-        $secretKey = hash('sha256', env('TELEGRAM_FATHER_BOT_TOKEN'), true);
+        $secretKey = hash('sha256', (string) config('telegram.father_bot.token'), true);
 
         // 5. Генерация хэша
         $generatedHash = hash_hmac('sha256', $dataCheckString, $secretKey);

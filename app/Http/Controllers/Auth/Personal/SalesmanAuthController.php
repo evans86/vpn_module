@@ -27,14 +27,23 @@ class SalesmanAuthController extends Controller
     public function redirect()
     {
         try {
-            $bot = new FatherBotController(env('TELEGRAM_FATHER_BOT_TOKEN'));
+            $token = (string) config('telegram.father_bot.token');
+            if ($token === '') {
+                return back()->with('error', 'Токен Telegram-бота не настроен. Обратитесь к администратору.');
+            }
+
+            // Для генерации deep-link не нужно каждый раз переустанавливать webhook.
+            $bot = new FatherBotController($token, false);
             $authUrl = $bot->generateAuthUrl();
             if (!$authUrl) {
                 return back()->with('error', 'Имя бота не настроено. Обратитесь к администратору.');
             }
             return redirect()->away($authUrl);
         } catch (Exception $e) {
-            Log::error('Redirect error: ' . $e->getMessage());
+            Log::error('Telegram auth redirect error: ' . $e->getMessage(), [
+                'source' => 'telegram',
+                'trace' => $e->getTraceAsString(),
+            ]);
             return back()->with('error', 'Ошибка при создании ссылки авторизации');
         }
     }
@@ -138,6 +147,11 @@ class SalesmanAuthController extends Controller
 
             $authData = Cache::get("telegram_auth:{$hash}");
             if (!$authData) {
+                Log::warning('Telegram auth callback without cache entry', [
+                    'hash' => $hash,
+                    'user_id' => $userId,
+                    'source' => 'telegram',
+                ]);
                 throw new Exception('Invalid or expired auth session');
             }
 
@@ -148,10 +162,15 @@ class SalesmanAuthController extends Controller
 
             $salesman = Salesman::where('telegram_id', $userId)->first();
             if (!$salesman) {
+                Log::warning('Telegram auth callback salesman not found', [
+                    'telegram_id' => $userId,
+                    'source' => 'telegram',
+                ]);
                 throw new Exception('Salesman not found');
             }
 
             Auth::guard('salesman')->login($salesman);
+            $request->session()->regenerate();
             Cache::forget("telegram_auth:{$hash}");
 
             // Всегда редиректим в личный кабинет, независимо от источника

@@ -23,10 +23,12 @@ class FatherBotController extends AbstractTelegramBot
 
     private const STATE_WAITING_PAYMENT_PROOF = 'waiting_payment_proof';
 
-    public function __construct(string $token)
+    public function __construct(string $token, bool $registerWebhook = true)
     {
         parent::__construct($token);
-        $this->setWebhook($token, self::BOT_TYPE_FATHER);
+        if ($registerWebhook) {
+            $this->setWebhook($token, self::BOT_TYPE_FATHER);
+        }
     }
 
     /**
@@ -409,7 +411,7 @@ class FatherBotController extends AbstractTelegramBot
     public function generateAuthUrl(): ?string
     {
         try {
-            $botUsername = ltrim((string) env('TELEGRAM_FATHER_BOT_NAME'), '@');
+            $botUsername = ltrim((string) config('telegram.father_bot.username'), '@');
 
             if ($botUsername === '') {
                 $botUsername = Cache::remember('telegram_father_bot_username', 3600, function () {
