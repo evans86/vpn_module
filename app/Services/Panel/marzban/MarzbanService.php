@@ -540,6 +540,20 @@ EOS
         );
 
         $bash = str_replace(["\r\n", "\r"], "\n", $script);
+
+        if (strpos($bash, 'marzban_inner_alive_8()') === false) {
+            Log::critical('MarzbanService: удалённый скрипт проверки без v4 (на проде старая копия класса?)', [
+                'php_file' => __FILE__,
+                'script_head' => Str::limit($bash, 260),
+            ]);
+
+            throw new RuntimeException(
+                'Обновите файл app/Services/Panel/marzban/MarzbanService.php на сервере приложения (до актуальной версии с marzban_inner_alive_8), '
+                .'перезапустите php-fpm / сбросьте opcache и перезапустите воркер очереди. '
+                .'Сообщение bash про «syntax error near unexpected token ||» означает старый сгенерированный скрипт, а не ошибку Marzban на VPS.'
+            );
+        }
+
         $b64 = base64_encode($bash);
         $out = (string) $ssh->exec('printf %s '.var_export($b64, true).' | base64 -d | /bin/bash 2>&1');
 
