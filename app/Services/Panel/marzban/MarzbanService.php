@@ -418,12 +418,14 @@ EOS,
         $host = $parts['host'];
         $port = (int) $parts['port'];
         $dashUrl = $parts['scheme'].'://'.$host.':'.$port.'/dashboard/';
-        // Не использовать sprintf() для всего скрипта: внутри есть printf '%s' и sed с «%» — PHP съест спецификаторы и сломает bash (syntax error у «||»).
+        // Не использовать sprintf() для всего скрипта: внутри есть printf '%s' и sed с «%» — PHP съест спецификаторы и сломает bash.
+        // Проверка backend :8000 — только через отдельные функции (без длинного if CMD1||CMD2).
         $script = str_replace(
             ['__MARZBAN_RT_HOST__', '__MARZBAN_RT_PORT__', '__MARZBAN_RT_DASHURL__'],
             [escapeshellarg($host), (string) $port, escapeshellarg($dashUrl)],
             <<<'EOS'
 set +e
+# MARZBAN_RT_VERIFY_V4_FUNCTIONS
 H=__MARZBAN_RT_HOST__
 P=__MARZBAN_RT_PORT__
 U=__MARZBAN_RT_DASHURL__
@@ -431,6 +433,28 @@ cd /opt/marzban 2>/dev/null || { echo MARZBAN_RT_FAIL=no_app_dir; exit 71; }
 
 RUNDC() {
   sudo docker compose -p marzban "$@" 2>/dev/null || docker compose -p marzban "$@" 2>/dev/null || true;
+}
+
+marzban_inner_alive_8() {
+  local svc="$1"
+  if RUNDC exec -T "$svc" wget -q -T 8 -O- http://127.0.0.1:8000/ >/dev/null 2>&1; then
+    return 0
+  fi
+  if RUNDC exec -T "$svc" sh -lc 'curl -sf --max-time 8 http://127.0.0.1:8000/' >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
+marzban_inner_alive_6() {
+  local svc="$1"
+  if RUNDC exec -T "$svc" wget -q -T 6 -O- http://127.0.0.1:8000/ >/dev/null 2>&1; then
+    return 0
+  fi
+  if RUNDC exec -T "$svc" sh -lc 'curl -sf --max-time 6 http://127.0.0.1:8000/' >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
 }
 
 # Из вывода curl -w держим только три цифры кода (иногда попадают мусор/несколько цифр → http_000000).
@@ -489,11 +513,11 @@ for j in $(seq 1 22); do
   fi
 
   BACK_OK=0
-  if RUNDC exec -T marzban wget -q -T 8 -O- http://127.0.0.1:8000/ >/dev/null 2>&1 || RUNDC exec -T marzban sh -lc 'curl -sf --max-time 8 http://127.0.0.1:8000/' >/dev/null 2>&1; then BACK_OK=1; fi
+  if marzban_inner_alive_8 marzban; then BACK_OK=1; fi
 
   if test "$BACK_OK" != 1; then
     for alt in dashboard marzban app; do
-      if RUNDC exec -T "$alt" wget -q -T 6 -O- http://127.0.0.1:8000/ >/dev/null 2>&1 || RUNDC exec -T "$alt" sh -lc 'curl -sf --max-time 6 http://127.0.0.1:8000/' >/dev/null 2>&1; then
+      if marzban_inner_alive_6 "$alt"; then
         BACK_OK=1
         break
       fi
@@ -520,6 +544,7 @@ EOS
         $out = (string) $ssh->exec('printf %s '.var_export($b64, true).' | base64 -d | /bin/bash 2>&1');
 
         Log::info('verifyMarzbanRuntimeOnHost', [
+            'script_marker' => 'MARZBAN_RT_VERIFY_V4_FUNCTIONS',
             'ssh_exit' => $ssh->getExitStatus(),
             'output' => Str::limit(trim($out), 2000),
             'source' => 'panel',
