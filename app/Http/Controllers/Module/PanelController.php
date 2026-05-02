@@ -220,7 +220,7 @@ class PanelController extends Controller
     }
 
     /**
-     * Фоновая установка: при активной Laravel-очереди — джоб; иначе nohup (Unix) / popen или Process / очередь.
+     * Фоновая установка: exec / popen → при отключённом exec — очередь или Symfony Process.
      *
      * @return string метка режима для логов
      */
@@ -229,33 +229,31 @@ class PanelController extends Controller
         $asyncQueue = config('queue.default') !== 'sync';
 
         /*
-         * При QUEUE_CONNECTION != sync ставим задачу в очередь в первую очередь — тот же путь,
-         * что перевыпуск ключей: видно Pending/воркер и запись после успеха.
-         * Раньше на Linux при включённом exec() шёл nohup в обход jobs — ошибка установки оставалась «невидимой».
+         * На php-fpm PHP_BINARY почти всегда указывает на php-fpm, а artisan из фонового Process/exec вылетает.
+         * Предпочтительно detached CLI (exec/popen); при отключённом exec — очередь (если не sync) или Process.
          */
         if (PHP_OS_FAMILY === 'Windows') {
-            if ($asyncQueue) {
-                return $this->dispatchInstallViaQueueOrFail($serverId);
-            }
             if ($this->isCallablePhpFunction('popen') && $this->isCallablePhpFunction('pclose')) {
                 $this->launchDetachedMarzbanCliInstallWindows($serverId);
 
                 return 'popen_windows';
             }
 
-            return $this->tryLaunchInstallViaSymfonyProcess($serverId)
-                ? 'symfony_process'
-                : $this->dispatchInstallViaQueueOrFail($serverId);
-        }
-
-        if ($asyncQueue) {
-            return $this->dispatchInstallViaQueueOrFail($serverId);
+            return $asyncQueue
+                ? $this->dispatchInstallViaQueueOrFail($serverId)
+                : ($this->tryLaunchInstallViaSymfonyProcess($serverId)
+                    ? 'symfony_process'
+                    : $this->dispatchInstallViaQueueOrFail($serverId));
         }
 
         if ($this->isCallablePhpFunction('exec')) {
             $this->launchDetachedMarzbanCliInstallUnixExec($serverId);
 
             return 'exec_nohup';
+        }
+
+        if ($asyncQueue) {
+            return $this->dispatchInstallViaQueueOrFail($serverId);
         }
 
         return $this->tryLaunchInstallViaSymfonyProcess($serverId)

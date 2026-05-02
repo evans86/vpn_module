@@ -13,8 +13,7 @@ use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
- * Установка Marzban в фоне через очередь (queue:work-safe / cron schedule), без удержания HTTP.
- * Используется при QUEUE_CONNECTION != sync (основной путь в проде).
+ * Установка Marzban при недоступном detached exec()/popen: fallback через очередь (queue:work / supervisor).
  */
 class InstallMarzbanPanelJob implements ShouldQueue
 {
