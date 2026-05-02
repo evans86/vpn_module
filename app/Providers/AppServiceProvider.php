@@ -134,6 +134,11 @@ class AppServiceProvider extends ServiceProvider
             }
         }
 
+        $refererHost = $this->allowedRefererHost($request);
+        if ($refererHost !== '') {
+            return $refererHost;
+        }
+
         return (string) $request->getHost();
     }
 
@@ -144,10 +149,33 @@ class AppServiceProvider extends ServiceProvider
             $proto = trim(explode(',', $proto)[0]);
         }
         if ($proto === '') {
+            $referer = (string) $request->headers->get('referer', '');
+            $refererHost = strtolower((string) parse_url($referer, PHP_URL_HOST));
+            if ($refererHost !== '' && strcasecmp($refererHost, $host) === 0) {
+                $proto = (string) parse_url($referer, PHP_URL_SCHEME);
+            }
+        }
+        if ($proto === '') {
             $proto = 'https';
         }
 
         return strtolower($proto) . '://' . $host;
+    }
+
+    private function allowedRefererHost($request): string
+    {
+        $referer = (string) $request->headers->get('referer', '');
+        if ($referer === '') {
+            return '';
+        }
+
+        $host = strtolower((string) parse_url($referer, PHP_URL_HOST));
+        if ($host === '') {
+            return '';
+        }
+
+        $allowedHosts = array_map('strtolower', (array) config('app.pwa_service_worker_hosts', []));
+        return in_array($host, $allowedHosts, true) ? $host : '';
     }
 
     private const PROCESSED_JOBS_KEEP = 500;

@@ -427,7 +427,7 @@ class PersonalController extends Controller
 
         $salesman->botModule->update(['vpn_instructions' => $request->instructions]);
 
-        return redirect()->back()->with('success', 'Инструкции успешно обновлены!');
+        return redirect()->to(UrlHelper::personalRoute('personal.faq'))->with('success', 'Инструкции успешно обновлены!');
     }
 
     /**
@@ -446,7 +446,7 @@ class PersonalController extends Controller
             'vpn_instructions' => $this->botModuleService->getDefaultVpnInstructions()
         ]);
 
-        return redirect()->back()->with('success', 'Инструкции сброшены к стандартным!');
+        return redirect()->to(UrlHelper::personalRoute('personal.faq'))->with('success', 'Инструкции сброшены к стандартным!');
     }
 
     /**
@@ -626,12 +626,12 @@ class PersonalController extends Controller
                     continue;
                 }
                 if ($t === '' || $u === '') {
-                    return redirect()->back()
+                    return redirect()->to(UrlHelper::personalRoute('personal.activation-success'))
                         ->withErrors(['activation_links' => 'Для каждой кнопки укажите и подпись, и ссылку, либо оставьте оба поля пустыми.'])
                         ->withInput();
                 }
                 if (! preg_match('#^https?://#i', $u)) {
-                    return redirect()->back()
+                    return redirect()->to(UrlHelper::personalRoute('personal.activation-success'))
                         ->withErrors(['activation_links' => 'Ссылки кнопок должны начинаться с http:// или https://'])
                         ->withInput();
                 }

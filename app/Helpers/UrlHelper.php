@@ -32,7 +32,7 @@ class UrlHelper
         $path = '/' . ltrim((string) $path, '/');
         $base = rtrim((string) config('app.config_public_url'), '/');
 
-        if (!$forceAbsolute && !app()->runningInConsole() && request()) {
+        if (!$forceAbsolute) {
             return $path;
         }
 

@@ -125,6 +125,7 @@ class MarzbanService
     }
 
     /**
+     *
      * Проверка статуса сервера
      *
      * @param Server $server
