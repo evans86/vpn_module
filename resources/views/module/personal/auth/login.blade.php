@@ -22,6 +22,11 @@
             @if(session('error'))
                 <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-3 border border-red-200">{{ session('error') }}</div>
             @endif
+            @if(request('auth_error'))
+                <div class="rounded-lg bg-red-50 text-red-800 text-sm px-4 py-3 border border-red-200">
+                    Ошибка авторизации: {{ request('auth_error') }}
+                </div>
+            @endif
 
             <!-- Telegram -->
             <div>

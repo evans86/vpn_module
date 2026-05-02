@@ -152,7 +152,7 @@ class SalesmanAuthController extends Controller
                     'user_id' => $userId,
                     'source' => 'telegram',
                 ]);
-                throw new Exception('Invalid or expired auth session');
+                throw new Exception('Ссылка входа устарела или кэш был очищен. Нажмите «Войти через Telegram» заново.');
             }
 
             $expectedUserId = (int) ($authData['user_id'] ?? 0);
@@ -166,7 +166,7 @@ class SalesmanAuthController extends Controller
                     'telegram_id' => $userId,
                     'source' => 'telegram',
                 ]);
-                throw new Exception('Salesman not found');
+                throw new Exception('Продавец с этим Telegram ID не найден. Сначала напишите /start главному боту или проверьте привязку продавца.');
             }
 
             Auth::guard('salesman')->login($salesman);
@@ -178,8 +178,13 @@ class SalesmanAuthController extends Controller
                 ->with('success', 'Вы успешно авторизованы');
 
         } catch (Exception $e) {
-            Log::error('Auth error: ' . $e->getMessage());
-            return redirect()->to(UrlHelper::personalRoute('personal.auth'))
+            Log::error('Telegram auth callback error: ' . $e->getMessage(), [
+                'source' => 'telegram',
+                'hash' => $request->input('hash'),
+                'user_id' => $request->input('user'),
+            ]);
+
+            return redirect()->to('/personal/auth?auth_error=' . rawurlencode($e->getMessage()))
                 ->with('error', 'Ошибка авторизации: ' . $e->getMessage());
         }
     }

@@ -376,7 +376,7 @@ class FatherBotController extends AbstractTelegramBot
                 'user_id' => $this->chatId,
                 'callback_url' => UrlHelper::personalRoute('personal.auth.telegram.callback', [], true),
                 'source' => 'bot' // Добавляем метку источника
-            ], now()->addMinutes(5));
+            ], now()->addMinutes(30));
 
             $message = "🔐 Для входа нажмите кнопку:\n";
             $message .= "1. Откроется Telegram\n";
@@ -442,7 +442,7 @@ class FatherBotController extends AbstractTelegramBot
                 $payload['user_id'] = $this->chatId;
             }
 
-            Cache::put("telegram_auth:{$hash}", $payload, now()->addMinutes(5));
+            Cache::put("telegram_auth:{$hash}", $payload, now()->addMinutes(30));
 
             return "https://t.me/{$botUsername}?start=auth_{$hash}";
         } catch (\Exception $e) {
@@ -483,7 +483,7 @@ class FatherBotController extends AbstractTelegramBot
 
             // Аккаунт входа — тот, кто нажал Start (переход с сайта раньше не содержал chatId).
             $authData['user_id'] = $this->chatId;
-            Cache::put("telegram_auth:{$hash}", $authData, now()->addMinutes(5));
+            Cache::put("telegram_auth:{$hash}", $authData, now()->addMinutes(30));
 
             // Всегда добавляем параметр redirect=profile
             $confirmationUrl = $authData['callback_url'] . '?' . http_build_query([
