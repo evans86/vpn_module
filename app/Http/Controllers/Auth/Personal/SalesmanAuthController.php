@@ -105,6 +105,7 @@ class SalesmanAuthController extends Controller
         }
 
         RateLimiter::clear($throttleKey);
+        $request->session()->forget(['impersonation_admin_id', 'impersonation_salesman_id']);
         $request->session()->regenerate();
 
         return redirect()->away($this->currentOrigin() . '/personal/dashboard')
@@ -178,6 +179,7 @@ class SalesmanAuthController extends Controller
             }
 
             Auth::guard('salesman')->login($salesman);
+            $request->session()->forget(['impersonation_admin_id', 'impersonation_salesman_id']);
             $request->session()->regenerate();
             Cache::forget("telegram_auth:{$hash}");
 
