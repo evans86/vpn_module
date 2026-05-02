@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Module;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\InstallMarzbanPanelJob;
 use App\Models\Panel\Panel;
 use App\Models\Server\Server;
 use App\Services\Panel\marzban\MarzbanService;
@@ -23,7 +22,6 @@ use Illuminate\Validation\Rule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Symfony\Component\Process\Process;
 
 class PanelController extends Controller
 {
@@ -146,9 +144,7 @@ class PanelController extends Controller
             $this->logger->info('Panel store validated', [
                 'source' => 'panel',
                 'server_id' => $serverId,
-                'queue' => config('queue.default'),
-                'PHP_BINARY' => PHP_BINARY,
-                'CLI_RESOLVED' => $this->resolvedArtisanPhpBinary(),
+                'install_mode' => 'sync_http',
             ]);
             $lockKey = 'marzban_panel_install_lock_'.$serverId;
 
@@ -167,42 +163,30 @@ class PanelController extends Controller
             Cache::put($lockKey, 1, now()->addSeconds(7200));
 
             try {
-                $mode = $this->startMarzbanInstallInBackground($serverId);
-            } catch (\Throwable $e) {
+                if (function_exists('set_time_limit')) {
+                    @set_time_limit(0);
+                }
+                @ini_set('max_execution_time', '0');
+
+                $strategy = new PanelStrategy($availablePanelTypes[0]);
+                $strategy->create($serverId);
+
+                $this->logger->info('Panel installation completed (sync HTTP)', [
+                    'source' => 'panel',
+                    'user_id' => auth()->id(),
+                    'server_id' => $serverId,
+                    'provider' => $availablePanelTypes[0],
+                ]);
+            } finally {
                 Cache::forget($lockKey);
-                throw $e;
             }
-
-            $this->logger->info('Panel installation background start', [
-                'source' => 'panel',
-                'user_id' => auth()->id(),
-                'server_id' => $serverId,
-                'mode' => $mode,
-            ]);
-
-            $logTail = PHP_OS_FAMILY === 'Windows'
-                ? 'storage/logs или вывод процесса'
-                : 'storage/logs/panel-install-server-'.$serverId.'.log';
-
-            $modeHint = [
-                'exec_nohup' => 'Запущен отдельный PHP через nohup (см. файл лога).',
-                'popen_windows' => 'Запущен фоновый PHP (Windows).',
-                'symfony_process' => 'Запущен отдельный PHP через proc_open (Symfony Process).',
-            ];
-            $queueMsg = 'Установка поставлена в очередь Laravel: в мониторе очередей должно быть «В ожидании» ≥ 1 до запуска воркера. '
-                .'Запустите постоянный воркер (SSH/cron/supervisor), для хостингов без pcntl: '
-                .'`php artisan queue:work-safe --timeout=7200 --sleep=5 --tries=1`. '
-                .'Пока воркера нет — задание в таблице `jobs`, панель не создаётся.';
-
-            $modeText = (strpos($mode, 'queue_') === 0) ? $queueMsg : ($modeHint[$mode] ?? 'Фоновый запуск.');
 
             return redirect()->route('admin.module.panel.index')
                 ->with(
                     'success',
-                    'Установка панели запущена в фоне (обычно 5–20 минут). Запись появится в списке после завершения.'
-                    .' '.$modeText
-                    .' Лог: '.$logTail.' + laravel.log.'
-                    .' Порт из URL панели откройте во внешнем фаерволе хостера.'
+                    'Панель установлена и сохранена в списке. '
+                    .'При обрыве соединения (таймаут Nginx или Cloudflare) проверьте список панелей и laravel.log — установка уже выполнилась в этом запросе. '
+                    .'Откройте порт из URL панели во внешнем фаерволе.'
                 );
 
         } catch (Exception $e) {
@@ -217,184 +201,6 @@ class PanelController extends Controller
             return redirect()->route('admin.module.panel.index')
                 ->withErrors(['msg' => 'Не удалось создать панель: ' . $e->getMessage()]);
         }
-    }
-
-    /**
-     * Фоновая установка: exec / popen → при отключённом exec — очередь или Symfony Process.
-     *
-     * @return string метка режима для логов
-     */
-    private function startMarzbanInstallInBackground(int $serverId): string
-    {
-        $asyncQueue = config('queue.default') !== 'sync';
-
-        /*
-         * На php-fpm PHP_BINARY почти всегда указывает на php-fpm, а artisan из фонового Process/exec вылетает.
-         * Предпочтительно detached CLI (exec/popen); при отключённом exec — очередь (если не sync) или Process.
-         */
-        if (PHP_OS_FAMILY === 'Windows') {
-            if ($this->isCallablePhpFunction('popen') && $this->isCallablePhpFunction('pclose')) {
-                $this->launchDetachedMarzbanCliInstallWindows($serverId);
-
-                return 'popen_windows';
-            }
-
-            return $asyncQueue
-                ? $this->dispatchInstallViaQueueOrFail($serverId)
-                : ($this->tryLaunchInstallViaSymfonyProcess($serverId)
-                    ? 'symfony_process'
-                    : $this->dispatchInstallViaQueueOrFail($serverId));
-        }
-
-        if ($this->isCallablePhpFunction('exec')) {
-            $this->launchDetachedMarzbanCliInstallUnixExec($serverId);
-
-            return 'exec_nohup';
-        }
-
-        if ($asyncQueue) {
-            return $this->dispatchInstallViaQueueOrFail($serverId);
-        }
-
-        return $this->tryLaunchInstallViaSymfonyProcess($serverId)
-            ? 'symfony_process'
-            : $this->dispatchInstallViaQueueOrFail($serverId);
-    }
-
-    /**
-     * PHP CLI для вызова `artisan panel:install-marzban` из exec/Process под веб-сервером (php-fpm).
-     */
-    private function resolvedArtisanPhpBinary(): string
-    {
-        $configured = config('services.panel_artisan.php_cli');
-        if (is_string($configured) && $configured !== '') {
-            return $configured;
-        }
-
-        $binary = (string) PHP_BINARY;
-        if ($binary !== '' && stripos(@basename($binary), 'php-fpm') !== false && defined('PHP_BINDIR')) {
-            $try = PHP_BINDIR.'/php';
-            if (@is_executable($try)) {
-                return $try;
-            }
-        }
-
-        return $binary ?: 'php';
-    }
-
-    private function isCallablePhpFunction(string $name): bool
-    {
-        if (! function_exists($name)) {
-            return false;
-        }
-        $ini = strtolower((string) ini_get('disable_functions'));
-        if ($ini === '') {
-            return true;
-        }
-        $needle = strtolower($name);
-        foreach (preg_split('/\s*,\s*/', $ini) as $token) {
-            if ($token === $needle) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function tryLaunchInstallViaSymfonyProcess(int $serverId): bool
-    {
-        if (! class_exists(Process::class)) {
-            return false;
-        }
-        if (! $this->isCallablePhpFunction('proc_open') || ! $this->isCallablePhpFunction('proc_close')) {
-            return false;
-        }
-
-        try {
-            $phpCli = $this->resolvedArtisanPhpBinary();
-
-            Log::info('Panel install Symfony Process CLI', ['php' => $phpCli, 'PHP_BINARY' => PHP_BINARY]);
-
-            $process = new Process(
-                [$phpCli, base_path('artisan'), 'panel:install-marzban', (string) $serverId],
-                base_path(),
-                null,
-                null,
-                null
-            );
-            $process->setTimeout(null);
-            $process->disableOutput();
-            $process->start();
-
-            Log::info('Panel install: Symfony Process started', ['server_id' => $serverId]);
-
-            return true;
-        } catch (\Throwable $e) {
-            Log::warning('Panel install: Symfony Process failed to start', [
-                'server_id' => $serverId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return false;
-        }
-    }
-
-    /**
-     * @throws \RuntimeException
-     */
-    private function dispatchInstallViaQueueOrFail(int $serverId): string
-    {
-        if (config('queue.default') === 'sync') {
-            throw new \RuntimeException(
-                'На хостинге отключён exec() и не удалось запустить фоновый PHP (proc_open). '
-                .'Варианты: 1) убрать exec из disable_functions в php.ini; 2) включить очередь: в .env '
-                .'`QUEUE_CONNECTION=database` (или redis), `php artisan queue:table` + migrate, постоянно '
-                .'запускать `php artisan queue:work --timeout=7200 --tries=1`.'
-            );
-        }
-
-        InstallMarzbanPanelJob::dispatch($serverId);
-
-        Log::info('InstallMarzbanPanelJob dispatched', ['server_id' => $serverId]);
-
-        return 'queue_'.(string) config('queue.default');
-    }
-
-    private function launchDetachedMarzbanCliInstallWindows(int $serverId): void
-    {
-        $php = $this->resolvedArtisanPhpBinary();
-        $artisan = base_path('artisan');
-        $arg = escapeshellarg((string) $serverId);
-        $cmd = sprintf(
-            'start /B "" %s %s panel:install-marzban %s',
-            escapeshellarg($php),
-            escapeshellarg($artisan),
-            $arg
-        );
-        @pclose(@popen($cmd, 'r'));
-
-        Log::info('Detached panel CLI (Windows)', ['server_id' => $serverId, 'cmd_profile' => 'start']);
-    }
-
-    private function launchDetachedMarzbanCliInstallUnixExec(int $serverId): void
-    {
-        $php = $this->resolvedArtisanPhpBinary();
-        $artisan = base_path('artisan');
-        $arg = escapeshellarg((string) $serverId);
-        $log = escapeshellarg(storage_path('logs/panel-install-server-'.$serverId.'.log'));
-
-        exec(sprintf(
-            'nohup %s %s panel:install-marzban %s >> %s 2>&1 &',
-            escapeshellarg($php),
-            escapeshellarg($artisan),
-            $arg,
-            $log
-        ));
-
-        Log::info('Detached panel CLI (Unix)', [
-            'server_id' => $serverId,
-            'log_file' => 'logs/panel-install-server-'.$serverId.'.log',
-        ]);
     }
 
     /**
