@@ -174,7 +174,7 @@ class SalesmanAuthController extends Controller
             Cache::forget("telegram_auth:{$hash}");
 
             // Всегда редиректим в личный кабинет, независимо от источника
-            return redirect()->to(UrlHelper::personalRoute('personal.dashboard'))
+            return redirect()->to(UrlHelper::personalRoute('personal.dashboard', ['telegram_login' => 'ok']))
                 ->with('success', 'Вы успешно авторизованы');
 
         } catch (Exception $e) {

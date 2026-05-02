@@ -374,7 +374,7 @@ class FatherBotController extends AbstractTelegramBot
             // Сохраняем в кэше информацию о том, что запрос идет из бота
             Cache::put("telegram_auth:{$hash}", [
                 'user_id' => $this->chatId,
-                'callback_url' => UrlHelper::personalRoute('personal.auth.telegram.callback', [], true),
+                'callback_url' => $this->personalAuthCallbackUrl(),
                 'source' => 'bot' // Добавляем метку источника
             ], now()->addMinutes(30));
 
@@ -435,7 +435,7 @@ class FatherBotController extends AbstractTelegramBot
 
             $hash = bin2hex(random_bytes(16));
             $payload = [
-                'callback_url' => UrlHelper::personalRoute('personal.auth.telegram.callback', [], true),
+                'callback_url' => $this->personalAuthCallbackUrl(),
                 'source' => $this->chatId ? 'bot' : 'web',
             ];
             if ($this->chatId) {
@@ -453,6 +453,35 @@ class FatherBotController extends AbstractTelegramBot
 
             return null;
         }
+    }
+
+    /**
+     * Для входа с сайта callback должен вернуться на тот же origin, где пользователь
+     * нажал «Войти через Telegram»; иначе session-cookie остаётся на другом домене.
+     */
+    private function personalAuthCallbackUrl(): string
+    {
+        if (!$this->chatId && !app()->runningInConsole() && request()) {
+            $host = $this->originalRequestHost();
+            if ($host !== '') {
+                return 'https://' . $host . route('personal.auth.telegram.callback', [], false);
+            }
+        }
+
+        return UrlHelper::personalRoute('personal.auth.telegram.callback', [], true);
+    }
+
+    private function originalRequestHost(): string
+    {
+        $forwardedHost = (string) request()->headers->get('x-forwarded-host', '');
+        if ($forwardedHost !== '') {
+            $first = trim(explode(',', $forwardedHost)[0]);
+            if ($first !== '') {
+                return $first;
+            }
+        }
+
+        return (string) request()->getHost();
     }
 
     /**
