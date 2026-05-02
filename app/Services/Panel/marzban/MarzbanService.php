@@ -486,13 +486,11 @@ for j in $(seq 1 22); do
   fi
 
   BACK_OK=0
-  if RUNDC exec -T marzban wget -q -T 8 -O- http://127.0.0.1:8000/ >/dev/null 2>&1 \\
-     || RUNDC exec -T marzban sh -lc 'curl -sf --max-time 8 http://127.0.0.1:8000/' >/dev/null 2>&1; then BACK_OK=1; fi
+  if RUNDC exec -T marzban wget -q -T 8 -O- http://127.0.0.1:8000/ >/dev/null 2>&1 || RUNDC exec -T marzban sh -lc 'curl -sf --max-time 8 http://127.0.0.1:8000/' >/dev/null 2>&1; then BACK_OK=1; fi
 
   if test "$BACK_OK" != 1; then
     for alt in dashboard marzban app; do
-      if RUNDC exec -T "$alt" wget -q -T 6 -O- http://127.0.0.1:8000/ >/dev/null 2>&1 \\
-        || RUNDC exec -T "$alt" sh -lc 'curl -sf --max-time 6 http://127.0.0.1:8000/' >/dev/null 2>&1; then
+      if RUNDC exec -T "$alt" wget -q -T 6 -O- http://127.0.0.1:8000/ >/dev/null 2>&1 || RUNDC exec -T "$alt" sh -lc 'curl -sf --max-time 6 http://127.0.0.1:8000/' >/dev/null 2>&1; then
         BACK_OK=1
         break
       fi
