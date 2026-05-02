@@ -77,11 +77,11 @@ class AppServiceProvider extends ServiceProvider
         if (!$this->app->runningInConsole() && $this->app->has('request')) {
             try {
                 $request = $this->app->make('request');
-                $host = $request->getHost();
+                $host = $this->originalRequestHost($request);
                 $hostLower = strtolower($host);
                 $multiHostsLower = is_array($multiHosts) ? array_map('strtolower', $multiHosts) : [];
                 if ($host !== '' && $multiHostsLower !== [] && in_array($hostLower, $multiHostsLower, true)) {
-                    URL::forceRootUrl(rtrim($request->getSchemeAndHttpHost(), '/'));
+                    URL::forceRootUrl($this->requestOrigin($request, $host));
                 } elseif ($defaultRoot !== '') {
                     URL::forceRootUrl($defaultRoot);
                 }
@@ -122,6 +122,32 @@ class AppServiceProvider extends ServiceProvider
                 Log::error('Queue: failed to log processed job', ['exception' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             }
         });
+    }
+
+    private function originalRequestHost($request): string
+    {
+        $forwardedHost = (string) $request->headers->get('x-forwarded-host', '');
+        if ($forwardedHost !== '') {
+            $first = trim(explode(',', $forwardedHost)[0]);
+            if ($first !== '') {
+                return $first;
+            }
+        }
+
+        return (string) $request->getHost();
+    }
+
+    private function requestOrigin($request, string $host): string
+    {
+        $proto = (string) $request->headers->get('x-forwarded-proto', '');
+        if ($proto !== '') {
+            $proto = trim(explode(',', $proto)[0]);
+        }
+        if ($proto === '') {
+            $proto = 'https';
+        }
+
+        return strtolower($proto) . '://' . $host;
     }
 
     private const PROCESSED_JOBS_KEEP = 500;

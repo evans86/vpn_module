@@ -211,7 +211,7 @@
                                         @endphp
                                         <p class="text-gray-600 leading-snug">
                                             <span class="text-gray-500">Новый ключ:</span>
-                                            <a href="{{ route('personal.keys', $newKeyLinkParams) }}"
+                                            <a href="{{ \App\Helpers\UrlHelper::personalRoute('personal.keys', $newKeyLinkParams) }}"
                                                class="font-mono text-indigo-600 hover:text-indigo-800 break-all"
                                                title="{{ $key->replacedViolation->replaced_key_id }}">
                                                 {{ $key->replacedViolation->replaced_key_id }}

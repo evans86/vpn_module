@@ -300,7 +300,9 @@ class PersonalController extends Controller
         $perPage = min($request->get('per_page', 15), 50); // Максимум 50 записей на странице
 
         // Явное имя таблицы: иначе при join с pack_salesman неоднозначен created_at → SQL-ошибка (500)
-        $keys = $query->orderBy('key_activate.created_at', 'desc')->paginate($perPage);
+        $keys = $query->orderBy('key_activate.created_at', 'desc')
+            ->paginate($perPage)
+            ->withPath($request->getPathInfo());
 
         $statuses = [
             '' => 'Все статусы',
