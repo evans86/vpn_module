@@ -10,7 +10,7 @@ class ForceHttps
 {
     public function handle(Request $request, Closure $next)
     {
-        if (!$request->secure() && app()->environment('production')) {
+        if (!$this->isOriginalRequestSecure($request) && app()->environment('production')) {
             URL::forceScheme('https');
 
             // 302 превращает POST в GET при редиректе на HTTPS → 405 на POST-маршрутах. 307 сохраняет метод.
@@ -30,5 +30,33 @@ class ForceHttps
         }
 
         return $response;
+    }
+
+    /**
+     * На проде приложение часто стоит за Cloudflare/nginx: PHP видит http,
+     * хотя клиент пришёл по https. Без учёта proxy-заголовков получается redirect loop.
+     */
+    private function isOriginalRequestSecure(Request $request): bool
+    {
+        if ($request->secure()) {
+            return true;
+        }
+
+        $forwardedProto = strtolower((string) $request->headers->get('x-forwarded-proto', ''));
+        if ($forwardedProto !== '') {
+            $first = trim(explode(',', $forwardedProto)[0]);
+            if ($first === 'https') {
+                return true;
+            }
+        }
+
+        $cfVisitor = (string) $request->headers->get('cf-visitor', '');
+        if ($cfVisitor !== '' && stripos($cfVisitor, '"scheme":"https"') !== false) {
+            return true;
+        }
+
+        return strtolower((string) $request->headers->get('x-forwarded-ssl', '')) === 'on'
+            || strtolower((string) $request->headers->get('front-end-https', '')) === 'on'
+            || strtolower((string) $request->server('HTTPS', '')) === 'on';
     }
 }
