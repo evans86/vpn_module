@@ -66,7 +66,7 @@ class ForceHttps
 
     private function hostIsConfiguredHttpsPublicHost(Request $request): bool
     {
-        $host = strtolower((string) $request->getHost());
+        $host = $this->originalHost($request);
         if ($host === '') {
             return false;
         }
@@ -82,8 +82,9 @@ class ForceHttps
                 continue;
             }
 
-            $scheme = strtolower((string) parse_url(str_contains($url, '://') ? $url : 'https://' . $url, PHP_URL_SCHEME));
-            $configuredHost = strtolower((string) parse_url(str_contains($url, '://') ? $url : 'https://' . $url, PHP_URL_HOST));
+            $normalizedUrl = $this->normalizeUrl($url);
+            $scheme = strtolower((string) parse_url($normalizedUrl, PHP_URL_SCHEME));
+            $configuredHost = strtolower((string) parse_url($normalizedUrl, PHP_URL_HOST));
 
             if ($scheme === 'https' && $configuredHost !== '' && $host === $configuredHost) {
                 return true;
@@ -91,5 +92,23 @@ class ForceHttps
         }
 
         return false;
+    }
+
+    private function originalHost(Request $request): string
+    {
+        $forwardedHost = (string) $request->headers->get('x-forwarded-host', '');
+        if ($forwardedHost !== '') {
+            $first = trim(explode(',', $forwardedHost)[0]);
+            if ($first !== '') {
+                return strtolower($first);
+            }
+        }
+
+        return strtolower((string) $request->getHost());
+    }
+
+    private function normalizeUrl(string $url): string
+    {
+        return strpos($url, '://') !== false ? $url : 'https://' . $url;
     }
 }

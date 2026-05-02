@@ -15,7 +15,7 @@ class RedirectPersonalToConfigPublicHost
     public function handle(Request $request, Closure $next): Response
     {
         $base = rtrim((string) config('app.config_public_url'), '/');
-        $targetHost = parse_url(str_contains($base, '://') ? $base : 'https://' . $base, PHP_URL_HOST);
+        $targetHost = parse_url($this->normalizeUrl($base), PHP_URL_HOST);
 
         $requestHost = $this->originalHost($request);
         if (!$targetHost || strcasecmp($requestHost, (string) $targetHost) === 0) {
@@ -43,5 +43,10 @@ class RedirectPersonalToConfigPublicHost
         }
 
         return strtolower((string) $request->getHost());
+    }
+
+    private function normalizeUrl(string $url): string
+    {
+        return strpos($url, '://') !== false ? $url : 'https://' . $url;
     }
 }

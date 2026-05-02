@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Closure;
+use App\Helpers\UrlHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -18,7 +19,7 @@ class SalesmanOnly
     public function handle(Request $request, Closure $next)
     {
         if (!Auth::guard('salesman')->check()) {
-            return redirect()->to(route('personal.auth.telegram'));
+            return redirect()->to(UrlHelper::personalRoute('personal.auth'));
         }
         return $next($request);
     }
