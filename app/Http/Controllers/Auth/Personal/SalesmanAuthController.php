@@ -126,6 +126,7 @@ class SalesmanAuthController extends Controller
         session([
             'impersonation_admin_id' => $adminId,
             'impersonation_salesman_id' => $salesman->id,
+            'impersonation_admin_origin' => $this->allowedAdminOrigin((string) $request->query('admin_origin', '')),
         ]);
         Auth::guard('salesman')->login($salesman);
         $request->session()->regenerate();
@@ -258,6 +259,20 @@ class SalesmanAuthController extends Controller
     private function normalizeUrl(string $url): string
     {
         return strpos($url, '://') !== false ? $url : 'https://' . $url;
+    }
+
+    private function allowedAdminOrigin(string $origin): string
+    {
+        $origin = rtrim(trim($origin), '/');
+        $host = strtolower((string) parse_url($origin, PHP_URL_HOST));
+        if ($host === '') {
+            return rtrim((string) config('app.url'), '/');
+        }
+
+        $appUrl = rtrim((string) config('app.url'), '/');
+        $appHost = strtolower((string) parse_url($this->normalizeUrl($appUrl), PHP_URL_HOST));
+
+        return $host === $appHost ? $origin : $appUrl;
     }
 
     private function currentOrigin(): string

@@ -159,12 +159,35 @@ class SalesmanController extends Controller
                 'admin' => auth()->id(),
                 // Backend может видеть внутренний Host, поэтому целевой origin ЛК фиксируем в ссылке.
                 'origin' => $publicUrl,
+                // Куда вернуться после "Выйти в админку".
+                'admin_origin' => $this->currentOrigin(),
             ],
             false
         );
         $target = $publicUrl . '/' . ltrim($relativeTarget, '/');
 
         return redirect()->away($target);
+    }
+
+    private function currentOrigin(): string
+    {
+        $host = (string) request()->headers->get('x-forwarded-host', '');
+        if ($host !== '') {
+            $host = trim(explode(',', $host)[0]);
+        }
+        if ($host === '') {
+            $host = (string) request()->getHost();
+        }
+
+        $proto = (string) request()->headers->get('x-forwarded-proto', '');
+        if ($proto !== '') {
+            $proto = trim(explode(',', $proto)[0]);
+        }
+        if ($proto === '') {
+            $proto = 'https';
+        }
+
+        return strtolower($proto) . '://' . $host;
     }
 
     /**

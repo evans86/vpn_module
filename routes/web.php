@@ -74,10 +74,12 @@ Route::middleware([RedirectPersonalToConfigPublicHost::class])->group(function (
         }
         if (session()->has('impersonation_admin_id')) {
             $sid = session('impersonation_salesman_id');
+            $adminOrigin = rtrim((string) session('impersonation_admin_origin', config('app.url')), '/');
             Auth::guard('salesman')->logout();
-            session()->forget(['impersonation_admin_id', 'impersonation_salesman_id']);
+            session()->forget(['impersonation_admin_id', 'impersonation_salesman_id', 'impersonation_admin_origin']);
             if ($sid) {
-                return redirect()->route('admin.module.salesman.show', $sid)
+                $adminPath = route('admin.module.salesman.show', $sid, false);
+                return redirect()->away($adminOrigin . '/' . ltrim($adminPath, '/'))
                     ->with('success', 'Режим просмотра личного кабинета завершён.');
             }
         }
