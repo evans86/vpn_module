@@ -418,12 +418,15 @@ EOS,
         $host = $parts['host'];
         $port = (int) $parts['port'];
         $dashUrl = $parts['scheme'].'://'.$host.':'.$port.'/dashboard/';
-        $script = sprintf(
+        // Не использовать sprintf() для всего скрипта: внутри есть printf '%s' и sed с «%» — PHP съест спецификаторы и сломает bash (syntax error у «||»).
+        $script = str_replace(
+            ['__MARZBAN_RT_HOST__', '__MARZBAN_RT_PORT__', '__MARZBAN_RT_DASHURL__'],
+            [escapeshellarg($host), (string) $port, escapeshellarg($dashUrl)],
             <<<'EOS'
 set +e
-H=%1$s
-P=%2$d
-U=%3$s
+H=__MARZBAN_RT_HOST__
+P=__MARZBAN_RT_PORT__
+U=__MARZBAN_RT_DASHURL__
 cd /opt/marzban 2>/dev/null || { echo MARZBAN_RT_FAIL=no_app_dir; exit 71; }
 
 RUNDC() {
@@ -439,7 +442,7 @@ http_code_three() {
 probe_https_dashboard() {
   local raw last hdr
   if command -v curl >/dev/null 2>&1; then
-    raw=$(curl -sk -o /dev/null -w '%%{http_code}' \
+    raw=$(curl -sk -o /dev/null -w '%{http_code}' \
       --http1.1 --connect-timeout 25 --max-time 40 \
       --resolve "${H}:${P}:127.0.0.1" "${U}" 2>/dev/null) || raw=""
     last=$(http_code_three "$raw")
@@ -509,10 +512,7 @@ done
 echo "MARZBAN_RT_FAIL=https_last=${LAST:-none}_probe=${SRC:-none}_loops_22_$MARZ_NOTE"
 echo "MARZBAN_RT_HINT=check_uvicorn_in_docker_exec_wget_127.0.0.1_8000"
 exit 72
-EOS,
-            escapeshellarg($host),
-            $port,
-            escapeshellarg($dashUrl)
+EOS
         );
 
         $bash = str_replace(["\r\n", "\r"], "\n", $script);
