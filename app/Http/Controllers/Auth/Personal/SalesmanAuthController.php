@@ -181,7 +181,9 @@ class SalesmanAuthController extends Controller
             Cache::forget("telegram_auth:{$hash}");
 
             // Всегда редиректим в личный кабинет, независимо от источника
-            return redirect()->away($this->currentOrigin() . '/personal/dashboard?telegram_login=ok')
+            $origin = $this->callbackOrigin($request, $authData);
+
+            return redirect()->away($origin . '/personal/dashboard?telegram_login=ok')
                 ->with('success', 'Вы успешно авторизованы');
 
         } catch (Exception $e) {
@@ -191,9 +193,68 @@ class SalesmanAuthController extends Controller
                 'user_id' => $request->input('user'),
             ]);
 
-            return redirect()->away($this->currentOrigin() . '/personal/auth?auth_error=' . rawurlencode($e->getMessage()))
+            return redirect()->away($this->callbackOrigin($request) . '/personal/auth?auth_error=' . rawurlencode($e->getMessage()))
                 ->with('error', 'Ошибка авторизации: ' . $e->getMessage());
         }
+    }
+
+    private function callbackOrigin(Request $request, ?array $authData = null): string
+    {
+        $origin = trim((string) $request->input('origin', ''));
+        if ($origin !== '' && $this->isAllowedPersonalOrigin($origin)) {
+            return rtrim($origin, '/');
+        }
+
+        $callbackUrl = is_array($authData) ? (string) ($authData['callback_url'] ?? '') : '';
+        if ($callbackUrl !== '') {
+            $fromCallback = $this->originFromUrl($callbackUrl);
+            if ($fromCallback !== '' && $this->isAllowedPersonalOrigin($fromCallback)) {
+                return $fromCallback;
+            }
+        }
+
+        return $this->currentOrigin();
+    }
+
+    private function isAllowedPersonalOrigin(string $origin): bool
+    {
+        $originHost = strtolower((string) parse_url($origin, PHP_URL_HOST));
+        if ($originHost === '') {
+            return false;
+        }
+
+        $allowedUrls = array_filter(array_merge(
+            [(string) config('app.url'), (string) config('app.config_public_url'), (string) config('app.public_url')],
+            is_array(config('app.mirror_urls')) ? config('app.mirror_urls') : []
+        ));
+
+        foreach ($allowedUrls as $url) {
+            $allowedHost = strtolower((string) parse_url($this->normalizeUrl((string) $url), PHP_URL_HOST));
+            if ($allowedHost !== '' && $originHost === $allowedHost) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function originFromUrl(string $url): string
+    {
+        $url = $this->normalizeUrl($url);
+        $scheme = parse_url($url, PHP_URL_SCHEME) ?: 'https';
+        $host = parse_url($url, PHP_URL_HOST) ?: '';
+        $port = parse_url($url, PHP_URL_PORT);
+
+        if ($host === '') {
+            return '';
+        }
+
+        return $scheme . '://' . $host . ($port ? ':' . $port : '');
+    }
+
+    private function normalizeUrl(string $url): string
+    {
+        return strpos($url, '://') !== false ? $url : 'https://' . $url;
     }
 
     private function currentOrigin(): string
@@ -226,10 +287,27 @@ class SalesmanAuthController extends Controller
             return false;
         }
 
-        return hash_equals($this->authCallbackSignature($hash, $userId, $expires), $sig);
+        $origin = trim((string) $request->input('origin', ''));
+
+        return hash_equals($this->authCallbackSignature($hash, $userId, $expires, $origin), $sig)
+            // Совместимость со ссылками, созданными предыдущей версией без origin в подписи.
+            || ($origin === '' && hash_equals($this->legacyAuthCallbackSignature($hash, $userId, $expires), $sig));
     }
 
-    private function authCallbackSignature(string $hash, int $userId, int $expires): string
+    private function authCallbackSignature(string $hash, int $userId, int $expires, string $origin = ''): string
+    {
+        $key = (string) config('app.key');
+        if (strpos($key, 'base64:') === 0) {
+            $decoded = base64_decode(substr($key, 7), true);
+            if ($decoded !== false) {
+                $key = $decoded;
+            }
+        }
+
+        return hash_hmac('sha256', $hash . '|' . $userId . '|' . $expires . '|' . $origin, $key);
+    }
+
+    private function legacyAuthCallbackSignature(string $hash, int $userId, int $expires): string
     {
         $key = (string) config('app.key');
         if (strpos($key, 'base64:') === 0) {

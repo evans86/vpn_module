@@ -515,13 +515,15 @@ class FatherBotController extends AbstractTelegramBot
             Cache::put("telegram_auth:{$hash}", $authData, now()->addMinutes(30));
 
             $expires = now()->addMinutes(30)->timestamp;
+            $origin = $this->originFromCallbackUrl((string) ($authData['callback_url'] ?? ''));
 
             // Всегда добавляем параметр redirect=profile
             $confirmationUrl = $authData['callback_url'] . '?' . http_build_query([
                 'hash' => $hash,
                 'user' => $this->chatId,
                 'expires' => $expires,
-                'sig' => $this->authCallbackSignature($hash, (int) $this->chatId, $expires),
+                'origin' => $origin,
+                'sig' => $this->authCallbackSignature($hash, (int) $this->chatId, $expires, $origin),
                 'redirect' => 'profile', // Жестко задаем редирект в профиль
             ]);
 
@@ -545,7 +547,20 @@ class FatherBotController extends AbstractTelegramBot
         }
     }
 
-    private function authCallbackSignature(string $hash, int $userId, int $expires): string
+    private function originFromCallbackUrl(string $callbackUrl): string
+    {
+        $scheme = parse_url($callbackUrl, PHP_URL_SCHEME) ?: 'https';
+        $host = parse_url($callbackUrl, PHP_URL_HOST) ?: '';
+        $port = parse_url($callbackUrl, PHP_URL_PORT);
+
+        if ($host === '') {
+            return '';
+        }
+
+        return $scheme . '://' . $host . ($port ? ':' . $port : '');
+    }
+
+    private function authCallbackSignature(string $hash, int $userId, int $expires, string $origin = ''): string
     {
         $key = (string) config('app.key');
         if (strpos($key, 'base64:') === 0) {
@@ -555,7 +570,7 @@ class FatherBotController extends AbstractTelegramBot
             }
         }
 
-        return hash_hmac('sha256', $hash . '|' . $userId . '|' . $expires, $key);
+        return hash_hmac('sha256', $hash . '|' . $userId . '|' . $expires . '|' . $origin, $key);
     }
 
     /**
