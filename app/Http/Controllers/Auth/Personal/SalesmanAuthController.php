@@ -54,7 +54,7 @@ class SalesmanAuthController extends Controller
     public function logout()
     {
         Auth::guard('salesman')->logout();
-        return redirect()->to(UrlHelper::personalRoute('personal.auth'))
+        return redirect()->away($this->currentOrigin() . '/personal/auth')
             ->with('success', 'Вы успешно вышли из системы');
     }
 
@@ -64,7 +64,7 @@ class SalesmanAuthController extends Controller
     public function showLoginForm()
     {
         if (Auth::guard('salesman')->check()) {
-            return redirect()->to(UrlHelper::personalRoute('personal.dashboard'));
+            return redirect()->away($this->currentOrigin() . '/personal/dashboard');
         }
 
         return view('module.personal.auth.login');
@@ -76,7 +76,7 @@ class SalesmanAuthController extends Controller
     public function loginWithEmail(Request $request): RedirectResponse
     {
         if (! $request->has('_token')) {
-            return redirect()->to(UrlHelper::personalRoute('personal.auth'));
+            return redirect()->away($this->currentOrigin() . '/personal/auth');
         }
 
         $throttleKey = 'salesman-email-login:' . $request->ip();
@@ -107,7 +107,7 @@ class SalesmanAuthController extends Controller
         RateLimiter::clear($throttleKey);
         $request->session()->regenerate();
 
-        return redirect()->intended(UrlHelper::personalRoute('personal.dashboard'))
+        return redirect()->away($this->currentOrigin() . '/personal/dashboard')
             ->with('success', 'Вы вошли в личный кабинет');
     }
 
@@ -128,7 +128,7 @@ class SalesmanAuthController extends Controller
         ]);
         Auth::guard('salesman')->login($salesman);
 
-        return redirect()->to(UrlHelper::personalRoute('personal.dashboard'))
+        return redirect()->away($this->currentOrigin() . '/personal/dashboard')
             ->with('success', 'Режим администратора: вы видите личный кабинет как этот продавец.');
     }
 
@@ -181,7 +181,7 @@ class SalesmanAuthController extends Controller
             Cache::forget("telegram_auth:{$hash}");
 
             // Всегда редиректим в личный кабинет, независимо от источника
-            return redirect()->to(UrlHelper::personalRoute('personal.dashboard', ['telegram_login' => 'ok']))
+            return redirect()->away($this->currentOrigin() . '/personal/dashboard?telegram_login=ok')
                 ->with('success', 'Вы успешно авторизованы');
 
         } catch (Exception $e) {
@@ -191,9 +191,30 @@ class SalesmanAuthController extends Controller
                 'user_id' => $request->input('user'),
             ]);
 
-            return redirect()->to('/personal/auth?auth_error=' . rawurlencode($e->getMessage()))
+            return redirect()->away($this->currentOrigin() . '/personal/auth?auth_error=' . rawurlencode($e->getMessage()))
                 ->with('error', 'Ошибка авторизации: ' . $e->getMessage());
         }
+    }
+
+    private function currentOrigin(): string
+    {
+        $host = (string) request()->headers->get('x-forwarded-host', '');
+        if ($host !== '') {
+            $host = trim(explode(',', $host)[0]);
+        }
+        if ($host === '') {
+            $host = (string) request()->getHost();
+        }
+
+        $proto = (string) request()->headers->get('x-forwarded-proto', '');
+        if ($proto !== '') {
+            $proto = trim(explode(',', $proto)[0]);
+        }
+        if ($proto === '') {
+            $proto = 'https';
+        }
+
+        return strtolower($proto) . '://' . $host;
     }
 
     private function hasValidSignedFallback(Request $request, string $hash, int $userId): bool

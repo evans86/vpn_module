@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use Closure;
-use App\Helpers\UrlHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -19,8 +18,29 @@ class SalesmanOnly
     public function handle(Request $request, Closure $next)
     {
         if (!Auth::guard('salesman')->check()) {
-            return redirect()->to(UrlHelper::personalRoute('personal.auth'));
+            return redirect()->away($this->currentOrigin($request) . '/personal/auth');
         }
         return $next($request);
+    }
+
+    private function currentOrigin(Request $request): string
+    {
+        $host = (string) $request->headers->get('x-forwarded-host', '');
+        if ($host !== '') {
+            $host = trim(explode(',', $host)[0]);
+        }
+        if ($host === '') {
+            $host = (string) $request->getHost();
+        }
+
+        $proto = (string) $request->headers->get('x-forwarded-proto', '');
+        if ($proto !== '') {
+            $proto = trim(explode(',', $proto)[0]);
+        }
+        if ($proto === '') {
+            $proto = 'https';
+        }
+
+        return strtolower($proto) . '://' . $host;
     }
 }
