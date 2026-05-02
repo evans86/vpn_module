@@ -147,12 +147,19 @@ class SalesmanAuthController extends Controller
 
             $authData = Cache::get("telegram_auth:{$hash}");
             if (!$authData) {
-                Log::warning('Telegram auth callback without cache entry', [
-                    'hash' => $hash,
-                    'user_id' => $userId,
-                    'source' => 'telegram',
-                ]);
-                throw new Exception('Ссылка входа устарела или кэш был очищен. Нажмите «Войти через Telegram» заново.');
+                if (! $this->hasValidSignedFallback($request, (string) $hash, (int) $userId)) {
+                    Log::warning('Telegram auth callback without cache entry', [
+                        'hash' => $hash,
+                        'user_id' => $userId,
+                        'source' => 'telegram',
+                    ]);
+                    throw new Exception('Ссылка входа устарела или кэш был очищен. Нажмите «Войти через Telegram» заново.');
+                }
+
+                $authData = [
+                    'user_id' => (int) $userId,
+                    'source' => 'signed_fallback',
+                ];
             }
 
             $expectedUserId = (int) ($authData['user_id'] ?? 0);
@@ -187,5 +194,30 @@ class SalesmanAuthController extends Controller
             return redirect()->to('/personal/auth?auth_error=' . rawurlencode($e->getMessage()))
                 ->with('error', 'Ошибка авторизации: ' . $e->getMessage());
         }
+    }
+
+    private function hasValidSignedFallback(Request $request, string $hash, int $userId): bool
+    {
+        $expires = (int) $request->input('expires', 0);
+        $sig = (string) $request->input('sig', '');
+
+        if ($expires < time() || $sig === '') {
+            return false;
+        }
+
+        return hash_equals($this->authCallbackSignature($hash, $userId, $expires), $sig);
+    }
+
+    private function authCallbackSignature(string $hash, int $userId, int $expires): string
+    {
+        $key = (string) config('app.key');
+        if (strpos($key, 'base64:') === 0) {
+            $decoded = base64_decode(substr($key, 7), true);
+            if ($decoded !== false) {
+                $key = $decoded;
+            }
+        }
+
+        return hash_hmac('sha256', $hash . '|' . $userId . '|' . $expires, $key);
     }
 }

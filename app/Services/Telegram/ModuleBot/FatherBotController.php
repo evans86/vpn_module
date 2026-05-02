@@ -514,10 +514,14 @@ class FatherBotController extends AbstractTelegramBot
             $authData['user_id'] = $this->chatId;
             Cache::put("telegram_auth:{$hash}", $authData, now()->addMinutes(30));
 
+            $expires = now()->addMinutes(30)->timestamp;
+
             // Всегда добавляем параметр redirect=profile
             $confirmationUrl = $authData['callback_url'] . '?' . http_build_query([
                 'hash' => $hash,
                 'user' => $this->chatId,
+                'expires' => $expires,
+                'sig' => $this->authCallbackSignature($hash, (int) $this->chatId, $expires),
                 'redirect' => 'profile', // Жестко задаем редирект в профиль
             ]);
 
@@ -539,6 +543,19 @@ class FatherBotController extends AbstractTelegramBot
             Log::error('Auth processing failed: ' . $e->getMessage(), ['source' => 'telegram']);
             $this->sendMessage("❌ Ошибка авторизации: " . $e->getMessage());
         }
+    }
+
+    private function authCallbackSignature(string $hash, int $userId, int $expires): string
+    {
+        $key = (string) config('app.key');
+        if (strpos($key, 'base64:') === 0) {
+            $decoded = base64_decode(substr($key, 7), true);
+            if ($decoded !== false) {
+                $key = $decoded;
+            }
+        }
+
+        return hash_hmac('sha256', $hash . '|' . $userId . '|' . $expires, $key);
     }
 
     /**
