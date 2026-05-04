@@ -368,9 +368,17 @@ class LogUploadService
      */
     private function checkInstallation(SSH2 $ssh): bool
     {
-        $command = "test -f " . self::UPLOAD_SCRIPT_PATH . " && test -x " . self::UPLOAD_SCRIPT_PATH . " && echo 'exists'";
-        $result = $ssh->exec($command);
-        
+        $path = escapeshellarg(self::UPLOAD_SCRIPT_PATH);
+        $bash = 'if [ -f '.$path.' ] && [ -x '.$path.' ]; then printf "\n__LOG_SCRIPT_CHK__:1\n"; else printf "\n__LOG_SCRIPT_CHK__:0\n"; fi';
+        $raw = trim((string) $ssh->exec($bash));
+        if (preg_match_all('/__LOG_SCRIPT_CHK__:([01])/', $raw, $mm) && ! empty($mm[1])) {
+            return end($mm[1]) === '1';
+        }
+
+        $result = (string) $ssh->exec(
+            'test -f '.self::UPLOAD_SCRIPT_PATH.' && test -x '.self::UPLOAD_SCRIPT_PATH." && echo 'exists'"
+        );
+
         return strpos($result, 'exists') !== false;
     }
 
@@ -397,11 +405,15 @@ class LogUploadService
     {
         $bucket = (string) config('services.s3_logs.bucket', 's3://logsvpn');
         $escaped = escapeshellarg($bucket);
-        $bash = '(s3cmd ls '.$escaped.' 2>&1); echo S3LS_EXIT:$?';
-        $raw = trim($ssh->exec($bash));
-        if (preg_match('/S3LS_EXIT:(\d+)\s*$/', $raw, $m)) {
-            $exit = (int) $m[1];
-            $out = trim(preg_replace('/\s*S3LS_EXIT:\d+\s*$/', '', $raw));
+        $bash = 's3cmd ls '.$escaped.' 2>&1; printf "\n__S3_LS_EXIT__:%s\n" "$?"';
+        $raw = trim((string) $ssh->exec($bash));
+        $exit = null;
+        if (preg_match_all('/__S3_LS_EXIT__:(\d+)/', $raw, $mm) && ! empty($mm[1])) {
+            $exit = (int) end($mm[1]);
+        }
+        $out = trim((string) preg_replace('/\s*__S3_LS_EXIT__:\d+\s*\z/', '', $raw));
+
+        if ($exit !== null) {
             if ($exit === 0) {
                 return ['ok' => true, 'message' => $out !== '' ? $out : $bucket];
             }
@@ -409,7 +421,17 @@ class LogUploadService
             return ['ok' => false, 'message' => $out !== '' ? $out : ('код '.$exit)];
         }
 
-        return ['ok' => false, 'message' => $raw !== '' ? $raw : 'нет вывода s3cmd'];
+        $sshExit = $ssh->getExitStatus();
+        if ($sshExit === 0 && stripos($out, 'ERROR:') === false) {
+            Log::warning('Log upload S3 verify: marker __S3_LS_EXIT__ missing; accepted by SSH exit 0', [
+                'source' => 'server',
+                'out_preview' => strlen($out) > 600 ? substr($out, 0, 600).'…' : $out,
+            ]);
+
+            return ['ok' => true, 'message' => $out !== '' ? $out : $bucket];
+        }
+
+        return ['ok' => false, 'message' => $out !== '' ? $out : 'нет маркера __S3_LS_EXIT__, SSH exit: '.json_encode($sshExit)];
     }
 
     /**

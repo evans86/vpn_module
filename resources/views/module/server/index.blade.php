@@ -138,8 +138,13 @@
                      class="hidden mb-4 w-full text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 max-h-72 overflow-auto border border-slate-700"></pre>
                 <pre id="bulkRunLogUploadNowOut"
                      class="hidden mb-4 w-full text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 max-h-96 overflow-auto border border-slate-700"></pre>
-                <pre id="bulkReinstallLogUploadScriptOut"
-                     class="hidden mb-4 w-full text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 max-h-96 overflow-auto border border-slate-700"></pre>
+                <div id="logUploadInstallPanel" class="hidden mb-4 rounded-md border border-sky-700 overflow-hidden shadow-sm">
+                    <div class="px-3 py-1.5 text-xs font-medium text-sky-950 bg-sky-100 border-b border-sky-300">
+                        Результат: установка / обновление скрипта выгрузки (одна нода или массово) — см. строки ниже
+                    </div>
+                    <pre id="logUploadInstallResultOut"
+                         class="w-full text-xs font-mono bg-slate-900 text-green-100 p-3 max-h-96 overflow-auto border-t border-slate-700 min-h-[2rem]"></pre>
+                </div>
                 <!-- Cards Grid -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     @foreach($servers as $server)
@@ -390,13 +395,13 @@
                                             </button>
                                         @endif
                                         @if(!$server->logs_upload_enabled)
-                                            <button type="button" onclick="enableLogUpload({{ $server->id }}, false)"
+                                            <button type="button" onclick="enableLogUpload({{ $server->id }}, false, @json($server->name ?: 'Сервер #'.$server->id))"
                                                     class="inline-flex flex-1 min-w-[min(100%,10rem)] basis-[calc(50%-0.25rem)] max-w-full items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors">
                                                 <i class="fas fa-upload mr-2"></i>
                                                 <span>Включить логи</span>
                                             </button>
                                         @else
-                                            <button type="button" onclick="enableLogUpload({{ $server->id }}, true)"
+                                            <button type="button" onclick="enableLogUpload({{ $server->id }}, true, @json($server->name ?: 'Сервер #'.$server->id))"
                                                     title="Заново записать /root/upload-logs.sh, ключи в ~/.s3cfg и строку cron (как при первом включении, с актуальным бакетом из .env)."
                                                     class="inline-flex flex-1 min-w-[min(100%,10rem)] basis-[calc(50%-0.25rem)] max-w-full items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-sky-800 bg-sky-50 hover:bg-sky-100 border border-sky-300 transition-colors">
                                                 <i class="fas fa-sync-alt mr-2"></i>
@@ -961,9 +966,22 @@
                 });
             }
 
+            /** Показать блок результата над списком серверов — установка / обновление скрипта выгрузки */
+            function showLogUploadInstallPanel(text) {
+                var wrap = document.getElementById('logUploadInstallPanel');
+                var out = document.getElementById('logUploadInstallResultOut');
+                if (!out || !wrap) {
+                    return;
+                }
+                wrap.classList.remove('hidden');
+                out.textContent = text;
+                wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+
             // Включить или переустановить выгрузку логов (тот же эндпоинт)
-            function enableLogUpload(id, reinstall) {
+            function enableLogUpload(id, reinstall, serverLabel) {
                 reinstall = !!reinstall;
+                serverLabel = serverLabel || ('#' + id);
                 var confirmText = reinstall
                     ? 'Переустановить скрипт выгрузки на этом сервере?\n\nБудут заново записаны /root/upload-logs.sh, ~/.s3cfg и задача cron с бакетом и ключами из конфигурации панели. Может занять минуту (apt и s3cmd).'
                     : 'Включить выгрузку логов на этом сервере? Это может занять некоторое время.';
@@ -979,13 +997,20 @@
                     },
                     beforeSend: function() {
                         toastr.info(reinstall ? 'Обновление скрипта выгрузки…' : 'Настройка выгрузки логов...', 'Пожалуйста, подождите');
+                        showLogUploadInstallPanel(
+                            (reinstall ? 'Обновление скрипта выгрузки' : 'Включение выгрузки логов') +
+                                '\n' + serverLabel + ' (id ' + id + ')\n\nВыполняется по SSH…'
+                        );
                     },
                     success: function (response) {
+                        var headline = reinstall ? 'Обновление скрипта выгрузки' : 'Включение выгрузки логов';
+                        var statusLine = (response.success ? 'OK' : 'Ошибка') + ': ' + (response.message || '');
+                        showLogUploadInstallPanel(
+                            headline + '\n' + serverLabel + ' (id ' + id + ')\n' + statusLine
+                        );
                         if (response.success) {
                             toastr.success(response.message || 'Выгрузка логов успешно включена');
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 1500);
+                            setTimeout(() => window.location.reload(), 6000);
                         } else {
                             toastr.error(response.message || 'Ошибка при включении выгрузки логов');
                         }
@@ -996,6 +1021,10 @@
                             errorMessage = xhr.responseJSON.message || errorMessage;
                         }
                         toastr.error(errorMessage);
+                        showLogUploadInstallPanel(
+                            (reinstall ? 'Обновление скрипта' : 'Включение выгрузки') +
+                                '\n' + serverLabel + ' (id ' + id + ')\nОшибка запроса: ' + errorMessage
+                        );
                     }
                 });
             }
@@ -1171,11 +1200,13 @@
                     return;
                 }
                 var btn = $(this);
-                var out = document.getElementById('bulkReinstallLogUploadScriptOut');
+                var wrap = document.getElementById('logUploadInstallPanel');
+                var out = document.getElementById('logUploadInstallResultOut');
                 btn.prop('disabled', true);
-                if (out) {
-                    out.classList.remove('hidden');
-                    out.textContent = 'Выполняется переустановка по серверам…';
+                if (wrap && out) {
+                    wrap.classList.remove('hidden');
+                    out.textContent = 'Массовое обновление скрипта выгрузки\n\nВыполняется по очереди по серверам…';
+                    wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
                 $.ajax({
                     url: '{{ route('admin.module.server.bulk-reinstall-log-upload-script') }}',
@@ -1185,7 +1216,10 @@
                         only_configured: 1
                     },
                     success: function (response) {
-                        var lines = [(response.message || '')];
+                        var lines = [
+                            'Массовое обновление скрипта выгрузки (статус «Настроен» + включена выгрузка в БД)',
+                            response.message || ''
+                        ];
                         (response.results || []).forEach(function (r) {
                             var prefix = '#' + r.id + ' ' + (r.name || '');
                             if (r.skipped) {
@@ -1194,13 +1228,11 @@
                                 lines.push(prefix + ' — ' + (r.success ? 'OK' : 'ошибка') + ': ' + (r.message || ''));
                             }
                         });
-                        if (out) {
-                            out.textContent = lines.join('\n');
-                        }
+                        showLogUploadInstallPanel(lines.join('\n'));
                         if (response.success) {
                             toastr.success(response.message || 'Готово');
                         } else {
-                            toastr.warning(response.message || 'Есть ошибки — см. лог ниже');
+                            toastr.warning(response.message || 'Есть ошибки — см. блок выше списком серверов');
                         }
                     },
                     error: function (xhr) {
@@ -1209,9 +1241,7 @@
                             msg = xhr.responseJSON.message;
                         }
                         toastr.error(msg);
-                        if (out) {
-                            out.textContent = msg;
-                        }
+                        showLogUploadInstallPanel('Массовое обновление скрипта выгрузки\n\nОшибка запроса: ' + msg);
                     },
                     complete: function () {
                         btn.prop('disabled', false);

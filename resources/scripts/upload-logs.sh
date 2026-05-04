@@ -10,8 +10,9 @@ S3_BUCKET="{{S3_BUCKET}}"
 S3_CONFIG="/root/.s3cfg"
 UPLOAD_SCRIPT="/root/upload-logs.sh"
 
-# Install required packages
-apt update && apt install -y s3cmd
+# Install required packages (apt-get без «Stable CLI»-warning от интерактивного apt)
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq </dev/null && apt-get install -y -qq s3cmd </dev/null
 
 # Configure s3cmd
 cat <<EOF > "$S3_CONFIG"
