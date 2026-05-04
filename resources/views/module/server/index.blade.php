@@ -1196,57 +1196,119 @@
             });
 
             $('#bulkReinstallLogUploadScriptBtn').on('click', function () {
-                if (!confirm('Переустановить скрипт выгрузки логов на всех серверах со статусом «Настроен», у которых выгрузка уже включена в БД?\n\nПо очереди: полная установка как при «Обновить скрипт выгрузки» (apt, ~/.s3cfg, /root/upload-logs.sh, cron, проверка s3cmd ls). Может занять много времени. Нужен SSH в карточке.')) {
+                if (!confirm('Переустановить скрипт выгрузки логов на всех серверах со статусом «Настроен», у которых выгрузка уже включена в БД?\n\nПо очереди: полная установка как при «Обновить скрипт выгрузки» (apt, ~/.s3cfg, /root/upload-logs.sh, cron, проверка s3cmd ls). Запрос идёт пакетами по 5 нод, чтобы не обрывался таймаут HTTP. Нужен SSH в карточке.')) {
                     return;
                 }
                 var btn = $(this);
                 var wrap = document.getElementById('logUploadInstallPanel');
                 var out = document.getElementById('logUploadInstallResultOut');
                 btn.prop('disabled', true);
+
+                var lines = [
+                    'Массовое обновление скрипта выгрузки',
+                    'Запросы идут пакетами (до 5 серверов за один HTTP-вызов), чтобы прокси/PHP не рвали длинное соединение.',
+                    ''
+                ];
+                var totals = { attempted: 0, ok: 0, fail: 0, skipped: 0 };
+                var matchedTotalHint = '?';
+
                 if (wrap && out) {
                     wrap.classList.remove('hidden');
-                    out.textContent = 'Массовое обновление скрипта выгрузки\n\nВыполняется по очереди по серверам…';
+                    out.textContent = lines.join('\n') + '\nВыполняется первый пакет…';
                     wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
-                $.ajax({
-                    url: '{{ route('admin.module.server.bulk-reinstall-log-upload-script') }}',
-                    method: 'POST',
-                    data: {
-                        _token: '{{ csrf_token() }}',
-                        only_configured: 1
-                    },
-                    success: function (response) {
-                        var lines = [
-                            'Массовое обновление скрипта выгрузки (статус «Настроен» + включена выгрузка в БД)',
-                            response.message || ''
-                        ];
-                        (response.results || []).forEach(function (r) {
-                            var prefix = '#' + r.id + ' ' + (r.name || '');
-                            if (r.skipped) {
-                                lines.push(prefix + ' — пропуск: ' + (r.message || ''));
-                            } else {
-                                lines.push(prefix + ' — ' + (r.success ? 'OK' : 'ошибка') + ': ' + (r.message || ''));
-                            }
-                        });
-                        showLogUploadInstallPanel(lines.join('\n'));
-                        if (response.success) {
-                            toastr.success(response.message || 'Готово');
-                        } else {
-                            toastr.warning(response.message || 'Есть ошибки — см. блок выше списком серверов');
-                        }
-                    },
-                    error: function (xhr) {
-                        var msg = 'Запрос не выполнен';
-                        if (xhr.responseJSON && xhr.responseJSON.message) {
-                            msg = xhr.responseJSON.message;
-                        }
-                        toastr.error(msg);
-                        showLogUploadInstallPanel('Массовое обновление скрипта выгрузки\n\nОшибка запроса: ' + msg);
-                    },
-                    complete: function () {
-                        btn.prop('disabled', false);
+
+                function renderPanel() {
+                    var tail = '\n────────────────────\nНакопленно по пакетам: попыток ' + totals.attempted + ', успех ' + totals.ok + ', ошибок ' + totals.fail + ', пропуск ' + totals.skipped;
+                    showLogUploadInstallPanel(lines.join('\n') + tail);
+                }
+
+                function appendBatch(response) {
+                    var b = response.batch || {};
+                    if (b.matched_total != null) {
+                        matchedTotalHint = b.matched_total;
                     }
-                });
+                    lines.push('— Пакет: после id ' + String(b.after_id != null ? b.after_id : 0) +
+                        ', курсор дальше id ' + String(b.next_after_id != null ? b.next_after_id : '?') +
+                        ', ещё пакеты: ' + (b.has_more ? 'да' : 'нет') +
+                        ', подходит по БД: ' + matchedTotalHint);
+                    lines.push(response.message || '');
+                    (response.results || []).forEach(function (r) {
+                        var prefix = '#' + r.id + ' ' + (r.name || '');
+                        if (r.skipped) {
+                            lines.push(prefix + ' — пропуск: ' + (r.message || ''));
+                        } else {
+                            lines.push(prefix + ' — ' + (r.success ? 'OK' : 'ошибка') + ': ' + (r.message || ''));
+                        }
+                    });
+                    lines.push('');
+                    var s = response.summary || {};
+                    totals.attempted += (s.attempted || 0);
+                    totals.ok += (s.ok || 0);
+                    totals.fail += (s.fail || 0);
+                    totals.skipped += (s.skipped || 0);
+                }
+
+                function runBatch(afterId) {
+                    $.ajax({
+                        url: '{{ route('admin.module.server.bulk-reinstall-log-upload-script') }}',
+                        method: 'POST',
+                        timeout: 420000,
+                        data: {
+                            _token: '{{ csrf_token() }}',
+                            only_configured: 1,
+                            after_id: afterId,
+                            per_batch: 5
+                        },
+                        success: function (response) {
+                            appendBatch(response);
+                            renderPanel();
+                            var b = response.batch || {};
+                            if (b.has_more) {
+                                lines.push('Запрос следующего пакета…');
+                                renderPanel();
+                                runBatch(b.next_after_id || 0);
+
+                                return;
+                            }
+                            lines.push('===== Итог по всем пакетам: попыток ' + totals.attempted +
+                                ', успех ' + totals.ok + ', ошибок ' + totals.fail + ', пропуск ' + totals.skipped);
+                            renderPanel();
+                            if (totals.fail === 0 && totals.attempted > 0) {
+                                toastr.success('Обновление скрипта завершено без ошибок на всех попытках');
+                            } else if (totals.fail > 0) {
+                                toastr.warning('Часть нод завершилась с ошибкой — см. текст в блоке выше');
+                            } else if (totals.attempted === 0 && totals.skipped === 0) {
+                                toastr.info(response.message || 'Нет серверов для обработки');
+                            } else if (totals.attempted === 0) {
+                                toastr.warning('Только пропуски (нет SSH) — см. блок выше');
+                            } else {
+                                toastr.success(response.message || 'Готово');
+                            }
+                            btn.prop('disabled', false);
+                        },
+                        error: function (xhr, textStatus) {
+                            var msg = 'Запрос не выполнен';
+                            if (xhr.responseJSON && xhr.responseJSON.message) {
+                                msg = xhr.responseJSON.message;
+                            } else if (textStatus === 'timeout') {
+                                msg = 'Таймаут запроса (7 мин). Уменьшите per_batch на стороне сервера или увеличьте proxy_read_timeout / max_execution_time.';
+                            } else if (xhr.status === 502 || xhr.status === 504) {
+                                msg = 'HTTP ' + xhr.status + ' — похоже на таймаут или обрыв прокси; обработка остановилась.';
+                            }
+                            toastr.error(msg);
+                            lines.push('');
+                            lines.push('!!! Ошибка HTTP при пакете после id ' + afterId + ': ' + msg);
+                            if (xhr.status) {
+                                lines.push('Статус: ' + xhr.status);
+                            }
+                            renderPanel();
+                            btn.prop('disabled', false);
+                        }
+                    });
+                }
+
+                runBatch(0);
             });
         </script>
     @endpush

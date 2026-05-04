@@ -1011,7 +1011,8 @@ class ServerController extends Controller
     }
 
     /**
-     * По SSH переустановить скрипт выгрузки логов (/root/upload-logs.sh, ~/.s3cfg, cron) как у кнопки «Обновить скрипт выгрузки».
+     * По SSH переустановить скрипт выгрузки логов. Длинные списки обрабатывайте порциями (after_id + per_batch),
+     * иначе один HTTP-запрос может оборваться по таймауту прокси при 10+ нодах.
      */
     public function bulkReinstallLogUploadScript(Request $request): JsonResponse
     {
@@ -1020,17 +1021,48 @@ class ServerController extends Controller
         }
 
         $onlyConfigured = $request->boolean('only_configured', true);
+        $afterId = max(0, (int) $request->input('after_id', 0));
+        $perBatch = min(5, max(1, (int) $request->input('per_batch', 5)));
 
-        $q = Server::query()
+        $baseQuery = Server::query()
             ->where('server_status', '!=', Server::SERVER_DELETED)
-            ->where('logs_upload_enabled', true);
+            ->where('logs_upload_enabled', true)
+            ->whereNotNull('ip')
+            ->where('ip', '!=', '');
         if ($onlyConfigured) {
-            $q->where('server_status', Server::SERVER_CONFIGURED);
+            $baseQuery->where('server_status', Server::SERVER_CONFIGURED);
         }
-        $servers = $q->whereNotNull('ip')
-            ->where('ip', '!=', '')
+
+        $matchedTotal = (clone $baseQuery)->count();
+        $servers = (clone $baseQuery)
+            ->where('id', '>', $afterId)
             ->orderBy('id')
+            ->limit($perBatch)
             ->get();
+
+        if ($servers->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'message' => $afterId === 0
+                    ? 'Нет серверов для переустановки (в БД нет подходящих записей).'
+                    : 'Дальше записей нет — все пакеты обработаны.',
+                'batch' => [
+                    'after_id' => $afterId,
+                    'next_after_id' => $afterId,
+                    'has_more' => false,
+                    'per_batch' => $perBatch,
+                    'matched_total' => $matchedTotal,
+                ],
+                'summary' => [
+                    'total' => 0,
+                    'attempted' => 0,
+                    'ok' => 0,
+                    'fail' => 0,
+                    'skipped' => 0,
+                ],
+                'results' => [],
+            ]);
+        }
 
         $results = [];
         $ok = 0;
@@ -1068,20 +1100,29 @@ class ServerController extends Controller
             ];
         }
 
+        $nextAfterId = (int) $servers->max('id');
+        $hasMore = (clone $baseQuery)->where('id', '>', $nextAfterId)->exists();
+
         $message = sprintf(
-            'С выгрузкой в БД%s: %d · попытка переустановки: %d · успех: %d · ошибок: %d · пропуск (нет SSH): %d.',
-            $onlyConfigured ? ' и статусом «Настроен»' : '',
+            'Пакет: id > %d, до %d серверов в запросе%s · в порции %d · попытка: %d · успех: %d · ошибок: %d · пропуск (нет SSH): %d · всего подходящих в БД: %d.',
+            $afterId,
+            $perBatch,
+            $onlyConfigured ? ' («Настроен»)' : '',
             $servers->count(),
             $attempted,
             $ok,
             $fail,
-            $skipped
+            $skipped,
+            $matchedTotal
         );
 
-        $this->logger->info('Bulk reinstall marzban log upload script', [
+        $this->logger->info('Bulk reinstall marzban log upload script (batch)', [
             'source' => 'server',
             'user_id' => auth()->id(),
             'only_configured' => $onlyConfigured,
+            'after_id' => $afterId,
+            'per_batch' => $perBatch,
+            'has_more' => $hasMore,
             'summary' => compact('ok', 'fail', 'skipped', 'attempted'),
         ]);
 
@@ -1090,6 +1131,13 @@ class ServerController extends Controller
         return response()->json([
             'success' => $allSucceeded,
             'message' => $message,
+            'batch' => [
+                'after_id' => $afterId,
+                'next_after_id' => $nextAfterId,
+                'has_more' => $hasMore,
+                'per_batch' => $perBatch,
+                'matched_total' => $matchedTotal,
+            ],
             'summary' => [
                 'total' => $servers->count(),
                 'attempted' => $attempted,

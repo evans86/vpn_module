@@ -224,7 +224,7 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
                     ->middleware('throttle:8,10')
                     ->name('bulk-run-log-upload');
                 Route::post('/bulk-reinstall-log-upload-script', [ServerController::class, 'bulkReinstallLogUploadScript'])
-                    ->middleware('throttle:4,10')
+                    ->middleware('throttle:120,1')
                     ->name('bulk-reinstall-log-upload-script');
                 Route::post('/{server}/setup-dns', [ServerController::class, 'setupDns'])->name('setup-dns');
                 Route::post('/{server}/ping-and-configure', [ServerController::class, 'pingAndConfigure'])->name('ping-and-configure');
