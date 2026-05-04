@@ -216,7 +216,8 @@
 
                 panelInfo(id) {
                     if (id === '' || id === null || id === undefined) return null;
-                    return this.panelsMeta[String(id)] ?? null;
+                    var pm = this.panelsMeta[String(id)];
+                    return (pm !== undefined && pm !== null) ? pm : null;
                 },
 
                 panelField(id, field) {
@@ -254,7 +255,7 @@
                     })
                         .then(r => r.json())
                         .then(data => {
-                            this.keyCount = data.count ?? 0;
+                            this.keyCount = (data.count !== undefined && data.count !== null) ? data.count : 0;
                             var el = document.getElementById('source_panel_id');
                             if (el) el.dataset.count = this.keyCount;
                         })
@@ -278,6 +279,10 @@
         (function () {
             var formEl = document.getElementById('mass-transfer-form');
             if (!formEl) return;
+
+            formEl.addEventListener('submit', function (submitGuard) {
+                submitGuard.preventDefault();
+            }, true);
 
             var btnDownload = document.getElementById('btn-download-report');
             if (btnDownload) btnDownload.addEventListener('click', function () {
