@@ -23,9 +23,12 @@ host_base = storage.yandexcloud.net
 host_bucket = %(bucket)s.storage.yandexcloud.net
 EOF
 
-# Create daily upload script
-cat <<'EOF' > "$UPLOAD_SCRIPT"
-#!/bin/bash
+# Ежедневный скрипт: bucket подставляется здесь (во вложенном heredoc с 'INNER' переменные бы не попали в файл).
+{
+  echo '#!/bin/bash'
+  echo "S3_BUCKET=\"$S3_BUCKET\""
+  cat <<'INNER'
+set -euo pipefail
 
 # Получаем вчерашнюю дату и IP-адрес сервера
 YESTERDAY=$(date -d "yesterday" +"%Y-%m-%d")
@@ -69,7 +72,14 @@ if [[ -f "$ACCESS_LOG" || -f "$ERROR_LOG" ]]; then
   
   # Загружаем в S3
   echo "[+] Uploading to S3: $COMBINED_GZ → $S3_BUCKET"
-  s3cmd put "$COMBINED_GZ" "$S3_BUCKET/"
+  if [[ -z "${S3_BUCKET:-}" ]]; then
+    echo "[!] S3_BUCKET is empty, check /root/upload-logs.sh install" >&2
+    exit 1
+  fi
+  if ! s3cmd put "$COMBINED_GZ" "$S3_BUCKET/"; then
+    echo "[!] s3cmd put failed (credentials, network, or bucket path)" >&2
+    exit 1
+  fi
   
   # Удаляем оригинальные файлы и временный объединенный файл
   if [[ -f "$ACCESS_LOG" ]]; then
@@ -85,9 +95,8 @@ if [[ -f "$ACCESS_LOG" || -f "$ERROR_LOG" ]]; then
   echo "[+] Removing temporary combined log: $COMBINED_LOG"
   rm "$COMBINED_LOG"
   
-  echo "[+] Removing gzipped combined log: $COMBINED_LOG"
+  echo "[+] Removing gzipped archive after upload: $COMBINED_GZ"
   if [[ -f "$COMBINED_GZ" ]]; then
-    echo "[+] Removing original: $COMBINED_GZ"
     rm "$COMBINED_GZ"
   fi
   
@@ -103,12 +112,12 @@ else
   echo "[!] No log files found to process"
 fi
 
-EOF
+INNER
+} > "$UPLOAD_SCRIPT"
 
 chmod +x "$UPLOAD_SCRIPT"
 
-# Register cronjob
-(crontab -l 2>/dev/null; echo "30 0 * * * $UPLOAD_SCRIPT >> /var/log/s3upload.log 2>&1") | crontab -
+# Register cronjob (одна строка — при повторном запуске установки не дублируем задачу)
+(crontab -l 2>/dev/null | grep -vF "$UPLOAD_SCRIPT" || true; echo "30 0 * * * $UPLOAD_SCRIPT >> /var/log/s3upload.log 2>&1") | crontab -
 
 echo "[+] Setup complete. Logs will be compressed and uploaded to $S3_BUCKET daily at 00:30."
-

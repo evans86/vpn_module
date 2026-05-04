@@ -64,6 +64,14 @@ class LogUploadService
             // Выполняем скрипт установки
             $this->executeInstallation($ssh);
 
+            // Проверяем доступ к бакету с сервера (ключи, сеть, имя бакета)
+            $verify = $this->verifyS3AccessFromHost($ssh);
+            if (!$verify['ok']) {
+                throw new RuntimeException(
+                    'Не удалось прочитать бакет с сервера (s3cmd ls). Выгрузка не будет работать. '.$verify['message']
+                );
+            }
+
             // Проверяем, что скрипт установлен
             $isInstalled = $this->checkInstallation($ssh);
 
@@ -187,7 +195,7 @@ class LogUploadService
         $checkCommand = "test -f /tmp/upload-logs-install.sh && test -x /tmp/upload-logs-install.sh && echo 'ok'";
         $checkResult = $ssh->exec($checkCommand);
         
-        if (!str_contains($checkResult, 'ok')) {
+        if (strpos($checkResult, 'ok') === false) {
             Log::error('Script upload verification failed', [
                 'upload_result' => $result,
                 'check_result' => $checkResult
@@ -228,7 +236,7 @@ class LogUploadService
         $command = "test -f " . self::UPLOAD_SCRIPT_PATH . " && test -x " . self::UPLOAD_SCRIPT_PATH . " && echo 'exists'";
         $result = $ssh->exec($command);
         
-        return str_contains($result, 'exists');
+        return strpos($result, 'exists') !== false;
     }
 
     /**
@@ -241,8 +249,32 @@ class LogUploadService
     {
         $command = "crontab -l 2>/dev/null | grep -q 'upload-logs.sh' && echo 'configured'";
         $result = $ssh->exec($command);
-        
-        return str_contains($result, 'configured');
+
+        return strpos($result, 'configured') !== false;
+    }
+
+    /**
+     * Проверка: с сервера виден объектный стор через s3cmd (после записи ~/.s3cfg установщиком).
+     *
+     * @return array{ok: bool, message: string}
+     */
+    private function verifyS3AccessFromHost(SSH2 $ssh): array
+    {
+        $bucket = (string) config('services.s3_logs.bucket', 's3://logsvpn');
+        $escaped = escapeshellarg($bucket);
+        $bash = '(s3cmd ls '.$escaped.' 2>&1); echo S3LS_EXIT:$?';
+        $raw = trim($ssh->exec($bash));
+        if (preg_match('/S3LS_EXIT:(\d+)\s*$/', $raw, $m)) {
+            $exit = (int) $m[1];
+            $out = trim(preg_replace('/\s*S3LS_EXIT:\d+\s*$/', '', $raw));
+            if ($exit === 0) {
+                return ['ok' => true, 'message' => $out !== '' ? $out : $bucket];
+            }
+
+            return ['ok' => false, 'message' => $out !== '' ? $out : ('код '.$exit)];
+        }
+
+        return ['ok' => false, 'message' => $raw !== '' ? $raw : 'нет вывода s3cmd'];
     }
 
     /**
