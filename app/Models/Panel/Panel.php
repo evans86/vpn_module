@@ -584,9 +584,9 @@ class Panel extends Model
             case self::CONFIG_TYPE_REALITY_STABLE:
                 return 'REALITY стабильный (только REALITY)';
             case self::CONFIG_TYPE_MIXED:
-                return 'SS + Trojan + 3 REALITY';
+                return 'Смешанная';
             case self::CONFIG_TYPE_MIXED_WARP:
-                return 'SS + Trojan + 3 REALITY + WARP';
+                return 'Смешанная + WARP';
             default:
                 return 'Неизвестно';
         }
@@ -612,6 +612,22 @@ class Panel extends Model
                 return 'purple';
             default:
                 return 'secondary';
+        }
+    }
+
+    /**
+     * Классы Tailwind для бейджа типа конфига на странице распределения и в списках.
+     * Смешанная / Смешанная + WARP выделены разными цветами.
+     */
+    public function getConfigDistributionBadgeTailwindAttribute(): string
+    {
+        switch ($this->config_type) {
+            case self::CONFIG_TYPE_MIXED:
+                return 'border-amber-400/70 bg-amber-50 text-amber-950 ring-1 ring-amber-400/25';
+            case self::CONFIG_TYPE_MIXED_WARP:
+                return 'border-violet-500/65 bg-violet-50 text-violet-950 ring-1 ring-violet-400/35';
+            default:
+                return 'border-slate-200/90 bg-white text-slate-700 shadow-sm';
         }
     }
 

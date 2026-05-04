@@ -108,7 +108,7 @@
                                                class="font-mono text-sm font-bold text-indigo-700 hover:text-indigo-900 hover:underline decoration-2 underline-offset-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 rounded">
                                                 #{{ $panel->id }}
                                             </a>
-                                            <span class="inline-flex max-w-full items-center truncate rounded-md border border-slate-200/90 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700 shadow-sm"
+                                            <span class="inline-flex max-w-full items-center truncate rounded-md border px-2 py-0.5 text-[10px] font-medium {{ $panel->config_distribution_badge_tailwind }}"
                                                   title="{{ $cfgKey !== '' ? $cfgLabel.' · '.$cfgKey : $cfgLabel }}">
                                                 {{ $cfgLabel }}
                                             </span>

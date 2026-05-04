@@ -17,7 +17,7 @@
                             <div class="flex-1">
                                 <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
                                     <span class="font-semibold text-gray-900">ID-{{ $panel->id }}</span>
-                                    <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-800 border border-slate-200" title="{{ $panel->config_type ? $panel->config_type_label.' · '.$panel->config_type : $panel->config_type_label }}">{{ $panel->config_type_label }}</span>
+                                    <span class="px-2 py-0.5 rounded text-[11px] font-medium border {{ $panel->config_distribution_badge_tailwind }}" title="{{ $panel->config_type ? $panel->config_type_label.' · '.$panel->config_type : $panel->config_type_label }}">{{ $panel->config_type_label }}</span>
                                     <span class="px-2 py-1 text-xs font-semibold bg-red-500 text-white rounded">Ошибка</span>
                                 </div>
                                 <div class="text-sm text-gray-600 mb-2">
@@ -101,7 +101,7 @@
                             <div class="flex-1">
                                 <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
                                     <span class="font-semibold text-gray-900">ID-{{ $panel->id }}</span>
-                                    <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-800 border border-slate-200" title="{{ $panel->config_type ? $panel->config_type_label.' · '.$panel->config_type : $panel->config_type_label }}">{{ $panel->config_type_label }}</span>
+                                    <span class="px-2 py-0.5 rounded text-[11px] font-medium border {{ $panel->config_distribution_badge_tailwind }}" title="{{ $panel->config_type ? $panel->config_type_label.' · '.$panel->config_type : $panel->config_type_label }}">{{ $panel->config_type_label }}</span>
                                     <span class="px-2 py-1 text-xs font-semibold bg-yellow-500 text-white rounded">Исключена</span>
                                 </div>
                                 <div class="text-sm text-gray-600">

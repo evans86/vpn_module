@@ -364,7 +364,7 @@ class PanelController extends Controller
             $strategy->updateConfigurationMixed($panel->id);
 
             return redirect()->route('admin.module.panel.index')
-                ->with('success', 'Конфигурация «SS + Trojan + VLESS + 2 REALITY» применена');
+                ->with('success', 'Конфигурация «Смешанная» применена');
         } catch (Exception $e) {
             $this->logger->error('Ошибка при обновлении конфигурации панели (смешанный)', [
                 'source' => 'panel',
@@ -413,7 +413,7 @@ class PanelController extends Controller
             $strategy->updateConfigurationMixedWarp($panel->id);
 
             return redirect()->route('admin.module.panel.index')
-                ->with('success', 'Пресет «SS + Trojan + 3 REALITY + WARP (полный туннель)» применён. Убедитесь, что на ноде поднят WARP (SOCKS или WireGuard) по настройкам ниже.');
+                ->with('success', 'Пресет «Смешанная + WARP» применён. Убедитесь, что на ноде поднят WARP (SOCKS или WireGuard) по настройкам ниже.');
         } catch (Exception $e) {
             $this->logger->error('Ошибка при обновлении конфигурации панели (смешанный + WARP)', [
                 'source' => 'panel',
