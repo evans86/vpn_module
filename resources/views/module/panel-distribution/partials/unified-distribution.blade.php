@@ -93,7 +93,9 @@
                                     ? strtolower(substr(preg_replace('/[^A-Za-z]/', '', $locCode), 0, 2))
                                     : '';
                                 $isTopScope = $idx < $scopeTopSlots;
-                                $searchBlob = Str::lower($block['label'].' '.$tier.' '.$panel->id.' '.$sName.' '.$prov.' '.$locCode);
+                                $cfgLabel = $panel->config_type_label;
+                                $cfgKey = $panel->config_type ? (string) $panel->config_type : '';
+                                $searchBlob = Str::lower($block['label'].' '.$tier.' '.$panel->id.' '.$sName.' '.$prov.' '.$locCode.' '.$cfgLabel.' '.$cfgKey);
                             @endphp
                             <article class="panel-dist-card group relative flex flex-col rounded-2xl border transition-all hover:shadow-lg {{ $isTopScope ? 'border-emerald-300/50 bg-gradient-to-br from-emerald-50/95 via-white to-teal-50/50 shadow-md shadow-emerald-500/15 ring-2 ring-emerald-400/20 hover:border-emerald-400/45 hover:shadow-emerald-500/20' : 'border-slate-200/90 bg-white shadow-md shadow-slate-200/40 ring-1 '.$acc['ring'].' hover:border-slate-300/90' }}"
                                      data-panel-card
@@ -106,6 +108,10 @@
                                                class="font-mono text-sm font-bold text-indigo-700 hover:text-indigo-900 hover:underline decoration-2 underline-offset-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 rounded">
                                                 #{{ $panel->id }}
                                             </a>
+                                            <span class="inline-flex max-w-full items-center truncate rounded-md border border-slate-200/90 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700 shadow-sm"
+                                                  title="{{ $cfgKey !== '' ? $cfgLabel.' · '.$cfgKey : $cfgLabel }}">
+                                                {{ $cfgLabel }}
+                                            </span>
                                         </div>
                                         <p class="font-semibold text-slate-900 truncate flex items-center gap-2 min-w-0" title="{{ $sName }}">
                                             @if(strlen($fiCode) === 2)

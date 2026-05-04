@@ -15,9 +15,10 @@
                     <div class="border border-red-200 rounded-lg p-4 bg-red-50">
                         <div class="flex items-start justify-between">
                             <div class="flex-1">
-                                <div class="flex items-center mb-2">
+                                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
                                     <span class="font-semibold text-gray-900">ID-{{ $panel->id }}</span>
-                                    <span class="ml-2 px-2 py-1 text-xs font-semibold bg-red-500 text-white rounded">Ошибка</span>
+                                    <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-800 border border-slate-200" title="{{ $panel->config_type ? $panel->config_type_label.' · '.$panel->config_type : $panel->config_type_label }}">{{ $panel->config_type_label }}</span>
+                                    <span class="px-2 py-1 text-xs font-semibold bg-red-500 text-white rounded">Ошибка</span>
                                 </div>
                                 <div class="text-sm text-gray-600 mb-2">
                                     <div><strong>Адрес:</strong> {{ $panel->panel_adress }}</div>
@@ -98,29 +99,15 @@
                     <div class="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
                         <div class="flex items-start justify-between">
                             <div class="flex-1">
-                                <div class="flex items-center mb-2">
+                                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
                                     <span class="font-semibold text-gray-900">ID-{{ $panel->id }}</span>
-                                    <span class="ml-2 px-2 py-1 text-xs font-semibold bg-yellow-500 text-white rounded">Исключена</span>
+                                    <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-800 border border-slate-200" title="{{ $panel->config_type ? $panel->config_type_label.' · '.$panel->config_type : $panel->config_type_label }}">{{ $panel->config_type_label }}</span>
+                                    <span class="px-2 py-1 text-xs font-semibold bg-yellow-500 text-white rounded">Исключена</span>
                                 </div>
                                 <div class="text-sm text-gray-600">
                                     <div><strong>Адрес:</strong> {{ $panel->panel_adress }}</div>
                                     @if($panel->server)
                                         <div><strong>Сервер:</strong> {{ $panel->server->name }}</div>
-                                    @endif
-                                    @if($panel->config_type)
-                                        <div><strong>Тип конфига:</strong>
-                                            @if($panel->config_type === 'reality_stable')
-                                                <span class="px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">REALITY (только)</span>
-                                            @elseif($panel->config_type === 'mixed_warp')
-                                                <span class="px-2 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-800">+ WARP (пресет)</span>
-                                            @elseif($panel->config_type === 'reality')
-                                                <span class="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">REALITY</span>
-                                            @elseif($panel->config_type === 'mixed')
-                                                <span class="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Смешанный</span>
-                                            @else
-                                                <span class="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Стабильный</span>
-                                            @endif
-                                        </div>
                                     @endif
                                 </div>
                             </div>
