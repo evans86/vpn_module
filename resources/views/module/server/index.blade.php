@@ -121,9 +121,17 @@
                         <i class="fas fa-tachometer-alt mr-2"></i>
                         speedtest-cli на всех «Настроен»
                     </button>
+                    <button type="button" id="bulkRunLogUploadNowBtn"
+                            class="inline-flex items-center px-3 py-1.5 border border-teal-500 text-sm font-medium rounded-md shadow-sm text-teal-900 bg-teal-50 hover:bg-teal-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
+                            title="На всех серверах с включённой выгрузкой логов по SSH выполнить /root/upload-logs.sh (как cron: сжатие, запись в S3, удаление исходников, при наличии контейнера — docker restart marzban).">
+                        <i class="fas fa-cloud-upload-alt mr-2"></i>
+                        Выгрузить логи сейчас (все с выгрузкой)
+                    </button>
                 </div>
                 <pre id="bulkInstallSpeedtestCliOut"
                      class="hidden mb-4 w-full text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 max-h-72 overflow-auto border border-slate-700"></pre>
+                <pre id="bulkRunLogUploadNowOut"
+                     class="hidden mb-4 w-full text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 max-h-96 overflow-auto border border-slate-700"></pre>
                 <!-- Cards Grid -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     @foreach($servers as $server)
@@ -1057,6 +1065,70 @@
                             toastr.success(response.message || 'Готово');
                         } else {
                             toastr.warning(response.message || 'Есть ошибки — см. лог ниже страницы');
+                        }
+                    },
+                    error: function (xhr) {
+                        var msg = 'Запрос не выполнен';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            msg = xhr.responseJSON.message;
+                        }
+                        toastr.error(msg);
+                        if (out) {
+                            out.textContent = msg;
+                        }
+                    },
+                    complete: function () {
+                        btn.prop('disabled', false);
+                    }
+                });
+            });
+
+            $('#bulkRunLogUploadNowBtn').on('click', function () {
+                if (!confirm('Запустить выгрузку логов на всех серверах, у которых в БД включена выгрузка?\n\nПо очереди по SSH выполнится /root/upload-logs.sh (как в cron по расписанию): архивация текущих логов marzban, загрузка в S3 через s3cmd, удаление исходных файлов после успешной отправки; при наличии контейнера — перезапуск marzban. Нужны логин и пароль SSH на карточке.')) {
+                    return;
+                }
+                var btn = $(this);
+                var out = document.getElementById('bulkRunLogUploadNowOut');
+                btn.prop('disabled', true);
+                if (out) {
+                    out.classList.remove('hidden');
+                    out.textContent = 'Выполняется… это может занять несколько минут.';
+                }
+
+                function firstLines(txt, maxLines) {
+                    if (!txt) {
+                        return '';
+                    }
+                    return txt.replace(/\r\n/g, '\n').split('\n').slice(0, maxLines).join('\n');
+                }
+
+                $.ajax({
+                    url: '{{ route('admin.module.server.bulk-run-log-upload') }}',
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function (response) {
+                        var lines = [(response.message || '')];
+                        (response.results || []).forEach(function (r) {
+                            var prefix = '#' + r.id + ' ' + (r.name || '');
+                            if (r.skipped) {
+                                lines.push(prefix + ' — пропуск: ' + (r.message || ''));
+                                return;
+                            }
+                            lines.push(prefix + ' — ' + (r.success ? 'OK' : 'ошибка') + ': ' + (r.message || ''));
+                            var excerpt = firstLines(r.output || '', 12);
+                            if (excerpt) {
+                                lines.push('  └─ вывод:\n    ' + excerpt.split('\n').join('\n    '));
+                            }
+                        });
+                        if (out) {
+                            out.textContent = lines.join('\n');
+                        }
+                        if (response.success) {
+                            toastr.success(response.message || 'Готово');
+                        } else {
+                            toastr.warning(response.message || 'Есть ошибки — см. лог ниже');
                         }
                     },
                     error: function (xhr) {

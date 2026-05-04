@@ -924,4 +924,89 @@ class ServerController extends Controller
             'results' => $results,
         ]);
     }
+
+    /**
+     * По SSH выполнить /root/upload-logs.sh на всех серверах, где в БД включена выгрузка логов.
+     */
+    public function bulkRunLogUploadNow(): JsonResponse
+    {
+        if (function_exists('set_time_limit')) {
+            set_time_limit(0);
+        }
+
+        $servers = Server::query()
+            ->where('server_status', '!=', Server::SERVER_DELETED)
+            ->where('logs_upload_enabled', true)
+            ->whereNotNull('ip')
+            ->where('ip', '!=', '')
+            ->orderBy('id')
+            ->get();
+
+        $results = [];
+        $ok = 0;
+        $fail = 0;
+        $skipped = 0;
+        $attempted = 0;
+
+        foreach ($servers as $server) {
+            $r = $this->logUploadService->runUploadScriptNow($server);
+            if (!empty($r['skipped'])) {
+                $skipped++;
+                $results[] = [
+                    'id' => $server->id,
+                    'name' => $server->name,
+                    'success' => false,
+                    'skipped' => true,
+                    'message' => $r['message'],
+                    'output' => $r['output'] ?? '',
+                ];
+
+                continue;
+            }
+            $attempted++;
+            if ($r['success']) {
+                $ok++;
+            } else {
+                $fail++;
+            }
+            $results[] = [
+                'id' => $server->id,
+                'name' => $server->name,
+                'success' => $r['success'],
+                'skipped' => false,
+                'message' => $r['message'],
+                'output' => $r['output'] ?? '',
+            ];
+        }
+
+        $message = sprintf(
+            'С включённой выгрузкой в БД: %d · запуск скрипта: %d · успех: %d · ошибок: %d · пропуск (нет SSH): %d.',
+            $servers->count(),
+            $attempted,
+            $ok,
+            $fail,
+            $skipped
+        );
+
+        $this->logger->info('Bulk manual marzban log upload', [
+            'source' => 'server',
+            'user_id' => auth()->id(),
+            'summary' => compact('ok', 'fail', 'skipped', 'attempted'),
+        ]);
+
+        $allSucceeded = ($attempted === 0 ? true : ($fail === 0));
+
+        return response()->json([
+            'success' => $allSucceeded,
+            'message' => $message,
+            'summary' => [
+                'total' => $servers->count(),
+                'attempted' => $attempted,
+                'ok' => $ok,
+                'fail' => $fail,
+                'skipped' => $skipped,
+            ],
+            'results' => $results,
+        ]);
+    }
 }

@@ -19,9 +19,9 @@ class LogUploadService
     private MarzbanService $marzbanService;
 
     /**
-     * Путь к скрипту установки на сервере
+     * Путь к скрипту выгрузки на сервере (cron и ручной запуск)
      */
-    private const UPLOAD_SCRIPT_PATH = '/root/upload-logs.sh';
+    public const UPLOAD_SCRIPT_PATH = '/root/upload-logs.sh';
     
     /**
      * Путь к конфигурации s3cmd
@@ -101,6 +101,92 @@ class LogUploadService
             return [
                 'success' => false,
                 'message' => 'Ошибка при включении выгрузки логов: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Один запуск скрипта выгрузки на сервере (текущие access.log/error.log как при cron).
+     *
+     * @return array{success: bool, message: string, output: string, skipped: bool}
+     */
+    public function runUploadScriptNow(Server $server): array
+    {
+        if (!$server->logs_upload_enabled) {
+            return [
+                'success' => false,
+                'message' => 'В БД не включена выгрузка логов для этого сервера.',
+                'output' => '',
+                'skipped' => true,
+            ];
+        }
+        if (empty($server->login) || $server->password === null || $server->password === '') {
+            return [
+                'success' => false,
+                'message' => 'Нет SSH логина или пароля.',
+                'output' => '',
+                'skipped' => true,
+            ];
+        }
+
+        try {
+            $serverDto = ServerFactory::fromEntity($server);
+            $ssh = $this->marzbanService->connectSshAdapter($serverDto);
+
+            $path = escapeshellarg(self::UPLOAD_SCRIPT_PATH);
+            $checkCmd = "test -f {$path} && test -x {$path} && echo SCRIPT_OK";
+            $checkOut = trim($ssh->exec($checkCmd));
+            if (strpos($checkOut, 'SCRIPT_OK') === false) {
+                return [
+                    'success' => false,
+                    'message' => 'Скрипт '.self::UPLOAD_SCRIPT_PATH.' не найден. Сначала включите выгрузку на этом сервере.',
+                    'output' => $checkOut,
+                    'skipped' => false,
+                ];
+            }
+
+            $bash = '(bash '.$path.' 2>&1); echo LOGUP_EXIT:$?';
+            $raw = trim($ssh->exec($bash));
+            $exit = null;
+            if (preg_match('/LOGUP_EXIT:(\d+)\s*$/', $raw, $m)) {
+                $exit = (int) $m[1];
+                $out = preg_replace('/\s*LOGUP_EXIT:\d+\s*$/', '', $raw);
+                $out = $out !== null ? trim((string) $out) : '';
+            } else {
+                $out = $raw;
+            }
+
+            $maxLen = 12000;
+            if (strlen($out) > $maxLen) {
+                $out = substr($out, 0, $maxLen)."\n… (вывод обрезан)";
+            }
+
+            $ok = $exit === 0;
+            Log::info('Manual log upload script run finished', [
+                'server_id' => $server->id,
+                'exit_code' => $exit,
+                'source' => 'server',
+                'success' => $ok,
+            ]);
+
+            return [
+                'success' => $ok,
+                'message' => $ok ? 'Выгрузка выполнена (код выхода 0).' : ('Ненулевой код выхода'.($exit !== null ? ": {$exit}" : '').'. См. вывод.'),
+                'output' => $out,
+                'skipped' => false,
+            ];
+        } catch (Exception $e) {
+            Log::error('Manual log upload script failed', [
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+                'source' => 'server',
+            ]);
+
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+                'output' => '',
+                'skipped' => false,
             ];
         }
     }
