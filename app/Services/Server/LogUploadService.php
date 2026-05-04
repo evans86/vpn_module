@@ -318,19 +318,21 @@ class LogUploadService
      */
     private function executeInstallation(SSH2 $ssh): void
     {
-        // Код выхода в выводе: getExitStatus() у phpseclib после длинного bash+apt иногда неверен
-        $bash = '(bash /tmp/upload-logs-install.sh 2>&1); echo LOGUP_INSTALL_EXIT:$?';
-        $raw = trim($ssh->exec($bash));
+        // Код выхода в выводе: getExitStatus() у phpseclib после длинного bash+apt часто неверен
+        $bash = 'bash /tmp/upload-logs-install.sh 2>&1; printf "\n__LOGUP_INSTALL_EXIT__:%s\n" "$?"';
+        $raw = trim((string) $ssh->exec($bash));
         $exit = null;
-        if (preg_match('/LOGUP_INSTALL_EXIT:(\d+)\s*$/', $raw, $m)) {
-            $exit = (int) $m[1];
-            $result = preg_replace('/\s*LOGUP_INSTALL_EXIT:\d+\s*$/', '', $raw);
-            $result = $result !== null ? trim((string) $result) : '';
-        } else {
-            $result = $raw;
+        if (preg_match_all('/__LOGUP_INSTALL_EXIT__:(\d+)/', $raw, $mm) && !empty($mm[1])) {
+            $exit = (int) end($mm[1]);
         }
+        $result = trim((string) preg_replace('/\s*__LOGUP_INSTALL_EXIT__:\d+\s*\z/', '', $raw));
 
-        Log::info('Installation script executed', ['output' => $result, 'source' => 'server']);
+        Log::info('Installation script executed', [
+            'output' => $result,
+            'parsed_exit' => $exit,
+            'ssh_get_exit_status' => $ssh->getExitStatus(),
+            'source' => 'server',
+        ]);
 
         if ($exit !== null) {
             if ($exit !== 0) {
@@ -344,9 +346,8 @@ class LogUploadService
         if ($sshExit === 0) {
             return;
         }
-        // Маркер в скрипте resources/scripts/upload-logs.sh при успешной установке
         if (strpos($result, '[+] Setup complete.') !== false) {
-            Log::warning('Log upload install: LOGUP_INSTALL_EXIT missing in SSH output; accepted by Setup complete marker', [
+            Log::warning('Log upload install: install exit marker missing in SSH output; accepted by Setup complete marker', [
                 'source' => 'server',
                 'ssh_get_exit_status' => $sshExit,
             ]);
