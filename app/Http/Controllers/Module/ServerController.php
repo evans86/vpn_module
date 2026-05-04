@@ -1009,4 +1009,95 @@ class ServerController extends Controller
             'results' => $results,
         ]);
     }
+
+    /**
+     * По SSH переустановить скрипт выгрузки логов (/root/upload-logs.sh, ~/.s3cfg, cron) как у кнопки «Обновить скрипт выгрузки».
+     */
+    public function bulkReinstallLogUploadScript(Request $request): JsonResponse
+    {
+        if (function_exists('set_time_limit')) {
+            set_time_limit(0);
+        }
+
+        $onlyConfigured = $request->boolean('only_configured', true);
+
+        $q = Server::query()
+            ->where('server_status', '!=', Server::SERVER_DELETED)
+            ->where('logs_upload_enabled', true);
+        if ($onlyConfigured) {
+            $q->where('server_status', Server::SERVER_CONFIGURED);
+        }
+        $servers = $q->whereNotNull('ip')
+            ->where('ip', '!=', '')
+            ->orderBy('id')
+            ->get();
+
+        $results = [];
+        $ok = 0;
+        $fail = 0;
+        $skipped = 0;
+        $attempted = 0;
+
+        foreach ($servers as $server) {
+            if (empty($server->login) || $server->password === null || $server->password === '') {
+                $skipped++;
+                $results[] = [
+                    'id' => $server->id,
+                    'name' => $server->name,
+                    'success' => false,
+                    'skipped' => true,
+                    'message' => 'Пропуск: нет SSH логина/пароля.',
+                ];
+
+                continue;
+            }
+
+            $attempted++;
+            $r = $this->logUploadService->enableLogUpload($server);
+            if ($r['success']) {
+                $ok++;
+            } else {
+                $fail++;
+            }
+            $results[] = [
+                'id' => $server->id,
+                'name' => $server->name,
+                'success' => $r['success'],
+                'skipped' => false,
+                'message' => $r['message'] ?? '',
+            ];
+        }
+
+        $message = sprintf(
+            'С выгрузкой в БД%s: %d · попытка переустановки: %d · успех: %d · ошибок: %d · пропуск (нет SSH): %d.',
+            $onlyConfigured ? ' и статусом «Настроен»' : '',
+            $servers->count(),
+            $attempted,
+            $ok,
+            $fail,
+            $skipped
+        );
+
+        $this->logger->info('Bulk reinstall marzban log upload script', [
+            'source' => 'server',
+            'user_id' => auth()->id(),
+            'only_configured' => $onlyConfigured,
+            'summary' => compact('ok', 'fail', 'skipped', 'attempted'),
+        ]);
+
+        $allSucceeded = ($attempted === 0 ? true : ($fail === 0));
+
+        return response()->json([
+            'success' => $allSucceeded,
+            'message' => $message,
+            'summary' => [
+                'total' => $servers->count(),
+                'attempted' => $attempted,
+                'ok' => $ok,
+                'fail' => $fail,
+                'skipped' => $skipped,
+            ],
+            'results' => $results,
+        ]);
+    }
 }

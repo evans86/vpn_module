@@ -127,10 +127,18 @@
                         <i class="fas fa-cloud-upload-alt mr-2"></i>
                         Выгрузить логи сейчас (все с выгрузкой)
                     </button>
+                    <button type="button" id="bulkReinstallLogUploadScriptBtn"
+                            class="inline-flex items-center px-3 py-1.5 border border-sky-500 text-sm font-medium rounded-md shadow-sm text-sky-900 bg-sky-50 hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                            title="На всех «Настроен» с включённой выгрузкой заново выполнить установку скрипта из панели: /tmp/upload-logs-install.sh → /root/upload-logs.sh, ~/.s3cfg, cron (apt/s3cmd, проверка s3cmd ls). Долго, по очереди.">
+                        <i class="fas fa-sync-alt mr-2"></i>
+                        Обновить скрипт выгрузки (все «Настроен»)
+                    </button>
                 </div>
                 <pre id="bulkInstallSpeedtestCliOut"
                      class="hidden mb-4 w-full text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 max-h-72 overflow-auto border border-slate-700"></pre>
                 <pre id="bulkRunLogUploadNowOut"
+                     class="hidden mb-4 w-full text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 max-h-96 overflow-auto border border-slate-700"></pre>
+                <pre id="bulkReinstallLogUploadScriptOut"
                      class="hidden mb-4 w-full text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 max-h-96 overflow-auto border border-slate-700"></pre>
                 <!-- Cards Grid -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1131,6 +1139,59 @@
                             var excerpt = firstLines(r.output || '', 12);
                             if (excerpt) {
                                 lines.push('  └─ вывод:\n    ' + excerpt.split('\n').join('\n    '));
+                            }
+                        });
+                        if (out) {
+                            out.textContent = lines.join('\n');
+                        }
+                        if (response.success) {
+                            toastr.success(response.message || 'Готово');
+                        } else {
+                            toastr.warning(response.message || 'Есть ошибки — см. лог ниже');
+                        }
+                    },
+                    error: function (xhr) {
+                        var msg = 'Запрос не выполнен';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            msg = xhr.responseJSON.message;
+                        }
+                        toastr.error(msg);
+                        if (out) {
+                            out.textContent = msg;
+                        }
+                    },
+                    complete: function () {
+                        btn.prop('disabled', false);
+                    }
+                });
+            });
+
+            $('#bulkReinstallLogUploadScriptBtn').on('click', function () {
+                if (!confirm('Переустановить скрипт выгрузки логов на всех серверах со статусом «Настроен», у которых выгрузка уже включена в БД?\n\nПо очереди: полная установка как при «Обновить скрипт выгрузки» (apt, ~/.s3cfg, /root/upload-logs.sh, cron, проверка s3cmd ls). Может занять много времени. Нужен SSH в карточке.')) {
+                    return;
+                }
+                var btn = $(this);
+                var out = document.getElementById('bulkReinstallLogUploadScriptOut');
+                btn.prop('disabled', true);
+                if (out) {
+                    out.classList.remove('hidden');
+                    out.textContent = 'Выполняется переустановка по серверам…';
+                }
+                $.ajax({
+                    url: '{{ route('admin.module.server.bulk-reinstall-log-upload-script') }}',
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        only_configured: 1
+                    },
+                    success: function (response) {
+                        var lines = [(response.message || '')];
+                        (response.results || []).forEach(function (r) {
+                            var prefix = '#' + r.id + ' ' + (r.name || '');
+                            if (r.skipped) {
+                                lines.push(prefix + ' — пропуск: ' + (r.message || ''));
+                            } else {
+                                lines.push(prefix + ' — ' + (r.success ? 'OK' : 'ошибка') + ': ' + (r.message || ''));
                             }
                         });
                         if (out) {
