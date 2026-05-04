@@ -224,7 +224,7 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
                     ->middleware('throttle:12,10')
                     ->name('bulk-install-speedtest-cli');
                 Route::post('/bulk-run-log-upload', [ServerController::class, 'bulkRunLogUploadNow'])
-                    ->middleware('throttle:8,10')
+                    ->middleware('throttle:120,1')
                     ->name('bulk-run-log-upload');
                 Route::post('/bulk-reinstall-log-upload-script', [ServerController::class, 'bulkReinstallLogUploadScript'])
                     ->middleware('throttle:120,1')

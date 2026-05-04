@@ -1132,7 +1132,7 @@
             });
 
             $('#bulkRunLogUploadNowBtn').on('click', function () {
-                if (!confirm('Запустить выгрузку логов на всех серверах, у которых в БД включена выгрузка?\n\nПо очереди по SSH выполнится /root/upload-logs.sh (как в cron по расписанию): архивация текущих логов marzban, загрузка в S3 через s3cmd, удаление исходных файлов после успешной отправки; при наличии контейнера — перезапуск marzban. Нужны логин и пароль SSH на карточке.')) {
+                if (!confirm('Запустить выгрузку логов на всех серверах, у которых в БД включена выгрузка?\n\nНа каждом узле по SSH выполнится /root/upload-logs.sh (архивация, S3, удаление файлов при успехе; при наличии контейнера — перезапуск marzban). Запросы к панели идут пакетами (по 1 серверу за короткий HTTP — иначе прокси/Cloudflare режет один долгий ответ).\nНужны логин и пароль SSH на карточке.')) {
                     return;
                 }
                 var btn = $(this);
@@ -1140,7 +1140,7 @@
                 btn.prop('disabled', true);
                 if (out) {
                     out.classList.remove('hidden');
-                    out.textContent = 'Выполняется… это может занять несколько минут.';
+                    out.textContent = 'Выполняется пакетами (одна нода за запрос к панели; обход Cloudflare/nginx)…';
                 }
 
                 function firstLines(txt, maxLines) {
@@ -1150,49 +1150,109 @@
                     return txt.replace(/\r\n/g, '\n').split('\n').slice(0, maxLines).join('\n');
                 }
 
-                $.ajax({
-                    url: '{{ route('admin.module.server.bulk-run-log-upload') }}',
-                    method: 'POST',
-                    data: {
-                        _token: '{{ csrf_token() }}'
-                    },
-                    success: function (response) {
-                        var lines = [(response.message || '')];
-                        (response.results || []).forEach(function (r) {
-                            var prefix = '#' + r.id + ' ' + (r.name || '');
-                            if (r.skipped) {
-                                lines.push(prefix + ' — пропуск: ' + (r.message || ''));
+                var lines = [
+                    'Ручная выгрузка логов: несколько коротких HTTP вместо одного долгого (иначе браузер видит ошибку при том, что ноды на origin уже успели выполниться).',
+                    ''
+                ];
+                var totals = { attempted: 0, ok: 0, fail: 0, skipped: 0 };
+
+                function renderOut() {
+                    var tail = '\n────────────────────\nИтого: попыток ' + totals.attempted +
+                        ', успех ' + totals.ok + ', ошибок ' + totals.fail + ', пропуск ' + totals.skipped;
+                    if (out) {
+                        out.textContent = lines.join('\n') + tail;
+                    }
+                }
+
+                function appendBatch(response) {
+                    lines.push(response.message || '');
+                    (response.results || []).forEach(function (r) {
+                        var prefix = '#' + r.id + ' ' + (r.name || '');
+                        if (r.skipped) {
+                            lines.push(prefix + ' — пропуск: ' + (r.message || ''));
+                            return;
+                        }
+                        lines.push(prefix + ' — ' + (r.success ? 'OK' : 'ошибка') + ': ' + (r.message || ''));
+                        var excerpt = firstLines(r.output || '', 12);
+                        if (excerpt) {
+                            lines.push('  └─ вывод:\n    ' + excerpt.split('\n').join('\n    '));
+                        }
+                    });
+                    lines.push('');
+                    var s = response.summary || {};
+                    totals.attempted += (s.attempted || 0);
+                    totals.ok += (s.ok || 0);
+                    totals.fail += (s.fail || 0);
+                    totals.skipped += (s.skipped || 0);
+                }
+
+                function runBatch(afterId, perBatch) {
+                    perBatch = perBatch == null ? 1 : perBatch;
+                    $.ajax({
+                        url: '{{ route('admin.module.server.bulk-run-log-upload') }}',
+                        method: 'POST',
+                        timeout: 420000,
+                        data: {
+                            _token: '{{ csrf_token() }}',
+                            after_id: afterId,
+                            per_batch: perBatch
+                        },
+                        success: function (response) {
+                            appendBatch(response);
+                            renderOut();
+                            var b = response.batch || {};
+                            if (b.has_more) {
+                                lines.push('Следующий пакет…');
+                                renderOut();
+                                runBatch(b.next_after_id || 0, perBatch);
+
                                 return;
                             }
-                            lines.push(prefix + ' — ' + (r.success ? 'OK' : 'ошибка') + ': ' + (r.message || ''));
-                            var excerpt = firstLines(r.output || '', 12);
-                            if (excerpt) {
-                                lines.push('  └─ вывод:\n    ' + excerpt.split('\n').join('\n    '));
+                            lines.push('===== Готово');
+                            renderOut();
+                            if (totals.fail === 0 && totals.attempted > 0) {
+                                toastr.success('Выгрузка выполнена по всем узлам выборки');
+                            } else if (totals.attempted === 0 && totals.skipped === 0) {
+                                toastr.info(response.message || 'Нет серверов для обработки');
+                            } else if (totals.fail > 0) {
+                                toastr.warning('Есть ошибки — см. текст ниже');
+                            } else {
+                                toastr.success(response.message || 'Готово');
                             }
-                        });
-                        if (out) {
-                            out.textContent = lines.join('\n');
+                            btn.prop('disabled', false);
+                        },
+                        error: function (xhr, textStatus) {
+                            var msg = 'Запрос не выполнен';
+                            if (xhr.responseJSON && xhr.responseJSON.message) {
+                                msg = xhr.responseJSON.message;
+                            } else if (xhr.status === 524) {
+                                msg = 'HTTP 524 (Cloudflare): ответ до браузера не успел.';
+                            } else if (textStatus === 'timeout') {
+                                msg = 'Таймаут запроса (7 мин)';
+                            }
+                            toastr.error(msg);
+                            lines.push('');
+                            lines.push('!!! Ошибка при пакете после id ' + afterId + ' (per_batch ' + perBatch + '): ' + msg);
+                            if (xhr.status) {
+                                lines.push('HTTP-код: ' + xhr.status);
+                            }
+                            renderOut();
+                            if ((xhr.status === 524 || xhr.status === 504) && perBatch > 1) {
+                                lines.push('Повтор этого же пакета с per_batch=1…');
+                                renderOut();
+                                setTimeout(function () {
+                                    runBatch(afterId, 1);
+                                }, 2500);
+
+                                return;
+                            }
+                            btn.prop('disabled', false);
                         }
-                        if (response.success) {
-                            toastr.success(response.message || 'Готово');
-                        } else {
-                            toastr.warning(response.message || 'Есть ошибки — см. лог ниже');
-                        }
-                    },
-                    error: function (xhr) {
-                        var msg = 'Запрос не выполнен';
-                        if (xhr.responseJSON && xhr.responseJSON.message) {
-                            msg = xhr.responseJSON.message;
-                        }
-                        toastr.error(msg);
-                        if (out) {
-                            out.textContent = msg;
-                        }
-                    },
-                    complete: function () {
-                        btn.prop('disabled', false);
-                    }
-                });
+                    });
+                }
+
+                renderOut();
+                runBatch(0, 1);
             });
 
             @php

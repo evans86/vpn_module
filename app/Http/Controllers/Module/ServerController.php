@@ -873,6 +873,20 @@ class ServerController extends Controller
     }
 
     /**
+     * Те же условия, что у массового «Запустить выгрузку сейчас» (в БД включена выгрузка, непустой IP).
+     *
+     * @return Builder<\App\Models\Server\Server>
+     */
+    private function logUploadBulkRunNowBaseQuery(): Builder
+    {
+        return Server::query()
+            ->where('server_status', '!=', Server::SERVER_DELETED)
+            ->where('logs_upload_enabled', true)
+            ->whereNotNull('ip')
+            ->where('ip', '!=', '');
+    }
+
+    /**
      * Nginx-заглушка (default_server 80/443) на сервере по SSH.
      */
     public function applyDecoyStub(Request $request, Server $server): JsonResponse
@@ -1005,21 +1019,53 @@ class ServerController extends Controller
     }
 
     /**
-     * По SSH выполнить /root/upload-logs.sh на всех серверах, где в БД включена выгрузка логов.
+     * По SSH выполнить /root/upload-logs.sh на серверах с включённой выгрузкой в БД (пакетами: after_id + per_batch).
+     *
+     * Один запрос на все ноды подряд легко упирается в таймаут Cloudflare/nginx до ответа, хоть PHP на origin успевает
+     * отработать до конца и залогировать успех по каждой ноде.
      */
-    public function bulkRunLogUploadNow(): JsonResponse
+    public function bulkRunLogUploadNow(Request $request): JsonResponse
     {
         if (function_exists('set_time_limit')) {
             set_time_limit(0);
         }
 
-        $servers = Server::query()
-            ->where('server_status', '!=', Server::SERVER_DELETED)
-            ->where('logs_upload_enabled', true)
-            ->whereNotNull('ip')
-            ->where('ip', '!=', '')
+        $afterId = max(0, (int) $request->input('after_id', 0));
+        /** По умолчанию 1: один SSH-комплект за HTTP-ответ — укладываются в короткий ответ origin. */
+        $perBatch = min(5, max(1, (int) $request->input('per_batch', 1)));
+
+        $baseQuery = $this->logUploadBulkRunNowBaseQuery();
+        $matchedTotal = (clone $baseQuery)->count();
+
+        $servers = (clone $baseQuery)
+            ->where('id', '>', $afterId)
             ->orderBy('id')
+            ->limit($perBatch)
             ->get();
+
+        if ($servers->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'message' => $afterId === 0
+                    ? 'Нет серверов с включённой выгрузкой в БД (и непустым IP).'
+                    : 'Дальше записей нет — все пакеты обработаны.',
+                'batch' => [
+                    'after_id' => $afterId,
+                    'next_after_id' => $afterId,
+                    'has_more' => false,
+                    'per_batch' => $perBatch,
+                    'matched_total' => $matchedTotal,
+                ],
+                'summary' => [
+                    'total' => 0,
+                    'attempted' => 0,
+                    'ok' => 0,
+                    'fail' => 0,
+                    'skipped' => 0,
+                ],
+                'results' => [],
+            ]);
+        }
 
         $results = [];
         $ok = 0;
@@ -1058,18 +1104,27 @@ class ServerController extends Controller
             ];
         }
 
+        $nextAfterId = (int) $servers->max('id');
+        $hasMore = (clone $baseQuery)->where('id', '>', $nextAfterId)->exists();
+
         $message = sprintf(
-            'С включённой выгрузкой в БД: %d · запуск скрипта: %d · успех: %d · ошибок: %d · пропуск (нет SSH): %d.',
+            'Пакет выгрузки: id > %d, до %d серверов в запросе · в порции %d · запуск: %d · успех: %d · ошибок: %d · пропуск: %d · всего с выгрузкой в БД: %d.',
+            $afterId,
+            $perBatch,
             $servers->count(),
             $attempted,
             $ok,
             $fail,
-            $skipped
+            $skipped,
+            $matchedTotal
         );
 
-        $this->logger->info('Bulk manual marzban log upload', [
+        $this->logger->info('Bulk manual marzban log upload (batch)', [
             'source' => 'server',
             'user_id' => auth()->id(),
+            'after_id' => $afterId,
+            'per_batch' => $perBatch,
+            'has_more' => $hasMore,
             'summary' => compact('ok', 'fail', 'skipped', 'attempted'),
         ]);
 
@@ -1078,6 +1133,13 @@ class ServerController extends Controller
         return response()->json([
             'success' => $allSucceeded,
             'message' => $message,
+            'batch' => [
+                'after_id' => $afterId,
+                'next_after_id' => $nextAfterId,
+                'has_more' => $hasMore,
+                'per_batch' => $perBatch,
+                'matched_total' => $matchedTotal,
+            ],
             'summary' => [
                 'total' => $servers->count(),
                 'attempted' => $attempted,
