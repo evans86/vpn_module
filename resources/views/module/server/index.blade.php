@@ -382,10 +382,17 @@
                                             </button>
                                         @endif
                                         @if(!$server->logs_upload_enabled)
-                                            <button type="button" onclick="enableLogUpload({{ $server->id }})"
+                                            <button type="button" onclick="enableLogUpload({{ $server->id }}, false)"
                                                     class="inline-flex flex-1 min-w-[min(100%,10rem)] basis-[calc(50%-0.25rem)] max-w-full items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors">
                                                 <i class="fas fa-upload mr-2"></i>
                                                 <span>Включить логи</span>
+                                            </button>
+                                        @else
+                                            <button type="button" onclick="enableLogUpload({{ $server->id }}, true)"
+                                                    title="Заново записать /root/upload-logs.sh, ключи в ~/.s3cfg и строку cron (как при первом включении, с актуальным бакетом из .env)."
+                                                    class="inline-flex flex-1 min-w-[min(100%,10rem)] basis-[calc(50%-0.25rem)] max-w-full items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-sky-800 bg-sky-50 hover:bg-sky-100 border border-sky-300 transition-colors">
+                                                <i class="fas fa-sync-alt mr-2"></i>
+                                                <span>Обновить скрипт выгрузки</span>
                                             </button>
                                         @endif
                                         <button type="button" onclick="checkLogUploadStatus({{ $server->id }})"
@@ -946,9 +953,13 @@
                 });
             }
 
-            // Включить выгрузку логов
-            function enableLogUpload(id) {
-                if (!confirm('Включить выгрузку логов на этом сервере? Это может занять некоторое время.')) {
+            // Включить или переустановить выгрузку логов (тот же эндпоинт)
+            function enableLogUpload(id, reinstall) {
+                reinstall = !!reinstall;
+                var confirmText = reinstall
+                    ? 'Переустановить скрипт выгрузки на этом сервере?\n\nБудут заново записаны /root/upload-logs.sh, ~/.s3cfg и задача cron с бакетом и ключами из конфигурации панели. Может занять минуту (apt и s3cmd).'
+                    : 'Включить выгрузку логов на этом сервере? Это может занять некоторое время.';
+                if (!confirm(confirmText)) {
                     return;
                 }
 
@@ -959,7 +970,7 @@
                         _token: '{{ csrf_token() }}'
                     },
                     beforeSend: function() {
-                        toastr.info('Настройка выгрузки логов...', 'Пожалуйста, подождите');
+                        toastr.info(reinstall ? 'Обновление скрипта выгрузки…' : 'Настройка выгрузки логов...', 'Пожалуйста, подождите');
                     },
                     success: function (response) {
                         if (response.success) {

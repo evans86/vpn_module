@@ -30,6 +30,12 @@ EOF
   cat <<'INNER'
 set -euo pipefail
 
+# Бакет задаётся одной строкой при установке; без s3:// не грузим и не удаляем логи
+if [[ -z "${S3_BUCKET// }" ]] || [[ "${S3_BUCKET}" != s3://* ]]; then
+  echo "[!] Некорректный или пустой S3_BUCKET (нужно s3://имя-бакета). Переустановите выгрузку в панели. Значение: '${S3_BUCKET}'" >&2
+  exit 1
+fi
+
 # Получаем вчерашнюю дату и IP-адрес сервера
 YESTERDAY=$(date -d "yesterday" +"%Y-%m-%d")
 IP=$(hostname -I | awk '{print $1}')
@@ -43,7 +49,6 @@ COMBINED_LOG="/tmp/marzban-combined-${YESTERDAY}.log"
 COMBINED_GZ="/var/lib/marzban/marzban-${YESTERDAY}-${IP}.log.gz"
 
 # Путь к S3 бакету (используется переменная из установочного скрипта)
-# S3_BUCKET уже определен в начале скрипта
 
 # Проверяем существование обоих логов
 if [[ -f "$ACCESS_LOG" || -f "$ERROR_LOG" ]]; then
@@ -72,10 +77,6 @@ if [[ -f "$ACCESS_LOG" || -f "$ERROR_LOG" ]]; then
   
   # Загружаем в S3
   echo "[+] Uploading to S3: $COMBINED_GZ → $S3_BUCKET"
-  if [[ -z "${S3_BUCKET:-}" ]]; then
-    echo "[!] S3_BUCKET is empty, check /root/upload-logs.sh install" >&2
-    exit 1
-  fi
   if ! s3cmd put "$COMBINED_GZ" "$S3_BUCKET/"; then
     echo "[!] s3cmd put failed (credentials, network, or bucket path)" >&2
     exit 1

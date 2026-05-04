@@ -43,6 +43,8 @@ class LogUploadService
     public function enableLogUpload(Server $server): array
     {
         try {
+            $alreadyEnabledInDb = (bool) $server->logs_upload_enabled;
+
             Log::info('Enabling log upload', ['server_id' => $server->id, 'source' => 'server']);
 
             $serverDto = ServerFactory::fromEntity($server);
@@ -87,7 +89,9 @@ class LogUploadService
 
             return [
                 'success' => true,
-                'message' => 'Выгрузка логов успешно включена'
+                'message' => $alreadyEnabledInDb
+                    ? 'Скрипт /root/upload-logs.sh, ~/.s3cfg и cron обновлены из настроек панели.'
+                    : 'Выгрузка логов успешно включена.',
             ];
 
         } catch (Exception $e) {
@@ -162,6 +166,12 @@ class LogUploadService
             }
 
             $ok = $exit === 0;
+            // Старые версии скрипта на нодах могли не проверять s3cmd и S3_BUCKET: выход 0 при ERROR в выводе
+            $s3OutputFailure = strpos($out, 'Destination must be S3Uri') !== false
+                || strpos($out, 'Parameter problem:') !== false;
+            if ($ok && $s3OutputFailure) {
+                $ok = false;
+            }
             Log::info('Manual log upload script run finished', [
                 'server_id' => $server->id,
                 'exit_code' => $exit,
@@ -169,9 +179,16 @@ class LogUploadService
                 'success' => $ok,
             ]);
 
+            $message = $ok
+                ? 'Выгрузка выполнена (код выхода 0).'
+                : ('Ненулевой код выхода'.($exit !== null ? ": {$exit}" : '').'. См. вывод.');
+            if (!$ok && $exit === 0 && $s3OutputFailure) {
+                $message = 'В выводе s3cmd ошибка (часто пустой или неверный S3_BUCKET на сервере). В панели заново включите выгрузку логов, чтобы обновить /root/upload-logs.sh.';
+            }
+
             return [
                 'success' => $ok,
-                'message' => $ok ? 'Выгрузка выполнена (код выхода 0).' : ('Ненулевой код выхода'.($exit !== null ? ": {$exit}" : '').'. См. вывод.'),
+                'message' => $message,
                 'output' => $out,
                 'skipped' => false,
             ];
