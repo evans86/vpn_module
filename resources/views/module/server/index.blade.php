@@ -1197,8 +1197,15 @@
 
             @php
                 $bulkAsyncSrvMarker = '__SRVTPL__';
-                $bulkAsyncStartTpl = route('admin.module.server.log-upload-async-reinstall-start', ['server' => $bulkAsyncSrvMarker]);
-                $bulkAsyncPollTpl = route('admin.module.server.log-upload-async-reinstall-status', ['server' => $bulkAsyncSrvMarker]);
+                /**
+                 * Не используем route('…log-upload-async-reinstall…'): на части окружений маршруты ещё не задеплоены
+                 * или висит старый route:cache без этих имён — тогда компиляция Blade падает. Собираем URL так же надёжно,
+                 * как для enable-log-upload с плейсхолдером :id ниже по файлу.
+                 */
+                $bulkAsyncTplBaseUrl = route('admin.module.server.enable-log-upload', ['server' => $bulkAsyncSrvMarker]);
+                $bulkAsyncStartTpl = preg_replace('#/enable-log-upload/?(\?.*)?$#', '/log-upload-async-reinstall/start$1', $bulkAsyncTplBaseUrl);
+                $bulkAsyncPollTpl = preg_replace('#/enable-log-upload/?(\?.*)?$#', '/log-upload-async-reinstall/status$1', $bulkAsyncTplBaseUrl);
+                $bulkAsyncTargetIdsUrl = rtrim(route('admin.module.server.index'), '/').'/log-upload-async-reinstall-target-ids';
             @endphp
 
             $('#bulkReinstallLogUploadScriptBtn').on('click', async function () {
@@ -1256,7 +1263,7 @@
                 renderOut();
 
                 try {
-                    var listUrl = '{{ route('admin.module.server.log-upload-async-reinstall-target-ids') }}?only_configured=1';
+                    var listUrl = @json($bulkAsyncTargetIdsUrl) + '?only_configured=1';
                     var rList = await fetchJson(listUrl, {
                         credentials: 'same-origin',
                         headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
