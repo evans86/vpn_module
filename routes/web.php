@@ -214,6 +214,9 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
             // Серверы
             Route::prefix('server')->name('server.')->group(function () {
                 Route::get('/', [ServerController::class, 'index'])->name('index');
+                Route::get('log-upload-async-reinstall-target-ids', [ServerController::class, 'logUploadAsyncReinstallTargetIds'])
+                    ->middleware('throttle:60,1')
+                    ->name('log-upload-async-reinstall-target-ids');
                 Route::get('/{server}', [ServerController::class, 'show'])->name('show');
                 Route::post('/', [ServerController::class, 'store'])->name('store');
                 Route::post('/store-manual', [ServerController::class, 'storeManual'])->name('store-manual');
@@ -226,6 +229,12 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
                 Route::post('/bulk-reinstall-log-upload-script', [ServerController::class, 'bulkReinstallLogUploadScript'])
                     ->middleware('throttle:120,1')
                     ->name('bulk-reinstall-log-upload-script');
+                Route::post('/{server}/log-upload-async-reinstall/start', [ServerController::class, 'startLogUploadAsyncReinstall'])
+                    ->middleware('throttle:120,1')
+                    ->name('log-upload-async-reinstall-start');
+                Route::get('/{server}/log-upload-async-reinstall/status', [ServerController::class, 'pollLogUploadAsyncReinstall'])
+                    ->middleware('throttle:180,1')
+                    ->name('log-upload-async-reinstall-status');
                 Route::post('/{server}/setup-dns', [ServerController::class, 'setupDns'])->name('setup-dns');
                 Route::post('/{server}/ping-and-configure', [ServerController::class, 'pingAndConfigure'])->name('ping-and-configure');
                 Route::post('/{server}/reboot', [ServerController::class, 'reboot'])->name('reboot');

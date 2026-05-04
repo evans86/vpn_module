@@ -7,6 +7,7 @@ use App\Dto\Server\ServerFactory;
 use App\Models\Server\Server;
 use App\Services\Panel\marzban\MarzbanService;
 use Exception;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use phpseclib3\Net\SSH2;
 use RuntimeException;
@@ -23,6 +24,11 @@ class LogUploadService
      */
     public const UPLOAD_SCRIPT_PATH = '/root/upload-logs.sh';
     
+    /** Файлы на ноде при фоновой установке (массовый reinstall без длинных HTTP ответов) */
+    public const REMOTE_ASYNC_STATUS_PATH = '/root/.log-upload-install-async.status';
+
+    public const REMOTE_ASYNC_RUNNING_PATH = '/root/.log-upload-install-async.running';
+
     /**
      * Путь к конфигурации s3cmd
      */
@@ -66,33 +72,7 @@ class LogUploadService
             // Выполняем скрипт установки
             $this->executeInstallation($ssh);
 
-            // Проверяем доступ к бакету с сервера (ключи, сеть, имя бакета)
-            $verify = $this->verifyS3AccessFromHost($ssh);
-            if (!$verify['ok']) {
-                throw new RuntimeException(
-                    'Не удалось прочитать бакет с сервера (s3cmd ls). Выгрузка не будет работать. '.$verify['message']
-                );
-            }
-
-            // Проверяем, что скрипт установлен
-            $isInstalled = $this->checkInstallation($ssh);
-
-            if (!$isInstalled) {
-                throw new RuntimeException('Script installation verification failed');
-            }
-
-            // Обновляем статус в БД
-            $server->logs_upload_enabled = true;
-            $server->save();
-
-            Log::info('Log upload enabled successfully', ['server_id' => $server->id, 'source' => 'server']);
-
-            return [
-                'success' => true,
-                'message' => $alreadyEnabledInDb
-                    ? 'Скрипт /root/upload-logs.sh, ~/.s3cfg и cron обновлены из настроек панели.'
-                    : 'Выгрузка логов успешно включена.',
-            ];
+            return $this->finalizeInstallerOnHost($ssh, $server, $alreadyEnabledInDb);
 
         } catch (Exception $e) {
             Log::error('Failed to enable log upload', [
@@ -107,6 +87,202 @@ class LogUploadService
                 'message' => 'Ошибка при включении выгрузки логов: ' . $e->getMessage()
             ];
         }
+    }
+
+    /**
+     * Загружает установщик и запускает его на ноде в фоне (ответ HTTP за несколько секунд; обход CF 524).
+     *
+     * @return array{success: bool, message: string}
+     */
+    public function startRemoteAsyncInstaller(Server $server): array
+    {
+        try {
+            if (! $server->logs_upload_enabled) {
+                return ['success' => false, 'message' => 'В БД выгрузка логов не включена для этого сервера.'];
+            }
+            if (empty($server->login) || $server->password === null || $server->password === '') {
+                return ['success' => false, 'message' => 'Нет SSH логина или пароля.'];
+            }
+
+            $serverDto = ServerFactory::fromEntity($server);
+            $ssh = $this->marzbanService->connectSshAdapter($serverDto);
+
+            $scriptContent = file_get_contents(resource_path('scripts/upload-logs.sh'));
+            if ($scriptContent === false) {
+                return ['success' => false, 'message' => 'Не удалось прочитать upload-logs.sh из ресурсов приложения'];
+            }
+
+            $scriptContent = $this->replaceScriptPlaceholders($scriptContent);
+            $this->uploadScript($ssh, $scriptContent);
+
+            $out = trim((string) $this->launchRemoteInstallInBackgroundShell($ssh));
+
+            if (strpos($out, 'ASYNC_LAUNCH_OK') === false) {
+                return [
+                    'success' => false,
+                    'message' => 'Не удалось запустить фоновую установку по SSH'.($out !== '' ? (': '.$out) : ''),
+                ];
+            }
+
+            Cache::put(self::cacheKeyAsyncInstallStarted($server->id), time(), 86400);
+
+            Log::info('Remote async log upload install launched', ['server_id' => $server->id, 'source' => 'server']);
+
+            return [
+                'success' => true,
+                'message' => 'Фоновая установка запущена на ноде. Опрос статусом до появления результата.',
+            ];
+
+        } catch (Exception $e) {
+            Log::error('startRemoteAsyncInstaller failed', [
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+                'source' => 'server',
+            ]);
+
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Короткий опрос: установка закончена — финализация (s3, проверка скрипта, БД).
+     *
+     * @return array<string, mixed>
+     */
+    public function pollRemoteAsyncInstaller(Server $server, bool $requireConfiguredStatus = true): array
+    {
+        try {
+            if ($requireConfiguredStatus && ! $server->isActive()) {
+                return ['pending' => false, 'success' => false, 'message' => 'Сервер не в статусе «Настроен».'];
+            }
+            if (! $server->logs_upload_enabled) {
+                return ['pending' => false, 'success' => false, 'message' => 'В БД выгрузка логов не включена'];
+            }
+
+            $serverDto = ServerFactory::fromEntity($server);
+            $ssh = $this->marzbanService->connectSshAdapter($serverDto);
+
+            $startedAt = Cache::get(self::cacheKeyAsyncInstallStarted($server->id));
+
+            $statusPathEsc = escapeshellarg(self::REMOTE_ASYNC_STATUS_PATH);
+            $runningPathEsc = escapeshellarg(self::REMOTE_ASYNC_RUNNING_PATH);
+
+            $raw = trim((string) $ssh->exec('cat '.$statusPathEsc.' 2>/dev/null || true'));
+            $exitFromFile = null;
+            if ($raw !== '' && preg_match('/__REMOTE_INSTALL_DONE__:(\d+)/', $raw, $m)) {
+                $exitFromFile = (int) $m[1];
+            }
+
+            if ($exitFromFile !== null) {
+                if ($exitFromFile !== 0) {
+                    $logTail = trim((string) $ssh->exec('tail -c 3600 /tmp/log-upload-async-install.log 2>/dev/null || true'));
+                    Cache::forget(self::cacheKeyAsyncInstallStarted($server->id));
+
+                    return [
+                        'pending' => false,
+                        'success' => false,
+                        'message' => sprintf('Установочный скрипт на ноде завершился с кодом %d.', $exitFromFile).
+                            ($logTail !== '' ? "\n\nФрагмент лога (/tmp/log-upload-async-install.log):\n".$logTail : ''),
+                    ];
+                }
+
+                $alreadyEnabledInDb = (bool) $server->logs_upload_enabled;
+                $final = $this->finalizeInstallerOnHost($ssh, $server, $alreadyEnabledInDb);
+                Cache::forget(self::cacheKeyAsyncInstallStarted($server->id));
+
+                return array_merge(['pending' => false], $final);
+
+            }
+
+            $runningProbe = trim((string) $ssh->exec('[ -f '.$runningPathEsc.' ] && echo Y || echo N'));
+
+            // Раннее окно после старта без файла статуса
+            if ($runningProbe === 'Y' || ($startedAt !== null && (time() - (int) $startedAt) < 240)) {
+                return [
+                    'pending' => true,
+                    'message' => 'Установка на ноде выполняется (apt/s3cfg/cron может занять несколько минут)…',
+                ];
+            }
+
+            if ($startedAt !== null && (time() - (int) $startedAt) < 7200) {
+                return [
+                    'pending' => true,
+                    'message' => 'Ожидание файла статуса установки на ноде…',
+                ];
+            }
+
+            return [
+                'pending' => false,
+                'success' => false,
+                'message' => 'Таймаут ожидания: нет '.self::REMOTE_ASYNC_STATUS_PATH.'. Посмотрите /tmp/log-upload-async-install.log на сервере и при необходимости запустите старт заново.',
+            ];
+
+        } catch (Exception $e) {
+            return [
+                'pending' => false,
+                'success' => false,
+                'message' => 'Ошибка опроса: '.$e->getMessage(),
+            ];
+        }
+    }
+
+    private static function cacheKeyAsyncInstallStarted(int $serverId): string
+    {
+        return 'log_upload_async_install_started:'.$serverId;
+    }
+
+    /**
+     * @return array{success: bool, message: string}
+     */
+    private function finalizeInstallerOnHost(SSH2 $ssh, Server $server, bool $alreadyEnabledInDb): array
+    {
+        $verify = $this->verifyS3AccessFromHost($ssh);
+        if (! $verify['ok']) {
+            return [
+                'success' => false,
+                'message' => 'Не удалось прочитать бакет с сервера (s3cmd ls). '.$verify['message'],
+            ];
+        }
+
+        if (! $this->checkInstallation($ssh)) {
+            return [
+                'success' => false,
+                'message' => 'Проверка: '.self::UPLOAD_SCRIPT_PATH.' не найден или не исполняем после установки',
+            ];
+        }
+
+        $server->logs_upload_enabled = true;
+        $server->save();
+
+        Log::info('Log upload finalize after install succeeded', ['server_id' => $server->id, 'source' => 'server']);
+
+        return [
+            'success' => true,
+            'message' => $alreadyEnabledInDb
+                ? 'Скрипт /root/upload-logs.sh, ~/.s3cfg и cron обновлены из настроек панели.'
+                : 'Выгрузка логов успешно включена.',
+        ];
+    }
+
+    private function launchRemoteInstallInBackgroundShell(SSH2 $ssh): string
+    {
+        $launcher = <<<'REMOTE'
+chmod +x /tmp/upload-logs-install.sh
+rm -f /root/.log-upload-install-async.status /root/.log-upload-install-async.running
+touch /root/.log-upload-install-async.running
+(
+  bash /tmp/upload-logs-install.sh
+  ec=$?
+  printf '__REMOTE_INSTALL_DONE__:%s\n' "$ec" > /root/.log-upload-install-async.status.new
+  mv -f /root/.log-upload-install-async.status.new /root/.log-upload-install-async.status
+  rm -f /root/.log-upload-install-async.running
+) >> /tmp/log-upload-async-install.log 2>&1 </dev/null &
+echo ASYNC_LAUNCH_OK
+
+REMOTE;
+
+        return (string) $ssh->exec('bash -lc '.escapeshellarg($launcher));
+
     }
 
     /**

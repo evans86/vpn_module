@@ -19,6 +19,7 @@ use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -794,6 +795,84 @@ class ServerController extends Controller
     }
 
     /**
+     * ID серверов для массовой переустановки скрипта (короткий GET без SSH).
+     */
+    public function logUploadAsyncReinstallTargetIds(Request $request): JsonResponse
+    {
+        $onlyConfigured = $request->boolean('only_configured', true);
+
+        $targets = $this->logUploadBulkReinstallBaseQuery($onlyConfigured)
+            ->orderBy('id')
+            ->select(['id', 'name'])
+            ->get()
+            ->map(function (Server $s) {
+                return [
+                    'id' => $s->id,
+                    'name' => $s->name ?: ('#'.$s->id),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return response()->json([
+            'success' => true,
+            'targets' => $targets,
+            'total' => count($targets),
+            'only_configured' => $onlyConfigured,
+        ]);
+    }
+
+    /**
+     * Старт фоновой переустановки на одной ноде (ответ за секунды; apt идёт в nohup на сервере).
+     */
+    public function startLogUploadAsyncReinstall(Server $server, Request $request): JsonResponse
+    {
+        if ($server->isDeleted()) {
+            return response()->json(['success' => false, 'message' => 'Сервер удалён'], 404);
+        }
+        $onlyConfigured = $request->boolean('only_configured', true);
+        if ($onlyConfigured && ! $server->isActive()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Обрабатываются только серверы в статусе «Настроен».',
+            ], 422);
+        }
+        $result = $this->logUploadService->startRemoteAsyncInstaller($server);
+
+        return response()->json($result, $result['success'] ? 200 : 400);
+    }
+
+    /**
+     * Короткий опрос: установка закончена — финальная проверка S3 и БД.
+     */
+    public function pollLogUploadAsyncReinstall(Server $server, Request $request): JsonResponse
+    {
+        if ($server->isDeleted()) {
+            return response()->json(['pending' => false, 'success' => false, 'message' => 'Сервер удалён'], 404);
+        }
+
+        $onlyConfigured = $request->boolean('only_configured', true);
+        $result = $this->logUploadService->pollRemoteAsyncInstaller($server, $onlyConfigured);
+
+        return response()->json($result);
+    }
+
+    /** @return Builder<\App\Models\Server\Server> */
+    private function logUploadBulkReinstallBaseQuery(bool $onlyConfigured): Builder
+    {
+        $q = Server::query()
+            ->where('server_status', '!=', Server::SERVER_DELETED)
+            ->where('logs_upload_enabled', true)
+            ->whereNotNull('ip')
+            ->where('ip', '!=', '');
+        if ($onlyConfigured) {
+            $q->where('server_status', Server::SERVER_CONFIGURED);
+        }
+
+        return $q;
+    }
+
+    /**
      * Nginx-заглушка (default_server 80/443) на сервере по SSH.
      */
     public function applyDecoyStub(Request $request, Server $server): JsonResponse
@@ -1025,14 +1104,7 @@ class ServerController extends Controller
         // По умолчанию 2: за Cloudflare (524) лимит ~100 с; одна установка по SSH часто 30–90 с.
         $perBatch = min(5, max(1, (int) $request->input('per_batch', 2)));
 
-        $baseQuery = Server::query()
-            ->where('server_status', '!=', Server::SERVER_DELETED)
-            ->where('logs_upload_enabled', true)
-            ->whereNotNull('ip')
-            ->where('ip', '!=', '');
-        if ($onlyConfigured) {
-            $baseQuery->where('server_status', Server::SERVER_CONFIGURED);
-        }
+        $baseQuery = $this->logUploadBulkReinstallBaseQuery($onlyConfigured);
 
         $matchedTotal = (clone $baseQuery)->count();
         $servers = (clone $baseQuery)
