@@ -149,7 +149,7 @@
                             :disabled="blockedSubmit">
                         <span id="btn-submit-label">Перенести все ключи</span>
                     </button>
-                    <button type="button" id="btn-test-transfer"
+                    <button type="submit" id="btn-test-transfer"
                             class="inline-flex items-center px-5 py-2.5 border border-amber-300 text-base font-medium rounded-md shadow-sm text-amber-900 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             :disabled="blockedTest">
                         <i class="fas fa-vial mr-2"></i> Тест: 2 ключа
@@ -231,12 +231,12 @@
 
                 get blockedTest() {
                     return this.loading || this.samePanel || !this.sourcePanelId || !this.targetPanelId
-                        || this.keyCount === null || this.keyCount === 0;
+                        || (this.keyCount !== null && this.keyCount === 0);
                 },
 
                 get blockedSubmit() {
                     return this.loading || this.samePanel || !this.sourcePanelId || !this.targetPanelId
-                        || this.keyCount === null || this.keyCount === 0;
+                        || (this.keyCount !== null && this.keyCount === 0);
                 },
 
                 loadKeyCount() {
@@ -247,7 +247,7 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || document.querySelector('input[name="_token"]')?.value,
+                            'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content')) || (document.querySelector('input[name="_token"]') && document.querySelector('input[name="_token"]').value),
                             'Accept': 'application/json',
                         },
                         body: JSON.stringify({ panel_id: id }),
@@ -304,20 +304,6 @@
             URL.revokeObjectURL(a.href);
         });
 
-            var btnTest = document.getElementById('btn-test-transfer');
-            if (btnTest) btnTest.addEventListener('click', function () {
-            var form = document.getElementById('mass-transfer-form');
-            var input = document.getElementById('mass-transfer-max-total');
-            var alpineEl = document.getElementById('mass-transfer-form');
-            var root = alpineEl ? getMassTransferAlpine(alpineEl) : null;
-            if (root && root.samePanel) {
-                if (typeof toastr !== 'undefined') toastr.warning('Выберите разные панели');
-                return;
-            }
-            if (input) input.value = '2';
-                if (form) form.requestSubmit();
-        });
-
             formEl.addEventListener('submit', function (e) {
             e.preventDefault();
             const form = this;
@@ -327,6 +313,16 @@
             if (alpineData && alpineData.samePanel) {
                 if (typeof toastr !== 'undefined') toastr.warning('Выберите разные панели');
                 return;
+            }
+
+            /** @type {HTMLInputElement|null} */
+            var maxTotalInputEl = form.querySelector('input[name="max_total"]');
+            // Полный перенос: без лимита. Тест: ровно 2 ключа. Если submitter недоступен (редкие браузеры) —
+            // сбрасываем лимит, чтобы не оставался max_total=2 от прошлого теста.
+            if (e.submitter && e.submitter.id === 'btn-test-transfer') {
+                if (maxTotalInputEl) maxTotalInputEl.value = '2';
+            } else {
+                if (maxTotalInputEl) maxTotalInputEl.value = '';
             }
 
             function readBatchSize() {
@@ -355,8 +351,6 @@
             totalKeys = parseInt(document.getElementById('source_panel_id').dataset.count || '0', 10) || 0;
             if (alpineData && alpineData.keyCount != null) totalKeys = parseInt(alpineData.keyCount, 10) || totalKeys;
 
-            var maxTotalInput = form.querySelector('input[name="max_total"]');
-            if (maxTotalInput && e.submitter && e.submitter.id === 'btn-submit') maxTotalInput.value = '';
             BATCH_SIZE = readBatchSize();
             if (alpineData) alpineData.loading = true;
             if (btn) btn.disabled = true;
