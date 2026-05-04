@@ -101,37 +101,37 @@
                     </x-slot>
                 </x-admin.empty-state>
             @else
-                <div class="flex flex-wrap items-center gap-2 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <span class="text-sm text-gray-600 font-medium">Действия:</span>
-                    <button type="button" 
-                            class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                <div class="flex flex-nowrap items-center gap-2 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200 overflow-x-auto">
+                    <span class="text-sm text-gray-600 font-medium shrink-0">Действия:</span>
+                    <button type="button"
+                            class="shrink-0 whitespace-nowrap inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                             onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createServerModal' } }))">
                         <i class="fas fa-plus mr-2"></i>
                         Добавить сервер (API)
                     </button>
-                    <button type="button" 
-                            class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    <button type="button"
+                            class="shrink-0 whitespace-nowrap inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                             onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createManualServerModal' } }))">
                         <i class="fas fa-server mr-2"></i>
                         Добавить вручную (без API)
                     </button>
                     <button type="button" id="bulkInstallSpeedtestCliBtn"
-                            class="inline-flex items-center px-3 py-1.5 border border-amber-400 text-sm font-medium rounded-md shadow-sm text-amber-900 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400"
+                            class="shrink-0 whitespace-nowrap inline-flex items-center px-3 py-1.5 border border-amber-400 text-sm font-medium rounded-md shadow-sm text-amber-900 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400"
                             title="По SSH ставит пакет speedtest-cli на серверы со статусом «Настроен» (нужен sudo или root)">
                         <i class="fas fa-tachometer-alt mr-2"></i>
-                        speedtest-cli на всех «Настроен»
+                        speedtest-cli
                     </button>
                     <button type="button" id="bulkRunLogUploadNowBtn"
-                            class="inline-flex items-center px-3 py-1.5 border border-teal-500 text-sm font-medium rounded-md shadow-sm text-teal-900 bg-teal-50 hover:bg-teal-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
+                            class="shrink-0 whitespace-nowrap inline-flex items-center px-3 py-1.5 border border-teal-500 text-sm font-medium rounded-md shadow-sm text-teal-900 bg-teal-50 hover:bg-teal-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
                             title="На всех серверах с включённой выгрузкой логов по SSH выполнить /root/upload-logs.sh (как cron: сжатие, запись в S3, удаление исходников, при наличии контейнера — docker restart marzban).">
                         <i class="fas fa-cloud-upload-alt mr-2"></i>
-                        Выгрузить логи сейчас (все с выгрузкой)
+                        Выгрузить логи сейчас
                     </button>
                     <button type="button" id="bulkReinstallLogUploadScriptBtn"
-                            class="inline-flex items-center px-3 py-1.5 border border-sky-500 text-sm font-medium rounded-md shadow-sm text-sky-900 bg-sky-50 hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                            class="shrink-0 whitespace-nowrap inline-flex items-center px-3 py-1.5 border border-sky-500 text-sm font-medium rounded-md shadow-sm text-sky-900 bg-sky-50 hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
                             title="На всех «Настроен» с включённой выгрузкой заново выполнить установку скрипта из панели: /tmp/upload-logs-install.sh → /root/upload-logs.sh, ~/.s3cfg, cron (apt/s3cmd, проверка s3cmd ls). Долго, по очереди.">
                         <i class="fas fa-sync-alt mr-2"></i>
-                        Обновить скрипт выгрузки (все «Настроен»)
+                        Обновить скрипт выгрузки
                     </button>
                 </div>
                 <pre id="bulkInstallSpeedtestCliOut"
