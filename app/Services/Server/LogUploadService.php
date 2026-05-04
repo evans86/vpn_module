@@ -318,14 +318,45 @@ class LogUploadService
      */
     private function executeInstallation(SSH2 $ssh): void
     {
-        $command = 'bash /tmp/upload-logs-install.sh';
-        $result = $ssh->exec($command);
-        
+        // Код выхода в выводе: getExitStatus() у phpseclib после длинного bash+apt иногда неверен
+        $bash = '(bash /tmp/upload-logs-install.sh 2>&1); echo LOGUP_INSTALL_EXIT:$?';
+        $raw = trim($ssh->exec($bash));
+        $exit = null;
+        if (preg_match('/LOGUP_INSTALL_EXIT:(\d+)\s*$/', $raw, $m)) {
+            $exit = (int) $m[1];
+            $result = preg_replace('/\s*LOGUP_INSTALL_EXIT:\d+\s*$/', '', $raw);
+            $result = $result !== null ? trim((string) $result) : '';
+        } else {
+            $result = $raw;
+        }
+
         Log::info('Installation script executed', ['output' => $result, 'source' => 'server']);
 
-        if ($ssh->getExitStatus() !== 0) {
-            throw new RuntimeException("Installation script failed: $result");
+        if ($exit !== null) {
+            if ($exit !== 0) {
+                throw new RuntimeException('Installation script failed: '.$result);
+            }
+
+            return;
         }
+
+        $sshExit = $ssh->getExitStatus();
+        if ($sshExit === 0) {
+            return;
+        }
+        // Маркер в скрипте resources/scripts/upload-logs.sh при успешной установке
+        if (strpos($result, '[+] Setup complete.') !== false) {
+            Log::warning('Log upload install: LOGUP_INSTALL_EXIT missing in SSH output; accepted by Setup complete marker', [
+                'source' => 'server',
+                'ssh_get_exit_status' => $sshExit,
+            ]);
+
+            return;
+        }
+
+        throw new RuntimeException(
+            'Installation script failed'.($sshExit !== null && $sshExit !== false ? ' (SSH exit '.$sshExit.')' : '').': '.$result
+        );
     }
 
     /**
