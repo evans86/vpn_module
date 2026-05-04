@@ -1196,7 +1196,7 @@
             });
 
             $('#bulkReinstallLogUploadScriptBtn').on('click', function () {
-                if (!confirm('Переустановить скрипт выгрузки логов на всех серверах со статусом «Настроен», у которых выгрузка уже включена в БД?\n\nПо очереди: полная установка как при «Обновить скрипт выгрузки» (apt, ~/.s3cfg, /root/upload-logs.sh, cron, проверка s3cmd ls). Запрос идёт пакетами по 5 нод, чтобы не обрывался таймаут HTTP. Нужен SSH в карточке.')) {
+                if (!confirm('Переустановить скрипт выгрузки логов на всех серверах со статусом «Настроен», у которых выгрузка уже включена в БД?\n\nПо очереди: полная установка (apt, ~/.s3cfg, /root/upload-logs.sh, cron, s3cmd ls). Запрос идёт пакетами по 2 ноды за вызов — так реже срабатывает таймаут Cloudflare (524, ~100 с). Нужен SSH в карточке.')) {
                     return;
                 }
                 var btn = $(this);
@@ -1206,7 +1206,7 @@
 
                 var lines = [
                     'Массовое обновление скрипта выгрузки',
-                    'Запросы идут пакетами (до 5 серверов за один HTTP-вызов), чтобы прокси/PHP не рвали длинное соединение.',
+                    'Запросы идут пакетами (до 2 серверов за один HTTP-вызов), чтобы реже попадать в таймаут Cloudflare 524 (~100 с) и прокси.',
                     ''
                 ];
                 var totals = { attempted: 0, ok: 0, fail: 0, skipped: 0 };
@@ -1249,7 +1249,12 @@
                     totals.skipped += (s.skipped || 0);
                 }
 
-                function runBatch(afterId) {
+                /**
+                 * @param {number} afterId
+                 * @param {number} perBatch размер пакета (1 при fallback после 524)
+                 */
+                function runBatch(afterId, perBatch) {
+                    perBatch = perBatch == null ? 2 : perBatch;
                     $.ajax({
                         url: '{{ route('admin.module.server.bulk-reinstall-log-upload-script') }}',
                         method: 'POST',
@@ -1258,7 +1263,7 @@
                             _token: '{{ csrf_token() }}',
                             only_configured: 1,
                             after_id: afterId,
-                            per_batch: 5
+                            per_batch: perBatch
                         },
                         success: function (response) {
                             appendBatch(response);
@@ -1267,7 +1272,7 @@
                             if (b.has_more) {
                                 lines.push('Запрос следующего пакета…');
                                 renderPanel();
-                                runBatch(b.next_after_id || 0);
+                                runBatch(b.next_after_id || 0, 2);
 
                                 return;
                             }
@@ -1291,24 +1296,37 @@
                             var msg = 'Запрос не выполнен';
                             if (xhr.responseJSON && xhr.responseJSON.message) {
                                 msg = xhr.responseJSON.message;
+                            } else if (xhr.status === 524) {
+                                msg = 'HTTP 524 (Cloudflare): ответ от origin не успел за ~100 с. Не повторяем тот же пакет автоматически — дождитесь завершения на сервере или уменьшите пакет. Ниже — повтор этого участка по 1 ноде.';
                             } else if (textStatus === 'timeout') {
-                                msg = 'Таймаут запроса (7 мин). Уменьшите per_batch на стороне сервера или увеличьте proxy_read_timeout / max_execution_time.';
+                                msg = 'Таймаут запроса (7 мин у клиента). Проверьте proxy_read_timeout / max_execution_time на origin.';
                             } else if (xhr.status === 502 || xhr.status === 504) {
-                                msg = 'HTTP ' + xhr.status + ' — похоже на таймаут или обрыв прокси; обработка остановилась.';
+                                msg = 'HTTP ' + xhr.status + ' — таймаут или обрыв прокси; обработка остановилась.';
                             }
                             toastr.error(msg);
                             lines.push('');
-                            lines.push('!!! Ошибка HTTP при пакете после id ' + afterId + ': ' + msg);
+                            lines.push('!!! Ошибка HTTP при пакете после id ' + afterId + ' (per_batch ' + perBatch + '): ' + msg);
                             if (xhr.status) {
                                 lines.push('Статус: ' + xhr.status);
                             }
+                            if ((xhr.status === 524 || xhr.status === 504) && perBatch > 1) {
+                                lines.push('Пробуем заново этот же участок очереди с per_batch=1…');
+                                renderPanel();
+                                setTimeout(function () {
+                                    runBatch(afterId, 1);
+                                }, 2500);
+
+                                return;
+                            }
+                            lines.push('');
+                            lines.push('Если снова 524 при per_batch=1: отключите оранжевое облако DNS для домена админки, увеличьте лимит на Cloudflare или обходите CF для origin.');
                             renderPanel();
                             btn.prop('disabled', false);
                         }
                     });
                 }
 
-                runBatch(0);
+                runBatch(0, 2);
             });
         </script>
     @endpush

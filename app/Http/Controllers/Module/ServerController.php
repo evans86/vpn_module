@@ -1022,7 +1022,8 @@ class ServerController extends Controller
 
         $onlyConfigured = $request->boolean('only_configured', true);
         $afterId = max(0, (int) $request->input('after_id', 0));
-        $perBatch = min(5, max(1, (int) $request->input('per_batch', 5)));
+        // По умолчанию 2: за Cloudflare (524) лимит ~100 с; одна установка по SSH часто 30–90 с.
+        $perBatch = min(5, max(1, (int) $request->input('per_batch', 2)));
 
         $baseQuery = Server::query()
             ->where('server_status', '!=', Server::SERVER_DELETED)
