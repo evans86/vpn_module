@@ -1268,7 +1268,12 @@
                 $bulkAsyncTargetIdsUrl = rtrim(route('admin.module.server.index'), '/').'/log-upload-async-reinstall-target-ids';
             @endphp
 
-            $('#bulkReinstallLogUploadScriptBtn').on('click', async function () {
+            /**
+             * Без async/await: в части WebView/старых движков парсер падает на «async function»,
+             * и весь код после этой строки не выполняется — кнопка остаётся без обработчика.
+             * Логика та же, через Promise + fetch.
+             */
+            $('#bulkReinstallLogUploadScriptBtn').on('click', function () {
                 if (!confirm('Переустановить скрипт выгрузки на всех «Настроен» серверах с включённой выгрузкой?\n\nУстановка (apt, s3cfg, cron) запускается на ноде в фоне (nohup). Браузер только короткими запросами опрашивает статус — так не действует лимит Cloudflare ~100 с на один долгий HTTP.')) {
                     return;
                 }
@@ -1278,7 +1283,7 @@
                 var bulkPollTpl = @json($bulkAsyncPollTpl);
                 var bulkMarker = @json($bulkAsyncSrvMarker);
 
-                function sleep(ms) {
+                function sleepPromise(ms) {
                     return new Promise(function (resolve) {
                         setTimeout(resolve, ms);
                     });
@@ -1288,20 +1293,19 @@
                     return tpl.split(bulkMarker).join(String(serverId));
                 }
 
-                async function fetchJson(url, options) {
-                    var res = await fetch(url, options || {});
-                    var data = {};
-                    try {
-                        data = await res.json();
-                    } catch (e) {
-                        data = {};
-                    }
-                    if (!res.ok && !data.message) {
-                        data.message = res.status === 524
-                            ? 'HTTP 524 (Cloudflare)'
-                            : ('HTTP ' + res.status);
-                    }
-                    return { res: res, data: data };
+                function fetchJsonPromise(url, options) {
+                    return fetch(url, options || {}).then(function (res) {
+                        return res.json().catch(function () {
+                            return {};
+                        }).then(function (data) {
+                            if (!res.ok && !data.message) {
+                                data.message = res.status === 524
+                                    ? 'HTTP 524 (Cloudflare)'
+                                    : ('HTTP ' + res.status);
+                            }
+                            return { res: res, data: data };
+                        });
+                    });
                 }
 
                 var btn = $(this);
@@ -1322,19 +1326,131 @@
 
                 renderOut();
 
-                try {
-                    var listUrl = @json($bulkAsyncTargetIdsUrl) + '?only_configured=1';
-                    var rList = await fetchJson(listUrl, {
-                        credentials: 'same-origin',
-                        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-                    });
+                var listUrl = @json($bulkAsyncTargetIdsUrl) + '?only_configured=1';
 
+                function finishAll(targetsLength) {
+                    lines.push('===== Завершено');
+                    renderOut();
+                    if (totals.fail === 0 && totals.startFail === 0 && totals.handled > 0) {
+                        toastr.success('Массовое обновление скриптов завершено');
+                    } else if (targetsLength === 0 && totals.handled === 0 && totals.startFail === 0) {
+                        toastr.info('Нет серверов в списке');
+                    } else {
+                        toastr.warning('Есть ошибки — см. блок выше');
+                    }
+                    btn.prop('disabled', false);
+                }
+
+                function processServerAt(i, targets) {
+                    if (i >= targets.length) {
+                        finishAll(targets.length);
+                        return;
+                    }
+
+                    var t = targets[i];
+                    var sid = t.id;
+                    var label = '#' + sid + ' ' + (t.name || '');
+
+                    lines.push('— ' + label);
+                    lines.push('  запуск фоновой установки на ноде…');
+                    renderOut();
+
+                    var startUrl = srvUrl(bulkStartTpl, sid);
+                    var pollUrl = srvUrl(bulkPollTpl, sid) + '?only_configured=1';
+
+                    fetchJsonPromise(startUrl, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            Accept: 'application/json',
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                            'X-CSRF-TOKEN': csrf,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: '_token=' + encodeURIComponent(csrf) + '&only_configured=1'
+                    }).then(function (rStart) {
+                        if (!rStart.res.ok || !rStart.data.success) {
+                            totals.startFail++;
+                            lines[lines.length - 1] = '  не удалось запустить: ' + (rStart.data.message || rStart.res.status);
+                            lines.push('');
+                            renderOut();
+                            processServerAt(i + 1, targets);
+                            return;
+                        }
+
+                        function pollStep(n) {
+                            if (n >= 600) {
+                                totals.handled++;
+                                totals.fail++;
+                                lines[lines.length - 1] = '  таймаут: нет файла статуса (см. /tmp/log-upload-async-install.log на сервере).';
+                                lines.push('');
+                                renderOut();
+                                processServerAt(i + 1, targets);
+                                return;
+                            }
+
+                            sleepPromise(n === 0 ? 2500 : 6500).then(function () {
+                                return fetchJsonPromise(pollUrl, {
+                                    credentials: 'same-origin',
+                                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                                });
+                            }).then(function (rPoll) {
+                                if (!rPoll.res.ok) {
+                                    totals.handled++;
+                                    totals.fail++;
+                                    lines[lines.length - 1] = '  ошибка опроса: ' + (rPoll.data.message || rPoll.res.status);
+                                    lines.push('');
+                                    renderOut();
+                                    processServerAt(i + 1, targets);
+                                    return;
+                                }
+
+                                if (rPoll.data.pending) {
+                                    lines[lines.length - 1] = '  ожидание ноды (опрос ' + (n + 1) + ')…';
+                                    renderOut();
+                                    pollStep(n + 1);
+                                    return;
+                                }
+
+                                totals.handled++;
+                                if (rPoll.data.success) {
+                                    totals.ok++;
+                                    lines[lines.length - 1] = '  OK: ' + (rPoll.data.message || '');
+                                } else {
+                                    totals.fail++;
+                                    lines[lines.length - 1] = '  ошибка: ' + (rPoll.data.message || '');
+                                }
+                                lines.push('');
+                                renderOut();
+                                processServerAt(i + 1, targets);
+                            }).catch(function (e) {
+                                totals.handled++;
+                                totals.fail++;
+                                lines[lines.length - 1] = '  ошибка сети при опросе: ' + (e && e.message ? e.message : String(e));
+                                lines.push('');
+                                renderOut();
+                                processServerAt(i + 1, targets);
+                            });
+                        }
+
+                        pollStep(0);
+                    }).catch(function (e) {
+                        lines[lines.length - 1] = '  ошибка сети при старте: ' + (e && e.message ? e.message : String(e));
+                        lines.push('');
+                        renderOut();
+                        processServerAt(i + 1, targets);
+                    });
+                }
+
+                fetchJsonPromise(listUrl, {
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                }).then(function (rList) {
                     if (!rList.res.ok || !Array.isArray(rList.data.targets)) {
                         lines.push('Не удалось получить список: ' + (rList.data.message || rList.res.status));
                         renderOut();
                         toastr.error('Не удалось получить список серверов');
                         btn.prop('disabled', false);
-
                         return;
                     }
 
@@ -1343,108 +1459,14 @@
                     lines.push('');
                     renderOut();
 
-                    for (var i = 0; i < targets.length; i++) {
-                        var t = targets[i];
-                        var sid = t.id;
-                        var label = '#' + sid + ' ' + (t.name || '');
-
-                        lines.push('— ' + label);
-                        lines.push('  запуск фоновой установки на ноде…');
-                        renderOut();
-
-                        var startUrl = srvUrl(bulkStartTpl, sid);
-                        var pollUrl = srvUrl(bulkPollTpl, sid) + '?only_configured=1';
-
-                        var rStart = await fetchJson(startUrl, {
-                            method: 'POST',
-                            credentials: 'same-origin',
-                            headers: {
-                                Accept: 'application/json',
-                                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                                'X-CSRF-TOKEN': csrf,
-                                'X-Requested-With': 'XMLHttpRequest'
-                            },
-                            body: '_token=' + encodeURIComponent(csrf) + '&only_configured=1'
-                        });
-
-                        if (!rStart.res.ok || !rStart.data.success) {
-                            totals.startFail++;
-                            lines[lines.length - 1] = '  не удалось запустить: ' + (rStart.data.message || rStart.res.status);
-                            lines.push('');
-                            renderOut();
-
-                            continue;
-                        }
-
-                        var finished = false;
-                        for (var n = 0; n < 600; n++) {
-                            await sleep(n === 0 ? 2500 : 6500);
-
-                            var rPoll = await fetchJson(pollUrl, {
-                                credentials: 'same-origin',
-                                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-                            });
-
-                            if (!rPoll.res.ok) {
-                                totals.handled++;
-                                totals.fail++;
-                                lines[lines.length - 1] = '  ошибка опроса: ' + (rPoll.data.message || rPoll.res.status);
-                                finished = true;
-                                lines.push('');
-                                renderOut();
-
-                                break;
-                            }
-
-                            if (rPoll.data.pending) {
-                                lines[lines.length - 1] = '  ожидание ноды (опрос ' + (n + 1) + ')…';
-                                renderOut();
-
-                                continue;
-                            }
-
-                            totals.handled++;
-                            if (rPoll.data.success) {
-                                totals.ok++;
-                                lines[lines.length - 1] = '  OK: ' + (rPoll.data.message || '');
-                            } else {
-                                totals.fail++;
-                                lines[lines.length - 1] = '  ошибка: ' + (rPoll.data.message || '');
-                            }
-                            finished = true;
-                            lines.push('');
-                            renderOut();
-
-                            break;
-                        }
-
-                        if (!finished) {
-                            totals.handled++;
-                            totals.fail++;
-                            lines[lines.length - 1] = '  таймаут: нет файла статуса (см. /tmp/log-upload-async-install.log на сервере).';
-                            lines.push('');
-                            renderOut();
-                        }
-                    }
-
-                    lines.push('===== Завершено');
-                    renderOut();
-
-                    if (totals.fail === 0 && totals.startFail === 0 && totals.handled > 0) {
-                        toastr.success('Массовое обновление скриптов завершено');
-                    } else if (totals.handled === 0 && totals.startFail === 0) {
-                        toastr.info('Нет серверов в списке');
-                    } else {
-                        toastr.warning('Есть ошибки — см. блок выше');
-                    }
-                } catch (e) {
+                    processServerAt(0, targets);
+                }).catch(function (e) {
                     lines.push('');
-                    lines.push('Ошибка в браузере: ' + (e.message || String(e)));
+                    lines.push('Ошибка в браузере: ' + (e && e.message ? e.message : String(e)));
                     renderOut();
                     toastr.error('Сбой сценария в браузере');
-                }
-
-                btn.prop('disabled', false);
+                    btn.prop('disabled', false);
+                });
             });
         </script>
     @endpush
