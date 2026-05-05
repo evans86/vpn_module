@@ -45,6 +45,16 @@
                 </div>
             </div>
 
+            <div id="fleetBrowserPanel" class="hidden mt-4 rounded-md border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-sm">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div class="text-xs font-semibold text-indigo-950">Сеть (ваш браузер)</div>
+                    <button type="button" id="copyBrowserBlockBtn" class="hidden shrink-0 text-xs px-2.5 py-1 rounded-md border border-indigo-300 bg-white text-indigo-900 hover:bg-indigo-50">
+                        Копировать блок
+                    </button>
+                </div>
+                <div id="fleetBrowserBody" class="text-slate-800 font-mono text-xs whitespace-pre-wrap break-words max-h-80 overflow-y-auto"></div>
+            </div>
+
             <div id="globalProbePanel" class="hidden mt-4 rounded-md border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-sm">
                 <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
                     <div class="text-xs font-semibold text-indigo-950">Результат: с хоста Laravel (ICMP + HTTPS по целям выше)</div>
@@ -124,30 +134,59 @@
                 var gpBody = document.getElementById('globalProbeBody');
                 var gpCopyBtn = document.getElementById('copyGlobalProbeBtn');
                 var fleetSummaryHeading = document.getElementById('fleetSummaryHeading');
+                var browserPanel = document.getElementById('fleetBrowserPanel');
+                var browserBody = document.getElementById('fleetBrowserBody');
+                var browserCopyBtn = document.getElementById('copyBrowserBlockBtn');
                 var meta = document.querySelector('meta[name="csrf-token"]');
                 var csrf = meta ? meta.getAttribute('content') : '';
                 var fleetCachedGlobalProbes = null;
                 var fleetCachedGlobalText = '';
                 var fleetReportStartedAt = '';
                 var fleetLastMergedSummary = null;
+                var fleetCachedBrowserText = '';
 
-                async function writeClipboard(text) {
-                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                        await navigator.clipboard.writeText(text);
-                        return;
-                    }
+                /** Надёжное копирование: Clipboard API может отказать (YaBrowser и др.) → execCommand со скрытым textarea */
+                function copyViaExecCommand(text) {
+                    var t = String(text == null ? '' : text);
                     var el = document.createElement('textarea');
-                    el.value = text;
+                    el.value = t;
                     el.setAttribute('readonly', '');
                     el.style.position = 'fixed';
-                    el.style.left = '-9999px';
+                    el.style.left = '0';
+                    el.style.top = '0';
+                    el.style.opacity = '0';
+                    el.style.width = '1px';
+                    el.style.height = '1px';
+                    el.style.margin = '0';
+                    el.style.padding = '0';
                     document.body.appendChild(el);
+                    el.focus();
                     el.select();
+                    el.setSelectionRange(0, el.value.length);
+                    var ok = false;
                     try {
-                        document.execCommand('copy');
-                    } finally {
-                        document.body.removeChild(el);
+                        ok = document.execCommand('copy');
+                    } catch (ignore) {
+                        ok = false;
                     }
+                    document.body.removeChild(el);
+                    return ok;
+                }
+
+                async function writeClipboard(text) {
+                    var t = String(text == null ? '' : text);
+                    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                        try {
+                            await navigator.clipboard.writeText(t);
+                            return;
+                        } catch (e) {
+                            /* NotAllowed и др. → fallback */
+                        }
+                    }
+                    if (copyViaExecCommand(t)) {
+                        return;
+                    }
+                    throw new Error('clipboard');
                 }
 
                 /** Текст для «Копировать блок» под Laravel-пробами (пробы + сводка по узлам). */
@@ -636,7 +675,10 @@
                     if (fleetSummaryHeading) fleetSummaryHeading.classList.add('hidden');
                     if (gpCopyBtn) gpCopyBtn.classList.add('hidden');
                     fleetLastMergedSummary = null;
-                    if (gpBody) gpBody.innerHTML = '';
+                    fleetCachedBrowserText = '';
+                    if (browserBody) browserBody.textContent = '';
+                    if (browserCopyBtn) browserCopyBtn.classList.add('hidden');
+                    if (browserPanel) browserPanel.classList.add('hidden');
                     if (gpPanel) gpPanel.classList.add('hidden');
                     fleetCachedGlobalProbes = null;
                     fleetCachedGlobalText = '';
@@ -683,6 +725,10 @@
                         var g = null;
                         setPhase('Сеть (браузер)…');
                         var part1 = await buildBrowserReport(setPhase);
+
+                        if (browserPanel) browserPanel.classList.remove('hidden');
+                        if (browserCopyBtn) browserCopyBtn.classList.remove('hidden');
+                        if (browserBody) browserBody.textContent = part1;
 
                         var part2 = '';
                         var includeTs = !!chk.checked;
@@ -771,6 +817,7 @@
                             }
                         }
 
+                        applyFleetBrowserBannerShell(part1, part2);
                         ta.value = part1 + part2;
                         if (fleetReportSuccess) {
                             setPhase('Готово.');
@@ -805,12 +852,50 @@
 
                 copyBtn.addEventListener('click', function () {
                     if (!ta.value) return;
-                    writeClipboard(ta.value).catch(function () {
-                        ta.select();
-                        document.execCommand('copy');
+                    var prev = st.textContent;
+                    writeClipboard(ta.value).then(function () {
+                        /* ok — без лишних сообщений */
+                    }).catch(function () {
+                        st.textContent = 'Не удалось скопировать полный отчёт (буфер обмена).';
+                        setTimeout(function () {
+                            if (st.textContent === 'Не удалось скопировать полный отчёт (буфер обмена).') {
+                                st.textContent = prev;
+                            }
+                        }, 4000);
                     });
                 });
 
+                function applyFleetBrowserBannerShell(part1Raw, part2Raw) {
+                    var sepBlk = '\n\n' + '='.repeat(72) + '\n\n';
+                    var vpsHdr = '=== Узлы VPS (хост панели) ===';
+                    var p2 = part2Raw || '';
+                    if (p2.indexOf('=== Узлы VPS ===') !== -1 && p2.indexOf('хост панели') === -1) {
+                        vpsHdr = '=== Узлы VPS ===';
+                    }
+                    fleetCachedBrowserText = part1Raw + sepBlk + vpsHdr + '\n';
+                    if (browserBody) browserBody.textContent = fleetCachedBrowserText;
+                }
+
+                if (browserCopyBtn) {
+                    browserCopyBtn.addEventListener('click', function () {
+                        var prev = st.textContent;
+                        var payload = fleetCachedBrowserText || (browserBody && browserBody.textContent) || '';
+                        writeClipboard(payload)
+                            .then(function () {
+                                st.textContent = 'Блок «Сеть (ваш браузер)» скопирован в буфер обмена.';
+                            })
+                            .catch(function () {
+                                st.textContent = 'Не удалось скопировать блок браузера.';
+                            })
+                            .finally(function () {
+                                setTimeout(function () {
+                                    if (st.textContent !== prev && (st.textContent.indexOf('скопирован') !== -1 || st.textContent.indexOf('Не удалось') === 0)) {
+                                        st.textContent = prev;
+                                    }
+                                }, 2800);
+                            });
+                    });
+                }
                 if (gpCopyBtn) {
                     gpCopyBtn.addEventListener('click', function () {
                         var prev = st.textContent;
@@ -819,7 +904,7 @@
                                 st.textContent = 'Блок Laravel (пробы + сводка) скопирован в буфер обмена.';
                             })
                             .catch(function () {
-                                st.textContent = 'Не удалось скопировать (нет доступа к буферу или страница не по HTTPS).';
+                                st.textContent = 'Не удалось скопировать блок Laravel.';
                             })
                             .finally(function () {
                                 setTimeout(function () {
