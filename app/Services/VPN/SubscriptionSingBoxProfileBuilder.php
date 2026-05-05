@@ -67,7 +67,7 @@ class SubscriptionSingBoxProfileBuilder
     }
     /**
      * @param  array<int, string>  $directDomains
-     * @param  array<int, string>  $subscriptionUris  Строки vless/vmess/trojan/ss из той же подписки, что и plain text
+     * @param  array<int, string>  $subscriptionUris  Строки vless/vmess/ss из той же подписки, что и plain text
      *
      * @throws \RuntimeException если не удалось собрать ни одного outbound
      */
@@ -107,7 +107,7 @@ class SubscriptionSingBoxProfileBuilder
         }
 
         if ($proxyTags === []) {
-            throw new \RuntimeException('sing-box: в подписке нет поддерживаемых URI (vless/vmess/trojan/ss)');
+            throw new \RuntimeException('sing-box: в подписке нет поддерживаемых URI (vless/vmess/ss)');
         }
 
         $outbounds = [
@@ -227,9 +227,6 @@ class SubscriptionSingBoxProfileBuilder
         }
         if (str_starts_with($lower, 'vmess://')) {
             return $this->parseVmess($uri, $tag);
-        }
-        if (str_starts_with($lower, 'trojan://')) {
-            return $this->parseTrojan($uri, $tag);
         }
         if (str_starts_with($lower, 'ss://')) {
             return $this->parseShadowsocks($uri, $tag);
@@ -413,51 +410,6 @@ class SubscriptionSingBoxProfileBuilder
                 'enabled' => true,
                 'server_name' => (string) ($cfg['sni'] ?? $cfg['host'] ?? $server),
             ];
-        }
-
-        return $ob;
-    }
-
-    /**
-     * @return array<string, mixed>|null
-     */
-    private function parseTrojan(string $uri, string $tag): ?array
-    {
-        $p = parse_url($uri);
-        if ($p === false || empty($p['host'])) {
-            return null;
-        }
-        $password = isset($p['user']) ? rawurldecode((string) $p['user']) : '';
-        if ($password === '') {
-            return null;
-        }
-        $server = $p['host'];
-        $port = (int) ($p['port'] ?? 443);
-        parse_str($p['query'] ?? '', $q);
-
-        $ob = [
-            'type' => 'trojan',
-            'tag' => $tag,
-            'server' => $server,
-            'server_port' => $port,
-            'password' => $password,
-        ];
-
-        $network = strtolower((string) ($q['type'] ?? $q['net'] ?? 'tcp'));
-        $this->applyV2Transport($ob, $network, $q, $server);
-
-        $sec = strtolower((string) ($q['security'] ?? 'tls'));
-        if ($sec !== 'none') {
-            $ob['tls'] = [
-                'enabled' => true,
-                'server_name' => (string) ($q['sni'] ?? $q['host'] ?? $server),
-            ];
-            if (! empty($q['fp'])) {
-                $ob['tls']['utls'] = [
-                    'enabled' => true,
-                    'fingerprint' => (string) $q['fp'],
-                ];
-            }
         }
 
         return $ob;

@@ -62,6 +62,29 @@ class VpnConfigController extends Controller
         $this->marzbanService = $marzbanService;
     }
 
+    /**
+     * В подписке и HTML-конфиге Trojan не выдаём (ссылки с панели по-прежнему могут храниться в БД со всеми протоколами).
+     *
+     * @param  array<int, mixed>  $links
+     * @return array<int, string>
+     */
+    private function excludeTrojanFromSubscriptionLinks(array $links): array
+    {
+        $out = [];
+        foreach ($links as $link) {
+            if (! is_string($link)) {
+                continue;
+            }
+            $link = stripslashes(trim($link));
+            if ($link === '' || str_starts_with(strtolower($link), 'trojan://')) {
+                continue;
+            }
+            $out[] = $link;
+        }
+
+        return $out;
+    }
+
     public function show(string $key_activate_id): Response
     {
         $key_activate_id = trim($key_activate_id);
@@ -660,6 +683,7 @@ class VpnConfigController extends Controller
             }
             $stored = json_decode($serverUser->keys ?? '[]', true);
             $slotLinks = is_array($stored) ? $stored : [];
+            $slotLinks = $this->excludeTrojanFromSubscriptionLinks($slotLinks);
             if (!empty($slotLinks)) {
                 if ($serverUser->updated_at && (!$lastUpdated || $serverUser->updated_at > $lastUpdated)) {
                     $lastUpdated = $serverUser->updated_at;
@@ -703,7 +727,7 @@ class VpnConfigController extends Controller
         }
 
         return [
-            'connectionKeys' => $connectionKeys,
+            'connectionKeys' => $this->excludeTrojanFromSubscriptionLinks($connectionKeys),
             'slotsWithLinks' => $slotsWithLinks,
             'firstKeyActivateUser' => $firstKeyActivateUser,
             'firstServerUser' => $firstServerUser,
@@ -872,12 +896,14 @@ class VpnConfigController extends Controller
             try {
                 $links = $this->getFreshUserLinks($serverUser, $panelFresh);
                 if (!empty($links)) {
-                    $slotLinks = $links;
-                    $connectionKeys = array_merge($connectionKeys, $links);
-                    $serverUser->refresh();
-                    $serverUser->loadMissing(['panel.server.location']);
-                    if ($serverUser->updated_at && (!$lastUpdated || $serverUser->updated_at > $lastUpdated)) {
-                        $lastUpdated = $serverUser->updated_at;
+                    $slotLinks = $this->excludeTrojanFromSubscriptionLinks($links);
+                    if (!empty($slotLinks)) {
+                        $connectionKeys = array_merge($connectionKeys, $slotLinks);
+                        $serverUser->refresh();
+                        $serverUser->loadMissing(['panel.server.location']);
+                        if ($serverUser->updated_at && (!$lastUpdated || $serverUser->updated_at > $lastUpdated)) {
+                            $lastUpdated = $serverUser->updated_at;
+                        }
                     }
                 }
                 unset($links);
@@ -892,8 +918,10 @@ class VpnConfigController extends Controller
                 ]);
                 $stored = json_decode($serverUser->keys ?? '[]', true);
                 if (!empty($stored) && is_array($stored)) {
-                    $slotLinks = $stored;
-                    $connectionKeys = array_merge($connectionKeys, $stored);
+                    $slotLinks = $this->excludeTrojanFromSubscriptionLinks($stored);
+                    if (!empty($slotLinks)) {
+                        $connectionKeys = array_merge($connectionKeys, $slotLinks);
+                    }
                 }
                 unset($stored);
             }
@@ -943,7 +971,7 @@ class VpnConfigController extends Controller
         }
 
         return [
-            'connectionKeys' => $connectionKeys,
+            'connectionKeys' => $this->excludeTrojanFromSubscriptionLinks($connectionKeys),
             'slotsWithLinks' => $slotsWithLinks,
             'firstKeyActivateUser' => $firstKeyActivateUser,
             'firstServerUser' => $firstServerUser,
@@ -1171,7 +1199,8 @@ class VpnConfigController extends Controller
                 }
             }
         }
-        return $connectionKeys;
+
+        return $this->excludeTrojanFromSubscriptionLinks($connectionKeys);
     }
 
     /**
@@ -1441,7 +1470,6 @@ class VpnConfigController extends Controller
         $demoKeys = [
             'vless://f83ca0f9-419c-4aa2-bb7e-47a82c900bef@77.238.239.214:2095?security=none&type=ws&headerType=&path=%2Fvless&host=#🚀%20Marz%20(12d21d3a-fe23-4c04-8ade-e316eac24fdf)%20[VLESS%20-%20ws]',
             'vmess://eyJhZGQiOiAiNzcuMjM4LjIzOS4yMTQiLCAiYWlkIjogIjAiLCAiaG9zdCI6ICIiLCAiaWQiOiAiMjBjYjJiZDMtMzMwYy00Y2NmLWFkZTItNjJlMjZjNmNlNzM5IiwgIm5ldCI6ICJ3cyIsICJwYXRoIjogIi92bWVzcyIsICJwb3J0IjogMjA5NiwgInBzIjogIlx1ZDgzZFx1ZGU4MCBNYXJ6ICgxMmQyMWQzYS1mZTIzLTRjMDQtOGFkZS1lMzE2ZWFjMjRmZGYpIFtWTWVzcyAtIHdzXSIsICJzY3kiOiAiYXV0byIsICJ0bHMiOiAibm9uZSIsICJ0eXBlIjogIiIsICJ2IjogIjIifQ==',
-            'trojan://OaPcTZw8NomUQXfY@77.238.239.214:2097?security=none&type=ws&headerType=&path=%2Ftrojan&host=#🚀%20Marz%20(12d21d3a-fe23-4c04-8ade-e316eac24fdf)%20[Trojan%20-%20ws]',
             'ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpVZnhLUG1oa3liRjhMdEQ0@77.238.239.214:2098#🚀%20Marz%20(12d21d3a-fe23-4c04-8ade-e316eac24fdf)%20[Shadowsocks%20-%20tcp]'
         ];
 
@@ -2270,10 +2298,6 @@ class VpnConfigController extends Controller
                 'name' => 'VMess',
                 'icon' => 'VM'
             ],
-            'trojan' => [
-                'name' => 'Trojan',
-                'icon' => 'T'
-            ],
             'shadowsocks' => [
                 'name' => 'Shadowsocks',
                 'icon' => 'SS'
@@ -2285,7 +2309,7 @@ class VpnConfigController extends Controller
             // Удаляем экранирование слешей
             $configString = stripslashes($configString);
 
-            if (preg_match('/^(vless|vmess|trojan|ss):\/\//', $configString, $matches)) {
+            if (preg_match('/^(vless|vmess|ss):\/\//', $configString, $matches)) {
                 $protocol = $matches[1];
                 if ($protocol === 'ss') {
                     $protocol = 'shadowsocks';
