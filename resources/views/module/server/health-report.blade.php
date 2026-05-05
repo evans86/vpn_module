@@ -8,69 +8,41 @@
         $fm = $fleetReportMeta ?? [
             'panel_targets_count' => 0,
             'our_domains_targets_count' => 0,
-            'merge_panels_from_db' => true,
-            'merge_app_domain_hosts' => true,
-            'panel_hosts_preview' => [],
-            'our_hosts_preview' => [],
         ];
     @endphp
     <div class="space-y-5">
-        <x-admin.card title="Цели проверки и инструменты">
+        <x-admin.card title="О разделе">
             <div class="text-sm text-slate-700 space-y-3">
                 <p>
-                    При нажатии «Запустить проверку» с сервера Laravel опрашиваются:
-                    <strong>все настроенные Marzban-панели из БД</strong> (поле <code class="text-xs bg-slate-100 px-1 rounded">panel_adress</code>),
-                    плюс строка <code class="text-xs bg-slate-100 px-1 rounded">FLEET_PROBE_PANEL_HOSTS</code>;
-                    домены — <code class="text-xs bg-slate-100 px-1 rounded">FLEET_PROBE_OUR_DOMAINS</code> и при включённом флаге —
-                    хосты из <code class="text-xs bg-slate-100 px-1 rounded">APP_URL</code>, <code class="text-xs bg-slate-100 px-1 rounded">APP_CONFIG_PUBLIC_URL</code>, <code class="text-xs bg-slate-100 px-1 rounded">APP_MIRROR_URLS</code>.
+                    Страница совмещает проверку <strong>с вашего браузера</strong> (задержка и скачивание до панели)
+                    и <strong>с сервера приложения</strong> (Laravel): доступность HTTP/HTTPS на IP каждого VPS,
+                    статус заглушки из БД, опционально приманка и полный отчёт <code class="text-xs bg-slate-100 px-1 rounded">/test-speed</code>,
+                    плюс замеры до панелей и «своих» доменов по настройкам окружения.
                 </p>
-                <ul class="list-disc pl-5 space-y-1 text-slate-800">
-                    <li>Панелей в списке ICMP/HTTPS сейчас: <strong>{{ (int) ($fm['panel_targets_count'] ?? 0) }}</strong>
-                        (подмешивание из БД: {{ !empty($fm['merge_panels_from_db']) ? 'да' : 'нет' }})</li>
-                    <li>Доменов в списке: <strong>{{ (int) ($fm['our_domains_targets_count'] ?? 0) }}</strong>
-                        (APP/*: {{ !empty($fm['merge_app_domain_hosts']) ? 'да' : 'нет' }})</li>
-                </ul>
-                @if(!empty($fm['panel_hosts_preview']) || !empty($fm['our_hosts_preview']))
-                    <div class="grid gap-3 md:grid-cols-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-md p-3">
-                        <div>
-                            <div class="font-semibold text-slate-900 mb-1">Первые URL панелей</div>
-                            @forelse($fm['panel_hosts_preview'] as $u)
-                                <div class="truncate text-slate-700" title="{{ $u }}">{{ $u }}</div>
-                            @empty
-                                <div class="text-slate-500">—</div>
-                            @endforelse
+                <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                    <div class="font-medium text-slate-900 mb-1">Эвристика «веб vs VPN»</div>
+                    <p class="mb-2">
+                        Ниже можно подставить IP или домен: эндпоинт классификации возвращает грубую оценку
+                        («похоже на веб-фронт / CDN / классический хостинг» vs «вероятнее выход VPN / неклассический набор открытых портов»).
+                        Полезно при разборе жалоб («сайт не открывается»), когда нужно понять, не упирается ли обращение в «не тот» хост или в режим блокировки.
+                    </p>
+                    <div class="text-xs text-slate-600 mb-3">
+                        Сейчас в списках целей: панелей <strong>{{ (int) ($fm['panel_targets_count'] ?? 0) }}</strong>,
+                        доменов <strong>{{ (int) ($fm['our_domains_targets_count'] ?? 0) }}</strong>.
+                    </div>
+                    <div class="flex flex-wrap items-end gap-2 pt-1">
+                        <div class="min-w-[12rem] flex-1">
+                            <label for="fleetClassifyHost" class="block text-xs font-medium text-slate-700 mb-1">Хост или IP</label>
+                            <input type="text" id="fleetClassifyHost" maxlength="512" placeholder="например 203.0.113.50 или probe.example.net"
+                                   class="w-full text-sm rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" autocomplete="off">
                         </div>
-                        <div>
-                            <div class="font-semibold text-slate-900 mb-1">Первые домены / URL</div>
-                            @forelse($fm['our_hosts_preview'] as $u)
-                                <div class="truncate text-slate-700" title="{{ $u }}">{{ $u }}</div>
-                            @empty
-                                <div class="text-slate-500">—</div>
-                            @endforelse
-                        </div>
+                        <button type="button" id="fleetClassifyBtn"
+                                class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-slate-800 text-white hover:bg-slate-900 disabled:opacity-50">
+                            Проверить
+                        </button>
                     </div>
-                @endif
-                <details class="rounded-md border border-slate-200 bg-white px-3 py-2">
-                    <summary class="cursor-pointer text-sm font-medium text-slate-800">Заглушка на VPS, Docker, лёгкий /server-probe-light</summary>
-                    <div class="mt-2 text-xs text-slate-600 space-y-2">
-                        <p>Статическая заглушка и nginx: каталог <code class="bg-slate-100 px-1 rounded">deploy/stub-assets</code>, конфиг <code class="bg-slate-100 px-1 rounded">deploy/nginx/panel-stub.default-server.conf</code>.</p>
-                        <p>Docker только для статики 80/443: <code class="bg-slate-100 px-1 rounded">deploy/docker-panel-stub/README.md</code> (полный <code>/test-speed</code> по-прежнему удобнее на хостовом nginx + fcgiwrap).</p>
-                        <p>Короткая самодиагностика исходящих с VPS: скрипт <code class="bg-slate-100 px-1 rounded">deploy/stub-assets/panel-stub-server-probe-light.sh</code> и пример include <code class="bg-slate-100 px-1 rounded">deploy/nginx/snippets/panel-stub-server-probe-light.inc.example</code> (если включён тот же token-файл, что для <code>/test-speed</code>).</p>
-                        <p class="mt-2">Блок <strong>speedtest</strong> в полном отчёте опционален (пакет <code class="bg-slate-100 px-1 rounded">speedtest-cli</code> в ОС). Массовая установка из админки: <strong>Серверы</strong> → кнопка «speedtest-cli на всех «Настроен»».</p>
-                    </div>
-                </details>
-                <div class="flex flex-wrap items-end gap-2 pt-1">
-                    <div class="min-w-[12rem] flex-1">
-                        <label for="fleetClassifyHost" class="block text-xs font-medium text-slate-700 mb-1">Эвристика веб vs VPN</label>
-                        <input type="text" id="fleetClassifyHost" maxlength="512" placeholder="IP или домен"
-                               class="w-full text-sm rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" autocomplete="off">
-                    </div>
-                    <button type="button" id="fleetClassifyBtn"
-                            class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-slate-800 text-white hover:bg-slate-900 disabled:opacity-50">
-                        Проверить
-                    </button>
+                    <pre id="fleetClassifyOut" class="hidden text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 overflow-x-auto max-h-64 overflow-y-auto mt-3"></pre>
                 </div>
-                <pre id="fleetClassifyOut" class="hidden text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 overflow-x-auto max-h-64 overflow-y-auto"></pre>
             </div>
 
             <div id="globalProbePanel" class="hidden mt-4 rounded-md border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-sm">
@@ -116,7 +88,7 @@
                         <th class="px-2 py-2 text-left font-medium">HTTPS</th>
                         <th class="px-2 py-2 text-left font-medium">Заглушка БД</th>
                         <th class="px-2 py-2 text-left font-medium">/123.rar</th>
-                        <th class="px-2 py-2 text-left font-medium">/test-speed</th>
+                        <th class="px-2 py-2 text-left font-medium">/test-speed <span class="font-normal text-slate-500">(скорость)</span></th>
                     </tr>
                     </thead>
                     <tbody id="fleetTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
@@ -172,6 +144,31 @@
                         + '_' + pad2(d.getHours()) + '-' + pad2(d.getMinutes()) + '-' + pad2(d.getSeconds());
                 }
 
+                function mbpsHeatClass(mbps) {
+                    if (mbps == null || isNaN(Number(mbps))) return '';
+                    var v = Number(mbps);
+                    if (v >= 200) return 'text-emerald-600 font-semibold';
+                    if (v >= 80) return 'text-lime-700 font-semibold';
+                    if (v >= 35) return 'text-amber-700 font-medium';
+                    if (v >= 8) return 'text-orange-700 font-medium';
+                    return 'text-rose-700 font-semibold';
+                }
+
+                function testSpeedMbpsSpan(tsObj) {
+                    var eff = tsObj.effective_mbps;
+                    if (eff == null || isNaN(Number(eff)) || Number(eff) <= 0) return '';
+                    return ' <span class="' + mbpsHeatClass(Number(eff)) + '">~'
+                        + Number(eff).toFixed(1) + ' Мбит/с</span>';
+                }
+
+                function latencyToneClass(ms) {
+                    if (ms == null || isNaN(Number(ms))) return 'text-slate-600';
+                    var v = Number(ms);
+                    if (v < 120) return 'text-emerald-700';
+                    if (v < 380) return 'text-amber-700';
+                    return 'text-rose-700';
+                }
+
                 function badge(ok) {
                     return ok
                         ? '<span class="text-emerald-700 font-medium">OK</span>'
@@ -181,7 +178,7 @@
                 function cellHttpsFleetGlobal(h) {
                     if (!h) return '—';
                     var c = h.code != null ? h.code : '—';
-                    var ms = h.ms != null ? (' ' + h.ms + ' мс') : '';
+                    var msCls = h.ms != null ? latencyToneClass(h.ms) : 'text-slate-600';
                     var err = h.error ? (' <span class="text-slate-500">' + esc(h.error) + '</span>') : '';
                     var b;
                     if (h.ok) {
@@ -191,15 +188,17 @@
                     } else {
                         b = badge(false);
                     }
-                    return b + ' <span class="text-slate-600">' + c + ms + '</span>' + err;
+                    return b + ' <span class="' + msCls + '">' + esc(String(c))
+                        + (h.ms != null ? (' ' + h.ms + ' мс') : '') + '</span>' + err;
                 }
 
                 function cellHttp(h) {
                     if (!h) return '—';
                     var c = h.code != null ? h.code : '—';
-                    var ms = h.ms != null ? (' ' + h.ms + ' мс') : '';
+                    var msCls = h.ms != null ? latencyToneClass(h.ms) : 'text-slate-600';
                     var err = h.error ? (' <span class="text-slate-500">' + esc(h.error) + '</span>') : '';
-                    return badge(!!h.ok) + ' <span class="text-slate-600">' + c + ms + '</span>' + err;
+                    return badge(!!h.ok) + ' <span class="' + msCls + '">' + esc(String(c))
+                        + (h.ms != null ? (' ' + h.ms + ' мс') : '') + '</span>' + err;
                 }
 
                 function kv(label, val) {
@@ -435,10 +434,12 @@
                                 + (ts.error ? (' — ' + esc(ts.error)) : '');
                         } else if ((ts.state || '') === 'ok') {
                             tsTxt = '<span class="text-emerald-700">OK</span>'
-                                + (ts.seconds != null ? (' ' + ts.seconds + ' с') : '');
+                                + (ts.seconds != null ? (' ' + ts.seconds + ' с') : '')
+                                + testSpeedMbpsSpan(ts);
                         } else {
                             tsTxt = '<span class="text-rose-700">ошибка</span>'
-                                + (ts.error ? (' — ' + esc(ts.error)) : '');
+                                + (ts.error ? (' — ' + esc(ts.error)) : '')
+                                + testSpeedMbpsSpan(ts);
                         }
                         var tr2 = document.createElement('tr');
                         tr2.className = 'align-top';

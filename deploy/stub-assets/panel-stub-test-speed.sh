@@ -107,19 +107,21 @@ probe_https 'DNS Google JSON (DoH заголовки)' 'https://dns.google/resol
 
 echo ""
 echo "--- speedtest (если есть в системе; иначе блок пропускается) ---"
-if command -v speedtest >/dev/null 2>&1; then
-  echo -n '  speedtest: '
+# Сначала speedtest-cli (apt install speedtest-cli) — то, что ставит кнопка в админке; иначе часто первым
+# попадает Ookla speedtest с другим CLI и другими флагами. Без пайпа в head: иначе SIGPIPE и ложная «ошибка».
+if command -v speedtest-cli >/dev/null 2>&1; then
+  echo "  speedtest-cli (python, --simple, до ~160 с):"
   if command -v timeout >/dev/null 2>&1; then
-    timeout 110 speedtest --accept-license --accept-gdpr --format=human-readable 2>&1 | head -14 || echo "ошибка/таймаут"
+    timeout 160 env LC_ALL=C.UTF-8 speedtest-cli --simple 2>&1 || echo "  ошибка или таймаут"
   else
-    speedtest --accept-license --accept-gdpr --simple 2>&1 | head -14 || echo "ошибка"
+    env LC_ALL=C.UTF-8 speedtest-cli --simple 2>&1 || echo "  ошибка"
   fi
-elif command -v speedtest-cli >/dev/null 2>&1; then
-  echo -n '  speedtest-cli: '
+elif command -v speedtest >/dev/null 2>&1; then
+  echo "  speedtest (Ookla):"
   if command -v timeout >/dev/null 2>&1; then
-    timeout 110 speedtest-cli --simple 2>&1 || echo "ошибка/таймаут"
+    timeout 160 speedtest --accept-license --accept-gdpr --format=human-readable 2>&1 | sed -n '1,20p' || echo "  ошибка/таймаут"
   else
-    speedtest-cli --simple 2>&1 || echo "ошибка"
+    speedtest --accept-license --accept-gdpr --simple 2>&1 | sed -n '1,20p' || echo "  ошибка"
   fi
 else
   echo "  утилиты speedtest / speedtest-cli не найдены (опционально: поставьте через пакеты ОС)."

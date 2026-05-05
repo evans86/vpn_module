@@ -66,7 +66,17 @@ class ServerFleetProbeService
                 $lureRow = ['skipped' => false, 'ok' => false, 'code' => null, 'error' => 'В БД приманка вкл., но заглушка не в успешном состоянии'];
             }
 
-            $testSpeed = ['state' => 'skipped', 'excerpt' => null, 'http_code' => null, 'error' => 'опция для этого запуска выключена', 'seconds' => null];
+            $testSpeed = [
+                'state' => 'skipped',
+                'excerpt' => null,
+                'http_code' => null,
+                'error' => 'опция для этого запуска выключена',
+                'seconds' => null,
+                'download_mbps' => null,
+                'upload_mbps' => null,
+                'curl_mbps_max' => null,
+                'effective_mbps' => null,
+            ];
             if ($includeTestSpeed) {
                 $token = $server->decoy_stub_test_speed_token;
                 if ($stubOkDb && $base !== '' && is_string($token) && $token !== '') {
@@ -467,11 +477,12 @@ class ServerFleetProbeService
      * Полный удалённый сценарий на VPS (скачивание тестовых файлов, проверки HTTPS, опционально speedtest).
      * Без ?fleet_check=1 — см. deploy/stub-assets/panel-stub-test-speed.sh.
      *
-     * @return array{state: string, excerpt: ?string, http_code: ?int, error: ?string, seconds: ?float}
+     * @return array<string, mixed>
      */
     private function probeTestSpeed(string $hostBracket, string $token): array
     {
         $url = 'https://'.$hostBracket.'/test-speed?'.http_build_query(['token' => $token]);
+        $emptyMetrics = ['download_mbps' => null, 'upload_mbps' => null, 'curl_mbps_max' => null, 'effective_mbps' => null];
 
         try {
             $t0 = microtime(true);
@@ -486,33 +497,94 @@ class ServerFleetProbeService
             $sec = round(microtime(true) - $t0, 2);
             $code = $res->status();
             $body = trim(Str::limit($res->body(), 65535));
+            $metrics = array_merge($emptyMetrics, $this->parseTestSpeedBodyMetrics($body));
+            $metrics['effective_mbps'] = $this->effectiveSpeedMbps($metrics);
 
             if ($code >= 200 && $code < 300) {
-                return [
+                return array_merge([
                     'state' => 'ok',
                     'excerpt' => $body !== '' ? $body : '(пустое тело)',
                     'http_code' => $code,
                     'error' => null,
                     'seconds' => $sec,
-                ];
+                ], $metrics);
             }
 
-            return [
+            return array_merge([
                 'state' => 'fail',
                 'excerpt' => $body !== '' ? $body : '(пустое тело)',
                 'http_code' => $code,
                 'error' => 'код '.$code.' (HTTPS)',
                 'seconds' => $sec,
-            ];
+            ], $metrics);
         } catch (Throwable $e) {
-            return [
+            return array_merge([
                 'state' => 'fail',
                 'excerpt' => null,
                 'http_code' => null,
                 'error' => Str::limit($e->getMessage(), 500),
                 'seconds' => null,
-            ];
+            ], $emptyMetrics);
         }
+    }
+
+    /**
+     * @param  array{download_mbps: ?float, upload_mbps: ?float, curl_mbps_max: ?float}  $m
+     */
+    private function effectiveSpeedMbps(array $m): ?float
+    {
+        foreach (['download_mbps', 'curl_mbps_max', 'upload_mbps'] as $k) {
+            if (isset($m[$k]) && $m[$k] !== null && (float) $m[$k] > 0) {
+                return round((float) $m[$k], 2);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{download_mbps: ?float, upload_mbps: ?float, curl_mbps_max: ?float}
+     */
+    private function parseTestSpeedBodyMetrics(string $body): array
+    {
+        $download = null;
+        $upload = null;
+        $curlMax = null;
+        if (preg_match_all('/~\s*([0-9]+(?:\.[0-9]+)?)\s*Мбит\/с/u', $body, $mm)) {
+            foreach ($mm[1] as $v) {
+                $f = (float) $v;
+                if ($curlMax === null || $f > $curlMax) {
+                    $curlMax = $f;
+                }
+            }
+        }
+        foreach ([
+            '/Download:\s*([0-9]+(?:\.[0-9]+)?)\s*Mbit/s/i',
+            '/Download:\s*([0-9]+(?:\.[0-9]+)?)\s*Mbits/i',
+            '/download:\s*([0-9]+(?:\.[0-9]+)?)\s*mbit/i',
+            '/Download:\s*([0-9]+(?:\.[0-9]+)?)\s*Mbps/i',
+        ] as $re) {
+            if (preg_match($re, $body, $m)) {
+                $download = (float) $m[1];
+                break;
+            }
+        }
+        foreach ([
+            '/Upload:\s*([0-9]+(?:\.[0-9]+)?)\s*Mbit/s/i',
+            '/Upload:\s*([0-9]+(?:\.[0-9]+)?)\s*Mbits/i',
+            '/Upload:\s*([0-9]+(?:\.[0-9]+)?)\s*Mbps/i',
+        ] as $re) {
+            if (preg_match($re, $body, $m)) {
+                $upload = (float) $m[1];
+                break;
+            }
+        }
+
+        return [
+            'download_mbps' => $download !== null ? round($download, 2) : null,
+            'upload_mbps' => $upload !== null ? round($upload, 2) : null,
+            'curl_mbps_max' => $curlMax !== null ? round($curlMax, 2) : null,
+        ];
     }
 
     /**
@@ -558,7 +630,11 @@ class ServerFleetProbeService
                 $lines[] = '  /test-speed: пропуск — '.($ts['error'] ?? '');
             } else {
                 $sec = isset($ts['seconds']) ? (string) $ts['seconds'].' с' : '';
-                $lines[] = '  /test-speed: '.(($ts['state'] ?? '') === 'ok' ? 'ОК '.$sec : (($ts['error'] ?? 'ошибка').' '.$sec));
+                $effRaw = $ts['effective_mbps'] ?? null;
+                $effPart = ($effRaw !== null && is_numeric($effRaw) && (float) $effRaw > 0)
+                    ? (' ~'.number_format((float) $effRaw, 1, '.', '').' Мбит/с')
+                    : '';
+                $lines[] = '  /test-speed: '.(($ts['state'] ?? '') === 'ok' ? ('ОК '.$sec.$effPart) : (($ts['error'] ?? 'ошибка').' '.$sec.$effPart));
                 $ex = isset($ts['excerpt']) ? Str::limit((string) $ts['excerpt'], 38000) : '';
                 if ($ex !== '') {
                     foreach (preg_split("/\r\n|\r|\n/", $ex, -1, PREG_SPLIT_NO_EMPTY) as $pex) {

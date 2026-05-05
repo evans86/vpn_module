@@ -41,10 +41,6 @@ class ServerFleetHealthController extends Controller
             'fleetReportMeta' => [
                 'panel_targets_count' => count($panelHosts),
                 'our_domains_targets_count' => count($ourHosts),
-                'merge_panels_from_db' => (bool) config('fleet_probe.merge_panels_from_db', true),
-                'merge_app_domain_hosts' => (bool) config('fleet_probe.merge_app_domain_hosts', true),
-                'panel_hosts_preview' => array_slice($panelHosts, 0, 15),
-                'our_hosts_preview' => array_slice($ourHosts, 0, 15),
             ],
             'classifyHostUrl' => route('admin.module.server-fleet.classify-host'),
         ]);

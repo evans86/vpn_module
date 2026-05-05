@@ -549,8 +549,8 @@ location = /test-speed {
 
     fastcgi_intercept_errors off;
     fastcgi_connect_timeout 15s;
-    fastcgi_send_timeout 180s;
-    fastcgi_read_timeout 180s;
+    fastcgi_send_timeout 620s;
+    fastcgi_read_timeout 620s;
     fastcgi_request_buffering off;
     fastcgi_buffer_size 64k;
     fastcgi_buffers 8 64k;
