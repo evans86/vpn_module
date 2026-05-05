@@ -1163,10 +1163,13 @@
                 }
 
                 var lines = [
-                    'Массовое обновление заглушки: несколько коротких HTTP подряд; один узел может занять до нескольких минут по SSH.',
+                    'Массовое обновление заглушки: пакеты по 1 узлу. Если между вами и панелью Cloudflare и ответ режется (HTTP 524/504), одна порция будет повторяться после паузы. Для стабильности можно отключить оранжевое облако на поддомене админки или увеличить лимиты ожидания на источнике.',
                     ''
                 ];
                 var totals = { attempted: 0, ok: 0, fail: 0, skipped: 0 };
+                var STUB_BATCH_GAP_MS = 2000;
+                var STUB_CF_RETRY_MS = 45000;
+                var STUB_CF_RETRY_MAX = 5;
 
                 function renderOut() {
                     var tail = '\n────────────────────\nИтого: попыток ' + totals.attempted +
@@ -1195,8 +1198,11 @@
                     totals.skipped += (s.skipped || 0);
                 }
 
-                function runBatch(afterId, perBatch) {
+                function runBatch(afterId, perBatch, cfRetriesLeft) {
                     perBatch = perBatch == null ? 1 : perBatch;
+                    if (cfRetriesLeft == null) {
+                        cfRetriesLeft = STUB_CF_RETRY_MAX;
+                    }
                     $.ajax({
                         url: '{{ route('admin.module.server.bulk-apply-decoy-stub') }}',
                         method: 'POST',
@@ -1216,7 +1222,9 @@
                             if (b.has_more) {
                                 lines.push('Следующий пакет…');
                                 renderOut();
-                                runBatch(b.next_after_id || 0, perBatch);
+                                setTimeout(function () {
+                                    runBatch(b.next_after_id || 0, perBatch, STUB_CF_RETRY_MAX);
+                                }, STUB_BATCH_GAP_MS);
 
                                 return;
                             }
@@ -1237,11 +1245,25 @@
                             btn.prop('disabled', false);
                         },
                         error: function (xhr, textStatus) {
+                            if ((xhr.status === 524 || xhr.status === 504) && cfRetriesLeft > 0) {
+                                lines.push('Прокси прервал ожидание ответа (HTTP ' + xhr.status + '). Повтор той же порции через '
+                                    + (STUB_CF_RETRY_MS / 1000) + ' с, попыток осталось: ' + cfRetriesLeft
+                                    + '. На origin запрос мог ещё выполняться — не дублируйте кнопку вручную.');
+                                renderOut();
+                                toastr.warning('HTTP ' + xhr.status + ' — повтор через ' + (STUB_CF_RETRY_MS / 1000) + ' с…');
+                                setTimeout(function () {
+                                    runBatch(afterId, perBatch, cfRetriesLeft - 1);
+                                }, STUB_CF_RETRY_MS);
+
+                                return;
+                            }
                             var msg = 'Запрос не выполнен';
                             if (xhr.responseJSON && xhr.responseJSON.message) {
                                 msg = xhr.responseJSON.message;
                             } else if (xhr.status === 524) {
-                                msg = 'HTTP 524 (Cloudflare): до браузера не успело ответа.';
+                                msg = 'HTTP 524 (Cloudflare): до браузера не успело ответа после нескольких повторов. Обновите оставшиеся серверы с карточки или откройте админку в обход Cloudflare.';
+                            } else if (xhr.status === 504) {
+                                msg = 'HTTP 504: шлюз не дождался ответа от панели.';
                             } else if (xhr.status === 429) {
                                 msg = 'Слишком много запросов (429). Подождите минуту и попробуйте снова.';
                             } else if (textStatus === 'timeout') {
