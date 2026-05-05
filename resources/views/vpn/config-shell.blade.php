@@ -244,6 +244,7 @@
             if (copyNotificationTimeout) clearTimeout(copyNotificationTimeout);
             copyNotificationTimeout = setTimeout(function() { notification.classList.add('hidden'); }, 3000);
         }
+        window.showCopyNotification = showCopyNotification;
         window.getVpnCleanConfigCanonicalUrl = function() {
             try {
                 var u = new URL(window.location.href);
@@ -525,6 +526,11 @@
                     if (res.data.lastUpdated && lastUpdatedEl) lastUpdatedEl.textContent = res.data.lastUpdated;
                     if (res.data.lastUpdated) window.__vpnLastConfigUpdatedLabel = res.data.lastUpdated;
                     if (typeof res.data.lastUpdatedEpoch === 'number') window.__vpnLastConfigEpoch = res.data.lastUpdatedEpoch;
+                    _vpnSilentOpenDeferId = setTimeout(function() {
+                        _vpnSilentOpenDeferId = null;
+                        if (window.__vpnSilentOpenCancelledByManual) return;
+                        runSilentSyncOnOpen();
+                    }, 0);
                 } else {
                     var rk = res.data && res.data.replacedKeyId;
                     if (rk) {
@@ -582,6 +588,98 @@
         }
 
         var _vpnSyncPollTimer = null;
+        var _vpnSilentOpenPollTimer = null;
+        var _vpnSilentOpenDeferId = null;
+        var VPN_CONFIG_SYNC_MAX_POLLS = 45;
+        var VPN_CONFIG_SYNC_POLL_MS = 2000;
+
+        function clearVpnSilentOpenPolling() {
+            if (_vpnSilentOpenPollTimer) {
+                clearInterval(_vpnSilentOpenPollTimer);
+                _vpnSilentOpenPollTimer = null;
+            }
+        }
+
+        /** Общая отрисовка после опроса /content (ручное «Обновить» и тихий запуск при открытии). */
+        function vpnApplyPollPayload(payload) {
+            if (!payload || !payload.page || !contentEl || typeof window.renderVpnConfigPage !== 'function') return;
+            window.__vpnConfigPage = payload.page;
+            window.renderVpnConfigPage(contentEl, payload.page);
+            if (typeof window.syncVpnToolbarProtoButtons === 'function') window.syncVpnToolbarProtoButtons();
+            if (payload.lastUpdated && lastUpdatedEl) lastUpdatedEl.textContent = payload.lastUpdated;
+            if (payload.lastUpdated) window.__vpnLastConfigUpdatedLabel = payload.lastUpdated;
+            if (typeof payload.lastUpdatedEpoch === 'number') window.__vpnLastConfigEpoch = payload.lastUpdatedEpoch;
+        }
+
+        function vpnPayloadIsNewerThanBaseline(payload, baselineEpoch, baselineLabel) {
+            if (!payload) return false;
+            var newEpoch = payload.lastUpdatedEpoch;
+            var newLabel = payload.lastUpdated ? String(payload.lastUpdated) : '';
+            if (typeof newEpoch === 'number' && typeof baselineEpoch === 'number') {
+                return newEpoch !== baselineEpoch;
+            }
+            return baselineLabel !== undefined && newLabel && newLabel !== String(baselineLabel);
+        }
+
+        /**
+         * Сразу после открытия страницы: тот же /refresh, что и у кнопки «Обновить» (фоновая синхронизация Marzban после ответа),
+         * без полноэкранного прогресса. Когда в БД появятся свежие ссылки — тихо перерисуем блок.
+         */
+        function runSilentSyncOnOpen() {
+            if (window.__vpnSilentOpenCancelledByManual) return;
+            if (window.__vpnSilentOpenSyncStarted) return;
+            window.__vpnSilentOpenSyncStarted = true;
+            clearVpnSilentOpenPolling();
+
+            fetch(refreshUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(parseJsonResponse)
+                .then(function(res) {
+                    if (window.__vpnSilentOpenCancelledByManual) return;
+                    if (!res.data || !res.data.success) {
+                        if (res.data && res.data.replacedKeyId) {
+                            setContentKeyReplaced((res.data && res.data.message) ? String(res.data.message) : '', res.data.replacedKeyId);
+                        }
+                        return;
+                    }
+                    if (!res.data.syncPending) return;
+
+                    var baselineEpoch = (typeof res.data.lastUpdatedEpoch === 'number') ? res.data.lastUpdatedEpoch : undefined;
+                    var baselineLabel = res.data.lastUpdated ? String(res.data.lastUpdated) : '';
+                    var silentFinished = false;
+                    var silentAttempts = 0;
+
+                    function silentPollOnce() {
+                        if (silentFinished) return;
+                        silentAttempts++;
+                        if (silentAttempts > VPN_CONFIG_SYNC_MAX_POLLS) {
+                            silentFinished = true;
+                            clearVpnSilentOpenPolling();
+                            return;
+                        }
+                        fetch(contentUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+                            .then(parseJsonResponse)
+                            .then(function(pollRes) {
+                                if (silentFinished) return;
+                                if (window.__vpnSilentOpenCancelledByManual) return;
+                                if (!pollRes.data || !pollRes.data.success || !pollRes.data.page) return;
+                                if (vpnPayloadIsNewerThanBaseline(pollRes.data, baselineEpoch, baselineLabel)) {
+                                    silentFinished = true;
+                                    clearVpnSilentOpenPolling();
+                                    vpnApplyPollPayload(pollRes.data);
+                                    if (typeof window.showCopyNotification === 'function') {
+                                        window.showCopyNotification('Конфигурация обновлена с сервера');
+                                    }
+                                }
+                            })
+                            .catch(function() { /* следующий тик */ });
+                    }
+
+                    silentPollOnce();
+                    _vpnSilentOpenPollTimer = setInterval(silentPollOnce, VPN_CONFIG_SYNC_POLL_MS);
+                })
+                .catch(function() { /* сеть: пользователь нажмёт «Обновить» */ });
+        }
+
         function clearVpnSyncPolling() {
             if (_vpnSyncPollTimer) {
                 clearInterval(_vpnSyncPollTimer);
@@ -593,12 +691,17 @@
             if (!progressBar || !refreshBar) return;
             if (btnRefresh && btnRefresh.disabled) return;
 
+            window.__vpnSilentOpenCancelledByManual = true;
+            if (_vpnSilentOpenDeferId != null) {
+                clearTimeout(_vpnSilentOpenDeferId);
+                _vpnSilentOpenDeferId = null;
+            }
+
             clearVpnSyncPolling();
+            clearVpnSilentOpenPolling();
             var refreshSessionClosed = false;
             var syncPollFinished = false;
             var syncPollAttempts = 0;
-            var MAX_SYNC_POLLS = 45;
-            var POLL_INTERVAL_MS = 2000;
 
             function closeRefreshUi(notifyMsg) {
                 if (refreshSessionClosed) return;
@@ -612,7 +715,7 @@
                 if (spinnerBlock) spinnerBlock.setAttribute('aria-busy', 'false');
                 progressBar.classList.add('hidden');
                 refreshBar.classList.remove('hidden');
-                if (notifyMsg) showCopyNotification(notifyMsg);
+                if (notifyMsg && typeof window.showCopyNotification === 'function') window.showCopyNotification(notifyMsg);
             }
 
             function resetUiBeforeRequest() {
@@ -678,29 +781,17 @@
                         }
 
                         function applyContentPayload(payload) {
-                            if (!payload || !payload.page || !contentEl || typeof window.renderVpnConfigPage !== 'function') return;
-                            window.__vpnConfigPage = payload.page;
-                            window.renderVpnConfigPage(contentEl, payload.page);
-                            if (typeof window.syncVpnToolbarProtoButtons === 'function') window.syncVpnToolbarProtoButtons();
-                            if (payload.lastUpdated && lastUpdatedEl) lastUpdatedEl.textContent = payload.lastUpdated;
-                            if (payload.lastUpdated) window.__vpnLastConfigUpdatedLabel = payload.lastUpdated;
-                            if (typeof payload.lastUpdatedEpoch === 'number') window.__vpnLastConfigEpoch = payload.lastUpdatedEpoch;
+                            vpnApplyPollPayload(payload);
                         }
 
                         function isDataNewerThanBaseline(payload) {
-                            if (!payload) return false;
-                            var newEpoch = payload.lastUpdatedEpoch;
-                            var newLabel = payload.lastUpdated ? String(payload.lastUpdated) : '';
-                            if (typeof newEpoch === 'number' && typeof baselineEpoch === 'number') {
-                                return newEpoch !== baselineEpoch;
-                            }
-                            return baselineLabel !== undefined && newLabel && newLabel !== String(baselineLabel);
+                            return vpnPayloadIsNewerThanBaseline(payload, baselineEpoch, baselineLabel);
                         }
 
                         function pollOnce() {
                             if (refreshSessionClosed) return;
                             syncPollAttempts++;
-                            if (syncPollAttempts > MAX_SYNC_POLLS) {
+                            if (syncPollAttempts > VPN_CONFIG_SYNC_MAX_POLLS) {
                                 if (syncPollFinished) return;
                                 syncPollFinished = true;
                                 clearVpnSyncPolling();
@@ -724,7 +815,7 @@
                         }
 
                         pollOnce();
-                        _vpnSyncPollTimer = setInterval(pollOnce, POLL_INTERVAL_MS);
+                        _vpnSyncPollTimer = setInterval(pollOnce, VPN_CONFIG_SYNC_POLL_MS);
                     } else {
                         var rkRefresh = res.data && res.data.replacedKeyId;
                         if (rkRefresh) {
