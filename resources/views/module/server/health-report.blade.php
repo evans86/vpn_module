@@ -193,14 +193,19 @@
                         + '_' + pad2(d.getHours()) + '-' + pad2(d.getMinutes()) + '-' + pad2(d.getSeconds());
                 }
 
+                /**
+                 * Скорость в Мбит/с: строго от «лучше = зелёнее» к «хуже = краснее» (без перепутанных оттенков).
+                 * Пороги под типичный прогон /test-speed на VPS (десятки–сотни–1000+ Мбит/с).
+                 */
                 function mbpsHeatClass(mbps) {
-                    if (mbps == null || isNaN(Number(mbps))) return '';
+                    if (mbps == null || isNaN(Number(mbps))) return 'text-slate-600';
                     var v = Number(mbps);
-                    if (v >= 200) return 'text-emerald-600 font-semibold';
-                    if (v >= 80) return 'text-lime-700 font-semibold';
-                    if (v >= 35) return 'text-amber-700 font-medium';
-                    if (v >= 8) return 'text-orange-700 font-medium';
-                    return 'text-rose-700 font-semibold';
+                    if (v >= 400) return 'text-green-600 font-semibold';
+                    if (v >= 150) return 'text-lime-600 font-semibold';
+                    if (v >= 70) return 'text-yellow-600 font-medium';
+                    if (v >= 35) return 'text-amber-600 font-medium';
+                    if (v >= 15) return 'text-orange-600 font-medium';
+                    return 'text-red-600 font-semibold';
                 }
 
                 function testSpeedMbpsSpan(tsObj) {
