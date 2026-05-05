@@ -239,7 +239,7 @@ class SalesmanAuthController extends Controller
             }
         }
 
-        return false;
+        return UrlHelper::hostMatchesTrustedApplicationPatterns($originHost);
     }
 
     private function originFromUrl(string $url): string
@@ -264,15 +264,20 @@ class SalesmanAuthController extends Controller
     private function allowedAdminOrigin(string $origin): string
     {
         $origin = rtrim(trim($origin), '/');
-        $host = strtolower((string) parse_url($origin, PHP_URL_HOST));
+        if ($origin === '') {
+            return rtrim((string) config('app.url'), '/');
+        }
+
+        $host = strtolower((string) parse_url($this->normalizeUrl($origin), PHP_URL_HOST));
         if ($host === '') {
             return rtrim((string) config('app.url'), '/');
         }
 
-        $appUrl = rtrim((string) config('app.url'), '/');
-        $appHost = strtolower((string) parse_url($this->normalizeUrl($appUrl), PHP_URL_HOST));
+        if (UrlHelper::hostMatchesTrustedApplicationPatterns($host)) {
+            return $origin;
+        }
 
-        return $host === $appHost ? $origin : $appUrl;
+        return rtrim((string) config('app.url'), '/');
     }
 
     private function currentOrigin(): string

@@ -5,6 +5,46 @@ namespace App\Helpers;
 class UrlHelper
 {
     /**
+     * Regex-паттерны доверенных хостов (APP_URL и поддомены + всё из app.trusted_host_patterns).
+     * Совпадает с логикой {@see \App\Http\Middleware\TrustHosts} и генерации корня URL на зеркалах.
+     *
+     * @return list<string>
+     */
+    public static function trustedApplicationHostPatterns(): array
+    {
+        $patterns = [];
+        $root = rtrim((string) config('app.url'), '/');
+        $appHostFromUrl = $root !== ''
+            ? strtolower((string) parse_url(str_contains($root, '://') ? $root : 'https://'.$root, PHP_URL_HOST))
+            : '';
+        if ($appHostFromUrl !== '') {
+            $patterns[] = '^(.+\.)?'.preg_quote($appHostFromUrl, '~').'$';
+        }
+        foreach ((array) config('app.trusted_host_patterns', []) as $pattern) {
+            if (is_string($pattern) && $pattern !== '') {
+                $patterns[] = $pattern;
+            }
+        }
+
+        return array_values(array_unique($patterns));
+    }
+
+    public static function hostMatchesTrustedApplicationPatterns(string $host): bool
+    {
+        $hostLower = strtolower(trim($host));
+        if ($hostLower === '') {
+            return false;
+        }
+        foreach (self::trustedApplicationHostPatterns() as $pattern) {
+            if (@preg_match('~'.$pattern.'~iu', $hostLower)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Ссылка на страницу конфигурации ключа (публичный «фронт», часто зеркало).
      * Использует config('app.config_public_url') — APP_CONFIG_PUBLIC_URL.
      */

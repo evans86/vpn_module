@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Module;
 
+use App\Helpers\UrlHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Salesman\Salesman;
 use App\Repositories\Panel\PanelRepository;
@@ -143,21 +144,27 @@ class SalesmanController extends Controller
     }
 
     /**
-     * Редирект на канонический хост ЛК с подписанной ссылкой (админ смотрит кабинет как продавец).
+     * Редирект в ЛК с подписанной ссылкой (админ смотрит кабинет как продавец).
+     * Если админ открыл панель с зеркала — ЛК открывается на том же origin (сессии и блокировки по основному домену не мешают).
      */
     public function impersonatePersonalCabinet(Salesman $salesman): RedirectResponse
     {
-        $publicUrl = rtrim((string) config('app.config_public_url'), '/');
-        if ($publicUrl === '') {
-            $publicUrl = rtrim((string) config('app.url'), '/');
+        $publicUrl = rtrim($this->currentOrigin(), '/');
+        $cabinetHost = strtolower((string) parse_url(str_contains($publicUrl, '://') ? $publicUrl : 'https://'.$publicUrl, PHP_URL_HOST));
+        if ($cabinetHost === '' || ! UrlHelper::hostMatchesTrustedApplicationPatterns($cabinetHost)) {
+            $publicUrl = rtrim((string) config('app.config_public_url'), '/');
+            if ($publicUrl === '') {
+                $publicUrl = rtrim((string) config('app.url'), '/');
+            }
         }
+
         $relativeTarget = URL::temporarySignedRoute(
             'personal.auth.impersonate',
             now()->addMinutes(10),
             [
                 'salesman' => $salesman->id,
                 'admin' => auth()->id(),
-                // Backend может видеть внутренний Host, поэтому целевой origin ЛК фиксируем в ссылке.
+                // Совпадает с хостом открытия ЛК (зеркало или APP_CONFIG_PUBLIC_URL).
                 'origin' => $publicUrl,
                 // Куда вернуться после "Выйти в админку".
                 'admin_origin' => $this->currentOrigin(),

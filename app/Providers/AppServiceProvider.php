@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Helpers\UrlHelper;
 use App\Queue\WorkerNoPcntl;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Support\ServiceProvider;
@@ -70,7 +71,9 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // Корень для URL::route() и redirect()->route():
-        // — на зеркалах (те же хосты, что для PWA/TrustHosts) остаёмся на текущем Host;
+        // — если Host входит в те же паттерны, что и TrustHosts (основной + APP_CONFIG_PUBLIC_URL + APP_MIRROR_URLS*
+        //   включая поддомены вида *.mirror), генерируем URL на текущий origin — иначе админка с зеркала
+        //   после входа собирается с APP_URL и уходит на заблокированный основной домен;
         // — в консоли, очередях и прочих случаях — канонический APP_URL.
         $defaultRoot = rtrim((string) config('app.url'), '/');
         $multiHosts = config('app.pwa_service_worker_hosts', []);
@@ -80,8 +83,12 @@ class AppServiceProvider extends ServiceProvider
                 $host = $this->originalRequestHost($request);
                 $hostLower = strtolower($host);
                 $multiHostsLower = is_array($multiHosts) ? array_map('strtolower', $multiHosts) : [];
-                if ($host !== '' && $multiHostsLower !== [] && in_array($hostLower, $multiHostsLower, true)) {
-                    URL::forceRootUrl($this->requestOrigin($request, $host));
+                $onKnownHost =
+                    $hostLower !== ''
+                    && (($multiHostsLower !== [] && in_array($hostLower, $multiHostsLower, true))
+                        || UrlHelper::hostMatchesTrustedApplicationPatterns($hostLower));
+                if ($onKnownHost) {
+                    URL::forceRootUrl($this->requestOrigin($request, $hostLower));
                 } elseif ($defaultRoot !== '') {
                     URL::forceRootUrl($defaultRoot);
                 }
