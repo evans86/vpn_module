@@ -6,7 +6,7 @@ use App\Models\Panel\Panel;
 use Illuminate\Support\Str;
 
 /**
- * Цели для «глобальных» проверок на странице флота: .env + панели из БД + домены приложения.
+ * Цели для «глобальных» проверок на странице флота: FLEET_PROBE_EXTERNAL_APP_DOMAINS, FLEET_PROBE_SERVER_ZONE_DOMAINS, FLEET_PROBE_OUR_DOMAINS (+ панели из БД и APP_* через config).
  */
 class FleetProbeTargetResolver
 {
@@ -57,6 +57,12 @@ class FleetProbeTargetResolver
     {
         $cfg = config('fleet_probe', []);
         $out = [];
+        foreach ((array) ($cfg['always_probe_our_domains'] ?? []) as $h) {
+            $h = $this->normalizeTarget((string) $h);
+            if ($h !== '') {
+                $out[] = $h;
+            }
+        }
         foreach ((array) ($cfg['our_domains'] ?? []) as $h) {
             $h = $this->normalizeTarget((string) $h);
             if ($h !== '') {

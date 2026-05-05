@@ -4,7 +4,8 @@
  * Сводная проверка флота (ServerFleetProbeService): доп. «пинг» с хоста Laravel
  * до панелей и до ваших доменов (ICMP при наличии, плюс HTTPS-задержка).
  *
- * @see .env.example — FLEET_PROBE_PANEL_HOSTS, FLEET_PROBE_OUR_DOMAINS
+ * @see .env.example — FLEET_PROBE_EXTERNAL_APP_DOMAINS, FLEET_PROBE_SERVER_ZONE_DOMAINS,
+ *      FLEET_PROBE_PANEL_HOSTS, FLEET_PROBE_OUR_DOMAINS
  */
 
 $split = static function (?string $csv): array {
@@ -15,6 +16,13 @@ $split = static function (?string $csv): array {
 
     return array_values(array_unique(array_map('trim', is_array($parts) ? $parts : [])));
 };
+
+$externalAppProbeDomains = $split(env('FLEET_PROBE_EXTERNAL_APP_DOMAINS', 'cursevagrus.ru'));
+$serverZoneProbeDomains = $split(env('FLEET_PROBE_SERVER_ZONE_DOMAINS', 'kvnfreetest.uk,kvncococ.org'));
+$alwaysProbeOurDomains = array_values(array_unique(array_merge(
+    $externalAppProbeDomains,
+    $serverZoneProbeDomains,
+)));
 
 return [
 
@@ -33,6 +41,21 @@ return [
     | Публичные домены проекта (лендинг, конфиг-зеркало, бот-хост и т.д.)
     */
     'our_domains' => $split(env('FLEET_PROBE_OUR_DOMAINS')),
+
+    /*
+    | Хост(ы) внешнего веб-приложения — FLEET_PROBE_EXTERNAL_APP_DOMAINS. Пустое в .env — не проверять.
+    */
+    'external_app_probe_domains' => $externalAppProbeDomains,
+
+    /*
+    | Базовые домены под хостнеймы серверов — FLEET_PROBE_SERVER_ZONE_DOMAINS (апекс по HTTPS). Пустое — не проверять.
+    */
+    'server_zone_probe_domains' => $serverZoneProbeDomains,
+
+    /*
+    | Слияние списков выше (уникальный порядок: сначала внешнее приложение, потом зоны серверов).
+    */
+    'always_probe_our_domains' => $alwaysProbeOurDomains,
 
     /*
     | Автоматически добавить хосты из APP_URL, APP_CONFIG_PUBLIC_URL и APP_MIRROR_URLS.
