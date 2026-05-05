@@ -7,6 +7,7 @@ use App\Http\Middleware\AdminHttpBasicAuth;
 use App\Http\Middleware\Authenticate;
 use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\ForceHttps;
+use App\Http\Middleware\ForceUrlRootForTrustedHost;
 use App\Http\Middleware\PreventAdminResponseCaching;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\RedirectIfAuthenticated;
@@ -44,6 +45,7 @@ class Kernel extends HttpKernel
     protected $middleware = [
 //        TrustHosts::class,
         TrustProxies::class,
+        ForceUrlRootForTrustedHost::class,
         HandleCors::class,
         PreventRequestsDuringMaintenance::class,
         ValidatePostSize::class,
