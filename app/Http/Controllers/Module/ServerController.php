@@ -931,8 +931,29 @@ class ServerController extends Controller
     }
 
     /**
+     * Базовая выборка для массового обновления заглушки.
+     *
+     * @return Builder<\App\Models\Server\Server>
+     */
+    private function decoyStubBulkApplyBaseQuery(bool $onlyConfigured, bool $onlyStubDeployedBefore): Builder
+    {
+        $q = Server::query()->where('server_status', '!=', Server::SERVER_DELETED);
+        if ($onlyConfigured) {
+            $q->where('server_status', Server::SERVER_CONFIGURED);
+        }
+        if ($onlyStubDeployedBefore) {
+            $q->whereNotNull('decoy_stub_last_applied_at');
+        }
+
+        return $q->whereNotNull('ip')
+            ->where('ip', '!=', '');
+    }
+
+    /**
      * Массовое обновление Nginx-заглушки (те же шаги, что кнопка в карточке): assets, /test-speed, конфиг.
-     * По умолчанию только серверы «Настроен» с непустым IP и только те, у кого заглушка уже успешно применялась (есть decoy_stub_last_applied_at).
+     *
+     * Пакеты after_id / per_batch: один узел за запрос по умолчанию — Cloudflare/nginx иначе рвёт долгий HTTP.
+     * По умолчанию только «Настроен» и только с непустой датой decoy_stub_last_applied_at.
      */
     public function bulkApplyDecoyStub(Request $request): JsonResponse
     {
@@ -943,18 +964,41 @@ class ServerController extends Controller
         $onlyConfigured = $request->boolean('only_configured', true);
         $onlyStubDeployedBefore = $request->boolean('only_stub_deployed_before', true);
         $installHostNginx = $request->boolean('install_host_nginx', true);
+        $afterId = max(0, (int) $request->input('after_id', 0));
+        $perBatch = min(5, max(1, (int) $request->input('per_batch', 1)));
 
-        $q = Server::query()->where('server_status', '!=', Server::SERVER_DELETED);
-        if ($onlyConfigured) {
-            $q->where('server_status', Server::SERVER_CONFIGURED);
-        }
-        if ($onlyStubDeployedBefore) {
-            $q->whereNotNull('decoy_stub_last_applied_at');
-        }
-        $servers = $q->whereNotNull('ip')
-            ->where('ip', '!=', '')
+        $baseQuery = $this->decoyStubBulkApplyBaseQuery($onlyConfigured, $onlyStubDeployedBefore);
+        $matchedTotal = (clone $baseQuery)->count();
+
+        $servers = (clone $baseQuery)
+            ->where('id', '>', $afterId)
             ->orderBy('id')
+            ->limit($perBatch)
             ->get();
+
+        if ($servers->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'message' => $afterId === 0
+                    ? 'Нет серверов для обновления заглушки (условие: «Настроен», заглушка уже применялась хотя бы раз, непустой IP).'
+                    : 'Дальше записей нет — все пакеты обработаны.',
+                'batch' => [
+                    'after_id' => $afterId,
+                    'next_after_id' => $afterId,
+                    'has_more' => false,
+                    'per_batch' => $perBatch,
+                    'matched_total' => $matchedTotal,
+                ],
+                'summary' => [
+                    'total' => 0,
+                    'attempted' => 0,
+                    'ok' => 0,
+                    'fail' => 0,
+                    'skipped' => 0,
+                ],
+                'results' => [],
+            ]);
+        }
 
         $results = [];
         $ok = 0;
@@ -993,28 +1037,44 @@ class ServerController extends Controller
             ];
         }
 
-        $allSucceeded = ($attempted === 0 ? true : ($fail === 0));
+        $nextAfterId = (int) $servers->max('id');
+        $hasMore = (clone $baseQuery)->where('id', '>', $nextAfterId)->exists();
+
+        $batchFail = ($attempted > 0 && $fail > 0);
         $message = sprintf(
-            'Заглушка: обработано записей %d · попыток SSH %d · успех %d · ошибок %d · пропуск (нет SSH) %d.',
+            'Заглушка, пакет: id > %d, порция до %d · в этом запросе %d узл. · успех %d · ошибок %d · пропуск (нет SSH) %d · всего в выборке %d.%s',
+            $afterId,
+            $perBatch,
             $servers->count(),
-            $attempted,
             $ok,
             $fail,
-            $skipped
+            $skipped,
+            $matchedTotal,
+            $hasMore ? ' Есть следующие узлы.' : ' Последний пакет.'
         );
 
-        $this->logger->info('Bulk decoy stub apply', [
+        $this->logger->info('Bulk decoy stub apply (batch)', [
             'source' => 'server',
             'user_id' => auth()->id(),
+            'after_id' => $afterId,
+            'per_batch' => $perBatch,
             'only_configured' => $onlyConfigured,
             'only_stub_deployed_before' => $onlyStubDeployedBefore,
             'install_host_nginx' => $installHostNginx,
+            'has_more' => $hasMore,
             'summary' => compact('ok', 'fail', 'skipped', 'attempted'),
         ]);
 
         return response()->json([
-            'success' => $allSucceeded,
+            'success' => ! $batchFail,
             'message' => $message,
+            'batch' => [
+                'after_id' => $afterId,
+                'next_after_id' => $nextAfterId,
+                'has_more' => $hasMore,
+                'per_batch' => $perBatch,
+                'matched_total' => $matchedTotal,
+            ],
             'summary' => [
                 'total' => $servers->count(),
                 'attempted' => $attempted,

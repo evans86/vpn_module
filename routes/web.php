@@ -230,7 +230,7 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
                     ->middleware('throttle:120,1')
                     ->name('bulk-reinstall-log-upload-script');
                 Route::post('/bulk-apply-decoy-stub', [ServerController::class, 'bulkApplyDecoyStub'])
-                    ->middleware('throttle:8,10')
+                    ->middleware('throttle:120,1')
                     ->name('bulk-apply-decoy-stub');
                 Route::post('/{server}/log-upload-async-reinstall/start', [ServerController::class, 'startLogUploadAsyncReinstall'])
                     ->middleware('throttle:120,1')

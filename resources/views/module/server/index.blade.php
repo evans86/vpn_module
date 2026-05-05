@@ -1147,10 +1147,11 @@
                 var installHost = document.getElementById('bulkApplyDecoyStubInstallHostNginx');
                 var installHostVal = !installHost || installHost.checked;
                 if (!confirm('Обновить Nginx-заглушку по SSH на всех серверах со статусом «Настроен», у которых заглушка уже применялась хотя бы раз?\n\n'
-                    + 'На каждый узел по очереди: те же шаги, что кнопка «Применить/обновить» в карточке (файлы в /var/www/panel-stub, сниппет /test-speed, конфиг).\n'
-                    + 'Приманка /123.rar: из галочки в карточке каждого сервера (сохранена в БД).\n'
+                    + 'Выполнение идёт пакетами (обычно по одному узлу на ответ HTTP), чтобы прокси/Cloudflare не обрывал соединение при долгом SSH.\n'
+                    + 'Шаги на узле те же, что кнопка «Применить/обновить» в карточке (/var/www/panel-stub, /test-speed, конфиг).\n'
+                    + 'Приманка /123.rar: из галочки в карточке (БД).\n'
                     + 'Ставить nginx на хост при отсутствии: ' + (installHostVal ? 'да' : 'нет') + '.\n\n'
-                    + 'Первое развёртывание на новой машине делайте из карточки. Может занять много времени.')) {
+                    + 'Первое развёртывание на новой машине — из карточки.')) {
                     return;
                 }
                 var btn = $(this);
@@ -1158,51 +1159,111 @@
                 btn.prop('disabled', true);
                 if (out) {
                     out.classList.remove('hidden');
-                    out.textContent = 'Выполняется…';
+                    out.textContent = 'Пакеты по одному узлу на запрос к панели…';
                 }
-                $.ajax({
-                    url: '{{ route('admin.module.server.bulk-apply-decoy-stub') }}',
-                    method: 'POST',
-                    data: {
-                        _token: '{{ csrf_token() }}',
-                        only_configured: 1,
-                        only_stub_deployed_before: 1,
-                        install_host_nginx: installHostVal ? 1 : 0
-                    },
-                    success: function (response) {
-                        var lines = [(response.message || '')];
-                        (response.results || []).forEach(function (r) {
-                            var prefix = '#' + r.id + ' ' + (r.name || '');
-                            if (r.skipped) {
-                                lines.push(prefix + ' — пропуск: ' + (r.message || ''));
-                            } else {
-                                lines.push(prefix + ' — ' + (r.success ? 'OK' : 'ошибка') + ': ' + (r.message || ''));
-                            }
-                        });
-                        if (out) {
-                            out.textContent = lines.join('\n');
-                        }
-                        if (response.success) {
-                            toastr.success(response.message || 'Готово');
-                            setTimeout(function () { window.location.reload(); }, 2500);
-                        } else {
-                            toastr.warning(response.message || 'Есть ошибки — см. лог ниже страницы');
-                        }
-                    },
-                    error: function (xhr) {
-                        var msg = 'Запрос не выполнен';
-                        if (xhr.responseJSON && xhr.responseJSON.message) {
-                            msg = xhr.responseJSON.message;
-                        }
-                        toastr.error(msg);
-                        if (out) {
-                            out.textContent = msg;
-                        }
-                    },
-                    complete: function () {
-                        btn.prop('disabled', false);
+
+                var lines = [
+                    'Массовое обновление заглушки: несколько коротких HTTP подряд; один узел может занять до нескольких минут по SSH.',
+                    ''
+                ];
+                var totals = { attempted: 0, ok: 0, fail: 0, skipped: 0 };
+
+                function renderOut() {
+                    var tail = '\n────────────────────\nИтого: попыток ' + totals.attempted +
+                        ', успех ' + totals.ok + ', ошибок ' + totals.fail + ', пропуск ' + totals.skipped;
+                    if (out) {
+                        out.textContent = lines.join('\n') + tail;
                     }
-                });
+                }
+
+                function appendBatch(response) {
+                    lines.push(response.message || '');
+                    (response.results || []).forEach(function (r) {
+                        var prefix = '#' + r.id + ' ' + (r.name || '');
+                        if (r.skipped) {
+                            lines.push(prefix + ' — пропуск: ' + (r.message || ''));
+
+                            return;
+                        }
+                        lines.push(prefix + ' — ' + (r.success ? 'OK' : 'ошибка') + ': ' + (r.message || ''));
+                    });
+                    lines.push('');
+                    var s = response.summary || {};
+                    totals.attempted += (s.attempted || 0);
+                    totals.ok += (s.ok || 0);
+                    totals.fail += (s.fail || 0);
+                    totals.skipped += (s.skipped || 0);
+                }
+
+                function runBatch(afterId, perBatch) {
+                    perBatch = perBatch == null ? 1 : perBatch;
+                    $.ajax({
+                        url: '{{ route('admin.module.server.bulk-apply-decoy-stub') }}',
+                        method: 'POST',
+                        timeout: 420000,
+                        data: {
+                            _token: '{{ csrf_token() }}',
+                            only_configured: 1,
+                            only_stub_deployed_before: 1,
+                            install_host_nginx: installHostVal ? 1 : 0,
+                            after_id: afterId,
+                            per_batch: perBatch
+                        },
+                        success: function (response) {
+                            appendBatch(response);
+                            renderOut();
+                            var b = response.batch || {};
+                            if (b.has_more) {
+                                lines.push('Следующий пакет…');
+                                renderOut();
+                                runBatch(b.next_after_id || 0, perBatch);
+
+                                return;
+                            }
+                            lines.push('===== Готово');
+                            renderOut();
+                            if (totals.fail === 0 && totals.attempted > 0) {
+                                toastr.success('Заглушка обновлена по всем узлам выборки');
+                                setTimeout(function () { window.location.reload(); }, 2200);
+                            } else if (totals.attempted === 0 && totals.skipped === 0) {
+                                toastr.info(response.message || 'Нет серверов для обработки');
+                            } else if (totals.fail > 0) {
+                                toastr.warning('Есть ошибки — см. текст ниже');
+                            } else if (totals.skipped > 0 && totals.attempted === 0) {
+                                toastr.warning('Все пропуски — проверьте SSH в карточках');
+                            } else {
+                                toastr.success(response.message || 'Готово');
+                            }
+                            btn.prop('disabled', false);
+                        },
+                        error: function (xhr, textStatus) {
+                            var msg = 'Запрос не выполнен';
+                            if (xhr.responseJSON && xhr.responseJSON.message) {
+                                msg = xhr.responseJSON.message;
+                            } else if (xhr.status === 524) {
+                                msg = 'HTTP 524 (Cloudflare): до браузера не успело ответа.';
+                            } else if (xhr.status === 429) {
+                                msg = 'Слишком много запросов (429). Подождите минуту и попробуйте снова.';
+                            } else if (textStatus === 'timeout') {
+                                msg = 'Таймаут запроса — один узел слишком долго по SSH (лимит 7 мин у браузера). Обновите эту машину с карточки или попробуйте снова.';
+                            }
+                            toastr.error(msg);
+                            lines.push('');
+                            lines.push('!!! Ошибка пакета после id ' + afterId + ': ' + msg);
+                            if (xhr.status) {
+                                lines.push('HTTP-код: ' + xhr.status);
+                            }
+                            if (xhr.responseText && typeof xhr.responseText === 'string' && xhr.responseText.length < 900) {
+                                lines.push(xhr.responseText.substring(0, 800));
+                            }
+                            renderOut();
+                            btn.prop('disabled', false);
+                        }
+                    });
+                }
+
+                renderOut();
+                runBatch(0, 1);
             });
 
             $('#bulkRunLogUploadNowBtn').on('click', function () {
