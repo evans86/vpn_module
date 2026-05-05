@@ -32,7 +32,9 @@
             </x-slot>
 
             <!-- Filters -->
-            <x-admin.filter-form action="{{ route('admin.module.server.index') }}">
+            <x-admin.filter-form
+                action="{{ route('admin.module.server.index') }}"
+                grid-class="grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
                 <x-admin.filter-input 
                     name="name" 
                     label="Имя сервера" 
@@ -101,49 +103,98 @@
                     </x-slot>
                 </x-admin.empty-state>
             @else
-                <div class="flex flex-wrap items-center gap-x-2 gap-y-2 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <span class="text-sm text-gray-600 font-medium shrink-0">Действия:</span>
-                    <button type="button"
-                            class="shrink-0 whitespace-nowrap inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                            onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createServerModal' } }))">
-                        <i class="fas fa-plus mr-2"></i>
-                        Добавить сервер (API)
-                    </button>
-                    <button type="button"
-                            class="shrink-0 whitespace-nowrap inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                            onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createManualServerModal' } }))">
-                        <i class="fas fa-server mr-2"></i>
-                        Добавить вручную (без API)
-                    </button>
-                    <button type="button" id="bulkInstallSpeedtestCliBtn"
-                            class="shrink-0 whitespace-nowrap inline-flex items-center px-3 py-1.5 border border-amber-400 text-sm font-medium rounded-md shadow-sm text-amber-900 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400"
-                            title="По SSH ставит пакет speedtest-cli на серверы со статусом «Настроен» (нужен sudo или root)">
-                        <i class="fas fa-tachometer-alt mr-2"></i>
-                        speedtest-cli
-                    </button>
-                    <button type="button" id="bulkApplyDecoyStubBtn"
-                            class="shrink-0 whitespace-nowrap inline-flex items-center px-3 py-1.5 border border-emerald-500 text-sm font-medium rounded-md shadow-sm text-emerald-900 bg-emerald-50 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
-                            title="По SSH обновить Nginx-заглушку (assets, /test-speed, конфиг) на всех «Настроен», где заглушка уже применялась хотя бы раз. Опция 123.rar — из БД каждой карточки.">
-                        <i class="fas fa-mask mr-2"></i>
-                        Обновить заглушку
-                    </button>
-                    <label class="shrink-0 inline-flex items-center gap-1.5 text-xs text-gray-600 whitespace-nowrap cursor-pointer" title="Общая настройка для массового «Обновить заглушку» (как чекбокс в карточке)">
-                        <input type="checkbox" id="bulkApplyDecoyStubInstallHostNginx" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" checked>
-                        <span>Ставить nginx на хост при отсутствии</span>
-                    </label>
-                    <button type="button" id="bulkRunLogUploadNowBtn"
-                            class="shrink-0 whitespace-nowrap inline-flex items-center px-3 py-1.5 border border-teal-500 text-sm font-medium rounded-md shadow-sm text-teal-900 bg-teal-50 hover:bg-teal-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
-                            title="На всех серверах с включённой выгрузкой логов по SSH выполнить /root/upload-logs.sh (как cron: сжатие, запись в S3, удаление исходников, при наличии контейнера — docker restart marzban).">
-                        <i class="fas fa-cloud-upload-alt mr-2"></i>
-                        Выгрузить логи сейчас
-                    </button>
-                    <button type="button" id="bulkReinstallLogUploadScriptBtn"
-                            class="shrink-0 whitespace-nowrap inline-flex items-center px-3 py-1.5 border border-sky-500 text-sm font-medium rounded-md shadow-sm text-sky-900 bg-sky-50 hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
-                            title="На всех «Настроен» с включённой выгрузкой заново выполнить установку скрипта из панели: /tmp/upload-logs-install.sh → /root/upload-logs.sh, ~/.s3cfg, cron (apt/s3cmd, проверка s3cmd ls). Долго, по очереди.">
-                        <i class="fas fa-sync-alt mr-2"></i>
-                        Обновить скрипт выгрузки
-                    </button>
+                <div class="mb-4 rounded-xl border border-slate-200 bg-gradient-to-b from-slate-50/90 to-white shadow-sm overflow-hidden">
+                    <div class="px-4 py-3 border-b border-slate-200 bg-white">
+                        <h2 class="text-sm font-semibold text-slate-800 tracking-tight">Массовые действия</h2>
+                        <p class="text-xs text-slate-500 mt-1 leading-snug">По SSH для всех подходящих узлов. Детали — во всплывающих подсказках к кнопкам.</p>
+                    </div>
+                    <div class="p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-0 lg:divide-x lg:divide-slate-200">
+                        <div class="lg:col-span-4 lg:pr-5 space-y-3">
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Добавление</p>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <button type="button"
+                                        class="justify-center inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm border border-transparent focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500 transition-colors"
+                                        onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createServerModal' } }))">
+                                    <i class="fas fa-plus mr-2 opacity-90"></i>
+                                    Добавить сервер (API)
+                                </button>
+                                <button type="button"
+                                        class="justify-center inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium text-indigo-700 bg-white hover:bg-indigo-50 border border-indigo-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-400 transition-colors"
+                                        onclick="window.dispatchEvent(new CustomEvent('open-modal', { detail: { id: 'createManualServerModal' } }))">
+                                    <i class="fas fa-server mr-2 text-indigo-500"></i>
+                                    Добавить вручную (без API)
+                                </button>
+                            </div>
+                        </div>
+                        <div class="lg:col-span-5 lg:px-5 space-y-3 pt-1 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Узел</p>
+                            <div class="flex flex-col gap-3">
+                                <div class="flex flex-wrap gap-2">
+                                    <button type="button" id="bulkInstallSpeedtestCliBtn"
+                                            class="server-bulk-action-btn"
+                                            title="По SSH ставит пакет speedtest-cli на серверы со статусом «Настроен» (нужен sudo или root)">
+                                        <i class="fas fa-tachometer-alt w-5 text-center text-amber-600"></i>
+                                        <span>speedtest-cli</span>
+                                    </button>
+                                    <button type="button" id="bulkApplyDecoyStubBtn"
+                                            class="server-bulk-action-btn"
+                                            title="По SSH обновить Nginx-заглушку (assets, /test-speed, конфиг) на всех «Настроен», где заглушка уже применялась хотя бы раз. Опция 123.rar — из БД каждой карточки.">
+                                        <i class="fas fa-mask w-5 text-center text-emerald-600"></i>
+                                        <span>Обновить заглушку</span>
+                                    </button>
+                                </div>
+                                <label class="inline-flex items-start gap-2.5 px-3 py-2 rounded-lg bg-slate-100/70 border border-slate-200/80 cursor-pointer max-w-xl">
+                                    <input type="checkbox" id="bulkApplyDecoyStubInstallHostNginx" class="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" checked title="Общая настройка для массового «Обновить заглушку» (как чекбокс в карточке)">
+                                    <span class="text-xs text-slate-600 leading-snug">Ставить nginx на хост при отсутствии</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="lg:col-span-3 lg:pl-5 space-y-3 pt-1 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Логи в S3</p>
+                            <div class="flex flex-col gap-2">
+                                <button type="button" id="bulkRunLogUploadNowBtn"
+                                        class="server-bulk-action-btn w-full justify-start"
+                                        title="На всех серверах с включённой выгрузкой логов по SSH выполнить /root/upload-logs.sh (как cron: сжатие, запись в S3, удаление исходников, при наличии контейнера — docker restart marzban).">
+                                    <i class="fas fa-cloud-upload-alt w-5 text-center text-sky-600"></i>
+                                    <span>Выгрузить логи сейчас</span>
+                                </button>
+                                <button type="button" id="bulkReinstallLogUploadScriptBtn"
+                                        class="server-bulk-action-btn w-full justify-start"
+                                        title="На всех «Настроен» с включённой выгрузкой заново выполнить установку скрипта из панели: /tmp/upload-logs-install.sh → /root/upload-logs.sh, ~/.s3cfg, cron (apt/s3cmd, проверка s3cmd ls). Долго, по очереди.">
+                                    <i class="fas fa-sync-alt w-5 text-center text-indigo-500"></i>
+                                    <span>Обновить скрипт выгрузки</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+                @push('styles')
+                <style>
+                    .server-bulk-action-btn {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 0.375rem;
+                        padding: 0.625rem 0.875rem;
+                        border-radius: 0.5rem;
+                        font-size: 0.875rem;
+                        font-weight: 500;
+                        color: rgb(51 65 85);
+                        background-color: white;
+                        border: 1px solid rgb(226 232 240);
+                        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+                        transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+                        text-align: left;
+                    }
+                    .server-bulk-action-btn:hover {
+                        background-color: rgb(248 250 252);
+                        border-color: rgb(203 213 225);
+                    }
+                    .server-bulk-action-btn:focus {
+                        outline: none;
+                        box-shadow: 0 0 0 2px rgb(255 255 255), 0 0 0 4px rgb(129 140 248);
+                    }
+                </style>
+                @endpush
                 <pre id="bulkInstallSpeedtestCliOut"
                      class="hidden mb-4 w-full text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 max-h-72 overflow-auto border border-slate-700"></pre>
                 <pre id="bulkApplyDecoyStubOut"
