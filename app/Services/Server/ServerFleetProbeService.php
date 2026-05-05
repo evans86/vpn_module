@@ -559,7 +559,7 @@ class ServerFleetProbeService
             }
         }
         foreach ([
-            '/Download:\s*([0-9]+(?:\.[0-9]+)?)\s*Mbit/s/i',
+            '/Download:\s*([0-9]+(?:\.[0-9]+)?)\s*Mbit\/s/i',
             '/Download:\s*([0-9]+(?:\.[0-9]+)?)\s*Mbits/i',
             '/download:\s*([0-9]+(?:\.[0-9]+)?)\s*mbit/i',
             '/Download:\s*([0-9]+(?:\.[0-9]+)?)\s*Mbps/i',
@@ -570,7 +570,7 @@ class ServerFleetProbeService
             }
         }
         foreach ([
-            '/Upload:\s*([0-9]+(?:\.[0-9]+)?)\s*Mbit/s/i',
+            '/Upload:\s*([0-9]+(?:\.[0-9]+)?)\s*Mbit\/s/i',
             '/Upload:\s*([0-9]+(?:\.[0-9]+)?)\s*Mbits/i',
             '/Upload:\s*([0-9]+(?:\.[0-9]+)?)\s*Mbps/i',
         ] as $re) {
