@@ -43,7 +43,6 @@ class ServerFleetHealthController extends Controller
                 'panel_targets_count' => count($panelHosts),
                 'our_domains_targets_count' => count($ourHosts),
             ],
-            'classifyHostUrl' => route('admin.module.server-fleet.classify-host'),
         ]);
     }
 

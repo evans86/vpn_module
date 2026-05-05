@@ -11,42 +11,11 @@
         ];
     @endphp
     <div class="space-y-5">
-        <x-admin.card title="О разделе">
-            <div class="text-sm text-slate-700 space-y-3">
-                <p>
-                    Страница совмещает проверку <strong>с вашего браузера</strong> (задержка и скачивание до панели)
-                    и <strong>с сервера приложения</strong> (Laravel): доступность HTTP/HTTPS на IP каждого VPS,
-                    статус заглушки из БД, опционально приманка и полный отчёт <code class="text-xs bg-slate-100 px-1 rounded">/test-speed</code>,
-                    плюс замеры до панелей и «своих» доменов по настройкам окружения.
-                </p>
-                <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
-                    <div class="font-medium text-slate-900 mb-1">Эвристика «веб vs VPN»</div>
-                    <p class="mb-2">
-                        Ниже можно подставить IP или домен: эндпоинт классификации возвращает грубую оценку
-                        («похоже на веб-фронт / CDN / классический хостинг» vs «вероятнее выход VPN / неклассический набор открытых портов»).
-                        Полезно при разборе жалоб («сайт не открывается»), когда нужно понять, не упирается ли обращение в «не тот» хост или в режим блокировки.
-                    </p>
-                    <div class="text-xs text-slate-600 mb-3">
-                        Сейчас в списках целей: панелей <strong>{{ (int) ($fm['panel_targets_count'] ?? 0) }}</strong>,
-                        доменов <strong>{{ (int) ($fm['our_domains_targets_count'] ?? 0) }}</strong>.
-                    </div>
-                    <div class="flex flex-wrap items-end gap-2 pt-1">
-                        <div class="min-w-[12rem] flex-1">
-                            <label for="fleetClassifyHost" class="block text-xs font-medium text-slate-700 mb-1">Хост или IP</label>
-                            <input type="text" id="fleetClassifyHost" maxlength="512" placeholder="например 203.0.113.50 или probe.example.net"
-                                   class="w-full text-sm rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" autocomplete="off">
-                        </div>
-                        <button type="button" id="fleetClassifyBtn"
-                                class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-slate-800 text-white hover:bg-slate-900 disabled:opacity-50">
-                            Проверить
-                        </button>
-                    </div>
-                    <pre id="fleetClassifyOut" class="hidden text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 overflow-x-auto max-h-64 overflow-y-auto mt-3"></pre>
-                </div>
-            </div>
-        </x-admin.card>
-
         <x-admin.card title="Проверка">
+            <div class="text-xs text-slate-600 mb-4">
+                Сейчас в списках целей: панелей <strong>{{ (int) ($fm['panel_targets_count'] ?? 0) }}</strong>,
+                доменов <strong>{{ (int) ($fm['our_domains_targets_count'] ?? 0) }}</strong>.
+            </div>
             <div class="flex flex-wrap items-center gap-x-6 gap-y-3 mb-4">
                 <label class="inline-flex items-center gap-2 cursor-pointer text-sm text-slate-800">
                     <input type="checkbox" id="includeTestSpeed"
@@ -67,12 +36,22 @@
                     Копировать
                 </button>
             </div>
-            <p id="checkStatus" class="text-sm text-slate-700 mb-2 min-h-[1.375rem]"></p>
+            <div id="fleetRunPhaseWrap" class="hidden mb-3 rounded-md border px-3 py-2.5 shadow-sm bg-slate-50 border-slate-300 transition-colors duration-150" role="status" aria-live="polite" aria-atomic="true">
+                <div class="flex gap-3 items-start">
+                    <span id="fleetRunPhaseSpinner" class="hidden shrink-0 pt-0.5 text-indigo-600" aria-hidden="true"><i class="fas fa-spinner fa-spin text-lg"></i></span>
+                    <span id="fleetRunPhaseDone" class="hidden shrink-0 pt-0.5 text-emerald-600" aria-hidden="true"><i class="fas fa-check-circle text-lg"></i></span>
+                    <span id="fleetRunPhaseWarn" class="hidden shrink-0 pt-0.5 text-amber-600" aria-hidden="true"><i class="fas fa-exclamation-circle text-lg"></i></span>
+                    <span id="fleetRunPhaseErr" class="hidden shrink-0 pt-0.5 text-rose-600" aria-hidden="true"><i class="fas fa-times-circle text-lg"></i></span>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Текущий этап</div>
+                        <p id="checkStatus" class="text-sm text-slate-900 mt-1 leading-snug whitespace-pre-wrap break-words"> </p>
+                    </div>
+                </div>
+            </div>
             <p id="fleetCopyNotice" class="text-sm min-h-[1.375rem] mb-3 transition-colors duration-150" role="status" aria-live="polite"></p>
 
             <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800 space-y-4">
                 <div class="font-medium text-slate-900">Результат проверки серверов и сети</div>
-                <p class="text-xs text-slate-600 -mt-2">Формат такой же, как у блока «Эвристика» выше: сводка, затем полный текст и таблица по узлам.</p>
 
                 <div id="globalProbePanel" class="hidden rounded-md border border-slate-200 bg-white px-3 py-2">
                     <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -121,7 +100,6 @@
                 var pingUrl = @json(route('netcheck.ping'));
                 var payloadUrl = @json(route('netcheck.payload', ['size' => '2mb']));
                 var fleetRunUrl = @json(route('admin.module.server-fleet.report.run'));
-                var classifyUrl = @json($classifyHostUrl ?? '');
                 var btn = document.getElementById('runCheckBtn');
                 var chk = document.getElementById('includeTestSpeed');
                 var st = document.getElementById('checkStatus');
@@ -143,6 +121,48 @@
                 var fleetReportStartedAt = '';
                 var fleetLastMergedSummary = null;
                 var copyNoticeTimer = null;
+
+                var phaseWrap = document.getElementById('fleetRunPhaseWrap');
+                var phaseSpinner = document.getElementById('fleetRunPhaseSpinner');
+                var phaseDone = document.getElementById('fleetRunPhaseDone');
+                var phaseWarn = document.getElementById('fleetRunPhaseWarn');
+                var phaseErr = document.getElementById('fleetRunPhaseErr');
+
+                /** Блок «Текущий этап»: единый стиль рамки/фона + индикация выполнения. */
+                function setFleetRunPhase(message, variant) {
+                    variant = variant || 'running';
+                    var wrapClasses = {
+                        running: 'mb-3 rounded-md border border-slate-300 bg-slate-50 px-3 py-2.5 shadow-sm transition-colors duration-150',
+                        done: 'mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 shadow-sm transition-colors duration-150',
+                        warn: 'mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 shadow-sm transition-colors duration-150',
+                        error: 'mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2.5 shadow-sm transition-colors duration-150'
+                    };
+                    if (st) st.textContent = message || '';
+
+                    function hideMarks() {
+                        [phaseSpinner, phaseDone, phaseWarn, phaseErr].forEach(function (el) {
+                            if (el) el.classList.add('hidden');
+                        });
+                    }
+
+                    if (!phaseWrap || !st) return;
+
+                    var t = String(message || '').trim();
+                    if (!t) {
+                        phaseWrap.classList.add('hidden');
+                        hideMarks();
+                        return;
+                    }
+
+                    phaseWrap.className = wrapClasses[variant] || wrapClasses.running;
+                    phaseWrap.classList.remove('hidden');
+                    hideMarks();
+                    if (variant === 'running' && phaseSpinner) phaseSpinner.classList.remove('hidden');
+                    else if (variant === 'done' && phaseDone) phaseDone.classList.remove('hidden');
+                    else if (variant === 'warn' && phaseWarn) phaseWarn.classList.remove('hidden');
+                    else if (variant === 'error' && phaseErr) phaseErr.classList.remove('hidden');
+                    else if (phaseSpinner) phaseSpinner.classList.remove('hidden');
+                }
 
                 /** Сообщение под кнопками: скопировано / ошибка (не смешиваем с фазами «Загрузка…»). */
                 function flashCopyNotice(message, ok) {
@@ -434,7 +454,7 @@
                     lines.push('');
 
                     try {
-                        setPhase('Публичный IP и Geo…');
+                        setPhase('Браузер: запрос внешнего IP и геоподписи по ipwho (может занять несколько секунд)…');
                         lines.push('--- IP / Geo ---');
                         var rip = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
                         var jip = await rip.json();
@@ -463,7 +483,7 @@
                     }
                     lines.push('');
 
-                    setPhase('Задержка до сайта панели…');
+                    setPhase('Браузер: несколько замеров задержки и скачивание пробного файла до этой админки…');
                     lines.push('--- До хоста панели ---');
                     var pingTimes = await measurePingMs(pingUrl, 4);
                     lines.push(pingUrl + ' (мс): ' + pingTimes.map(function (x) {
@@ -476,7 +496,7 @@
                     }
                     lines.push('');
 
-                    setPhase('Внешние HTTPS (задержка)…');
+                    setPhase('Браузер: последовательные запросы к Яндекс, Google, Cloudflare, Telegram (оценка задержки)…');
                     lines.push('--- Внешние точки ---');
                     var ext = [
                         { label: 'Яндекс', url: 'https://yandex.ru/favicon.ico' },
@@ -639,45 +659,6 @@
                     paintFleetMergedState(null, d.summary || emptyFleetSummary(), d.rows || []);
                 }
 
-                var clBtn = document.getElementById('fleetClassifyBtn');
-                var clIn = document.getElementById('fleetClassifyHost');
-                var clOut = document.getElementById('fleetClassifyOut');
-                if (clBtn && clIn && clOut && classifyUrl) {
-                    clBtn.addEventListener('click', async function () {
-                        var v = (clIn.value || '').trim();
-                        if (!v) {
-                            clOut.classList.remove('hidden');
-                            clOut.textContent = 'Укажите IP или домен.';
-                            return;
-                        }
-                        clBtn.disabled = true;
-                        clOut.classList.remove('hidden');
-                        clOut.textContent = 'Запрос…';
-                        try {
-                            var res = await fetch(classifyUrl, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-CSRF-TOKEN': csrf,
-                                    'Accept': 'application/json',
-                                    'X-Requested-With': 'XMLHttpRequest'
-                                },
-                                body: JSON.stringify({ host: v })
-                            });
-                            var txt = await res.text();
-                            try {
-                                clOut.textContent = JSON.stringify(JSON.parse(txt), null, 2);
-                            } catch (e) {
-                                clOut.textContent = txt || res.status;
-                            }
-                        } catch (err) {
-                            clOut.textContent = String(err.message || err);
-                        } finally {
-                            clBtn.disabled = false;
-                        }
-                    });
-                }
-
                 btn.addEventListener('click', async function () {
                     btn.disabled = true;
                     saveBtn.disabled = true;
@@ -702,9 +683,10 @@
                     fleetCachedGlobalProbes = null;
                     fleetCachedGlobalText = '';
                     fleetReportStartedAt = '';
+                    setFleetRunPhase('', 'idle');
 
-                    function setPhase(msg) {
-                        st.textContent = msg;
+                    function setPhase(msg, phaseVariant) {
+                        setFleetRunPhase(msg, phaseVariant !== undefined ? phaseVariant : 'running');
                     }
 
                     function delay(ms) {
@@ -726,7 +708,7 @@
                             });
                             if ((res.status === 524 || res.status === 504) && cfRetries524 > 0) {
                                 cfRetries524--;
-                                setPhase('Прокси оборвал долгий ответ (HTTP ' + res.status + '), повтор через 45 с…');
+                                setPhase('Прокси (Cloudflare) оборвал долгий ответ с кодом HTTP ' + res.status + '. Повтор того же запроса через 45 секунд — это защита от ошибки «таймаут шлюза».');
                                 await delay(45000);
                                 continue;
                             }
@@ -742,7 +724,7 @@
 
                     try {
                         var g = null;
-                        setPhase('Сеть (браузер)…');
+                        setPhase('Этап 1 из 3: ваш браузер — сеть до панели и внешние узлы.');
                         var part1 = await buildBrowserReport(setPhase);
 
                         var part2 = '';
@@ -756,7 +738,7 @@
                         var fleetOk = false;
                         var fleetReportSuccess = false;
 
-                        setPhase('Laravel → панели и домены (отдельный запрос, обход лимита Cloudflare)…');
+                        setPhase('Этап 2 из 3: приложение Laravel — ICMP/HTTPS до панелей Marzban из БД и к своим доменам (отдельный запрос от обрыва Cloudflare).');
                         g = await fleetFetchJson({ fleet_global_only: true, include_test_speed: false }, 4);
                         if (!g.j.success || !g.res.ok) {
                             var ge = (g.j.message != null && g.j.message !== '') ? String(g.j.message) : ('HTTP ' + g.res.status);
@@ -777,7 +759,14 @@
                             var afterId = 0;
                             var batchFail = false;
                             while (true) {
-                                setPhase('Узлы VPS: пакет id > ' + afterId + ', до ' + perBatch + ' серв.…');
+                                var batchLimit = includeTs ? 1 : perBatch;
+                                var batchNote = includeTs
+                                    ? 'Запрошен полный /test-speed — в одном ответе приложения обрабатывается ровно один сервер.'
+                                    : ('За один ответ приложения — не более ' + perBatch + ' серверов (так снижаем риск таймаута у прокси).');
+                                var cursorMsg = afterId === 0
+                                    ? 'Это первая порция серверов в этой проверке.'
+                                    : ('Следующие строки отчёта — для серверов с id в базе больше ' + afterId + ' (предыдущие пакеты уже учтены).');
+                                setPhase('Этап 3 из 3: узлы VPS. ' + cursorMsg + ' ' + batchNote + ' Запрашиваем до ' + batchLimit + ' шт. Ждём ответ Laravel…');
                                 var bag = await fleetFetchJson({
                                     include_test_speed: includeTs,
                                     after_id: afterId,
@@ -834,16 +823,20 @@
 
                         ta.value = part1 + part2;
                         if (fleetReportSuccess) {
-                            setPhase('Готово.');
+                            setPhase('Проверка завершена успешно. Ниже — сводный текст и таблица по узлам.', 'done');
                         } else if (g != null && g.res && g.res.status === 429) {
-                            setPhase('Лимит запросов.');
+                            setPhase('Слишком частые запросы (лимит защиты). Подождите около минуты и запустите снова.', 'error');
                         } else {
-                            setPhase(part2 === '' ? 'Готово (только браузер).' : 'Частично готово — см. текст отчёта.');
+                            if (part2 === '') {
+                                setPhase('Этапы с узлами не выполнялись: в отчёте только блок «ваш браузер» или произошёл сбой до запроса серверов.', 'warn');
+                            } else {
+                                setPhase('Проверка остановилась частично: смотрите текст отчёта и возможные ошибки в конце файла.', 'warn');
+                            }
                         }
                         saveBtn.disabled = false;
                         copyBtn.disabled = false;
                     } catch (err) {
-                        setPhase('Ошибка.');
+                        setPhase('Сбой в скрипте страницы: ' + String(err.message || err), 'error');
                         ta.value = ta.value ? (ta.value + '\n\n[Ошибка] ' + err.message) : ('[Ошибка] ' + err.message);
                         saveBtn.disabled = !ta.value;
                         copyBtn.disabled = !ta.value;
