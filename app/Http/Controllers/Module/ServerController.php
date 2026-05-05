@@ -892,6 +892,7 @@ class ServerController extends Controller
     public function applyDecoyStub(Request $request, Server $server): JsonResponse
     {
         $include = $request->boolean('include_123_rar');
+        $installHostNginx = $request->boolean('install_host_nginx', true);
 
         try {
             $this->logger->info('Apply decoy stub', [
@@ -899,9 +900,10 @@ class ServerController extends Controller
                 'user_id' => auth()->id(),
                 'server_id' => $server->id,
                 'include_123_rar' => $include,
+                'install_host_nginx' => $installHostNginx,
             ]);
 
-            $result = $this->decoyStubService->apply($server, $include);
+            $result = $this->decoyStubService->apply($server, $include, $installHostNginx);
 
             if (! $result['success']) {
                 $this->logger->error('Decoy stub apply failed', [
@@ -926,6 +928,102 @@ class ServerController extends Controller
                 'message' => 'Ошибка: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Массовое обновление Nginx-заглушки (те же шаги, что кнопка в карточке): assets, /test-speed, конфиг.
+     * По умолчанию только серверы «Настроен» с непустым IP и только те, у кого заглушка уже успешно применялась (есть decoy_stub_last_applied_at).
+     */
+    public function bulkApplyDecoyStub(Request $request): JsonResponse
+    {
+        if (function_exists('set_time_limit')) {
+            set_time_limit(0);
+        }
+
+        $onlyConfigured = $request->boolean('only_configured', true);
+        $onlyStubDeployedBefore = $request->boolean('only_stub_deployed_before', true);
+        $installHostNginx = $request->boolean('install_host_nginx', true);
+
+        $q = Server::query()->where('server_status', '!=', Server::SERVER_DELETED);
+        if ($onlyConfigured) {
+            $q->where('server_status', Server::SERVER_CONFIGURED);
+        }
+        if ($onlyStubDeployedBefore) {
+            $q->whereNotNull('decoy_stub_last_applied_at');
+        }
+        $servers = $q->whereNotNull('ip')
+            ->where('ip', '!=', '')
+            ->orderBy('id')
+            ->get();
+
+        $results = [];
+        $ok = 0;
+        $fail = 0;
+        $skipped = 0;
+        $attempted = 0;
+
+        foreach ($servers as $server) {
+            if (empty($server->login) || $server->password === null || $server->password === '') {
+                $skipped++;
+                $results[] = [
+                    'id' => $server->id,
+                    'name' => $server->name,
+                    'success' => false,
+                    'skipped' => true,
+                    'message' => 'Пропуск: нет SSH логина/пароля.',
+                ];
+
+                continue;
+            }
+
+            $attempted++;
+            $includeRar = (bool) $server->decoy_stub_include_123_rar;
+            $result = $this->decoyStubService->apply($server, $includeRar, $installHostNginx);
+            if ($result['success']) {
+                $ok++;
+            } else {
+                $fail++;
+            }
+            $results[] = [
+                'id' => $server->id,
+                'name' => $server->name,
+                'success' => $result['success'],
+                'skipped' => false,
+                'message' => (string) ($result['message'] ?? ''),
+            ];
+        }
+
+        $allSucceeded = ($attempted === 0 ? true : ($fail === 0));
+        $message = sprintf(
+            'Заглушка: обработано записей %d · попыток SSH %d · успех %d · ошибок %d · пропуск (нет SSH) %d.',
+            $servers->count(),
+            $attempted,
+            $ok,
+            $fail,
+            $skipped
+        );
+
+        $this->logger->info('Bulk decoy stub apply', [
+            'source' => 'server',
+            'user_id' => auth()->id(),
+            'only_configured' => $onlyConfigured,
+            'only_stub_deployed_before' => $onlyStubDeployedBefore,
+            'install_host_nginx' => $installHostNginx,
+            'summary' => compact('ok', 'fail', 'skipped', 'attempted'),
+        ]);
+
+        return response()->json([
+            'success' => $allSucceeded,
+            'message' => $message,
+            'summary' => [
+                'total' => $servers->count(),
+                'attempted' => $attempted,
+                'ok' => $ok,
+                'fail' => $fail,
+                'skipped' => $skipped,
+            ],
+            'results' => $results,
+        ]);
     }
 
     /**

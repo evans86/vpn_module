@@ -121,6 +121,16 @@
                         <i class="fas fa-tachometer-alt mr-2"></i>
                         speedtest-cli
                     </button>
+                    <button type="button" id="bulkApplyDecoyStubBtn"
+                            class="shrink-0 whitespace-nowrap inline-flex items-center px-3 py-1.5 border border-emerald-500 text-sm font-medium rounded-md shadow-sm text-emerald-900 bg-emerald-50 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+                            title="По SSH обновить Nginx-заглушку (assets, /test-speed, конфиг) на всех «Настроен», где заглушка уже применялась хотя бы раз. Опция 123.rar — из БД каждой карточки.">
+                        <i class="fas fa-mask mr-2"></i>
+                        Обновить заглушку
+                    </button>
+                    <label class="shrink-0 inline-flex items-center gap-1.5 text-xs text-gray-600 whitespace-nowrap cursor-pointer" title="Общая настройка для массового «Обновить заглушку» (как чекбокс в карточке)">
+                        <input type="checkbox" id="bulkApplyDecoyStubInstallHostNginx" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" checked>
+                        <span>Ставить nginx на хост при отсутствии</span>
+                    </label>
                     <button type="button" id="bulkRunLogUploadNowBtn"
                             class="shrink-0 whitespace-nowrap inline-flex items-center px-3 py-1.5 border border-teal-500 text-sm font-medium rounded-md shadow-sm text-teal-900 bg-teal-50 hover:bg-teal-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
                             title="На всех серверах с включённой выгрузкой логов по SSH выполнить /root/upload-logs.sh (как cron: сжатие, запись в S3, удаление исходников, при наличии контейнера — docker restart marzban).">
@@ -135,6 +145,8 @@
                     </button>
                 </div>
                 <pre id="bulkInstallSpeedtestCliOut"
+                     class="hidden mb-4 w-full text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 max-h-72 overflow-auto border border-slate-700"></pre>
+                <pre id="bulkApplyDecoyStubOut"
                      class="hidden mb-4 w-full text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 max-h-72 overflow-auto border border-slate-700"></pre>
                 <pre id="bulkRunLogUploadNowOut"
                      class="hidden mb-4 w-full text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 max-h-96 overflow-auto border border-slate-700"></pre>
@@ -1111,6 +1123,68 @@
                         }
                         if (response.success) {
                             toastr.success(response.message || 'Готово');
+                        } else {
+                            toastr.warning(response.message || 'Есть ошибки — см. лог ниже страницы');
+                        }
+                    },
+                    error: function (xhr) {
+                        var msg = 'Запрос не выполнен';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            msg = xhr.responseJSON.message;
+                        }
+                        toastr.error(msg);
+                        if (out) {
+                            out.textContent = msg;
+                        }
+                    },
+                    complete: function () {
+                        btn.prop('disabled', false);
+                    }
+                });
+            });
+
+            $('#bulkApplyDecoyStubBtn').on('click', function () {
+                var installHost = document.getElementById('bulkApplyDecoyStubInstallHostNginx');
+                var installHostVal = !installHost || installHost.checked;
+                if (!confirm('Обновить Nginx-заглушку по SSH на всех серверах со статусом «Настроен», у которых заглушка уже применялась хотя бы раз?\n\n'
+                    + 'На каждый узел по очереди: те же шаги, что кнопка «Применить/обновить» в карточке (файлы в /var/www/panel-stub, сниппет /test-speed, конфиг).\n'
+                    + 'Приманка /123.rar: из галочки в карточке каждого сервера (сохранена в БД).\n'
+                    + 'Ставить nginx на хост при отсутствии: ' + (installHostVal ? 'да' : 'нет') + '.\n\n'
+                    + 'Первое развёртывание на новой машине делайте из карточки. Может занять много времени.')) {
+                    return;
+                }
+                var btn = $(this);
+                var out = document.getElementById('bulkApplyDecoyStubOut');
+                btn.prop('disabled', true);
+                if (out) {
+                    out.classList.remove('hidden');
+                    out.textContent = 'Выполняется…';
+                }
+                $.ajax({
+                    url: '{{ route('admin.module.server.bulk-apply-decoy-stub') }}',
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        only_configured: 1,
+                        only_stub_deployed_before: 1,
+                        install_host_nginx: installHostVal ? 1 : 0
+                    },
+                    success: function (response) {
+                        var lines = [(response.message || '')];
+                        (response.results || []).forEach(function (r) {
+                            var prefix = '#' + r.id + ' ' + (r.name || '');
+                            if (r.skipped) {
+                                lines.push(prefix + ' — пропуск: ' + (r.message || ''));
+                            } else {
+                                lines.push(prefix + ' — ' + (r.success ? 'OK' : 'ошибка') + ': ' + (r.message || ''));
+                            }
+                        });
+                        if (out) {
+                            out.textContent = lines.join('\n');
+                        }
+                        if (response.success) {
+                            toastr.success(response.message || 'Готово');
+                            setTimeout(function () { window.location.reload(); }, 2500);
                         } else {
                             toastr.warning(response.message || 'Есть ошибки — см. лог ниже страницы');
                         }

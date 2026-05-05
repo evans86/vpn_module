@@ -107,8 +107,9 @@ probe_https 'DNS Google JSON (DoH заголовки)' 'https://dns.google/resol
 
 echo ""
 echo "--- speedtest (если есть в системе; иначе блок пропускается) ---"
-# Сначала speedtest-cli (apt install speedtest-cli) — то, что ставит кнопка в админке; иначе часто первым
-# попадает Ookla speedtest с другим CLI и другими флагами. Без пайпа в head: иначе SIGPIPE и ложная «ошибка».
+# 1) speedtest-cli из apt — то же имя ставит часть сборок рядом с «speedtest» (sivel / python).
+# 2) Если в PATH только speedtest — это либо Ookla (--accept-license в --help), либо оболочка sivel; флаги разные.
+# Без пайпа в sed/head: иначе SIGPIPE и ложная «ошибка» при длинном выводе.
 if command -v speedtest-cli >/dev/null 2>&1; then
   echo "  speedtest-cli (python, --simple, до ~160 с):"
   if command -v timeout >/dev/null 2>&1; then
@@ -117,11 +118,20 @@ if command -v speedtest-cli >/dev/null 2>&1; then
     env LC_ALL=C.UTF-8 speedtest-cli --simple 2>&1 || echo "  ошибка"
   fi
 elif command -v speedtest >/dev/null 2>&1; then
-  echo "  speedtest (Ookla):"
-  if command -v timeout >/dev/null 2>&1; then
-    timeout 160 speedtest --accept-license --accept-gdpr --format=human-readable 2>&1 | sed -n '1,20p' || echo "  ошибка/таймаут"
+  if speedtest --help 2>&1 | grep -Fq -- '--accept-license'; then
+    echo "  speedtest (Ookla CLI, --simple, до ~160 с):"
+    if command -v timeout >/dev/null 2>&1; then
+      timeout 160 speedtest --accept-license --accept-gdpr --simple 2>&1 || echo "  ошибка/таймаут"
+    else
+      speedtest --accept-license --accept-gdpr --simple 2>&1 || echo "  ошибка"
+    fi
   else
-    speedtest --accept-license --accept-gdpr --simple 2>&1 | sed -n '1,20p' || echo "  ошибка"
+    echo "  speedtest (python/sivel, --simple, до ~160 с):"
+    if command -v timeout >/dev/null 2>&1; then
+      timeout 160 env LC_ALL=C.UTF-8 speedtest --simple 2>&1 || echo "  ошибка или таймаут"
+    else
+      env LC_ALL=C.UTF-8 speedtest --simple 2>&1 || echo "  ошибка"
+    fi
   fi
 else
   echo "  утилиты speedtest / speedtest-cli не найдены (опционально: поставьте через пакеты ОС)."
