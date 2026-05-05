@@ -30,6 +30,9 @@ class ServerDecoyStubService
 
     private const DECOY_CADDY_MARKER = '# DECOY_STUB_ADMIN_IMPORT';
 
+    /** Каталог с несколькими HTML-лендингами (имя файла *.html). На VPS всегда заливается как index.html. */
+    private const STUB_LANDINGS_DIR = 'deploy/stub-assets/landings';
+
     /** @var string префикс: один export PATH, без if/for (совместимость с /bin/sh, без CRLF-ловушек) */
     private const DOCKER_BASH_PROLOG = <<<'SH'
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin:/usr/sbin:/sbin:/snap/bin"
@@ -46,6 +49,40 @@ SH;
     public function __construct(MarzbanService $marzbanService)
     {
         $this->marzbanService = $marzbanService;
+    }
+
+    /**
+     * Выбор статического лендинга: разные VPS получают разные шаблоны; при повторном
+     * «Применить/обновить заглушку» индекс смещается (в seed входит время прошлого успешного apply).
+     */
+    private function resolveStubLandingSourcePath(Server $server): string
+    {
+        $fallback = base_path('deploy/stub-assets/index.html');
+        $dir = base_path(self::STUB_LANDINGS_DIR);
+        if (! is_dir($dir)) {
+            return $fallback;
+        }
+        /** @var list<string|false> $glob */
+        $glob = glob($dir.DIRECTORY_SEPARATOR.'*.html', GLOB_NOSORT);
+        $files = [];
+        foreach ($glob as $p) {
+            if ($p !== false && is_readable($p)) {
+                $files[] = $p;
+            }
+        }
+        sort($files, SORT_STRING);
+        if ($files === []) {
+            return $fallback;
+        }
+
+        $salt = '0';
+        if ($server->decoy_stub_last_applied_at !== null) {
+            $salt = (string) $server->decoy_stub_last_applied_at->getTimestamp();
+        }
+        $n = count($files);
+        $pick = abs(crc32((string) $server->id.'|'.(string) $server->ip.'|'.$salt)) % $n;
+
+        return $files[$pick];
     }
 
     /**
@@ -135,10 +172,10 @@ INSTALL;
             return ['success' => false, 'message' => 'Не задан IP сервера.'];
         }
 
-        $indexPath = base_path('deploy/stub-assets/index.html');
+        $indexPath = $this->resolveStubLandingSourcePath($server);
         $nginxPath = base_path('deploy/nginx/panel-stub.default-server.conf');
         if (! is_readable($indexPath) || ! is_readable($nginxPath)) {
-            return ['success' => false, 'message' => 'В проекте нет deploy/stub-assets/index.html или deploy/nginx/panel-stub.default-server.conf.'];
+            return ['success' => false, 'message' => 'В проекте нет читаемой заглушки (deploy/stub-assets/index.html или landings/*.html) или deploy/nginx/panel-stub.default-server.conf.'];
         }
 
         $server->decoy_stub_include_123_rar = $include123Rar;
@@ -268,7 +305,11 @@ INSTALL;
             $server->decoy_stub_test_speed_token = $tokenForDb;
             $server->save();
 
-            Log::info('Decoy stub applied', ['server_id' => $server->id, 'include_123' => $include123Rar]);
+            Log::info('Decoy stub applied', [
+                'server_id' => $server->id,
+                'include_123' => $include123Rar,
+                'landing_source' => basename($indexPath),
+            ]);
 
             $this->provisionNote = '';
 

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="AuroraMetric — аналитика потоков и отчётность для растущих команд. Прозрачные дашборды без лишней бюрократии.">
+  <meta name="theme-color" content="#1e1033">
+  <title>AuroraMetric — умные дашборды для живых процессов</title>
+  <style>
+    :root { --bg: #12081f; --card: rgba(255,255,255,.06); --text: #f4f0ff; --muted: #b9a8d9; --accent: #8b5cf6; --accent2: #22d3ee; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, "Segoe UI", Roboto, sans-serif; background: radial-gradient(1200px 600px at 10% -10%, #2e1068 0%, transparent 55%), radial-gradient(900px 500px at 100% 20%, #0c4a6e 0%, transparent 50%), var(--bg); color: var(--text); line-height: 1.65; }
+    a { color: var(--accent2); }
+    header { padding: 4rem 1.5rem 3rem; max-width: 1100px; margin: 0 auto; }
+    .badge { display: inline-block; font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; padding: .35rem .75rem; border-radius: 999px; background: var(--card); border: 1px solid rgba(255,255,255,.12); color: var(--muted); }
+    h1 { font-size: clamp(2rem, 5vw, 3.1rem); line-height: 1.12; margin: 1rem 0; font-weight: 800; letter-spacing: -.03em; }
+    .lead { font-size: 1.2rem; color: var(--muted); max-width: 38rem; }
+    .cta-row { margin-top: 2rem; display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+    .btn { display: inline-flex; align-items: center; gap: .5rem; padding: .85rem 1.4rem; border-radius: .75rem; font-weight: 600; text-decoration: none; border: none; cursor: default; }
+    .btn-primary { background: linear-gradient(135deg, var(--accent), #6366f1); color: #fff; }
+    .btn-ghost { background: transparent; color: var(--text); border: 1px solid rgba(255,255,255,.2); }
+    section { padding: 3rem 1.5rem; max-width: 1100px; margin: 0 auto; }
+    .grid { display: grid; gap: 1.25rem; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .card { background: var(--card); border: 1px solid rgba(255,255,255,.1); border-radius: 1rem; padding: 1.5rem; backdrop-filter: blur(8px); }
+    .card h3 { margin: 0 0 .5rem; font-size: 1.15rem; }
+    .card p { margin: 0; color: var(--muted); font-size: .95rem; }
+    .stats { display: flex; flex-wrap: wrap; gap: 2rem; margin-top: 2rem; }
+    .stat strong { display: block; font-size: 2rem; font-weight: 800; background: linear-gradient(90deg, #c4b5fd, #67e8f9); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .stat span { color: var(--muted); font-size: .85rem; }
+    .quote { border-left: 4px solid var(--accent); padding-left: 1.25rem; margin: 2rem 0; color: var(--muted); font-style: italic; }
+    footer { padding: 3rem 1.5rem 4rem; border-top: 1px solid rgba(255,255,255,.08); margin-top: 2rem; color: var(--muted); font-size: .9rem; text-align: center; }
+    .fine { opacity: .75; font-size: .8rem; max-width: 40rem; margin: 2rem auto 0; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="badge">Платформа аналитики</span>
+    <h1>Меньше таблиц в почте — больше ясности в решениях</h1>
+    <p class="lead">AuroraMetric собирает разрозненные метрики в спокойные дашборды: вы видите темп, качество сервиса и деньги без «ещё один отчёт в Excel». Подходит командам 15–250 человек.</p>
+    <div class="cta-row">
+      <span class="btn btn-primary">Запросить демо (скоро)</span>
+      <span class="btn btn-ghost">Смотреть шаблоны отчётов</span>
+    </div>
+    <div class="stats">
+      <div class="stat"><strong>−38%</strong><span>меньше ручной сводки времени цикла</span></div>
+      <div class="stat"><strong>4.8</strong><span>удобство для аналитиков (опрос команд)</span></div>
+      <div class="stat"><strong>24 цвета</strong><span>тем оформления из коробки</span></div>
+    </div>
+  </header>
+  <section>
+    <h2 style="font-size:1.6rem;margin:0 0 1rem">Почему нас выбирают вместо «ещё одного BI»</h2>
+    <div class="grid">
+      <div class="card"><h3>Поток данных без хаоса</h3><p>Встроенные коннекторы к складам продаж и CI — без «выгружай CSV и молись». SLA на доставку сырья в модель понятен с первого экрана.</p></div>
+      <div class="card"><h3>Роли без дубля</h3><p>Владельцы процессов настраивают видимость: юристы видят аудит-трейсы, финансы — маржинальность без чужих KPI.</p></div>
+      <div class="card"><h3>История изменений политик</h3><p>Когда меняются пороговые значения SLA, сохраняется кто попросил правку и зачем — дисциплина без скуки.</p></div>
+      <div class="card"><h3>Спокойные отчётные срезы</h3><p>Воронки недели можно снимать локально перед совещанием; тяжёлые rollup — по ночному расписанию.</p></div>
+    </div>
+    <p class="quote">«Мы наконец-то объяснили руководству, почему задерживается выпуск каждое второе понедельник — не эмодзи, а срезы доставки». — технический директор e-commerce-сети «Северный склад».</p>
+  </section>
+  <section>
+    <h2 style="font-size:1.6rem;margin:0 0 1rem">Как мы выстраиваем внедрение</h2>
+    <p style="color:var(--muted);max-width:46rem;margin:0 0 1.5rem;">Пилот ограничен одной доменной зоной: например поддержка клиентов и логистика. За два спринта команда понимает, какие KPI реально нужны топ-менеджменту, а какие — философия «чтобы висело красиво».</p>
+    <div class="grid">
+      <div class="card"><h3>Недели 1–2</h3><p>Согласование наборов метрик и прав доступа, подключение тестовых витрин.</p></div>
+      <div class="card"><h3>Недели 3–4</h3><p>Инлайн-сверка данных с финансовыми узлами, настройка уведомлений и чек-поинтов.</p></div>
+      <div class="card"><h3>Потом</h3><p>Расширение на производственные блоки после фиксации baseline и шаблонов ревью.</p></div>
+    </div>
+    <p class="fine">AuroraMetric — вымышленный продуктовый набросок для демонстрации нейтрального лендинга. Здесь нет регистрации и сокращённых финансовых показателей; контент создан как образец «живого» корпоративного описания услуги.</p>
+  </section>
+  <footer>
+    AuroraMetric · демонстрационная маркетинговая страница · связь только через вашу официальную админ-систему
+  </footer>
+</body>
+</html>

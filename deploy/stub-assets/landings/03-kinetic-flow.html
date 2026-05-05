@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Kinetic Flow — мобильное сопровождение тренировок с акцентом на мобильность суставов и осознанную нагрузку без культа «боль = прогресс».">
+  <meta name="theme-color" content="#0f766e">
+  <title>Kinetic Flow — движение без гонки за PR</title>
+  <style>
+    :root { --bg: #f0fdfa; --text: #134e4a; --accent: #0d9488; --dark: #042f2e; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+    .band { background: linear-gradient(120deg, var(--dark), #115e59 60%, #0f766e); color: #ecfdf5; padding: 3.5rem 1.5rem 4rem; }
+    .inner { max-width: 960px; margin: 0 auto; }
+    h1 { font-size: clamp(2rem, 4.5vw, 2.85rem); margin: 0 0 1rem; font-weight: 800; letter-spacing: -.02em; }
+    .tagline { font-size: 1.15rem; opacity: .92; max-width: 36rem; line-height: 1.55; }
+    .pill { display: inline-block; background: rgba(255,255,255,.12); padding: .25rem .75rem; border-radius: 999px; font-size: .75rem; margin-bottom: .75rem; }
+    main { padding: 2.5rem 1.5rem 4rem; max-width: 960px; margin: 0 auto; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start; }
+    @media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
+    h2 { font-size: 1.45rem; margin: 0 0 1rem; color: var(--dark); }
+    p { line-height: 1.7; margin: 0 0 1rem; }
+    .chart { background: #fff; border-radius: 1rem; padding: 1.5rem; box-shadow: 0 12px 40px rgba(15,118,110,.12); border: 1px solid #ccfbf1; }
+    .bar { height: 10px; border-radius: 5px; background: #99f6e4; margin: .75rem 0; overflow: hidden; }
+    .bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), #2dd4bf); width: 72%; }
+    .bar.b2 > i { width: 58%; }
+    .bar.b3 > i { width: 88%; }
+    .list { list-style: none; padding: 0; margin: 1.5rem 0 0; }
+    .list li { padding: .85rem 0; border-bottom: 1px solid #ccfbf1; display: flex; gap: .75rem; align-items: flex-start; }
+    .list li::before { content: "✓"; color: var(--accent); font-weight: 800; flex-shrink: 0; }
+    footer { text-align: center; padding: 2rem; color: #5eead4; background: var(--dark); font-size: .85rem; }
+    .discl { font-size: .82rem; color: #5b7c79; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <div class="band">
+    <div class="inner">
+      <span class="pill">Коучинг движения · 2026</span>
+      <h1>Тело не проект с дедлайном — это ежедневный прототип</h1>
+      <p class="tagline">Kinetic Flow помогает людям с графиком «код + перелёты» вернуть подвижность без ощущения вины. Мы строим планы вокруг сна, шагов и силы, а не вокруг зеркал в соцсетях.</p>
+    </div>
+  </div>
+  <main>
+    <div class="row">
+      <div>
+        <h2>Что вы получаете за 12 недель</h2>
+        <p>Три фазы: стабилизация дыхания и шеи, базовая сила с акцентом на таз, интеграция кардио без перегрева. Каждую пятницу — короткий аудио-разбор того, что пошло не так, без мотивационных клише.</p>
+        <ul class="list">
+          <li>Персональные подсказки по разминке перед долгими сессиями за столом.</li>
+          <li>Мягкие напоминания о воде и свете (если вы сами их включите).</li>
+          <li>Доступ к библиотеке мобильности вместо бесконечных « challenge » в ленте.</li>
+        </ul>
+      </div>
+      <div class="chart">
+        <h2 style="font-size:1.1rem;color:var(--accent);margin-top:0;">Индекс комфорта (учебный)</h2>
+        <p style="font-size:.88rem;color:#578f8c;margin:0 0 1rem;">Демонстрационный график — не медицинский показатель.</p>
+        <div>Сон восстановление<div class="bar"><i></i></div></div>
+        <div>Суставы утром<div class="bar b2"><i></i></div></div>
+        <div>Стабильность позвоночника<div class="bar b3"><i></i></div></div>
+      </div>
+    </div>
+    <p class="discl">Kinetic Flow — вымышленный сервис. Никакая диагностика и платные услуги через эту статическую страницу не предлагаются. Перед изменением нагрузок консультируйтесь со специалистами.</p>
+  </main>
+  <footer>
+    Kinetic Flow · образец лендинга · не является медицинским изделием или приложением
+  </footer>
+</body>
+</html>

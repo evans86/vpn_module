@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Nebula Glitch Works — микро-студия нарратива и геймдизайна для пиксельных и low-poly проектов с атмосферой научной фантастики 90-х.">
+  <meta name="theme-color" content="#020617">
+  <title>Nebula Glitch Works — игры с заботой про светотень</title>
+  <style>
+    :root { --void: #020617; --neon: #22d3ee; --pink: #f472b6; --lime: #a3e635; text-rendering: optimizeLegibility; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--void); color: #e2e8f0; font-family: ui-sans-serif, system-ui, sans-serif; line-height: 1.6; }
+    .scan { background: linear-gradient(rgba(34,211,238,.05) 1px, transparent 1px); background-size: 100% 3px; min-height: 100vh; }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 3rem 1.25rem 4rem; }
+    .logo-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; }
+    .orbit { width: 48px; height: 48px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, var(--neon), transparent 65%), radial-gradient(circle at 70% 80%, var(--pink), transparent 55%), var(--void); border: 2px solid rgba(148,163,184,.4); animation: pulse 3s ease-in-out infinite alternate; }
+    @keyframes pulse { from { box-shadow: 0 0 0 0 rgba(34,211,238,.3); } to { box-shadow: 0 0 24px 2px rgba(244,114,182,.25); } }
+    @media (prefers-reduced-motion: reduce) { .orbit { animation: none; } }
+    h1 { font-size: clamp(1.85rem, 4vw, 2.65rem); margin: 0; letter-spacing: -.02em; text-shadow: 0 0 40px rgba(34,211,238,.35); }
+    .subtitle { margin: .75rem 0 2rem; color: #94a3b8; font-size: 1.05rem; }
+    .deck { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); margin: 2rem 0; }
+    .card { border: 1px solid rgba(148,163,184,.35); border-radius: .85rem; padding: 1.25rem; background: rgba(15,23,42,.65); backdrop-filter: blur(6px); }
+    .card h2 { margin: 0 0 .5rem; font-size: 1.05rem; color: var(--lime); letter-spacing: .04em; text-transform: uppercase; }
+    .card p { margin: 0; color: #cbd5e1; font-size: .92rem; }
+    .ribbon { overflow: hidden; white-space: nowrap; border-block: 1px solid rgba(148,163,184,.22); padding: .75rem 0; margin: 2rem 0; font-family: ui-monospace, monospace; font-size: .82rem; color: #64748b; }
+    .ribbon span { display: inline-block; padding-right: 3rem; animation: scroll 18s linear infinite; }
+    @keyframes scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    @media (prefers-reduced-motion: reduce) { .ribbon span { animation: none; } }
+    .long { columns: 1; }
+    @media (min-width: 640px) { .long { columns: 2; gap: 2rem; } }
+    .long p { margin: 0 0 1rem; break-inside: avoid; font-size: .95rem; color: #94a3b8; }
+    footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid rgba(148,163,184,.22); font-size: .82rem; color: #64748b; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="scan">
+    <div class="wrap">
+      <div class="logo-row"><div class="orbit" aria-hidden="true"></div><div><div style="font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.15em">Indie coalition</div><div style="font-weight:700">Nebula Glitch Works</div></div></div>
+      <h1>Сюжеты, которые живут между двумя сейв-поинтами</h1>
+      <p class="subtitle">Мы режиссируем миры там, где пиксель — язык эмоции, а камера узнавает страх через шум CRT. Одна экспериментальная билд-линия каждый квартал, без давления Kickstarter.</p>
+      <div class="deck">
+        <div class="card"><h2>Signal Lost</h2><p>Вертикальный шутер-слэш про станцию наблюдения за чёрными дырами. Три акта про подпись главного инженера и шёпот сенсора.</p></div>
+        <div class="card"><h2>Park Row</h2><p>Стелс-хоррор без прыганья: вы — ночная дежурная в парке с фонариком и недотёпой патрульным.</p></div>
+        <div class="card"><h2>Side B</h2><p>Визуальная новелла-коллаж про подростков и магнитофоны на кассете; музыку пишут друзья из реальной группы.</p></div>
+      </div>
+      <div class="ribbon" aria-hidden="true"><span>BUILD · 0x7F3 · no lootboxes · coop remote · CRT safe mode · shaders optional · рус / eng · локальные сохранения · neon dreams · BUILD · 0x7F3 · no lootboxes · coop remote ·</span></div>
+      <div class="long">
+        <p>Внутри маленькой студии главное — понимать предел железа любителей. Мы режем фичи добровольно, но не резем отношения с тестерами: каждая альфа сопровождается коротким журналом «что сломалось по-честному».</p>
+        <p>Наш процесс питчей отталкивается от одного заглавного кадра и одной аудиофразы уровня 12 секунд. Если они не живут параллельно, идею откладываем — индустрия и без нас переполнена сиренами.</p>
+        <p>Безопасное пространство для команды: никто не записывает «мотивацию» перед дедлайном. Работа ночью — по желанию, не по приказу.</p>
+        <p>Все упомянутые проекты и студия являются художественной вымышленностью данной статической заглушки. Нельзя покупать игры и DLC по этому URL.</p>
+      </div>
+      <footer>Nebula Glitch Works · демонстрационная страница · не официальный магазин</footer>
+    </div>
+  </div>
+</body>
+</html>

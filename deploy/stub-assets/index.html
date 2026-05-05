@@ -3,17 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Сервер</title>
+  <meta name="description" content="Нейтральная заглушка веб-сервера. При развёртывании из панели обычно подставляется один из расширенных лендингов из каталога landings/.">
+  <title>Веб-сервер — заглушка</title>
   <style>
-    body { font-family: ui-monospace, "Cascadia Code", "Consolas", monospace; margin: 0; padding: 1.5rem; color: #222; background: #fafafa; }
+    body { font-family: ui-monospace, "Cascadia Code", "Consolas", monospace; margin: 0; padding: 1.5rem; color: #222; background: #fafafa; max-width: 52rem; }
     a { color: #0b57d0; text-decoration: none; }
     a:hover { text-decoration: underline; }
-    .tree { margin: 0; font-size: 0.95rem; line-height: 1.5; white-space: pre; tab-size: 2; }
+    .tree { margin: 0 0 1rem; font-size: 0.95rem; line-height: 1.5; white-space: pre; tab-size: 2; }
+    .note { font-size: 0.88rem; color: #555; line-height: 1.5; margin-top: 1rem; }
   </style>
 </head>
 <body>
 <pre class="tree">.
-├── <a href="/">index.html</a>
+├── <a href="/">index.html</a>   (минимальная версия; в пакете есть landings/*.html)
 └── <a href="/123.rar">123.rar</a></pre>
+<p class="note">Если заглушка развёрнута через приложение-панель, файл index.html обычно заменён на один из более «говорящих» шаблонов из deploy/stub-assets/landings/ — они отличаются по серверам и обновлению конфигурации.</p>
 </body>
 </html>
