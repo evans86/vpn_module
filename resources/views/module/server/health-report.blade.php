@@ -44,30 +44,6 @@
                     <pre id="fleetClassifyOut" class="hidden text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 overflow-x-auto max-h-64 overflow-y-auto mt-3"></pre>
                 </div>
             </div>
-
-            <div id="fleetBrowserPanel" class="hidden mt-4 rounded-md border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-sm">
-                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-                    <div class="text-xs font-semibold text-indigo-950">Сеть (ваш браузер)</div>
-                    <button type="button" id="copyBrowserBlockBtn" class="hidden shrink-0 text-xs px-2.5 py-1 rounded-md border border-indigo-300 bg-white text-indigo-900 hover:bg-indigo-50">
-                        Копировать блок
-                    </button>
-                </div>
-                <div id="fleetBrowserBody" class="text-slate-800 font-mono text-xs whitespace-pre-wrap break-words max-h-80 overflow-y-auto"></div>
-            </div>
-
-            <div id="globalProbePanel" class="hidden mt-4 rounded-md border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-sm">
-                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-                    <div class="text-xs font-semibold text-indigo-950">Результат: с хоста Laravel (ICMP + HTTPS по целям выше)</div>
-                    <button type="button" id="copyGlobalProbeBtn" class="hidden shrink-0 text-xs px-2.5 py-1 rounded-md border border-indigo-300 bg-white text-indigo-900 hover:bg-indigo-50">
-                        Копировать блок
-                    </button>
-                </div>
-                <div id="globalProbeBody" class="text-slate-800 space-y-2 font-mono text-xs"></div>
-                <div id="fleetSummaryHeading" class="hidden text-xs font-semibold text-indigo-950 mt-3 pt-3 border-t border-indigo-200/80 mb-2">
-                    Итоги по узлам VPS
-                </div>
-                <div id="fleetSummary" class="hidden grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 text-sm"></div>
-            </div>
         </x-admin.card>
 
         <x-admin.card title="Проверка">
@@ -91,25 +67,50 @@
                     Копировать
                 </button>
             </div>
-            <p id="checkStatus" class="text-sm text-slate-700 mb-3 min-h-[1.375rem]"></p>
-            <textarea id="fullReport" readonly rows="20"
-                      class="w-full font-mono text-sm text-slate-800 border border-slate-300 rounded-md p-3 bg-slate-50 mb-6"></textarea>
+            <p id="checkStatus" class="text-sm text-slate-700 mb-2 min-h-[1.375rem]"></p>
+            <p id="fleetCopyNotice" class="text-sm min-h-[1.375rem] mb-3 transition-colors duration-150" role="status" aria-live="polite"></p>
 
-            <div id="fleetTableCard" class="hidden border border-slate-200 rounded-md overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50 text-slate-800">
-                    <tr>
-                        <th class="px-2 py-2 text-left font-medium">#</th>
-                        <th class="px-2 py-2 text-left font-medium">Имя / IP</th>
-                        <th class="px-2 py-2 text-left font-medium">HTTP</th>
-                        <th class="px-2 py-2 text-left font-medium">HTTPS</th>
-                        <th class="px-2 py-2 text-left font-medium">Заглушка БД</th>
-                        <th class="px-2 py-2 text-left font-medium">/123.rar</th>
-                        <th class="px-2 py-2 text-left font-medium">/test-speed <span class="font-normal text-slate-500">(скорость)</span></th>
-                    </tr>
-                    </thead>
-                    <tbody id="fleetTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
-                </table>
+            <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800 space-y-4">
+                <div class="font-medium text-slate-900">Результат проверки серверов и сети</div>
+                <p class="text-xs text-slate-600 -mt-2">Формат такой же, как у блока «Эвристика» выше: сводка, затем полный текст и таблица по узлам.</p>
+
+                <div id="globalProbePanel" class="hidden rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <div class="text-xs font-semibold text-slate-900">С хоста Laravel: панели и домены (ICMP / HTTPS)</div>
+                        <button type="button" id="copyGlobalProbeBtn" class="hidden shrink-0 text-xs px-2.5 py-1 rounded-md border border-slate-300 bg-white text-slate-800 hover:bg-slate-50">
+                            Копировать блок
+                        </button>
+                    </div>
+                    <div id="globalProbeBody" class="text-slate-800 space-y-2 font-mono text-xs"></div>
+                </div>
+
+                <div>
+                    <div class="text-xs font-medium text-slate-700 mb-1">Полный текстовый отчёт</div>
+                    <textarea id="fullReport" readonly rows="18"
+                              class="w-full font-mono text-sm text-slate-800 border border-slate-200 rounded-md p-3 bg-white"></textarea>
+                </div>
+
+                <div id="fleetSummaryHeading" class="hidden text-xs font-semibold text-slate-900 border-t border-slate-200 pt-3 mb-2">
+                    Итоги по узлам VPS
+                </div>
+                <div id="fleetSummary" class="hidden grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 text-sm"></div>
+
+                <div id="fleetTableCard" class="hidden border border-slate-200 rounded-md overflow-x-auto bg-white">
+                    <table class="min-w-full divide-y divide-slate-200 text-sm">
+                        <thead class="bg-slate-50 text-slate-800">
+                        <tr>
+                            <th class="px-2 py-2 text-left font-medium">#</th>
+                            <th class="px-2 py-2 text-left font-medium">Имя / IP</th>
+                            <th class="px-2 py-2 text-left font-medium">HTTP</th>
+                            <th class="px-2 py-2 text-left font-medium">HTTPS</th>
+                            <th class="px-2 py-2 text-left font-medium">Заглушка БД</th>
+                            <th class="px-2 py-2 text-left font-medium">/123.rar</th>
+                            <th class="px-2 py-2 text-left font-medium">/test-speed <span class="font-normal text-slate-500">(скорость)</span></th>
+                        </tr>
+                        </thead>
+                        <tbody id="fleetTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
+                    </table>
+                </div>
             </div>
         </x-admin.card>
     </div>
@@ -124,6 +125,7 @@
                 var btn = document.getElementById('runCheckBtn');
                 var chk = document.getElementById('includeTestSpeed');
                 var st = document.getElementById('checkStatus');
+                var copyNotice = document.getElementById('fleetCopyNotice');
                 var ta = document.getElementById('fullReport');
                 var saveBtn = document.getElementById('saveReportTxt');
                 var copyBtn = document.getElementById('copyReportBtn');
@@ -134,16 +136,30 @@
                 var gpBody = document.getElementById('globalProbeBody');
                 var gpCopyBtn = document.getElementById('copyGlobalProbeBtn');
                 var fleetSummaryHeading = document.getElementById('fleetSummaryHeading');
-                var browserPanel = document.getElementById('fleetBrowserPanel');
-                var browserBody = document.getElementById('fleetBrowserBody');
-                var browserCopyBtn = document.getElementById('copyBrowserBlockBtn');
                 var meta = document.querySelector('meta[name="csrf-token"]');
                 var csrf = meta ? meta.getAttribute('content') : '';
                 var fleetCachedGlobalProbes = null;
                 var fleetCachedGlobalText = '';
                 var fleetReportStartedAt = '';
                 var fleetLastMergedSummary = null;
-                var fleetCachedBrowserText = '';
+                var copyNoticeTimer = null;
+
+                /** Сообщение под кнопками: скопировано / ошибка (не смешиваем с фазами «Загрузка…»). */
+                function flashCopyNotice(message, ok) {
+                    if (!copyNotice) return;
+                    if (copyNoticeTimer) {
+                        clearTimeout(copyNoticeTimer);
+                        copyNoticeTimer = null;
+                    }
+                    copyNotice.textContent = message;
+                    copyNotice.className = 'text-sm min-h-[1.375rem] mb-3 font-medium '
+                        + (ok ? 'text-emerald-700' : 'text-rose-700');
+                    copyNoticeTimer = setTimeout(function () {
+                        copyNotice.textContent = '';
+                        copyNotice.className = 'text-sm min-h-[1.375rem] mb-3 transition-colors duration-150';
+                        copyNoticeTimer = null;
+                    }, 4000);
+                }
 
                 /** Надёжное копирование: Clipboard API может отказать (YaBrowser и др.) → execCommand со скрытым textarea */
                 function copyViaExecCommand(text) {
@@ -482,18 +498,17 @@
                     if (!gp || typeof gp !== 'object') {
                         gpPanel.classList.add('hidden');
                         if (gpCopyBtn) gpCopyBtn.classList.add('hidden');
-                        if (fleetSummaryHeading) fleetSummaryHeading.classList.add('hidden');
                         return;
                     }
                     var icmp = gp.icmp_cli_available ? 'ICMP (ping): доступен' : 'ICMP: только HTTPS (ОС/права)';
                     var div0 = document.createElement('div');
-                    div0.className = 'text-indigo-900/90';
+                    div0.className = 'text-slate-800';
                     div0.textContent = icmp;
                     gpBody.appendChild(div0);
                     if (gp.meta) {
                         var m = gp.meta;
                         var dm = document.createElement('div');
-                        dm.className = 'text-indigo-950/90 mt-1';
+                        dm.className = 'text-slate-800 mt-1';
                         dm.textContent = 'Целей: панели ' + (m.panels_target_count != null ? m.panels_target_count : '—')
                             + ', домены ' + (m.our_domains_target_count != null ? m.our_domains_target_count : '—')
                             + (m.merge_panels_from_db ? ' · +БД панелей' : '')
@@ -515,7 +530,7 @@
                         }
                         list.forEach(function (row) {
                             var line = document.createElement('div');
-                            line.className = 'pl-1 border-l-2 border-indigo-200 ml-0.5';
+                            line.className = 'pl-1 border-l-2 border-slate-300 ml-0.5';
                             var https = row.https || {};
                             var ic = row.icmp_ms != null ? ('~' + row.icmp_ms + ' мс') : (row.icmp_error || '—');
                             line.innerHTML = esc(row.raw || '') + ': ICMP ' + esc(String(ic))
@@ -675,10 +690,14 @@
                     if (fleetSummaryHeading) fleetSummaryHeading.classList.add('hidden');
                     if (gpCopyBtn) gpCopyBtn.classList.add('hidden');
                     fleetLastMergedSummary = null;
-                    fleetCachedBrowserText = '';
-                    if (browserBody) browserBody.textContent = '';
-                    if (browserCopyBtn) browserCopyBtn.classList.add('hidden');
-                    if (browserPanel) browserPanel.classList.add('hidden');
+                    if (copyNotice) {
+                        copyNotice.textContent = '';
+                        copyNotice.className = 'text-sm min-h-[1.375rem] mb-3 transition-colors duration-150';
+                    }
+                    if (copyNoticeTimer) {
+                        clearTimeout(copyNoticeTimer);
+                        copyNoticeTimer = null;
+                    }
                     if (gpPanel) gpPanel.classList.add('hidden');
                     fleetCachedGlobalProbes = null;
                     fleetCachedGlobalText = '';
@@ -725,10 +744,6 @@
                         var g = null;
                         setPhase('Сеть (браузер)…');
                         var part1 = await buildBrowserReport(setPhase);
-
-                        if (browserPanel) browserPanel.classList.remove('hidden');
-                        if (browserCopyBtn) browserCopyBtn.classList.remove('hidden');
-                        if (browserBody) browserBody.textContent = part1;
 
                         var part2 = '';
                         var includeTs = !!chk.checked;
@@ -817,7 +832,6 @@
                             }
                         }
 
-                        applyFleetBrowserBannerShell(part1, part2);
                         ta.value = part1 + part2;
                         if (fleetReportSuccess) {
                             setPhase('Готово.');
@@ -852,66 +866,21 @@
 
                 copyBtn.addEventListener('click', function () {
                     if (!ta.value) return;
-                    var prev = st.textContent;
                     writeClipboard(ta.value).then(function () {
-                        /* ok — без лишних сообщений */
+                        flashCopyNotice('Скопировано: полный отчёт в буфере обмена.', true);
                     }).catch(function () {
-                        st.textContent = 'Не удалось скопировать полный отчёт (буфер обмена).';
-                        setTimeout(function () {
-                            if (st.textContent === 'Не удалось скопировать полный отчёт (буфер обмена).') {
-                                st.textContent = prev;
-                            }
-                        }, 4000);
+                        flashCopyNotice('Не удалось скопировать отчёт. Попробуйте выделить текст вручную в поле ниже.', false);
                     });
                 });
 
-                function applyFleetBrowserBannerShell(part1Raw, part2Raw) {
-                    var sepBlk = '\n\n' + '='.repeat(72) + '\n\n';
-                    var vpsHdr = '=== Узлы VPS (хост панели) ===';
-                    var p2 = part2Raw || '';
-                    if (p2.indexOf('=== Узлы VPS ===') !== -1 && p2.indexOf('хост панели') === -1) {
-                        vpsHdr = '=== Узлы VPS ===';
-                    }
-                    fleetCachedBrowserText = part1Raw + sepBlk + vpsHdr + '\n';
-                    if (browserBody) browserBody.textContent = fleetCachedBrowserText;
-                }
-
-                if (browserCopyBtn) {
-                    browserCopyBtn.addEventListener('click', function () {
-                        var prev = st.textContent;
-                        var payload = fleetCachedBrowserText || (browserBody && browserBody.textContent) || '';
-                        writeClipboard(payload)
-                            .then(function () {
-                                st.textContent = 'Блок «Сеть (ваш браузер)» скопирован в буфер обмена.';
-                            })
-                            .catch(function () {
-                                st.textContent = 'Не удалось скопировать блок браузера.';
-                            })
-                            .finally(function () {
-                                setTimeout(function () {
-                                    if (st.textContent !== prev && (st.textContent.indexOf('скопирован') !== -1 || st.textContent.indexOf('Не удалось') === 0)) {
-                                        st.textContent = prev;
-                                    }
-                                }, 2800);
-                            });
-                    });
-                }
                 if (gpCopyBtn) {
                     gpCopyBtn.addEventListener('click', function () {
-                        var prev = st.textContent;
                         writeClipboard(buildGlobalProbeClipboardText())
                             .then(function () {
-                                st.textContent = 'Блок Laravel (пробы + сводка) скопирован в буфер обмена.';
+                                flashCopyNotice('Скопировано: блок Laravel (пробы и сводка по узлам).', true);
                             })
                             .catch(function () {
-                                st.textContent = 'Не удалось скопировать блок Laravel.';
-                            })
-                            .finally(function () {
-                                setTimeout(function () {
-                                    if (st.textContent !== prev) {
-                                        st.textContent = prev;
-                                    }
-                                }, 2800);
+                                flashCopyNotice('Не удалось скопировать блок Laravel.', false);
                             });
                     });
                 }
