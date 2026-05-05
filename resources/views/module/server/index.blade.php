@@ -407,13 +407,13 @@
                                             </button>
                                         @endif
                                         @if(!$server->logs_upload_enabled)
-                                            <button type="button" onclick="enableLogUpload({{ $server->id }}, false, @json($server->name ?: 'Сервер #'.$server->id))"
+                                            <button type="button" onclick='enableLogUpload({{ $server->id }}, false, @json($server->name ?: 'Сервер #'.$server->id))'
                                                     class="inline-flex flex-1 min-w-[min(100%,10rem)] basis-[calc(50%-0.25rem)] max-w-full items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors">
                                                 <i class="fas fa-upload mr-2"></i>
                                                 <span>Включить логи</span>
                                             </button>
                                         @else
-                                            <button type="button" onclick="enableLogUpload({{ $server->id }}, true, @json($server->name ?: 'Сервер #'.$server->id))"
+                                            <button type="button" onclick='enableLogUpload({{ $server->id }}, true, @json($server->name ?: 'Сервер #'.$server->id))'
                                                     title="Заново записать /root/upload-logs.sh, ключи в ~/.s3cfg и строку cron (как при первом включении, с актуальным бакетом из .env)."
                                                     class="inline-flex flex-1 min-w-[min(100%,10rem)] basis-[calc(50%-0.25rem)] max-w-full items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-sky-800 bg-sky-50 hover:bg-sky-100 border border-sky-300 transition-colors">
                                                 <i class="fas fa-sync-alt mr-2"></i>
