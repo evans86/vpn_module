@@ -297,30 +297,30 @@
             var btnDownload = document.getElementById('btn-download-report');
             if (btnDownload) {
                 btnDownload.addEventListener('click', function () {
-                    if (!lastTransferReport.length) return;
-                    var headers = ['key_activate_id', 'server_user_id', 'traffic_limit_mb', 'traffic_limit_bytes', 'expire_date', 'finish_at', 'user_tg_id'];
-                    var rows = [headers.join(',')];
-                    lastTransferReport.forEach(function (r) {
-                        rows.push([
-                            (r.key_activate_id || '').replace(/"/g, '""'),
-                            (r.server_user_id || '').replace(/"/g, '""'),
-                            r.traffic_limit_mb != null ? r.traffic_limit_mb : '',
-                            r.traffic_limit_bytes != null ? r.traffic_limit_bytes : '',
-                            (r.expire_date || '').replace(/"/g, '""'),
-                            r.finish_at != null ? r.finish_at : '',
-                            r.user_tg_id != null ? r.user_tg_id : ''
+            if (!lastTransferReport.length) return;
+            var headers = ['key_activate_id', 'server_user_id', 'traffic_limit_mb', 'traffic_limit_bytes', 'expire_date', 'finish_at', 'user_tg_id'];
+            var rows = [headers.join(',')];
+            lastTransferReport.forEach(function (r) {
+                rows.push([
+                    (r.key_activate_id || '').replace(/"/g, '""'),
+                    (r.server_user_id || '').replace(/"/g, '""'),
+                    r.traffic_limit_mb != null ? r.traffic_limit_mb : '',
+                    r.traffic_limit_bytes != null ? r.traffic_limit_bytes : '',
+                    (r.expire_date || '').replace(/"/g, '""'),
+                    r.finish_at != null ? r.finish_at : '',
+                    r.user_tg_id != null ? r.user_tg_id : ''
                         ].map(function (cell) {
                             return typeof cell === 'string' && (cell.indexOf(',') >= 0 || cell.indexOf('"') >= 0) ? '"' + cell + '"' : cell;
                         }).join(','));
-                    });
-                    var csv = '\uFEFF' + rows.join('\r\n');
-                    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-                    var a = document.createElement('a');
-                    a.href = URL.createObjectURL(blob);
-                    a.download = 'mass-transfer-report-' + new Date().toISOString().slice(0, 10) + '.csv';
-                    a.click();
-                    URL.revokeObjectURL(a.href);
-                });
+            });
+            var csv = '\uFEFF' + rows.join('\r\n');
+            var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'mass-transfer-report-' + new Date().toISOString().slice(0, 10) + '.csv';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        });
             }
 
             function readBatchSize() {
@@ -377,34 +377,34 @@
                 if (progressBar) progressBar.style.width = '0%';
                 if (progressText) progressText.textContent = 'Запуск переноса…';
 
-                var totalTransferred = 0;
-                var totalFailed = 0;
-                var allErrors = [];
-                var allTransferredKeys = [];
+            var totalTransferred = 0;
+            var totalFailed = 0;
+            var allErrors = [];
+            var allTransferredKeys = [];
                 var outerMaxTotalEl = maxTotalInputEl;
 
-                function runBatch() {
-                    var fd = new FormData(form);
+            function runBatch() {
+                var fd = new FormData(form);
                     fd.set('batch_size', String(readBatchSize()));
                     var maxEl = form.querySelector('input[name="max_total"]');
                     if (maxEl && maxEl.value) fd.set('max_total', maxEl.value);
                     fetch(runBatchUrl, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': fd.get('_token'),
-                            'Accept': 'application/json',
-                        },
-                        body: fd,
-                    })
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': fd.get('_token'),
+                        'Accept': 'application/json',
+                    },
+                    body: fd,
+                })
                         .then(function (r) {
                             return r.json().then(function (data) {
                                 return { ok: r.ok, data: data };
                             });
                         })
-                        .then(function (_ref) {
-                            var ok = _ref.ok;
-                            var data = _ref.data;
-                            if (!ok || !data.success) {
+                    .then(function (_ref) {
+                        var ok = _ref.ok;
+                        var data = _ref.data;
+                        if (!ok || !data.success) {
                                 if (progressBlock) progressBlock.classList.add('hidden');
                                 if (resultBlock) resultBlock.classList.remove('hidden');
                                 if (resultBlock) resultBlock.classList.remove('border-green-200', 'bg-green-50');
@@ -416,65 +416,65 @@
                                 if (btn) btn.disabled = false;
                                 if (btnTest) btnTest.disabled = false;
                                 setMassTransferSubmitLabel(false);
-                                return;
-                            }
-                            totalTransferred += data.transferred || 0;
-                            totalFailed += data.failed || 0;
-                            if (data.errors && data.errors.length) {
-                                allErrors = allErrors.concat(data.errors);
-                            }
-                            if (data.transferred_keys && data.transferred_keys.length) {
-                                allTransferredKeys = allTransferredKeys.concat(data.transferred_keys);
-                            }
-                            var processed = totalTransferred + totalFailed;
-                            if (totalKeys === 0 && (processed > 0 || (data.remaining !== undefined && data.remaining > 0))) {
-                                totalKeys = processed + (data.remaining || 0);
-                            }
-                            var pct = totalKeys > 0 ? Math.min(100, Math.round((processed / totalKeys) * 100)) : 0;
+                            return;
+                        }
+                        totalTransferred += data.transferred || 0;
+                        totalFailed += data.failed || 0;
+                        if (data.errors && data.errors.length) {
+                            allErrors = allErrors.concat(data.errors);
+                        }
+                        if (data.transferred_keys && data.transferred_keys.length) {
+                            allTransferredKeys = allTransferredKeys.concat(data.transferred_keys);
+                        }
+                        var processed = totalTransferred + totalFailed;
+                        if (totalKeys === 0 && (processed > 0 || (data.remaining !== undefined && data.remaining > 0))) {
+                            totalKeys = processed + (data.remaining || 0);
+                        }
+                        var pct = totalKeys > 0 ? Math.min(100, Math.round((processed / totalKeys) * 100)) : 0;
                             if (progressBar) progressBar.style.width = pct + '%';
                             if (progressText) {
-                                progressText.textContent = totalKeys > 0
-                                    ? ('Обработано примерно ' + processed + ' из ' + totalKeys + '. Перенесено: ' + totalTransferred + ', ошибок: ' + totalFailed)
-                                    : ('Обработано: ' + processed + '. Перенесено: ' + totalTransferred + ', ошибок: ' + totalFailed);
+                        progressText.textContent = totalKeys > 0
+                            ? ('Обработано примерно ' + processed + ' из ' + totalKeys + '. Перенесено: ' + totalTransferred + ', ошибок: ' + totalFailed)
+                            : ('Обработано: ' + processed + '. Перенесено: ' + totalTransferred + ', ошибок: ' + totalFailed);
                             }
-                            if (data.done) {
+                        if (data.done) {
                                 if (progressBlock) progressBlock.classList.add('hidden');
                                 if (resultBlock) resultBlock.classList.remove('hidden');
                                 if (resultBlock) resultBlock.classList.remove('border-red-200', 'bg-red-50');
                                 if (resultBlock) resultBlock.classList.add('border-green-200', 'bg-green-50');
-                                var isTest = data.test_run === true;
+                            var isTest = data.test_run === true;
                                 if (resultMessage) {
-                                    resultMessage.textContent = isTest
-                                        ? ('Тестовый перенос завершён. Перенесено: ' + totalTransferred + ', ошибок: ' + totalFailed + '. Остальные ключи не трогались.')
-                                        : ('Готово. Перенесено: ' + totalTransferred + ', ошибок: ' + totalFailed + '.');
+                            resultMessage.textContent = isTest
+                                ? ('Тестовый перенос завершён. Перенесено: ' + totalTransferred + ', ошибок: ' + totalFailed + '. Остальные ключи не трогались.')
+                                : ('Готово. Перенесено: ' + totalTransferred + ', ошибок: ' + totalFailed + '.');
                                 }
                                 if (isTest && outerMaxTotalEl) outerMaxTotalEl.value = '';
                                 if (allErrors.length > 0 && resultErrors) {
-                                    resultErrors.classList.remove('hidden');
-                                    resultErrors.innerHTML = '<ul class="list-disc pl-5">' +
-                                        allErrors.slice(0, 50).map(function (err) {
-                                            return '<li>' + (err.key_id || '') + ': ' + (err.message || '') + '</li>';
-                                        }).join('') + (allErrors.length > 50 ? '<li class="text-gray-500">… и ещё ' + (allErrors.length - 50) + ' ошибок</li>' : '') + '</ul>';
+                                resultErrors.classList.remove('hidden');
+                                resultErrors.innerHTML = '<ul class="list-disc pl-5">' +
+                                    allErrors.slice(0, 50).map(function (err) {
+                                        return '<li>' + (err.key_id || '') + ': ' + (err.message || '') + '</li>';
+                                    }).join('') + (allErrors.length > 50 ? '<li class="text-gray-500">… и ещё ' + (allErrors.length - 50) + ' ошибок</li>' : '') + '</ul>';
                                 } else if (resultErrors) {
-                                    resultErrors.classList.add('hidden');
-                                    resultErrors.innerHTML = '';
-                                }
-                                var reportWrap = document.getElementById('result-report-wrap');
-                                var reportBody = document.getElementById('result-report-body');
-                                if (allTransferredKeys.length > 0 && reportWrap && reportBody) {
-                                    reportWrap.classList.remove('hidden');
-                                    reportBody.innerHTML = allTransferredKeys.map(function (r) {
+                                resultErrors.classList.add('hidden');
+                                resultErrors.innerHTML = '';
+                            }
+                            var reportWrap = document.getElementById('result-report-wrap');
+                            var reportBody = document.getElementById('result-report-body');
+                            if (allTransferredKeys.length > 0 && reportWrap && reportBody) {
+                                reportWrap.classList.remove('hidden');
+                                reportBody.innerHTML = allTransferredKeys.map(function (r) {
                                         function esc(s) {
                                             return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
                                         }
-                                        return '<tr><td class="px-3 py-1.5 font-mono text-xs">' + esc(r.key_activate_id) + '</td><td class="px-3 py-1.5 font-mono text-xs">' + esc(r.server_user_id) + '</td><td class="px-3 py-1.5">' + esc(r.traffic_limit_mb) + '</td><td class="px-3 py-1.5">' + esc(r.expire_date) + '</td><td class="px-3 py-1.5">' + esc(r.user_tg_id) + '</td></tr>';
-                                    }).join('');
-                                } else if (reportWrap) {
-                                    reportWrap.classList.add('hidden');
+                                    return '<tr><td class="px-3 py-1.5 font-mono text-xs">' + esc(r.key_activate_id) + '</td><td class="px-3 py-1.5 font-mono text-xs">' + esc(r.server_user_id) + '</td><td class="px-3 py-1.5">' + esc(r.traffic_limit_mb) + '</td><td class="px-3 py-1.5">' + esc(r.expire_date) + '</td><td class="px-3 py-1.5">' + esc(r.user_tg_id) + '</td></tr>';
+                                }).join('');
+                            } else if (reportWrap) {
+                                reportWrap.classList.add('hidden');
                                     if (reportBody) reportBody.innerHTML = '';
-                                }
-                                lastTransferReport = allTransferredKeys.slice(0);
-                                if (typeof toastr !== 'undefined') toastr.success('Перенос завершён.');
+                            }
+                            lastTransferReport = allTransferredKeys.slice(0);
+                            if (typeof toastr !== 'undefined') toastr.success('Перенос завершён.');
                                 if (alpineData && alpineData.loadKeyCount) alpineData.loadKeyCount();
                                 if (alpineData) alpineData.loading = false;
                                 if (btn) btn.disabled = false;

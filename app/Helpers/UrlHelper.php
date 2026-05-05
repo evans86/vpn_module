@@ -2,6 +2,8 @@
 
 namespace App\Helpers;
 
+use Illuminate\Http\Request;
+
 class UrlHelper
 {
     /**
@@ -42,6 +44,136 @@ class UrlHelper
         }
 
         return false;
+    }
+
+    /**
+     * HTTPS-оригин браузера за прокси (Cloudflare при подстановке Host на origin).
+     * Порядок как в ForceUrlRootForTrustedHost + RFC 7239 Forwarded при наличии.
+     */
+    public static function incomingRequestOrigin(Request $request): string
+    {
+        $scheme = strtolower(self::incomingRequestScheme($request));
+        $candidates = self::incomingRequestHostCandidates($request);
+        $canonical = self::canonicalAppUrlHost();
+
+        foreach ($candidates as $hostLower) {
+            if ($hostLower === '' || ! self::hostMatchesTrustedApplicationPatterns($hostLower)) {
+                continue;
+            }
+            if ($canonical !== '' && strcasecmp($hostLower, $canonical) !== 0) {
+                return $scheme.'://'.$hostLower;
+            }
+        }
+
+        foreach ($candidates as $hostLower) {
+            if ($hostLower !== '' && self::hostMatchesTrustedApplicationPatterns($hostLower)) {
+                return $scheme.'://'.$hostLower;
+            }
+        }
+
+        try {
+            $url = strtolower((string) $request->getSchemeAndHttpHost());
+            if ($url !== '' && $url !== ':') {
+                return $url;
+            }
+        } catch (\Throwable $e) {
+            //
+        }
+
+        return rtrim((string) config('app.config_public_url'), '/')
+            ?: rtrim((string) config('app.url'), '/');
+    }
+
+    private static function canonicalAppUrlHost(): string
+    {
+        $root = rtrim((string) config('app.url'), '/');
+        if ($root === '') {
+            return '';
+        }
+        $h = parse_url(str_contains($root, '://') ? $root : 'https://'.$root, PHP_URL_HOST);
+
+        return $h !== null && $h !== '' ? strtolower((string) $h) : '';
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function incomingRequestHostCandidates(Request $request): array
+    {
+        $raw = [];
+
+        $refererHost = strtolower((string) parse_url((string) $request->headers->get('referer'), PHP_URL_HOST));
+        if ($refererHost !== '' && self::hostMatchesTrustedApplicationPatterns(self::stripHostPort($refererHost))) {
+            $raw[] = self::stripHostPort($refererHost);
+        }
+
+        $xfh = (string) $request->headers->get('X-Forwarded-Host');
+        if ($xfh !== '') {
+            foreach (array_map('trim', explode(',', $xfh)) as $part) {
+                if ($part !== '') {
+                    $raw[] = self::stripHostPort(strtolower(trim($part)));
+                }
+            }
+        }
+
+        $fromForwardedHdr = self::parseForwardedHost((string) $request->headers->get('Forwarded'));
+        if ($fromForwardedHdr !== null && $fromForwardedHdr !== '') {
+            $raw[] = $fromForwardedHdr;
+        }
+
+        $httpHost = (string) $request->server->get('HTTP_HOST');
+        if ($httpHost !== '') {
+            $raw[] = self::stripHostPort(strtolower(trim($httpHost)));
+        }
+
+        $gh = strtolower((string) $request->getHost());
+        if ($gh !== '') {
+            $raw[] = self::stripHostPort($gh);
+        }
+
+        return array_values(array_unique(array_filter($raw)));
+    }
+
+    private static function parseForwardedHost(string $forwarded): ?string
+    {
+        if ($forwarded === '') {
+            return null;
+        }
+        if (! preg_match_all('~(?:^|[;,])\s*host\s*=\s*(?:"([^"]+)"|([^;,\s]+))~i', $forwarded, $m)) {
+            return null;
+        }
+        $n = count($m[0]);
+        for ($i = 0; $i < $n; $i++) {
+            $candidate = $m[1][$i] !== '' ? $m[1][$i] : ($m[2][$i] ?? '');
+            $candidate = self::stripHostPort(strtolower(trim($candidate)));
+            if ($candidate !== '') {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static function stripHostPort(string $hostLower): string
+    {
+        if ($hostLower === '' || str_starts_with($hostLower, '[')) {
+            return $hostLower;
+        }
+        $parts = explode(':', $hostLower, 2);
+
+        return (count($parts) === 2 && preg_match('/^\d+$/', $parts[1]))
+            ? $parts[0]
+            : $hostLower;
+    }
+
+    private static function incomingRequestScheme(Request $request): string
+    {
+        $p = trim(explode(',', (string) $request->headers->get('X-Forwarded-Proto'))[0] ?? '');
+        if ($p !== '') {
+            return strtolower($p);
+        }
+
+        return strtolower($request->getScheme());
     }
 
     /**

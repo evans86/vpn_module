@@ -282,23 +282,7 @@ class SalesmanAuthController extends Controller
 
     private function currentOrigin(): string
     {
-        $host = (string) request()->headers->get('x-forwarded-host', '');
-        if ($host !== '') {
-            $host = trim(explode(',', $host)[0]);
-        }
-        if ($host === '') {
-            $host = (string) request()->getHost();
-        }
-
-        $proto = (string) request()->headers->get('x-forwarded-proto', '');
-        if ($proto !== '') {
-            $proto = trim(explode(',', $proto)[0]);
-        }
-        if ($proto === '') {
-            $proto = 'https';
-        }
-
-        return strtolower($proto) . '://' . $host;
+        return UrlHelper::incomingRequestOrigin(request());
     }
 
     private function hasValidSignedFallback(Request $request, string $hash, int $userId): bool
