@@ -101,7 +101,7 @@
                     </x-slot>
                 </x-admin.empty-state>
             @else
-                <div class="flex flex-nowrap items-center gap-2 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200 overflow-x-auto">
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-2 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <span class="text-sm text-gray-600 font-medium shrink-0">Действия:</span>
                     <button type="button"
                             class="shrink-0 whitespace-nowrap inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
