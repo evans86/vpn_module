@@ -5,20 +5,29 @@
 
 @section('content')
     <div id="config-refresh-bar" class="container mx-auto px-4 pt-4 max-w-6xl">
-        <div class="bg-indigo-100 border-2 border-indigo-300 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-sm">
-            <div class="flex items-center gap-3">
-                <span class="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white flex-shrink-0" title="Время обновления">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </span>
-                <div>
-                    <div class="text-xs font-semibold uppercase tracking-wide text-indigo-600">Конфигурация обновлена</div>
-                    <div id="config-last-updated" class="text-lg font-bold text-indigo-900">—</div>
+        <div class="bg-indigo-100 border-2 border-indigo-300 rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <span class="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white flex-shrink-0" title="Время обновления">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </span>
+                    <div>
+                        <div class="text-xs font-semibold uppercase tracking-wide text-indigo-600">Конфигурация обновлена</div>
+                        <div id="config-last-updated" class="text-lg font-bold text-indigo-900">—</div>
+                    </div>
                 </div>
+                <button type="button" id="config-btn-refresh" class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors shadow">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    Обновить
+                </button>
             </div>
-            <button type="button" id="config-btn-refresh" class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors shadow">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                Обновить
-            </button>
+            <div id="config-silent-sync-hint" class="hidden items-start gap-2.5 pt-1 border-t border-indigo-200/80 text-sm text-indigo-900/90 leading-snug" role="status" aria-live="polite">
+                <svg class="animate-spin h-4 w-4 text-indigo-600 flex-shrink-0 mt-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span id="config-silent-sync-hint-text">Запрошена фоновая синхронизация с сервером — при появлении новых данных страница обновится.</span>
+            </div>
         </div>
     </div>
     <div id="config-progress-bar" class="container mx-auto px-4 pt-4 max-w-6xl hidden">
@@ -219,7 +228,8 @@
             .vpn-config-mascot--robot,
             .vpn-config-mascot--ghost,
             .vpn-config-mascot--duck,
-            .vpn-config-progress-fill {
+            .vpn-config-progress-fill,
+            #config-silent-sync-hint svg.animate-spin {
                 animation: none !important;
             }
         }
@@ -399,6 +409,8 @@
         var refreshBar = document.getElementById('config-refresh-bar');
         var progressBar = document.getElementById('config-progress-bar');
         var lastUpdatedEl = document.getElementById('config-last-updated');
+        var silentSyncHintEl = document.getElementById('config-silent-sync-hint');
+        var silentSyncHintTextEl = document.getElementById('config-silent-sync-hint-text');
         var btnRefresh = document.getElementById('config-btn-refresh');
         var statusTextEl = document.getElementById('config-progress-status');
         var spinnerBlock = document.getElementById('config-progress-spinner');
@@ -600,6 +612,18 @@
             }
         }
 
+        function setVpnSilentSyncHintVisible(show, hintText) {
+            if (!silentSyncHintEl) return;
+            if (hintText && silentSyncHintTextEl) silentSyncHintTextEl.textContent = hintText;
+            if (show) {
+                silentSyncHintEl.classList.remove('hidden');
+                silentSyncHintEl.classList.add('flex');
+            } else {
+                silentSyncHintEl.classList.add('hidden');
+                silentSyncHintEl.classList.remove('flex');
+            }
+        }
+
         /** Общая отрисовка после опроса /content (ручное «Обновить» и тихий запуск при открытии). */
         function vpnApplyPollPayload(payload) {
             if (!payload || !payload.page || !contentEl || typeof window.renderVpnConfigPage !== 'function') return;
@@ -630,18 +654,27 @@
             if (window.__vpnSilentOpenSyncStarted) return;
             window.__vpnSilentOpenSyncStarted = true;
             clearVpnSilentOpenPolling();
+            setVpnSilentSyncHintVisible(true, 'Запрошена фоновая синхронизация с сервером — при появлении новых данных страница обновится.');
 
             fetch(refreshUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
                 .then(parseJsonResponse)
                 .then(function(res) {
-                    if (window.__vpnSilentOpenCancelledByManual) return;
+                    if (window.__vpnSilentOpenCancelledByManual) {
+                        setVpnSilentSyncHintVisible(false);
+                        return;
+                    }
                     if (!res.data || !res.data.success) {
+                        setVpnSilentSyncHintVisible(false);
                         if (res.data && res.data.replacedKeyId) {
                             setContentKeyReplaced((res.data && res.data.message) ? String(res.data.message) : '', res.data.replacedKeyId);
                         }
                         return;
                     }
-                    if (!res.data.syncPending) return;
+                    if (!res.data.syncPending) {
+                        setVpnSilentSyncHintVisible(false);
+                        return;
+                    }
+                    setVpnSilentSyncHintVisible(true, 'Сервер готовит свежие ссылки — ожидаем появление данных (можете пользоваться текущими).');
 
                     var baselineEpoch = (typeof res.data.lastUpdatedEpoch === 'number') ? res.data.lastUpdatedEpoch : undefined;
                     var baselineLabel = res.data.lastUpdated ? String(res.data.lastUpdated) : '';
@@ -654,6 +687,7 @@
                         if (silentAttempts > VPN_CONFIG_SYNC_MAX_POLLS) {
                             silentFinished = true;
                             clearVpnSilentOpenPolling();
+                            setVpnSilentSyncHintVisible(false);
                             return;
                         }
                         fetch(contentUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
@@ -665,6 +699,7 @@
                                 if (vpnPayloadIsNewerThanBaseline(pollRes.data, baselineEpoch, baselineLabel)) {
                                     silentFinished = true;
                                     clearVpnSilentOpenPolling();
+                                    setVpnSilentSyncHintVisible(false);
                                     vpnApplyPollPayload(pollRes.data);
                                     if (typeof window.showCopyNotification === 'function') {
                                         window.showCopyNotification('Конфигурация обновлена с сервера');
@@ -677,7 +712,9 @@
                     silentPollOnce();
                     _vpnSilentOpenPollTimer = setInterval(silentPollOnce, VPN_CONFIG_SYNC_POLL_MS);
                 })
-                .catch(function() { /* сеть: пользователь нажмёт «Обновить» */ });
+                .catch(function() {
+                    setVpnSilentSyncHintVisible(false);
+                });
         }
 
         function clearVpnSyncPolling() {
@@ -696,6 +733,7 @@
                 clearTimeout(_vpnSilentOpenDeferId);
                 _vpnSilentOpenDeferId = null;
             }
+            setVpnSilentSyncHintVisible(false);
 
             clearVpnSyncPolling();
             clearVpnSilentOpenPolling();
