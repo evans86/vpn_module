@@ -15,9 +15,9 @@ use Throwable;
 class ServerFleetProbeService
 {
     /**
-     * @return array<string, mixed>
+     * @return array{rows: array<int, array<string, mixed>>, summary: array<string, int>, elapsed_ms: float}
      */
-    public function probe(Collection $servers, bool $includeTestSpeed): array
+    public function probeServerChunk(Collection $servers, bool $includeTestSpeed): array
     {
         $started = microtime(true);
         $rows = [];
@@ -128,15 +128,49 @@ class ServerFleetProbeService
             ];
         }
 
-        $elapsed = round((microtime(true) - $started) * 1000);
+        return [
+            'rows' => $rows,
+            'summary' => $summary,
+            'elapsed_ms' => round((microtime(true) - $started) * 1000),
+        ];
+    }
+
+    /**
+     * Текстового представление блока global_probes как в сохранённом отчёте (.txt).
+     */
+    public function globalProbesToText(array $globalProbes): string
+    {
+        return $this->buildGlobalProbesTextBlock($globalProbes);
+    }
+
+    /**
+     * Часть .txt только по узлам VPS (без шапки и сводной строки).
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    public function textReportServersSection(array $rows, bool $includeTestSpeed): string
+    {
+        return $this->buildTextReportServersSection($rows, $includeTestSpeed);
+    }
+
+    /**
+     * Полная проверка всех переданных серверов одним проходом (глобальный блок ICMP/HTTPS + узлы в одном ответе).
+     *
+     * @return array<string, mixed>
+     */
+    public function probe(Collection $servers, bool $includeTestSpeed): array
+    {
+        $t0All = microtime(true);
+        $inner = $this->probeServerChunk($servers, $includeTestSpeed);
+        $elapsed = round((microtime(true) - $t0All) * 1000);
         $globalProbes = $this->gatherGlobalProbesFromAppHost();
 
         return [
-            'summary' => $summary,
-            'rows' => $rows,
+            'summary' => $inner['summary'],
+            'rows' => $inner['rows'],
             'elapsed_ms' => $elapsed,
             'global_probes' => $globalProbes,
-            'text_report' => $this->buildTextReport($rows, $summary, $elapsed, $includeTestSpeed, $globalProbes),
+            'text_report' => $this->buildTextReport($inner['rows'], $inner['summary'], $elapsed, $includeTestSpeed, $globalProbes),
         ];
     }
 
@@ -607,6 +641,19 @@ class ServerFleetProbeService
         }
         $lines[] = '';
 
+        $lines[] = $this->buildTextReportServersSection($rows, $includeTestSpeed);
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Фрагмент отчёта .txt только по списку узлов (секции --- #id ...).
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    private function buildTextReportServersSection(array $rows, bool $includeTestSpeed): string
+    {
+        $lines = [];
         foreach ($rows as $r) {
             if (isset($r['error']) && isset($r['ip'])) {
                 $lines[] = "--- #{$r['server_id']} {$r['name']} ({$r['ip']}) — {$r['error']}";

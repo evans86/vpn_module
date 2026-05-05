@@ -117,6 +117,55 @@
                 var gpBody = document.getElementById('globalProbeBody');
                 var meta = document.querySelector('meta[name="csrf-token"]');
                 var csrf = meta ? meta.getAttribute('content') : '';
+                var fleetCachedGlobalProbes = null;
+                var fleetCachedGlobalText = '';
+                var fleetReportStartedAt = '';
+
+                function emptyFleetSummary() {
+                    return {
+                        total: 0,
+                        http_ok: 0,
+                        https_ok: 0,
+                        stub_ok_db: 0,
+                        lure_http_ok: 0,
+                        test_speed_ok: 0,
+                        test_speed_fail: 0,
+                        test_speed_skipped: 0
+                    };
+                }
+
+                function mergeFleetSummary(acc, delta) {
+                    if (!delta) return;
+                    var keys = ['total', 'http_ok', 'https_ok', 'stub_ok_db', 'lure_http_ok',
+                        'test_speed_ok', 'test_speed_fail', 'test_speed_skipped'];
+                    keys.forEach(function (key) {
+                        acc[key] = (acc[key] || 0) + (delta[key] || 0);
+                    });
+                }
+
+                /** Заголовок текстового отчёта по узлам (как в PHP buildTextReport, без блока узлов). */
+                function fleetTextPreamble(mergedSummary, sumElapsedMs, includeTestSpeed, globalProbesText, startedLabel) {
+                    var nf = function (x) {
+                        var n = Number(x);
+                        if (isNaN(n)) return '0';
+                        return n.toLocaleString('ru-RU');
+                    };
+                    var s = mergedSummary;
+                    var lines = [
+                        'Сводная проверка VPS — ' + (startedLabel || '—'),
+                        'Обработано: ' + s.total + ' серверов, суммарное время пакетов на сервере Laravel: ' + nf(sumElapsedMs) + ' мс.',
+                        globalProbesText || '',
+                        'HTTP OK: ' + s.http_ok + '  | HTTPS OK: ' + s.https_ok + '  | заглушка OK (БД): ' + s.stub_ok_db,
+                        '(Эти счётчики — только узлы VPS ниже; блок «панели и домены» сверху считается отдельно.)'
+                    ];
+                    if (includeTestSpeed) {
+                        lines.push('/test-speed: успех ' + s.test_speed_ok + ', ошибок ' + s.test_speed_fail + ', пропуск ' + s.test_speed_skipped + '.');
+                    } else {
+                        lines.push('/test-speed: не запускался (опция отключена).');
+                    }
+                    lines.push('');
+                    return lines.join('\n');
+                }
 
                 function esc(s) {
                     return String(s == null ? '' : s)
@@ -387,16 +436,12 @@
                     gpPanel.classList.remove('hidden');
                 }
 
-                function renderFleetTables(j) {
-                    if (!j.success) {
-                        sum.classList.add('hidden');
-                        tableCard.classList.add('hidden');
-                        if (gpPanel) gpPanel.classList.add('hidden');
-                        return;
+                function paintFleetMergedState(gpPatch, mergedSummary, mergedRows) {
+                    if (gpPatch != null && typeof gpPatch === 'object') {
+                        fleetCachedGlobalProbes = gpPatch;
                     }
-                    var d = j.data || {};
-                    renderGlobalProbes(d.global_probes || null);
-                    var s = d.summary || {};
+                    renderGlobalProbes(fleetCachedGlobalProbes);
+                    var s = mergedSummary || emptyFleetSummary();
                     sum.innerHTML =
                         kv('Всего', s.total)
                         + kv('HTTP OK', s.http_ok)
@@ -409,7 +454,7 @@
                     sum.classList.remove('hidden');
 
                     tbody.innerHTML = '';
-                    (d.rows || []).forEach(function (row) {
+                    (mergedRows || []).forEach(function (row) {
                         if (row.error) {
                             var tr = document.createElement('tr');
                             tr.innerHTML =
@@ -454,6 +499,23 @@
                         tbody.appendChild(tr2);
                     });
                     tableCard.classList.remove('hidden');
+                }
+
+                function renderFleetTables(j) {
+                    if (!j.success) {
+                        sum.classList.add('hidden');
+                        tableCard.classList.add('hidden');
+                        if (gpPanel) gpPanel.classList.add('hidden');
+                        return;
+                    }
+                    var d = j.data || {};
+                    if (d.global_probes != null && typeof d.global_probes === 'object') {
+                        fleetCachedGlobalProbes = d.global_probes;
+                    }
+                    if (typeof d.global_probes_text === 'string' && d.global_probes_text !== '') {
+                        fleetCachedGlobalText = d.global_probes_text;
+                    }
+                    paintFleetMergedState(null, d.summary || emptyFleetSummary(), d.rows || []);
                 }
 
                 var clBtn = document.getElementById('fleetClassifyBtn');
@@ -506,57 +568,147 @@
                     sum.innerHTML = '';
                     if (gpBody) gpBody.innerHTML = '';
                     if (gpPanel) gpPanel.classList.add('hidden');
+                    fleetCachedGlobalProbes = null;
+                    fleetCachedGlobalText = '';
+                    fleetReportStartedAt = '';
 
                     function setPhase(msg) {
                         st.textContent = msg;
                     }
 
+                    function delay(ms) {
+                        return new Promise(function (r) { setTimeout(r, ms); });
+                    }
+
+                    async function fleetFetchJson(payload, cfRetries524) {
+                        cfRetries524 = (cfRetries524 == null) ? 4 : cfRetries524;
+                        while (true) {
+                            var res = await fetch(fleetRunUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': csrf,
+                                    'Accept': 'application/json',
+                                    'X-Requested-With': 'XMLHttpRequest'
+                                },
+                                body: JSON.stringify(payload)
+                            });
+                            if ((res.status === 524 || res.status === 504) && cfRetries524 > 0) {
+                                cfRetries524--;
+                                setPhase('Прокси оборвал долгий ответ (HTTP ' + res.status + '), повтор через 45 с…');
+                                await delay(45000);
+                                continue;
+                            }
+                            var j = {};
+                            try {
+                                j = await res.json();
+                            } catch (parseErr) {
+                                j = {};
+                            }
+                            return { res: res, j: j };
+                        }
+                    }
+
                     try {
+                        var g = null;
                         setPhase('Сеть (браузер)…');
                         var part1 = await buildBrowserReport(setPhase);
 
-                        setPhase('Серверы панели…');
-                        var res = await fetch(fleetRunUrl, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': csrf,
-                                'Accept': 'application/json',
-                                'X-Requested-With': 'XMLHttpRequest'
-                            },
-                            body: JSON.stringify({
-                                include_test_speed: chk.checked
-                            })
-                        });
-                        var j = {};
-                        try {
-                            j = await res.json();
-                        } catch (parseErr) {
-                            j = {};
-                        }
-
                         var part2 = '';
-                        if (j.success) {
-                            renderFleetTables(j);
-                            var d = j.data || {};
-                            var fleetNote = '';
-                            fleetNote += 'Время прогона на сервере (Laravel, все узлы + глобальные цели): '
-                                + (d.elapsed_ms != null ? (d.elapsed_ms + ' мс') : '—')
-                                + ' · Узлов VPS: ' + (j.included_count != null ? j.included_count : '—')
-                                + '\n\n';
-                            part2 = '\n\n' + '='.repeat(72) + '\n\n=== Узлы VPS (хост панели) ===\n\n'
-                                + fleetNote + (d.text_report || '');
-                        } else {
-                            renderFleetTables({ success: false });
-                            var fleetErr = (j.message != null && j.message !== '') ? String(j.message) : ('HTTP ' + res.status);
-                            if (res.status === 429 || /too many attempts/i.test(fleetErr)) {
-                                fleetErr = 'Слишком частые запросы (лимит защиты API). Подождите минуту и запустите снова — не жмите кнопку подряд и не держите несколько вкладок с одновременным прогоном.';
+                        var includeTs = !!chk.checked;
+                        var perBatch = includeTs ? 1 : 3;
+                        var mergedSummary = emptyFleetSummary();
+                        var mergedRows = [];
+                        var serversTextChunks = [];
+                        var sumElapsedChunk = 0;
+                        var matchedTotalFinal = null;
+                        var fleetOk = false;
+                        var fleetReportSuccess = false;
+
+                        setPhase('Laravel → панели и домены (отдельный запрос, обход лимита Cloudflare)…');
+                        g = await fleetFetchJson({ fleet_global_only: true, include_test_speed: false }, 4);
+                        if (!g.j.success || !g.res.ok) {
+                            var ge = (g.j.message != null && g.j.message !== '') ? String(g.j.message) : ('HTTP ' + g.res.status);
+                            if (g.res.status === 429 || /too many attempts/i.test(ge)) {
+                                ge = 'Слишком частые запросы (лимит защиты API). Подождите минуту и запустите снова.';
                             }
-                            part2 = '\n\n' + '='.repeat(72) + '\n\n=== Узлы VPS ===\n\nОшибка: ' + fleetErr;
+                            renderFleetTables({ success: false });
+                            part2 = '\n\n' + '='.repeat(72) + '\n\n=== Узлы VPS ===\n\nОшибка (блок панелей/доменов): ' + ge;
+                        } else {
+                            var gd = g.j.data || {};
+                            fleetCachedGlobalProbes = gd.global_probes || null;
+                            fleetCachedGlobalText = gd.global_probes_text || '';
+                            fleetReportStartedAt = gd.report_started_at || '';
+                            sumElapsedChunk += (gd.elapsed_ms || 0);
+                            matchedTotalFinal = g.j.included_count;
+                            paintFleetMergedState(fleetCachedGlobalProbes, emptyFleetSummary(), []);
+
+                            var afterId = 0;
+                            var batchFail = false;
+                            while (true) {
+                                setPhase('Узлы VPS: пакет id > ' + afterId + ', до ' + perBatch + ' серв.…');
+                                var bag = await fleetFetchJson({
+                                    include_test_speed: includeTs,
+                                    after_id: afterId,
+                                    per_batch: perBatch
+                                }, 4);
+                                if (!bag.res.ok) {
+                                    batchFail = true;
+                                    part2 = '\n\n' + '='.repeat(72) + '\n\n=== Узлы VPS ===\n\nОшибка HTTP ' + bag.res.status + ' при пакете узлов.';
+                                    break;
+                                }
+                                if (!bag.j.success) {
+                                    var bm = (bag.j.message != null && bag.j.message !== '') ? String(bag.j.message) : 'Неизвестная ошибка пакета';
+                                    batchFail = true;
+                                    part2 = '\n\n' + '='.repeat(72) + '\n\n=== Узлы VPS ===\n\nОшибка пакета: ' + bm;
+                                    break;
+                                }
+                                var d = bag.j.data || {};
+                                var b = bag.j.batch || {};
+                                mergeFleetSummary(mergedSummary, d.summary);
+                                sumElapsedChunk += (d.elapsed_ms || 0);
+                                (d.rows || []).forEach(function (r) { mergedRows.push(r); });
+                                if (typeof d.servers_text_chunk === 'string' && d.servers_text_chunk !== '') {
+                                    serversTextChunks.push(d.servers_text_chunk);
+                                }
+                                paintFleetMergedState(undefined, mergedSummary, mergedRows);
+                                matchedTotalFinal = bag.j.included_count;
+
+                                if (!b.has_more) {
+                                    fleetOk = true;
+                                    break;
+                                }
+                                afterId = b.next_after_id || 0;
+                                await delay(1600);
+                            }
+
+                            if (!batchFail && fleetOk) {
+                                fleetReportSuccess = true;
+                                var preambleBlocks = fleetTextPreamble(
+                                    mergedSummary,
+                                    sumElapsedChunk,
+                                    includeTs,
+                                    fleetCachedGlobalText,
+                                    fleetReportStartedAt
+                                );
+                                var fleetNote = 'Проверка шла несколькими HTTP-запросами к панели (короче по времени каждый ответ — меньше риска HTTP 524 от Cloudflare). '
+                                    + 'Узлов в выборке: ' + (matchedTotalFinal != null ? matchedTotalFinal : mergedSummary.total)
+                                    + '; сумма времени пакетов на Laravel (мс): ' + sumElapsedChunk + '.\n\n';
+                                part2 = '\n\n' + '='.repeat(72) + '\n\n=== Узлы VPS (хост панели) ===\n\n'
+                                    + fleetNote + preambleBlocks + serversTextChunks.join('');
+                            } else if (!batchFail && !fleetOk) {
+                                part2 = '\n\n' + '='.repeat(72) + '\n\n=== Узлы VPS ===\n\nПрервано без завершения пакетов.';
+                            }
                         }
 
                         ta.value = part1 + part2;
-                        setPhase(j.success ? 'Готово.' : (res.status === 429 ? 'Лимит запросов.' : 'Частично готово (ошибка проверки флота).'));
+                        if (fleetReportSuccess) {
+                            setPhase('Готово.');
+                        } else if (g != null && g.res && g.res.status === 429) {
+                            setPhase('Лимит запросов.');
+                        } else {
+                            setPhase(part2 === '' ? 'Готово (только браузер).' : 'Частично готово — см. текст отчёта.');
+                        }
                         saveBtn.disabled = false;
                         copyBtn.disabled = false;
                     } catch (err) {
