@@ -98,6 +98,33 @@
             </div>
         </div>
 
+        @if(is_array($purchaseBot ?? null) && ($purchaseBot['url'] ?? '') !== '' && ($purchaseBot['url'] ?? '#') !== '#')
+            <div class="mb-8" role="region" aria-label="Telegram бот">
+                <div class="relative overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-indigo-50 shadow-md">
+                    <div class="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-sky-200/30 blur-2xl"></div>
+                    <div class="relative flex flex-col gap-5 p-6 md:flex-row md:items-center md:gap-6 md:p-7">
+                        <div class="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-[#229ED9]/12 text-[#229ED9] ring-1 ring-sky-200/60">
+                            <svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.943 3.057a1.5 1.5 0 00-1.53-.128L3.098 11.087a1 1 0 00-.075 1.855l5.066 2.065 11.93-11.056-10.43 13.086v-.01l-.01.009 10.394-13.069z"/></svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <h2 class="mb-1 text-lg font-bold text-gray-900 md:text-xl">{{ $purchaseBot['heading'] }}</h2>
+                            @if(!empty($purchaseBot['username']))
+                                <p class="mb-2 text-sm font-semibold text-sky-800">{{ $purchaseBot['username'] }}</p>
+                            @endif
+                            <p class="text-sm leading-relaxed text-gray-600">{{ $purchaseBot['description'] }}</p>
+                        </div>
+                        <div class="flex md:flex-shrink-0">
+                            <a href="{{ $purchaseBot['url'] }}" target="_blank" rel="noopener noreferrer"
+                               class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#229ED9] px-5 py-3 text-sm font-semibold text-white shadow transition-colors hover:bg-[#1b8dc4] focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 md:w-auto">
+                                <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.943 3.057a1.5 1.5 0 00-1.53-.128L3.098 11.087a1 1 0 00-.075 1.855l5.066 2.065 11.93-11.056-10.43 13.086v-.01l-.01.009 10.394-13.069z"/></svg>
+                                <span>{{ $purchaseBot['cta'] }}</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <div class="bg-white rounded-2xl shadow-lg p-6 md:p-8" id="config-content-wrapper" data-all-config-links="{{ !empty($allConfigLinks) ? base64_encode(json_encode($allConfigLinks)) : '' }}">
             <!-- Action Buttons -->
             <div class="mb-8 flex flex-col sm:flex-row gap-3 flex-wrap">

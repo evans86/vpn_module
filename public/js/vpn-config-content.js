@@ -40,6 +40,39 @@
         return 'дней';
     }
 
+    /**
+     * Карточка: бот, где оформлен ключ (поле purchaseBot из /content).
+     * @param {object|null|undefined} pb
+     */
+    function buildPurchaseBotCardHtml(pb) {
+        if (!pb || !pb.url || pb.url === '#') return '';
+        var heading = escapeHtml(pb.heading || 'Ваш Telegram-бот');
+        var desc = escapeHtml(pb.description || '');
+        var username = pb.username ? escapeHtml(String(pb.username)) : '';
+        var cta = escapeHtml(pb.cta || 'Открыть в Telegram');
+        var tgIcon = '<svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.943 3.057a1.5 1.5 0 00-1.53-.128L3.098 11.087a1 1 0 00-.075 1.855l5.066 2.065 11.93-11.056-10.43 13.086v-.01l-.01.009 10.394-13.069z"/></svg>';
+        var tgIconSmall = '<svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.943 3.057a1.5 1.5 0 00-1.53-.128L3.098 11.087a1 1 0 00-.075 1.855l5.066 2.065 11.93-11.056-10.43 13.086v-.01l-.01.009 10.394-13.069z"/></svg>';
+        return (
+            '<div class="mb-8" role="region" aria-label="Telegram бот">' +
+            '<div class="relative overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-indigo-50 shadow-md">' +
+            '<div class="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-sky-200/30 blur-2xl" aria-hidden="true"></div>' +
+            '<div class="relative flex flex-col gap-5 p-6 md:flex-row md:items-center md:gap-6 md:p-7">' +
+            '<div class="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-[#229ED9]/12 text-[#229ED9] ring-1 ring-sky-200/60">' +
+            tgIcon +
+            '</div>' +
+            '<div class="min-w-0 flex-1">' +
+            '<h2 class="mb-1 text-lg font-bold text-gray-900 md:text-xl">' + heading + '</h2>' +
+            (username ? '<p class="mb-2 text-sm font-semibold text-sky-800">' + username + '</p>' : '') +
+            '<p class="text-sm leading-relaxed text-gray-600">' + desc + '</p>' +
+            '</div>' +
+            '<div class="flex md:flex-shrink-0">' +
+            '<a href="' + escapeAttr(pb.url) + '" target="_blank" rel="noopener noreferrer" class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#229ED9] px-5 py-3 text-sm font-semibold text-white shadow transition-colors hover:bg-[#1b8dc4] focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 md:w-auto">' +
+            tgIconSmall +
+            '<span>' + cta + '</span></a>' +
+            '</div></div></div></div>'
+        );
+    }
+
     /** Панель действий: ссылка, Clash-подписка, QR, все протоколы. */
     function buildVpnActionToolbarHtml() {
         var c = 'inline-flex w-full h-full min-h-[4.25rem] items-center justify-center text-center px-2 py-2.5 sm:px-3 border-2 rounded-xl font-medium text-xs sm:text-sm leading-tight focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all shadow-sm hover:shadow';
@@ -143,6 +176,11 @@
             '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Проверить качество сети</a>' +
             '</div></div>'
         );
+
+        var purchaseBotHtml = buildPurchaseBotCardHtml(page.purchaseBot);
+        if (purchaseBotHtml) {
+            parts.push(purchaseBotHtml);
+        }
 
         parts.push(buildVpnActionToolbarHtml());
 

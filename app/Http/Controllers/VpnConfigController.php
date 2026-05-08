@@ -1843,12 +1843,19 @@ class VpnConfigController extends Controller
                 }
             }
 
+            $purchaseBotSourceKey = $keyActivate;
+            if ($newKeyActivate !== null && is_array($newKeyFormattedKeys) && count($newKeyFormattedKeys) > 0) {
+                $purchaseBotSourceKey = $newKeyActivate;
+            }
+            $purchaseBot = $this->resolveConfigPurchaseBotForClient($purchaseBotSourceKey);
+
             $viewData = compact(
                 'keyActivate',
                 'userInfo',
                 'formattedKeys',
                 'formattedKeysGrouped',
                 'botLink',
+                'purchaseBot',
                 'netcheckUrl',
                 'isDemoMode',
                 'violations',
@@ -1918,6 +1925,7 @@ class VpnConfigController extends Controller
             'formattedKeys' => $this->normalizeFormattedKeysForClient($viewData['formattedKeys'] ?? []),
             'formattedKeysGrouped' => $formattedKeysGrouped,
             'botLink' => (string) ($viewData['botLink'] ?? '#'),
+            'purchaseBot' => $viewData['purchaseBot'] ?? null,
             'netcheckUrl' => (string) ($viewData['netcheckUrl'] ?? ''),
             'isDemoMode' => (bool) ($viewData['isDemoMode'] ?? false),
             'violations' => $violationsOut,
@@ -2382,6 +2390,31 @@ class VpnConfigController extends Controller
         }
 
         return '#';
+    }
+
+    /**
+     * Карточка «где оформлен ключ» для страницы конфигурации: ссылка на Telegram и подпись для пользователя.
+     *
+     * @return array<string, string>|null
+     */
+    private function resolveConfigPurchaseBotForClient(KeyActivate $keyActivate): ?array
+    {
+        $url = trim($this->resolveConfigDisplayBotLink($keyActivate));
+        if ($url === '' || $url === '#') {
+            return null;
+        }
+
+        $viaModule = $keyActivate->module_salesman_id !== null && (int) $keyActivate->module_salesman_id > 0;
+
+        return [
+            'url' => $url,
+            'username' => $this->botLinkToAtUsername($url),
+            'heading' => 'Ваш Telegram-бот',
+            'description' => $viaModule
+                ? 'Подписку оформили через партнёрский бот или сайт — для продления тарифа и поддержки перейдите по ссылке ниже.'
+                : 'Вы получили этот ключ в Telegram-боте продавца. Нажмите, чтобы перейти в чат и написать по любым вопросам.',
+            'cta' => 'Открыть в Telegram',
+        ];
     }
 
     /**
