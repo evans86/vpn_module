@@ -4047,10 +4047,16 @@ EOS
 //            ];
             $targetPanel = self::updateMarzbanToken($targetPanel->id);
             [$targetInbounds, $targetProxies] = $this->getInboundsAndProxiesForPanel($targetPanel);
+            // Marzban: data_limit >= 0; 0 часто означает «без лимита». Нельзя слать «остаток» как (0 - used) — будет 422.
+            $srcLimit = (int) ($userData['data_limit'] ?? 0);
+            $usedTraffic = (int) ($userData['used_traffic'] ?? 0);
+            $transferDataLimit = $srcLimit <= 0
+                ? 0
+                : max(0, $srcLimit - $usedTraffic);
             $newUser = $targetMarzbanApi->createUser(
                 $targetPanel->auth_token,
                 $serverUser->id,
-                $userData['data_limit'] - $userData['used_traffic'] ?? 0,
+                $transferDataLimit,
                 $userData['expire'] ?? 0,
                 null,
                 $targetInbounds,
