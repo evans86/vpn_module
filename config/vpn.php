@@ -84,4 +84,17 @@ return [
         'clients6.google.com',
         'google.dev',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Синхронизация после запроса подписки (VPN клиент забрал URL)
+    |--------------------------------------------------------------------------
+    | Успешный GET тел подписки /config/{id} может поставить в очередь ту же задачу, что фон после «Обновить».
+    | Cooldown по key id защищает от засорения очереди при частом автообновлении клиентов.
+    */
+    'subscription_sync_to_queue' => filter_var(
+        env('VPN_SUBSCRIPTION_SYNC_QUEUE', true),
+        FILTER_VALIDATE_BOOL
+    ),
+    'subscription_sync_cooldown_seconds' => max(60, (int) env('VPN_SUBSCRIPTION_SYNC_COOLDOWN_SECONDS', 180)),
 ];

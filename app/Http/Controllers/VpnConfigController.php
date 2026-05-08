@@ -12,6 +12,7 @@ use App\Models\VPN\VpnDirectDomain;
 use App\Services\VPN\SubscriptionClashProfileBuilder;
 use App\Services\VPN\SubscriptionSingBoxProfileBuilder;
 use App\Jobs\AddMissingSlotsForKeyJob;
+use App\Jobs\SyncVpnKeyActivateFromPanelsJob;
 use App\Repositories\KeyActivate\KeyActivateRepository;
 use App\Repositories\KeyActivateUser\KeyActivateUserRepository;
 use App\Repositories\ServerUser\ServerUserRepository;
@@ -193,7 +194,7 @@ class VpnConfigController extends Controller
                         $response->header('Profile-Title', $profileTitle);
                     }
 
-                    return $response;
+                    return $this->withQueuedSubscriptionPanelsSync($response, $key_activate_id);
                 }
 
                 if ($this->wantsClashSubscriptionProfile()) {
@@ -219,7 +220,7 @@ class VpnConfigController extends Controller
                         $response->header('Profile-Title', $profileTitle);
                     }
 
-                    return $response;
+                    return $this->withQueuedSubscriptionPanelsSync($response, $key_activate_id);
                 }
 
                 if (config('vpn.sing_box_subscription_profile', true)
@@ -256,7 +257,7 @@ class VpnConfigController extends Controller
                             $response->header('Profile-Title', $profileTitle);
                         }
 
-                        return $response;
+                        return $this->withQueuedSubscriptionPanelsSync($response, $key_activate_id);
                     }
                 }
 
@@ -296,7 +297,7 @@ class VpnConfigController extends Controller
                     $response->header('Profile-Title', $profileTitle);
                 }
 
-                return $response;
+                return $this->withQueuedSubscriptionPanelsSync($response, $key_activate_id);
             }
 
             // Браузер: лёгкая оболочка (shell), контент подгрузится по /config/{token}/content.
@@ -580,6 +581,30 @@ class VpnConfigController extends Controller
                 'message' => 'Не удалось обновить конфигурацию. Попробуйте позже.',
             ], 500);
         }
+    }
+
+    /**
+     * После успешной отдачи подписки VPN-клиенту — ставим в очередь ту же синхронизацию с Marzban, что и после кнопки «Обновить».
+     * Повторные запросы по тому же ключу в интервале cooldown не создают дубликаты задач (частые опросы клиентов).
+     */
+    private function withQueuedSubscriptionPanelsSync(Response $response, string $keyActivateId): Response
+    {
+        $this->queueSubscriptionPanelsSyncThrottled($keyActivateId);
+
+        return $response;
+    }
+
+    private function queueSubscriptionPanelsSyncThrottled(string $keyActivateId): void
+    {
+        if (! config('vpn.subscription_sync_to_queue', true)) {
+            return;
+        }
+        $seconds = max(60, (int) config('vpn.subscription_sync_cooldown_seconds', 180));
+        $cacheKey = 'vpn:subscription_sync_dispatched:'.$keyActivateId;
+        if (! Cache::add($cacheKey, 1, $seconds)) {
+            return;
+        }
+        SyncVpnKeyActivateFromPanelsJob::dispatch($keyActivateId)->afterResponse();
     }
 
     /**
