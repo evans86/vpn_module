@@ -81,28 +81,11 @@
             </div>
         @endif
 
-        <!-- Hero Section -->
-        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">
-            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div>
-                    <h1 class="text-2xl md:text-3xl font-bold mb-2">Конфигурация VPN</h1>
-                    <p class="text-blue-100 text-sm md:text-base">Управление подключением и проверка качества сети</p>
-                </div>
-                <a href="{{ $netcheckUrl ?? route('netcheck.index') }}"
-                   class="inline-flex items-center px-4 py-2 bg-white text-indigo-700 rounded-lg font-semibold hover:bg-blue-50 transition-colors shadow-lg">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                    Проверить качество сети
-                </a>
-            </div>
-        </div>
-
         @if(is_array($purchaseBot ?? null) && ($purchaseBot['url'] ?? '') !== '' && ($purchaseBot['url'] ?? '#') !== '#')
-            <div class="mx-auto mb-8 max-w-lg" role="region" aria-label="Telegram бот">
-                <div class="relative overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-indigo-50 shadow-md">
+            <div class="mb-8 w-full" role="region" aria-label="Telegram бот">
+                <div class="relative overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-indigo-50 shadow-xl">
                     <div class="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-sky-200/30 blur-2xl"></div>
-                    <div class="relative flex flex-col gap-4 p-5 md:flex-row md:items-center md:gap-5">
+                    <div class="relative flex flex-col gap-4 p-5 md:flex-row md:items-center md:gap-5 md:p-6">
                         <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-[#229ED9] shadow-sm ring-1 ring-sky-100">
                             <svg class="h-9 w-9" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.559z"/></svg>
                         </div>
@@ -123,6 +106,23 @@
                 </div>
             </div>
         @endif
+
+        <!-- Hero Section -->
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-bold mb-2">Конфигурация VPN</h1>
+                    <p class="text-blue-100 text-sm md:text-base">Управление подключением и проверка качества сети</p>
+                </div>
+                <a href="{{ $netcheckUrl ?? route('netcheck.index') }}"
+                   class="inline-flex items-center px-4 py-2 bg-white text-indigo-700 rounded-lg font-semibold hover:bg-blue-50 transition-colors shadow-lg">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Проверить качество сети
+                </a>
+            </div>
+        </div>
 
         <div class="bg-white rounded-2xl shadow-lg p-6 md:p-8" id="config-content-wrapper" data-all-config-links="{{ !empty($allConfigLinks) ? base64_encode(json_encode($allConfigLinks)) : '' }}">
             <!-- Action Buttons -->

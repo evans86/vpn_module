@@ -62,10 +62,10 @@
             TG_ICON_PATH +
             '"/></svg>';
         return (
-            '<div class="mx-auto mb-8 max-w-lg" role="region" aria-label="Telegram бот">' +
-            '<div class="relative overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-indigo-50 shadow-md">' +
+            '<div class="mb-8 w-full" role="region" aria-label="Telegram бот">' +
+            '<div class="relative overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-indigo-50 shadow-xl">' +
             '<div class="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-sky-200/30 blur-2xl" aria-hidden="true"></div>' +
-            '<div class="relative flex flex-col gap-4 p-5 md:flex-row md:items-center md:gap-5">' +
+            '<div class="relative flex flex-col gap-4 p-5 md:flex-row md:items-center md:gap-5 md:p-6">' +
             '<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-[#229ED9] shadow-sm ring-1 ring-sky-100">' +
             tgIcon +
             '</div>' +
@@ -179,6 +179,11 @@
             );
         }
 
+        var purchaseBotHtml = buildPurchaseBotCardHtml(page.purchaseBot);
+        if (purchaseBotHtml) {
+            parts.push(purchaseBotHtml);
+        }
+
         parts.push(
             '<div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-xl p-6 md:p-8 mb-8 text-white">' +
             '<div class="flex flex-col md:flex-row items-center justify-between gap-4">' +
@@ -188,11 +193,6 @@
             '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Проверить качество сети</a>' +
             '</div></div>'
         );
-
-        var purchaseBotHtml = buildPurchaseBotCardHtml(page.purchaseBot);
-        if (purchaseBotHtml) {
-            parts.push(purchaseBotHtml);
-        }
 
         parts.push(buildVpnActionToolbarHtml());
 
