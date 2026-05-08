@@ -2393,7 +2393,7 @@ class VpnConfigController extends Controller
     }
 
     /**
-     * Карточка «где оформлен ключ» для страницы конфигурации: ссылка на Telegram и подпись для пользователя.
+     * Карточка «где оформлен ключ» для страницы конфигурации (заголовок, @бот, кнопка — без справочного текста).
      *
      * @return array<string, string>|null
      */
@@ -2404,15 +2404,10 @@ class VpnConfigController extends Controller
             return null;
         }
 
-        $viaModule = $keyActivate->module_salesman_id !== null && (int) $keyActivate->module_salesman_id > 0;
-
         return [
             'url' => $url,
             'username' => $this->botLinkToAtUsername($url),
             'heading' => 'Ваш Telegram-бот',
-            'description' => $viaModule
-                ? 'Подписку оформили через партнёрский бот или сайт — для продления тарифа и поддержки перейдите по ссылке ниже.'
-                : 'Вы получили этот ключ в Telegram-боте продавца. Нажмите, чтобы перейти в чат и написать по любым вопросам.',
             'cta' => 'Открыть в Telegram',
         ];
     }
