@@ -57,6 +57,7 @@
                 <p class="text-sm text-gray-500">При подключении <code>sync</code> задания выполняются в том же запросе и не логируются здесь. Для отображения обработанных заданий укажите <code>QUEUE_CONNECTION=database</code> в .env и запустите воркер: <code>php artisan queue:work-safe database</code>.</p>
             @elseif(count($processedJobs) === 0)
                 <p class="text-sm text-gray-500">Пока нет записей. После обработки заданий воркером здесь появятся последние 50 успешных джоб (всего хранится до 500).</p>
+                <p class="text-sm text-gray-600 mt-3"><span class="font-medium">Подписка VPN:</span> задача <code class="text-xs bg-gray-100 px-1 rounded">SyncVpnKeyActivateFromPanelsJob</code> ставится только при успешной выдаче <strong>тела подписки</strong> по URL вида <code class="text-xs bg-gray-100 px-1 rounded">/config/{uuid}</code> (клиент или <code class="text-xs">curl</code>), не при открытии HTML-страницы конфига в браузере. На один ключ — не чаще одного раза в заданный cooldown (по умолчанию см. <code class="text-xs">VPN_SUBSCRIPTION_SYNC_COOLDOWN_SECONDS</code> в .env). В логах ищите строку <code class="text-xs bg-gray-100 px-1 rounded">Vpn subscription sync: задание поставлено в очередь</code>.</p>
             @else
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">

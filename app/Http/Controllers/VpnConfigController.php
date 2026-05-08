@@ -597,14 +597,37 @@ class VpnConfigController extends Controller
     private function queueSubscriptionPanelsSyncThrottled(string $keyActivateId): void
     {
         if (! config('vpn.subscription_sync_to_queue', true)) {
+            Log::debug('Vpn subscription sync: отключено (VPN_SUBSCRIPTION_SYNC_QUEUE)', [
+                'key_activate_id' => $keyActivateId,
+                'source' => 'vpn',
+            ]);
+
             return;
         }
         $seconds = max(60, (int) config('vpn.subscription_sync_cooldown_seconds', 180));
         $cacheKey = 'vpn:subscription_sync_dispatched:'.$keyActivateId;
         if (! Cache::add($cacheKey, 1, $seconds)) {
+            Log::debug('Vpn subscription sync: пропуск (cooldown по ключу)', [
+                'key_activate_id' => $keyActivateId,
+                'cooldown_seconds' => $seconds,
+                'source' => 'vpn',
+            ]);
+
             return;
         }
-        SyncVpnKeyActivateFromPanelsJob::dispatch($keyActivateId)->afterResponse();
+        // database/redis: сразу попадает в jobs — видно в мониторинге. sync: после ответа, иначе Marzban блокирует выдачу подписки.
+        $pending = SyncVpnKeyActivateFromPanelsJob::dispatch($keyActivateId);
+        if (config('queue.default') === 'sync') {
+            $pending->afterResponse();
+        }
+        $conn = (string) config('queue.default');
+        $queueLabel = (string) (config('queue.connections.'.$conn.'.queue') ?? $conn);
+        Log::info('Vpn subscription sync: задание поставлено в очередь', [
+            'key_activate_id' => $keyActivateId,
+            'queue_connection' => $conn,
+            'queue' => $queueLabel,
+            'source' => 'vpn',
+        ]);
     }
 
     /**
