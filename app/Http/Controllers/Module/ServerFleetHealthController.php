@@ -146,7 +146,11 @@ class ServerFleetHealthController extends Controller
             ]);
         }
 
-        $chunk = $this->fleetProbeService->probeServerChunk($slice, $includeTestSpeed);
+        $chunk = $this->fleetProbeService->probeServerChunk(
+            $slice,
+            $includeTestSpeed,
+            $includeTestSpeed ? ServerFleetProbeService::FLEET_TEST_SPEED_TIMEOUT_SECONDS : null
+        );
         $serversTextChunk = $this->fleetProbeService->textReportServersSection($chunk['rows'], $includeTestSpeed);
         $nextAfterId = (int) $slice->max('id');
         $hasMore = (clone $base)->where('id', '>', $nextAfterId)->exists();

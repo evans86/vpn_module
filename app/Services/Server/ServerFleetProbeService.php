@@ -14,10 +14,14 @@ use Throwable;
  */
 class ServerFleetProbeService
 {
+    private const DEFAULT_TEST_SPEED_TIMEOUT_SECONDS = 620;
+
+    public const FLEET_TEST_SPEED_TIMEOUT_SECONDS = 30;
+
     /**
      * @return array{rows: array<int, array<string, mixed>>, summary: array<string, int>, elapsed_ms: float}
      */
-    public function probeServerChunk(Collection $servers, bool $includeTestSpeed): array
+    public function probeServerChunk(Collection $servers, bool $includeTestSpeed, ?int $testSpeedTimeoutSeconds = null): array
     {
         $started = microtime(true);
         $rows = [];
@@ -80,7 +84,7 @@ class ServerFleetProbeService
             if ($includeTestSpeed) {
                 $token = $server->decoy_stub_test_speed_token;
                 if ($stubOkDb && $base !== '' && is_string($token) && $token !== '') {
-                    $testSpeed = $this->probeTestSpeed($base, $token);
+                    $testSpeed = $this->probeTestSpeed($base, $token, $testSpeedTimeoutSeconds);
                 } else {
                     $testSpeed['state'] = 'skipped';
                     if (! $stubOkDb) {
@@ -513,17 +517,19 @@ class ServerFleetProbeService
      *
      * @return array<string, mixed>
      */
-    private function probeTestSpeed(string $hostBracket, string $token): array
+    private function probeTestSpeed(string $hostBracket, string $token, ?int $timeoutSeconds = null): array
     {
         $url = 'https://'.$hostBracket.'/test-speed?'.http_build_query(['token' => $token]);
         $emptyMetrics = ['download_mbps' => null, 'upload_mbps' => null, 'curl_mbps_max' => null, 'effective_mbps' => null];
+        $timeoutSeconds = $timeoutSeconds ?? self::DEFAULT_TEST_SPEED_TIMEOUT_SECONDS;
+        $timeoutSeconds = max(10, min(self::DEFAULT_TEST_SPEED_TIMEOUT_SECONDS, $timeoutSeconds));
 
         try {
             $t0 = microtime(true);
             $res = Http::withoutVerifying()
-                ->timeout(620)
+                ->timeout($timeoutSeconds)
                 ->withOptions([
-                    'connect_timeout' => 15,
+                    'connect_timeout' => min(15, max(5, $timeoutSeconds - 5)),
                     'http_errors' => false,
                 ])
                 ->get($url);
@@ -552,11 +558,16 @@ class ServerFleetProbeService
                 'seconds' => $sec,
             ], $metrics);
         } catch (Throwable $e) {
+            $message = Str::limit($e->getMessage(), 500);
+            if (str_contains(mb_strtolower($message, 'UTF-8'), 'timed out')) {
+                $message = 'таймаут /test-speed после '.$timeoutSeconds.' сек — сервер слишком долго выполнял проверку, пропускаем и идём дальше';
+            }
+
             return array_merge([
                 'state' => 'fail',
                 'excerpt' => null,
                 'http_code' => null,
-                'error' => Str::limit($e->getMessage(), 500),
+                'error' => $message,
                 'seconds' => null,
             ], $emptyMetrics);
         }

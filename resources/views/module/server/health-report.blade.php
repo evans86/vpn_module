@@ -759,14 +759,13 @@
                             var afterId = 0;
                             var batchFail = false;
                             while (true) {
-                                var batchLimit = includeTs ? 1 : perBatch;
                                 var batchNote = includeTs
-                                    ? 'Запрошен полный /test-speed — в одном ответе приложения обрабатывается ровно один сервер.'
+                                    ? 'Полный /test-speed проверяется по одному серверу; если узел отвечает дольше 30 секунд, он будет отмечен ошибкой таймаута, а проверка продолжится.'
                                     : ('За один ответ приложения — не более ' + perBatch + ' серверов (так снижаем риск таймаута у прокси).');
                                 var cursorMsg = afterId === 0
                                     ? 'Это первая порция серверов в этой проверке.'
                                     : ('Следующие строки отчёта — для серверов с id в базе больше ' + afterId + ' (предыдущие пакеты уже учтены).');
-                                setPhase('Этап 3 из 3: узлы VPS. ' + cursorMsg + ' ' + batchNote + ' Запрашиваем до ' + batchLimit + ' шт. Ждём ответ Laravel…');
+                                setPhase('Этап 3 из 3: узлы VPS. ' + cursorMsg + ' ' + batchNote + ' Запрашиваем до ' + perBatch + ' шт. Ждём ответ Laravel…');
                                 var bag = await fleetFetchJson({
                                     include_test_speed: includeTs,
                                     after_id: afterId,
@@ -811,7 +810,10 @@
                                     fleetCachedGlobalText,
                                     fleetReportStartedAt
                                 );
-                                var fleetNote = 'Проверка шла несколькими HTTP-запросами к панели (короче по времени каждый ответ — меньше риска HTTP 524 от Cloudflare). '
+                                var fleetNote = includeTs
+                                    ? 'Полный /test-speed проверялся по одному серверу за запрос. Долгие ответы ограничены таймаутом и отмечаются ошибкой, после чего проверка идёт дальше. '
+                                    : 'Проверка шла несколькими HTTP-запросами к панели (короче по времени каждый ответ — меньше риска HTTP 524 от Cloudflare). ';
+                                fleetNote = fleetNote
                                     + 'Узлов в выборке: ' + (matchedTotalFinal != null ? matchedTotalFinal : mergedSummary.total)
                                     + '; сумма времени пакетов на Laravel (мс): ' + sumElapsedChunk + '.\n\n';
                                 part2 = '\n\n' + '='.repeat(72) + '\n\n=== Узлы VPS (хост панели) ===\n\n'
