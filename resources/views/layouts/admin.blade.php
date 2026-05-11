@@ -134,6 +134,21 @@
             </button>
         </div>
 
+        @auth
+            <div x-show="!sidebarCollapsed"
+                 x-transition
+                 class="admin-sidebar-label border-b border-gray-200 px-3 py-3">
+                <div class="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                    <span>Сейчас в админке</span>
+                    <span id="adminPresenceCount"
+                          class="inline-flex min-w-[1.5rem] justify-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-emerald-700">0</span>
+                </div>
+                <div id="adminPresenceList" class="mt-2 space-y-1.5 text-xs text-gray-600">
+                    <div class="text-gray-400">Проверяем активность...</div>
+                </div>
+            </div>
+        @endauth
+
         <!-- Navigation (группы со сворачиваемыми подразделами) -->
         <nav class="flex-1 overflow-y-auto py-4 px-2">
             <ul class="space-y-2">
@@ -420,6 +435,107 @@
             "extendedTimeOut": "1000"
         };
     </script>
+
+    @auth
+        <script>
+            (function () {
+                var heartbeatUrl = @json(route('admin.presence.heartbeat'));
+                var onlineUrl = @json(route('admin.presence.online'));
+                var csrf = document.querySelector('meta[name="csrf-token"]');
+                var token = csrf ? csrf.getAttribute('content') : '';
+                var listEl = document.getElementById('adminPresenceList');
+                var countEl = document.getElementById('adminPresenceCount');
+
+                function esc(value) {
+                    return String(value == null ? '' : value)
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;');
+                }
+
+                function renderPresence(items) {
+                    items = Array.isArray(items) ? items : [];
+                    if (countEl) {
+                        countEl.textContent = String(items.length);
+                    }
+                    if (!listEl) {
+                        return;
+                    }
+                    if (!items.length) {
+                        listEl.innerHTML = '<div class="text-gray-400">Активных сессий нет</div>';
+                        return;
+                    }
+
+                    listEl.innerHTML = items.map(function (item) {
+                        var title = item.username ? (item.name + ' / ' + item.username) : item.name;
+                        return '<div class="rounded-md border border-gray-100 bg-gray-50 px-2 py-1.5">'
+                            + '<div class="flex items-center gap-1.5 text-gray-800">'
+                            + '<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span>'
+                            + '<span class="truncate" title="' + esc(title) + '">' + esc(title || 'Админ') + '</span>'
+                            + '</div>'
+                            + '<div class="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-gray-500">'
+                            + '<span class="truncate" title="' + esc(item.ip) + '">' + esc(item.ip || 'IP неизвестен') + '</span>'
+                            + '<span class="shrink-0">' + esc(item.last_seen_human || '') + '</span>'
+                            + '</div>'
+                            + '</div>';
+                    }).join('');
+                }
+
+                async function postHeartbeat() {
+                    var res = await fetch(heartbeatUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': token,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'same-origin',
+                        body: '{}'
+                    });
+                    if (!res.ok) {
+                        throw new Error('heartbeat HTTP ' + res.status);
+                    }
+                    return res.json();
+                }
+
+                async function loadOnline() {
+                    var res = await fetch(onlineUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'same-origin'
+                    });
+                    if (!res.ok) {
+                        throw new Error('online HTTP ' + res.status);
+                    }
+                    return res.json();
+                }
+
+                async function tick(sendHeartbeat) {
+                    try {
+                        var data = sendHeartbeat ? await postHeartbeat() : await loadOnline();
+                        renderPresence(data.online || []);
+                    } catch (e) {
+                        if (listEl) {
+                            listEl.innerHTML = '<div class="text-amber-600">Не удалось обновить статус</div>';
+                        }
+                    }
+                }
+
+                tick(true);
+                setInterval(function () {
+                    tick(true);
+                }, 25000);
+                setInterval(function () {
+                    tick(false);
+                }, 10000);
+            })();
+        </script>
+    @endauth
 
     @stack('js')
     @stack('scripts')

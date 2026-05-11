@@ -14,6 +14,7 @@ use App\Http\Controllers\Module\ServerFleetHealthController;
 use App\Http\Controllers\Module\ServerMonitoringController;
 use App\Http\Controllers\Module\TelegramUserController;
 use App\Http\Controllers\Module\VpnDirectDomainController;
+use App\Http\Controllers\AdminPresenceController;
 use App\Http\Controllers\VpnConfigController;
 use App\Http\Controllers\VpnDirectDomainsPublicController;
 use App\Http\Controllers\LogController;
@@ -192,6 +193,13 @@ Route::get('/vpn/routing/direct-domains-rule-set.json', [VpnDirectDomainsPublicC
 // Admin Routes (опционально: ADMIN_HTTP_BASIC_USER + ADMIN_HTTP_BASIC_PASSWORD в .env)
 Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(function () {
     Route::middleware(['auth'])->group(function () {
+        Route::post('/presence/heartbeat', [AdminPresenceController::class, 'heartbeat'])
+            ->middleware('throttle:240,1')
+            ->name('presence.heartbeat');
+        Route::get('/presence/online', [AdminPresenceController::class, 'online'])
+            ->middleware('throttle:240,1')
+            ->name('presence.online');
+
         // Logs
         Route::get('/logs', [LogController::class, 'index'])->name('logs.index');
         Route::get('/logs/{log}', [LogController::class, 'show'])->name('logs.show');
