@@ -382,16 +382,41 @@
                         + '<div class="text-base font-semibold text-slate-900">' + esc(val) + '</div></div>';
                 }
 
+                function fetchWithTimeout(url, options, timeoutMs) {
+                    options = options || {};
+                    timeoutMs = timeoutMs || 5000;
+                    if (typeof AbortController === 'undefined') {
+                        return fetch(url, options);
+                    }
+                    var controller = new AbortController();
+                    var timer = setTimeout(function () {
+                        controller.abort();
+                    }, timeoutMs);
+                    var opts = Object.assign({}, options, { signal: controller.signal });
+
+                    return fetch(url, opts).finally(function () {
+                        clearTimeout(timer);
+                    });
+                }
+
+                function friendlyFetchError(e, timeoutMs) {
+                    if (e && (e.name === 'AbortError' || /abort/i.test(String(e.message || '')))) {
+                        return 'таймаут ' + Math.round(timeoutMs / 1000) + ' сек';
+                    }
+
+                    return (e && e.message) ? e.message : String(e || 'ошибка запроса');
+                }
+
                 async function measurePingMs(url, trials) {
                     var out = [];
                     for (var i = 0; i < trials; i++) {
                         var t0 = performance.now();
                         try {
                             var u = url + (url.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now() + '_' + i;
-                            var res = await fetch(u, {
+                            var res = await fetchWithTimeout(u, {
                                 cache: 'no-store',
                                 credentials: 'same-origin'
-                            });
+                            }, 4000);
                             await res.blob();
                             out.push(Math.round(performance.now() - t0));
                         } catch (e) {
@@ -405,7 +430,7 @@
                 async function measureNoCorsMs(url) {
                     var t0 = performance.now();
                     try {
-                        await fetch(url, { mode: 'no-cors', cache: 'no-store' });
+                        await fetchWithTimeout(url, { mode: 'no-cors', cache: 'no-store' }, 5000);
                         return Math.round(performance.now() - t0);
                     } catch (e) {
                         return null;
@@ -414,7 +439,7 @@
 
                 async function measureDownload(url, maxBytes, label, lines) {
                     var t0 = performance.now();
-                    var res = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
+                    var res = await fetchWithTimeout(url, { cache: 'no-store', credentials: 'same-origin' }, 12000);
                     if (!res.ok) {
                         lines.push(label + ': ошибка HTTP ' + res.status);
                         return;
@@ -454,32 +479,42 @@
                     lines.push('');
 
                     try {
-                        setPhase('Браузер: запрос внешнего IP и геоподписи по ipwho (может занять несколько секунд)…');
+                        setPhase('Браузер: запрос внешнего IP и геоподписи (внешние сервисы ограничены коротким таймаутом)…');
                         lines.push('--- IP / Geo ---');
-                        var rip = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
+                        var rip = await fetchWithTimeout('https://api.ipify.org?format=json', { cache: 'no-store' }, 3500);
+                        if (!rip.ok) {
+                            throw new Error('ipify HTTP ' + rip.status);
+                        }
                         var jip = await rip.json();
                         lines.push('IPv4/v6 (ipify): ' + (jip.ip || '—'));
                         try {
-                            var rg = await fetch('https://ipwho.is/' + encodeURIComponent(jip.ip), { cache: 'no-store' });
-                            var g = await rg.json();
-                            if (g.success) {
+                            var rg = await fetchWithTimeout('https://ipwho.is/' + encodeURIComponent(jip.ip), { cache: 'no-store' }, 3500);
+                            var g = {};
+                            try {
+                                g = await rg.json();
+                            } catch (jsonErr) {
+                                g = {};
+                            }
+                            if (rg.ok && g.success) {
                                 lines.push('Страна: ' + g.country + ' (' + g.country_code + ')');
                                 lines.push('Город: ' + (g.city || '—') + ', регион: ' + (g.region || '—'));
                                 if (g.connection) {
                                     lines.push('Провайдер: ' + (g.connection.isp || '—') + ', ASN: ' + (g.connection.asn || '—'));
                                 }
                             } else {
-                                var gm = g.message || 'нет данных';
-                                if (/cors/i.test(gm) || /free plan/i.test(gm)) {
-                                    gm += ' — типично для бесплатного плана ipwho: браузерный запрос без ключа; на проверку VPS не влияет.';
+                                var gm = g.message || ('HTTP ' + rg.status);
+                                if (rg.status === 403) {
+                                    gm = 'HTTP 403 от ipwho.is — внешний GeoIP сервис отклонил браузерный запрос; на проверку VPS не влияет.';
+                                } else if (/cors/i.test(gm) || /free plan/i.test(gm)) {
+                                    gm += ' — типично для бесплатного плана GeoIP: браузерный запрос без ключа; на проверку VPS не влияет.';
                                 }
                                 lines.push('GeoIP: ' + gm);
                             }
                         } catch (e) {
-                            lines.push('GeoIP (ipwho): ' + e.message);
+                            lines.push('GeoIP (ipwho): ' + friendlyFetchError(e, 3500) + ' — пропущено, на проверку VPS не влияет.');
                         }
                     } catch (e) {
-                        lines.push('Публичный IP: ' + e.message);
+                        lines.push('Публичный IP: ' + friendlyFetchError(e, 3500) + ' — пропущено, проверка продолжается.');
                     }
                     lines.push('');
 
