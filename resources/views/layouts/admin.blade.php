@@ -439,8 +439,8 @@
     @auth
         <script>
             (function () {
-                var heartbeatUrl = @json(route('admin.presence.heartbeat'));
-                var onlineUrl = @json(route('admin.presence.online'));
+                var heartbeatUrl = @json(url('/admin/presence/heartbeat'));
+                var onlineUrl = @json(url('/admin/presence/online'));
                 var csrf = document.querySelector('meta[name="csrf-token"]');
                 var token = csrf ? csrf.getAttribute('content') : '';
                 var listEl = document.getElementById('adminPresenceList');

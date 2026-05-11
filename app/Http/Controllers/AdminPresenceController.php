@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
 
 class AdminPresenceController extends Controller
 {
@@ -24,7 +23,7 @@ class AdminPresenceController extends Controller
 
         $sessions = $this->freshSessions();
         $sessionId = $request->session()->getId();
-        $presenceKey = ((int) $user->id).':'.sha1($sessionId !== '' ? $sessionId : Str::random(16));
+        $presenceKey = ((int) $user->id).':'.sha1($sessionId !== '' ? $sessionId : (string) $user->id);
         $now = now();
 
         $sessions[$presenceKey] = [
@@ -32,7 +31,7 @@ class AdminPresenceController extends Controller
             'name' => (string) ($user->name ?: $user->username ?: ('User #'.$user->id)),
             'username' => (string) ($user->username ?? ''),
             'ip' => $this->clientIp($request),
-            'user_agent' => Str::limit((string) $request->userAgent(), 160, ''),
+            'user_agent' => mb_substr((string) $request->userAgent(), 0, 160),
             'last_seen_at' => $now->toIso8601String(),
             'last_seen_human' => $now->format('H:i:s'),
         ];
