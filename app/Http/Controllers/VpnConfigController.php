@@ -1312,7 +1312,7 @@ class VpnConfigController extends Controller
             'hexasoftware', 'v2rayg', 'anxray', 'kitsunebi', 'potatso', 'rocket',
             'pharos', 'stash', 'mellow', 'leaf', 'hysteria', 'tuic', 'naive', 'brook',
             'vnet', 'http injector', 'anonym', 'proxy', 'vpn', 'sub', 'subscribe',
-            'subscription', 'hiddifynext', 'karing',
+            'subscription', 'hiddifynext', 'karing', 'incy',
         ];
 
         foreach ($vpnPatterns as $pattern) {
