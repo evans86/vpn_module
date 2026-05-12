@@ -3104,7 +3104,7 @@ EOS
                 'sniffing' => ['enabled' => true, 'destOverride' => ['http', 'tls']],
             ],
             [
-                'tag' => 'Shadowsocks-TCP',
+                'tag' => 'Shadowsocks TCP',
                 'listen' => '0.0.0.0',
                 'port' => 28388,
                 'protocol' => 'shadowsocks',
@@ -3926,6 +3926,7 @@ EOS
         $portMapByTag = [
             'TROJAN-WS' => 22097,
             'Shadowsocks-TCP' => 28388,
+            'Shadowsocks TCP' => 28388,
             'VLESS TCP REALITY' => 21443,
             'VLESS GRPC REALITY' => 22443,
             'VLESS XHTTP REALITY' => 21444,
@@ -3990,10 +3991,35 @@ EOS
                 return;
             }
 
-            throw new RuntimeException(
-                'В текущем core config не найдены ожидаемые inbounds/ports для mixed stealth port-map. '
-                .'Порты: '.implode(', ', $currentPorts).'. Теги: '.implode(', ', $currentTags).'.'
-            );
+            $hasOnlyFallbackShadowsocks = count($json_config['inbounds']) === 1
+                && in_array('Shadowsocks TCP', $currentTags, true)
+                && in_array(1080, $currentPorts, true);
+            if ($hasOnlyFallbackShadowsocks) {
+                Log::warning('Mixed stealth current config is incomplete; rebuilding full mixed stealth preset', [
+                    'panel_id' => $panel_id,
+                    'ports' => $currentPorts,
+                    'tags' => $currentTags,
+                    'source' => 'panel',
+                ]);
+
+                $realityKeys = $this->getOrGenerateRealityKeys($panel);
+                $json_config = $this->buildBaseConfig($panel);
+                $json_config['inbounds'] = array_merge(
+                    $this->buildStableBasicInboundsForMixedStealth($panel),
+                    $this->buildMixedRealityStealthInbounds(
+                        $realityKeys['private_key'],
+                        $realityKeys['short_id'],
+                        $realityKeys['grpc_short_id'],
+                        $realityKeys['xhttp_short_id']
+                    )
+                );
+                $changed[] = 'rebuilt full mixed stealth from incomplete Shadowsocks-only config';
+            } else {
+                throw new RuntimeException(
+                    'В текущем core config не найдены ожидаемые inbounds/ports для mixed stealth port-map. '
+                    .'Порты: '.implode(', ', $currentPorts).'. Теги: '.implode(', ', $currentTags).'.'
+                );
+            }
         }
 
         Log::info('Mixed stealth port-map prepared from current config', [
