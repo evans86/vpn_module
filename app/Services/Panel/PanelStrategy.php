@@ -115,6 +115,22 @@ class PanelStrategy
     }
 
     /**
+     * Тестовый скрытый пресет: один VLESS TCP REALITY inbound на высоком порту.
+     */
+    public function updateConfigurationRealityStealth(int $panel_id): void
+    {
+        $this->strategy->updateConfigurationRealityStealth($panel_id);
+    }
+
+    /**
+     * Тот же mixed/mixed_warp набор inbounds, но на высоких непалевных портах.
+     */
+    public function updateConfigurationMixedStealth(int $panel_id): void
+    {
+        $this->strategy->updateConfigurationMixedStealth($panel_id);
+    }
+
+    /**
      * Обновление конфига панели — смешанный: SS + Trojan + VLESS + 2 REALITY
      */
     public function updateConfigurationMixed(int $panel_id): void

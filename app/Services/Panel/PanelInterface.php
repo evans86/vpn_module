@@ -52,6 +52,16 @@ interface PanelInterface
     public function updateConfigurationReality443(int $panel_id): void;
 
     /**
+     * Тестовый скрытый пресет: один VLESS TCP REALITY inbound на высоком порту.
+     */
+    public function updateConfigurationRealityStealth(int $panel_id): void;
+
+    /**
+     * Тот же mixed/mixed_warp набор inbounds, но на высоких непалевных портах.
+     */
+    public function updateConfigurationMixedStealth(int $panel_id): void;
+
+    /**
      * Обновление конфигурации панели — смешанный пресет: SS + Trojan + VLESS + 2 REALITY
      *
      * @param int $panel_id

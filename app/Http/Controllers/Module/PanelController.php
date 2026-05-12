@@ -380,6 +380,70 @@ class PanelController extends Controller
     }
 
     /**
+     * Тестовый скрытый пресет: один VLESS TCP REALITY inbound на высоком порту.
+     */
+    public function updateConfigRealityStealth(Panel $panel): RedirectResponse
+    {
+        try {
+            $this->logger->info('Обновление конфигурации панели (REALITY stealth)', [
+                'source' => 'panel',
+                'action' => 'update-config-reality-stealth',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+            ]);
+
+            $strategy = new PanelStrategy($panel->panel);
+            $strategy->updateConfigurationRealityStealth($panel->id);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'Тестовый пресет «REALITY stealth» применён к одной панели. Проверьте, что в аудите остался только высокий порт Xray и подписка обновилась.');
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при обновлении конфигурации панели (REALITY stealth)', [
+                'source' => 'panel',
+                'action' => 'update-config-reality-stealth',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Ошибка при обновлении конфигурации: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Текущий mixed/WARP набор inbounds, но на высоких непалевных портах.
+     */
+    public function updateConfigMixedStealth(Panel $panel): RedirectResponse
+    {
+        try {
+            $this->logger->info('Обновление конфигурации панели (mixed stealth)', [
+                'source' => 'panel',
+                'action' => 'update-config-mixed-stealth',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+            ]);
+
+            $strategy = new PanelStrategy($panel->panel);
+            $strategy->updateConfigurationMixedStealth($panel->id);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'Тестовый пресет «Смешанная stealth» применён к одной панели. Набор протоколов сохранён, изменены только порты.');
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при обновлении конфигурации панели (mixed stealth)', [
+                'source' => 'panel',
+                'action' => 'update-config-mixed-stealth',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Ошибка при обновлении конфигурации: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Update panel configuration — mixed: SS + Trojan + VLESS + 2 REALITY (no VMess).
      */
     public function updateConfigMixed(Panel $panel): RedirectResponse

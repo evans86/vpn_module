@@ -380,6 +380,16 @@ class Panel extends Model
     const CONFIG_TYPE_REALITY_443 = 'reality_443';
 
     /**
+     * @var string Тестовый скрытый пресет: один VLESS TCP REALITY inbound на высоком порту.
+     */
+    const CONFIG_TYPE_REALITY_STEALTH = 'reality_stealth';
+
+    /**
+     * @var string Тот же mixed/mixed_warp набор inbounds, но на высоких непалевных портах.
+     */
+    const CONFIG_TYPE_MIXED_STEALTH = 'mixed_stealth';
+
+    /**
      * @var string Тип конфига: SS + Trojan + 3 VLESS REALITY (без VMess)
      */
     const CONFIG_TYPE_MIXED = 'mixed';
@@ -590,6 +600,10 @@ class Panel extends Model
                 return 'REALITY стабильный (только REALITY)';
             case self::CONFIG_TYPE_REALITY_443:
                 return 'REALITY 443 only';
+            case self::CONFIG_TYPE_REALITY_STEALTH:
+                return 'REALITY stealth';
+            case self::CONFIG_TYPE_MIXED_STEALTH:
+                return 'Смешанная stealth';
             case self::CONFIG_TYPE_MIXED:
                 return 'Смешанная';
             case self::CONFIG_TYPE_MIXED_WARP:
@@ -615,6 +629,10 @@ class Panel extends Model
                 return 'primary';
             case self::CONFIG_TYPE_REALITY_443:
                 return 'success';
+            case self::CONFIG_TYPE_REALITY_STEALTH:
+                return 'success';
+            case self::CONFIG_TYPE_MIXED_STEALTH:
+                return 'success';
             case self::CONFIG_TYPE_MIXED:
                 return 'warning';
             case self::CONFIG_TYPE_MIXED_WARP:
@@ -631,6 +649,7 @@ class Panel extends Model
     public function getConfigDistributionBadgeTailwindAttribute(): string
     {
         switch ($this->config_type) {
+            case self::CONFIG_TYPE_MIXED_STEALTH:
             case self::CONFIG_TYPE_MIXED:
                 return 'border-amber-400/70 bg-amber-50 text-amber-950 ring-1 ring-amber-400/25';
             case self::CONFIG_TYPE_MIXED_WARP:

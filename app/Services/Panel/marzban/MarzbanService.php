@@ -2742,7 +2742,10 @@ EOS
             }
 
             if (! empty($panel->warp_routing_all)) {
-                if (isset($panel->config_type) && $panel->config_type === Panel::CONFIG_TYPE_MIXED_WARP) {
+                if (isset($panel->config_type) && in_array($panel->config_type, [
+                    Panel::CONFIG_TYPE_MIXED_WARP,
+                    Panel::CONFIG_TYPE_MIXED_STEALTH,
+                ], true)) {
                     $routingRules = $this->buildRealityFullWarpRoutingRules($panel);
                 } else {
                     $bypassIps = config('panel.warp_routing_full_bypass_ip_cidr', []);
@@ -3083,6 +3086,34 @@ EOS
     }
 
     /**
+     * То же, что buildStableBasicInboundsForMixed(), но без палевных низких/типовых портов.
+     */
+    private function buildStableBasicInboundsForMixedStealth(?Panel $panel = null): array
+    {
+        return [
+            [
+                'tag' => 'TROJAN-WS',
+                'listen' => '0.0.0.0',
+                'port' => 22097,
+                'protocol' => 'trojan',
+                'settings' => ['clients' => [], 'level' => 0],
+                'streamSettings' => array_merge([
+                    'network' => 'ws',
+                    'wsSettings' => ['path' => '/trojan'],
+                ], $this->getSecuritySettings($panel, true)),
+                'sniffing' => ['enabled' => true, 'destOverride' => ['http', 'tls']],
+            ],
+            [
+                'tag' => 'Shadowsocks-TCP',
+                'listen' => '0.0.0.0',
+                'port' => 28388,
+                'protocol' => 'shadowsocks',
+                'settings' => ['clients' => [], 'network' => 'tcp,udp', 'level' => 0],
+            ],
+        ];
+    }
+
+    /**
      * Два стабильных VLESS REALITY: TCP (Microsoft) и TCP ALT (Google).
      */
     private function buildTwoRealityInbounds(string $privateKey, string $shortId, string $xhttpShortId): array
@@ -3137,11 +3168,47 @@ EOS
      */
     private function buildReality443Inbound(string $privateKey, string $shortId): array
     {
+        return $this->buildSingleTcpRealityInbound('VLESS TCP REALITY 443', 443, $privateKey, $shortId);
+    }
+
+    /**
+     * Один inbound на высоком порту для тестовой скрытой миграции.
+     */
+    private function buildRealityStealthInbound(string $privateKey, string $shortId): array
+    {
+        return $this->buildSingleTcpRealityInbound('VLESS TCP REALITY STEALTH', 21443, $privateKey, $shortId);
+    }
+
+    /**
+     * Тот же набор REALITY inbounds, что в mixed, но с заменой портов:
+     * 8443→21443, 9443→22443, 2083→22083.
+     */
+    private function buildMixedRealityStealthInbounds(
+        string $privateKey,
+        string $shortId,
+        string $grpcShortId,
+        string $xhttpShortId
+    ): array {
+        $inbounds = $this->buildRealityInbounds($privateKey, $shortId, $grpcShortId, $xhttpShortId);
+        $selected = [
+            $inbounds[0],
+            $inbounds[1],
+            $inbounds[3],
+        ];
+        $selected[0]['port'] = 21443;
+        $selected[1]['port'] = 22443;
+        $selected[2]['port'] = 22083;
+
+        return $selected;
+    }
+
+    private function buildSingleTcpRealityInbound(string $tag, int $port, string $privateKey, string $shortId): array
+    {
         return [
             [
-                'tag' => 'VLESS TCP REALITY 443',
+                'tag' => $tag,
                 'listen' => '0.0.0.0',
-                'port' => 443,
+                'port' => $port,
                 'protocol' => 'vless',
                 'settings' => [
                     'clients' => [],
@@ -3711,6 +3778,31 @@ EOS
     }
 
     /**
+     * Тестовый скрытый пресет: только один VLESS TCP REALITY inbound на высоком порту.
+     *
+     * @throws GuzzleException
+     */
+    public function updateConfigurationRealityStealth(int $panel_id): void
+    {
+        $panel = self::updateMarzbanToken($panel_id);
+
+        Log::info('Updating configuration to REALITY stealth high port only', [
+            'panel_id' => $panel_id,
+            'source' => 'panel',
+        ]);
+
+        $realityKeys = $this->getOrGenerateRealityKeys($panel);
+
+        $json_config = $this->buildBaseConfig($panel);
+        $json_config['inbounds'] = $this->buildRealityStealthInbound(
+            $realityKeys['private_key'],
+            $realityKeys['short_id']
+        );
+
+        $this->applyConfiguration($panel, $json_config, Panel::CONFIG_TYPE_REALITY_STEALTH);
+    }
+
+    /**
      * Обновление конфигурации панели — смешанный пресет: SS + Trojan + VLESS (VLESS-WS) + 2 стабильных VLESS REALITY.
      * Без VMess. Для теста на проде.
      *
@@ -3787,6 +3879,37 @@ EOS
     }
 
     /**
+     * Mixed/WARP-набор inbounds на высоких портах:
+     * Trojan 22097, SS 28388, VLESS Reality 21443/22443/22083.
+     *
+     * @throws GuzzleException
+     */
+    public function updateConfigurationMixedStealth(int $panel_id): void
+    {
+        $panel = self::updateMarzbanToken($panel_id);
+
+        Log::info('Updating configuration to mixed stealth high ports', [
+            'panel_id' => $panel_id,
+            'source' => 'panel',
+        ]);
+
+        $realityKeys = $this->getOrGenerateRealityKeys($panel);
+
+        $json_config = $this->buildBaseConfig($panel);
+        $json_config['inbounds'] = array_merge(
+            $this->buildStableBasicInboundsForMixedStealth($panel),
+            $this->buildMixedRealityStealthInbounds(
+                $realityKeys['private_key'],
+                $realityKeys['short_id'],
+                $realityKeys['grpc_short_id'],
+                $realityKeys['xhttp_short_id']
+            )
+        );
+
+        $this->applyConfiguration($panel, $json_config, Panel::CONFIG_TYPE_MIXED_STEALTH);
+    }
+
+    /**
      * Повторно применить текущий пресет конфигурации (после смены флагов WARP и т.п.).
      *
      * @throws GuzzleException
@@ -3809,11 +3932,17 @@ EOS
             case Panel::CONFIG_TYPE_REALITY_443:
                 $this->updateConfigurationReality443($panel_id);
                 break;
+            case Panel::CONFIG_TYPE_REALITY_STEALTH:
+                $this->updateConfigurationRealityStealth($panel_id);
+                break;
             case Panel::CONFIG_TYPE_MIXED:
                 $this->updateConfigurationMixed($panel_id);
                 break;
             case Panel::CONFIG_TYPE_MIXED_WARP:
                 $this->updateConfigurationMixedWarp($panel_id);
+                break;
+            case Panel::CONFIG_TYPE_MIXED_STEALTH:
+                $this->updateConfigurationMixedStealth($panel_id);
                 break;
             default:
                 $this->updateConfigurationMixed($panel_id);
@@ -3936,7 +4065,19 @@ EOS
             return [$inbounds, $proxies];
         }
 
-        if ($configType === Panel::CONFIG_TYPE_MIXED || $configType === Panel::CONFIG_TYPE_MIXED_WARP) {
+        if ($configType === Panel::CONFIG_TYPE_REALITY_STEALTH) {
+            $inbounds = [
+                'vless' => ['VLESS TCP REALITY STEALTH'],
+            ];
+            $proxies = [
+                'vless' => ['id' => $vlessId],
+            ];
+            return [$inbounds, $proxies];
+        }
+
+        if ($configType === Panel::CONFIG_TYPE_MIXED
+            || $configType === Panel::CONFIG_TYPE_MIXED_WARP
+            || $configType === Panel::CONFIG_TYPE_MIXED_STEALTH) {
             // SS + Trojan + 3 VLESS REALITY (без VLESS-WS)
             $inbounds = [
                 'vless' => ['VLESS TCP REALITY', 'VLESS GRPC REALITY', 'VLESS TCP REALITY ALT'],

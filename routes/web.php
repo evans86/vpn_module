@@ -285,6 +285,8 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
                 Route::post('/{panel}/update-config-reality', [PanelController::class, 'updateConfigReality'])->name('update-config-reality');
                 Route::post('/{panel}/update-config-reality-stable', [PanelController::class, 'updateConfigRealityStable'])->name('update-config-reality-stable');
                 Route::post('/{panel}/update-config-reality-443', [PanelController::class, 'updateConfigReality443'])->name('update-config-reality-443');
+                Route::post('/{panel}/update-config-reality-stealth', [PanelController::class, 'updateConfigRealityStealth'])->name('update-config-reality-stealth');
+                Route::post('/{panel}/update-config-mixed-stealth', [PanelController::class, 'updateConfigMixedStealth'])->name('update-config-mixed-stealth');
                 Route::post('/{panel}/update-config-mixed', [PanelController::class, 'updateConfigMixed'])->name('update-config-mixed');
                 Route::post('/{panel}/update-config-mixed-warp', [PanelController::class, 'updateConfigMixedWarp'])->name('update-config-mixed-warp');
                 Route::post('/{panel}/warp-routing', [PanelController::class, 'updateWarpRouting'])->name('update-warp-routing');
