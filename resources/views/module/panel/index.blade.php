@@ -253,6 +253,13 @@
                                                         Переконфигурировать
                                                     </button>
                                                 </form>
+                                                <form action="{{ url('/admin/module/panel/'.$panel->id.'/update-config-mixed-stealth') }}" method="POST" class="mt-2"
+                                                      onsubmit="return confirm('Вернуть high-port конфиг «Смешанная stealth» с сохранением WARP для панели #{{ $panel->id }}?');">
+                                                    @csrf
+                                                    <button type="submit" class="w-full py-2.5 px-3 text-sm font-medium rounded-lg text-white bg-teal-700 border border-teal-900 hover:bg-teal-800">
+                                                        Смешанная stealth + WARP
+                                                    </button>
+                                                </form>
                                             @else
                                                 @if($marzbanConfigured)
                                                     <form action="{{ route('admin.module.panel.reapply-marzban-config', $panel) }}" method="POST" class="mb-2" title="Повторно отправить в Marzban текущий пресет после обновления кода">
