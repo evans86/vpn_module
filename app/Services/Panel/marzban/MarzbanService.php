@@ -3132,6 +3132,54 @@ EOS
         ];
     }
 
+    /**
+     * Один публичный inbound для тестовой миграции: VLESS TCP REALITY на 443.
+     */
+    private function buildReality443Inbound(string $privateKey, string $shortId): array
+    {
+        return [
+            [
+                'tag' => 'VLESS TCP REALITY 443',
+                'listen' => '0.0.0.0',
+                'port' => 443,
+                'protocol' => 'vless',
+                'settings' => [
+                    'clients' => [],
+                    'decryption' => 'none',
+                    'level' => 0,
+                ],
+                'streamSettings' => [
+                    'network' => 'tcp',
+                    'tcpSettings' => [
+                        'acceptProxyProtocol' => false,
+                        'header' => [
+                            'type' => 'none',
+                        ],
+                    ],
+                    'security' => 'reality',
+                    'realitySettings' => [
+                        'show' => false,
+                        'dest' => 'www.microsoft.com:443',
+                        'xver' => 0,
+                        'serverNames' => [
+                            'www.microsoft.com',
+                            'microsoft.com',
+                            'login.microsoftonline.com',
+                            'outlook.office.com',
+                            'office.com',
+                        ],
+                        'privateKey' => $privateKey,
+                        'shortIds' => ['', $shortId],
+                    ],
+                ],
+                'sniffing' => [
+                    'enabled' => true,
+                    'destOverride' => ['http', 'tls', 'quic'],
+                ],
+            ],
+        ];
+    }
+
     private function buildRealityInbounds(string $privateKey, string $shortId, string $grpcShortId, string $xhttpShortId): array
     {
         return [
@@ -3635,6 +3683,34 @@ EOS
     }
 
     /**
+     * Тестовый пресет: только один VLESS TCP REALITY inbound на 443.
+     *
+     * Важно: применять сначала на одной тестовой панели. Если 443 занят nginx/caddy/другим сервисом,
+     * Xray/Marzban может не поднять inbound — это должно выявляться на тестовом сервере до массовой миграции.
+     *
+     * @throws GuzzleException
+     */
+    public function updateConfigurationReality443(int $panel_id): void
+    {
+        $panel = self::updateMarzbanToken($panel_id);
+
+        Log::info('Updating configuration to REALITY 443 only', [
+            'panel_id' => $panel_id,
+            'source' => 'panel',
+        ]);
+
+        $realityKeys = $this->getOrGenerateRealityKeys($panel);
+
+        $json_config = $this->buildBaseConfig($panel);
+        $json_config['inbounds'] = $this->buildReality443Inbound(
+            $realityKeys['private_key'],
+            $realityKeys['short_id']
+        );
+
+        $this->applyConfiguration($panel, $json_config, Panel::CONFIG_TYPE_REALITY_443);
+    }
+
+    /**
      * Обновление конфигурации панели — смешанный пресет: SS + Trojan + VLESS (VLESS-WS) + 2 стабильных VLESS REALITY.
      * Без VMess. Для теста на проде.
      *
@@ -3729,6 +3805,9 @@ EOS
                 break;
             case Panel::CONFIG_TYPE_REALITY_STABLE:
                 $this->updateConfigurationRealityStable($panel_id);
+                break;
+            case Panel::CONFIG_TYPE_REALITY_443:
+                $this->updateConfigurationReality443($panel_id);
                 break;
             case Panel::CONFIG_TYPE_MIXED:
                 $this->updateConfigurationMixed($panel_id);
@@ -3840,6 +3919,16 @@ EOS
                     'VLESS XHTTP REALITY',
                     'VLESS TCP REALITY ALT',
                 ],
+            ];
+            $proxies = [
+                'vless' => ['id' => $vlessId],
+            ];
+            return [$inbounds, $proxies];
+        }
+
+        if ($configType === Panel::CONFIG_TYPE_REALITY_443) {
+            $inbounds = [
+                'vless' => ['VLESS TCP REALITY 443'],
             ];
             $proxies = [
                 'vless' => ['id' => $vlessId],

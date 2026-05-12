@@ -201,6 +201,8 @@
                      class="hidden mb-4 w-full text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 max-h-72 overflow-auto border border-slate-700"></pre>
                 <pre id="bulkRunLogUploadNowOut"
                      class="hidden mb-4 w-full text-xs font-mono bg-slate-900 text-green-100 rounded-md p-3 max-h-96 overflow-auto border border-slate-700"></pre>
+                <pre id="serverPortAuditOut"
+                     class="hidden mb-4 w-full text-xs font-mono bg-slate-900 text-slate-100 rounded-md p-3 max-h-96 overflow-auto border border-slate-700 whitespace-pre-wrap"></pre>
                 <div id="logUploadInstallPanel" class="hidden mb-4 rounded-md border border-sky-700 overflow-hidden shadow-sm">
                     <div class="px-3 py-1.5 text-xs font-medium text-sky-950 bg-sky-100 border-b border-sky-300">
                         Результат: установка / обновление скрипта выгрузки (одна нода или массово) — см. строки ниже
@@ -475,6 +477,11 @@
                                                 class="inline-flex flex-1 min-w-[min(100%,10rem)] basis-[calc(50%-0.25rem)] max-w-full items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 transition-colors">
                                             <i class="fas fa-check-circle mr-2"></i>
                                             <span>Проверить логи</span>
+                                        </button>
+                                        <button type="button" onclick="auditServerPorts({{ $server->id }})"
+                                                class="inline-flex flex-1 min-w-[min(100%,10rem)] basis-[calc(50%-0.25rem)] max-w-full items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-slate-800 bg-slate-50 hover:bg-slate-100 border border-slate-300 transition-colors">
+                                            <i class="fas fa-shield-alt mr-2"></i>
+                                            <span>Аудит портов</span>
                                         </button>
                                         <button type="button" onclick="rebootServer({{ $server->id }})"
                                                 class="inline-flex flex-1 min-w-[min(100%,10rem)] basis-[calc(50%-0.25rem)] max-w-full items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 transition-colors">
@@ -766,6 +773,72 @@
                     error: function (xhr) {
                         var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Ошибка перезагрузки';
                         toastr.error(msg);
+                    }
+                });
+            }
+
+            function renderPortAudit(response) {
+                var out = document.getElementById('serverPortAuditOut');
+                if (!out) {
+                    return;
+                }
+                var s = response.server || {};
+                var lines = [];
+                lines.push('===== Аудит портов (read-only)');
+                lines.push('Сервер: #' + (s.id || '') + ' ' + (s.name || '') + ' ' + (s.ip || ''));
+                lines.push('Разрешённые публичные TCP: ' + (response.allowed_ports || []).join(', '));
+                lines.push('Палевные/нежелательные TCP: ' + (response.bad_ports || []).join(', '));
+                lines.push('');
+
+                var open = response.open_ports || [];
+                if (!open.length) {
+                    lines.push('Открытых портов из проверяемого списка не найдено.');
+                } else {
+                    lines.push('Открытые порты:');
+                    open.forEach(function (row) {
+                        var mark = row.status === 'bad' ? '[BAD] ' : (row.status === 'allowed' ? '[OK]  ' : '[?]   ');
+                        lines.push('  ' + mark + row.port + '  ' + (row.line || ''));
+                    });
+                }
+
+                lines.push('');
+                lines.push('Raw:');
+                lines.push(response.raw || '');
+                out.textContent = lines.join('\n');
+                out.classList.remove('hidden');
+                out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+
+            function auditServerPorts(id) {
+                var out = document.getElementById('serverPortAuditOut');
+                if (out) {
+                    out.textContent = 'Аудит портов сервера #' + id + '... Подключаемся по SSH, изменений на сервере не делаем.';
+                    out.classList.remove('hidden');
+                    out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                $.ajax({
+                    url: '{{ route('admin.module.server.audit-ports', ['server' => ':id']) }}'.replace(':id', id),
+                    method: 'POST',
+                    data: { _token: '{{ csrf_token() }}' },
+                    beforeSend: function () {
+                        toastr.info('Запущен read-only аудит портов...', '', { timeOut: 2500 });
+                    },
+                    success: function (response) {
+                        renderPortAudit(response);
+                        var bad = (response.open_ports || []).filter(function (row) { return row.status === 'bad'; }).length;
+                        if (bad > 0) {
+                            toastr.warning('Найдены нежелательные открытые порты: ' + bad);
+                        } else {
+                            toastr.success(response.message || 'Опасные порты не найдены');
+                        }
+                    },
+                    error: function (xhr) {
+                        var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Ошибка аудита портов';
+                        toastr.error(msg);
+                        if (out) {
+                            out.textContent = 'Ошибка аудита портов сервера #' + id + ': ' + msg;
+                            out.classList.remove('hidden');
+                        }
                     }
                 });
             }

@@ -47,6 +47,11 @@ interface PanelInterface
     public function updateConfigurationRealityStable(int $panel_id): void;
 
     /**
+     * Тестовый пресет: один VLESS TCP REALITY inbound на 443.
+     */
+    public function updateConfigurationReality443(int $panel_id): void;
+
+    /**
      * Обновление конфигурации панели — смешанный пресет: SS + Trojan + VLESS + 2 REALITY
      *
      * @param int $panel_id

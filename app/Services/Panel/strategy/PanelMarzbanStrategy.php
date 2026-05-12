@@ -95,6 +95,14 @@ class PanelMarzbanStrategy extends PanelMainStrategy implements PanelInterface
     }
 
     /**
+     * Тестовый пресет: один VLESS TCP REALITY inbound на 443.
+     */
+    public function updateConfigurationReality443(int $panel_id): void
+    {
+        $this->marzbanService->updateConfigurationReality443($panel_id);
+    }
+
+    /**
      * Обновление конфигурации панели — смешанный: SS + Trojan + VLESS + 2 REALITY
      */
     public function updateConfigurationMixed(int $panel_id): void

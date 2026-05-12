@@ -248,6 +248,9 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
                     ->name('log-upload-async-reinstall-status');
                 Route::post('/{server}/setup-dns', [ServerController::class, 'setupDns'])->name('setup-dns');
                 Route::post('/{server}/ping-and-configure', [ServerController::class, 'pingAndConfigure'])->name('ping-and-configure');
+                Route::post('/{server}/audit-ports', [ServerController::class, 'auditPorts'])
+                    ->middleware('throttle:30,1')
+                    ->name('audit-ports');
                 Route::post('/{server}/reboot', [ServerController::class, 'reboot'])->name('reboot');
                 Route::put('/{server}', [ServerController::class, 'update'])->name('update');
                 Route::delete('/{server}', [ServerController::class, 'destroy'])->name('destroy');
@@ -281,6 +284,7 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
                 Route::post('/{panel}/update-config-stable', [PanelController::class, 'updateConfigStable'])->name('update-config-stable');
                 Route::post('/{panel}/update-config-reality', [PanelController::class, 'updateConfigReality'])->name('update-config-reality');
                 Route::post('/{panel}/update-config-reality-stable', [PanelController::class, 'updateConfigRealityStable'])->name('update-config-reality-stable');
+                Route::post('/{panel}/update-config-reality-443', [PanelController::class, 'updateConfigReality443'])->name('update-config-reality-443');
                 Route::post('/{panel}/update-config-mixed', [PanelController::class, 'updateConfigMixed'])->name('update-config-mixed');
                 Route::post('/{panel}/update-config-mixed-warp', [PanelController::class, 'updateConfigMixedWarp'])->name('update-config-mixed-warp');
                 Route::post('/{panel}/warp-routing', [PanelController::class, 'updateWarpRouting'])->name('update-warp-routing');

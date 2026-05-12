@@ -24,6 +24,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
+use phpseclib3\Net\SSH2;
 use RuntimeException;
 
 class ServerController extends Controller
@@ -687,6 +688,110 @@ class ServerController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Ошибка: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Read-only аудит слушающих TCP-портов на одном сервере.
+     */
+    public function auditPorts(Server $server): JsonResponse
+    {
+        if ($server->isDeleted()) {
+            return response()->json(['success' => false, 'message' => 'Сервер удалён'], 404);
+        }
+        if (trim((string) $server->ip) === '' || trim((string) $server->login) === '' || trim((string) $server->password) === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Для аудита нужны IP, логин и пароль SSH в карточке сервера.',
+            ], 422);
+        }
+
+        $badPorts = [81, 5000, 6443, 7443, 8000, 8001, 8080, 8443, 8880, 9090, 9443, 10086, 30000, 31000, 54321];
+        $allowedPorts = [22, 80, 443];
+        $scanPorts = array_values(array_unique(array_merge(
+            $allowedPorts,
+            [992, 994, 1080, 1194, 2022, 2053, 2083, 2087, 2096, 3128, 3389, 4443, 5555, 8388, 9000],
+            $badPorts
+        )));
+        sort($scanPorts);
+
+        try {
+            $ssh = new SSH2((string) $server->ip, (int) ($server->ssh_port ?? 22));
+            $ssh->setTimeout(45);
+            if (! $ssh->login((string) $server->login, (string) $server->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'SSH-аутентификация не удалась.',
+                ], 422);
+            }
+
+            $script = <<<'BASH'
+PORTS="__PORTS__"
+echo "PORT_AUDIT_BEGIN"
+if command -v ss >/dev/null 2>&1; then
+  LISTEN="$(sudo ss -ltnpH 2>/dev/null || ss -ltnpH 2>/dev/null || true)"
+  SRC="ss"
+elif command -v netstat >/dev/null 2>&1; then
+  LISTEN="$(sudo netstat -ltnp 2>/dev/null || netstat -ltnp 2>/dev/null || true)"
+  SRC="netstat"
+else
+  LISTEN=""
+  SRC="none"
+fi
+echo "SOURCE|$SRC"
+for P in $PORTS; do
+  LINE="$(printf '%s\n' "$LISTEN" | grep -E "[:.]${P}[[:space:]]" | head -n 1)"
+  if [ -n "$LINE" ]; then
+    echo "OPEN|$P|$LINE"
+  fi
+done
+echo "PORT_AUDIT_END"
+BASH;
+            $script = str_replace('__PORTS__', implode(' ', $scanPorts), $script);
+            $out = (string) $ssh->exec('bash -lc '.escapeshellarg($script).' 2>&1');
+
+            $open = [];
+            foreach (preg_split("/\r\n|\r|\n/", $out) as $line) {
+                if (strpos($line, 'OPEN|') !== 0) {
+                    continue;
+                }
+                $parts = explode('|', $line, 3);
+                $port = isset($parts[1]) ? (int) $parts[1] : 0;
+                if ($port < 1) {
+                    continue;
+                }
+                $open[] = [
+                    'port' => $port,
+                    'status' => in_array($port, $badPorts, true) ? 'bad' : (in_array($port, $allowedPorts, true) ? 'allowed' : 'review'),
+                    'line' => $parts[2] ?? '',
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Аудит портов выполнен. Изменений на сервере не делалось.',
+                'server' => [
+                    'id' => $server->id,
+                    'name' => $server->name,
+                    'ip' => $server->ip,
+                ],
+                'allowed_ports' => $allowedPorts,
+                'bad_ports' => $badPorts,
+                'open_ports' => $open,
+                'raw' => trim($out),
+            ]);
+        } catch (Exception $e) {
+            $this->logger->error('Port audit failed', [
+                'source' => 'server',
+                'user_id' => auth()->id(),
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Ошибка аудита портов: ' . $e->getMessage(),
             ], 500);
         }
     }

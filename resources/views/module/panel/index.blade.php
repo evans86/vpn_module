@@ -263,6 +263,14 @@
                                                     </form>
                                                 @endif
                                                 <div class="grid grid-cols-2 gap-2">
+                                                    <form action="{{ route('admin.module.panel.update-config-reality-443', $panel) }}" method="POST" class="min-w-0 col-span-2"
+                                                          onsubmit="return confirm('Применить тестовый пресет REALITY 443 only только к панели #{{ $panel->id }}?\n\nВажно: если на сервере порт 443 занят nginx/caddy/другим сервисом, inbound может не подняться. Сначала проверьте одну тестовую панель и только потом переносите остальные.');">
+                                                        @csrf
+                                                        <button type="submit" class="w-full min-h-[3.25rem] flex flex-col items-center justify-center px-2 py-2 text-xs font-semibold rounded-lg text-white bg-slate-900 hover:bg-slate-800 border border-slate-950">
+                                                            <span>REALITY 443 only</span>
+                                                            <span class="text-[10px] font-normal opacity-80">тест на одной панели</span>
+                                                        </button>
+                                                    </form>
                                                     <form action="{{ route('admin.module.panel.update-config-mixed', $panel) }}" method="POST" class="min-w-0">
                                                         @csrf
                                                         <button type="submit" class="w-full min-h-[3.25rem] flex flex-col items-center justify-center px-2 py-2 text-xs font-semibold rounded-lg text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300">

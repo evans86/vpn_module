@@ -348,6 +348,38 @@ class PanelController extends Controller
     }
 
     /**
+     * Тестовый одиночный пресет: один VLESS TCP REALITY inbound на 443.
+     */
+    public function updateConfigReality443(Panel $panel): RedirectResponse
+    {
+        try {
+            $this->logger->info('Обновление конфигурации панели (REALITY 443 only)', [
+                'source' => 'panel',
+                'action' => 'update-config-reality-443',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+            ]);
+
+            $strategy = new PanelStrategy($panel->panel);
+            $strategy->updateConfigurationReality443($panel->id);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('success', 'Тестовый пресет «REALITY 443 only» применён к одной панели. Проверьте подписку и доступность узла перед массовыми изменениями.');
+        } catch (Exception $e) {
+            $this->logger->error('Ошибка при обновлении конфигурации панели (REALITY 443 only)', [
+                'source' => 'panel',
+                'action' => 'update-config-reality-443',
+                'user_id' => auth()->id(),
+                'panel_id' => $panel->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Ошибка при обновлении конфигурации: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Update panel configuration — mixed: SS + Trojan + VLESS + 2 REALITY (no VMess).
      */
     public function updateConfigMixed(Panel $panel): RedirectResponse
