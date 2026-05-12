@@ -400,12 +400,12 @@
                 }
 
                 function friendlyFetchError(e, timeoutMs) {
-                    if (e && (e.name === 'AbortError' || /abort/i.test(String(e.message || '')))) {
+                    if (timeoutMs && e && (e.name === 'AbortError' || /abort/i.test(String(e.message || '')))) {
                         return 'таймаут ' + Math.round(timeoutMs / 1000) + ' сек';
                     }
                     var msg = (e && e.message) ? e.message : String(e || 'ошибка запроса');
                     if (/failed to fetch/i.test(msg)) {
-                        return 'браузерная сетевая ошибка Failed to fetch (запрос не дошёл или был заблокирован браузером/сетью/CORS/прокси)';
+                        return 'браузерная сетевая ошибка Failed to fetch (запрос был оборван сетью/браузером/прокси до получения HTTP-ответа)';
                     }
 
                     return msg;
@@ -750,7 +750,7 @@
                         while (true) {
                             var res;
                             try {
-                                res = await fetchWithTimeout(fleetRunUrl, {
+                                res = await fetch(fleetRunUrl, {
                                     method: 'POST',
                                     headers: {
                                         'Content-Type': 'application/json',
@@ -759,13 +759,13 @@
                                         'X-Requested-With': 'XMLHttpRequest'
                                     },
                                     body: JSON.stringify(payload)
-                                }, 90000);
+                                });
                             } catch (fetchErr) {
                                 return {
                                     res: { ok: false, status: 0 },
                                     j: {
                                         success: false,
-                                        message: 'Сетевая ошибка запроса к Laravel: POST ' + fleetRunUrl + ' — ' + friendlyFetchError(fetchErr, 90000)
+                                        message: 'Сетевая ошибка запроса к Laravel: POST ' + fleetRunUrl + ' — ' + friendlyFetchError(fetchErr, 0)
                                     }
                                 };
                             }
