@@ -3895,9 +3895,20 @@ EOS
 
         $marzbanApi = new MarzbanAPI($panel->api_address);
         $json_config = $marzbanApi->getConfig($panel->auth_token);
+        if (isset($json_config['config']) && is_array($json_config['config'])) {
+            $json_config = $json_config['config'];
+        }
         if (empty($json_config) || ! is_array($json_config) || empty($json_config['inbounds']) || ! is_array($json_config['inbounds'])) {
             throw new RuntimeException('Не удалось получить текущий core config Marzban для port-map миграции.');
         }
+
+        Log::info('Mixed stealth current inbound tags before port-map', [
+            'panel_id' => $panel_id,
+            'tags' => array_values(array_filter(array_map(static function ($inbound) {
+                return is_array($inbound) ? (string) ($inbound['tag'] ?? '') : '';
+            }, $json_config['inbounds']))),
+            'source' => 'panel',
+        ]);
 
         $portMapByTag = [
             'TROJAN-WS' => 22097,
@@ -3913,17 +3924,30 @@ EOS
                 continue;
             }
             $tag = (string) ($inbound['tag'] ?? '');
-            if ($tag === '' || ! array_key_exists($tag, $portMapByTag)) {
+            $oldPort = (int) ($inbound['port'] ?? 0);
+            $newPort = null;
+            if ($tag !== '' && array_key_exists($tag, $portMapByTag)) {
+                $newPort = (int) $portMapByTag[$tag];
+            } elseif ($oldPort > 0) {
+                $fallbackPortMap = [
+                    2097 => 22097,
+                    8388 => 28388,
+                    8443 => 21443,
+                    9443 => 22443,
+                    8444 => 21444,
+                    2083 => 22083,
+                ];
+                $newPort = $fallbackPortMap[$oldPort] ?? null;
+            }
+            if ($newPort === null) {
                 continue;
             }
-            $oldPort = (int) ($inbound['port'] ?? 0);
-            $newPort = (int) $portMapByTag[$tag];
             $json_config['inbounds'][$idx]['port'] = $newPort;
-            $changed[] = $tag.': '.$oldPort.' -> '.$newPort;
+            $changed[] = ($tag !== '' ? $tag : ('port '.$oldPort)).': '.$oldPort.' -> '.$newPort;
         }
 
         if ($changed === []) {
-            throw new RuntimeException('В текущем core config не найдены ожидаемые inbounds для mixed stealth port-map.');
+            throw new RuntimeException('В текущем core config не найдены ожидаемые inbounds/ports для mixed stealth port-map. Проверьте логи: Mixed stealth current inbound tags before port-map.');
         }
 
         Log::info('Mixed stealth port-map prepared from current config', [
