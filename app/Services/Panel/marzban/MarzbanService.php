@@ -3888,145 +3888,28 @@ EOS
     {
         $panel = self::updateMarzbanToken($panel_id);
 
-        Log::info('Updating current Marzban configuration ports to mixed stealth', [
+        Log::info('Rebuilding full mixed stealth configuration', [
             'panel_id' => $panel_id,
             'source' => 'panel',
         ]);
 
-        $marzbanApi = new MarzbanAPI($panel->api_address);
-        $json_config = $marzbanApi->getConfig($panel->auth_token);
-        $responseKeys = is_array($json_config) ? array_keys($json_config) : [];
-        if (isset($json_config['config']) && is_array($json_config['config'])) {
-            $json_config = $json_config['config'];
-        } elseif (isset($json_config['config']) && is_string($json_config['config'])) {
-            $decoded = json_decode($json_config['config'], true);
-            if (is_array($decoded)) {
-                $json_config = $decoded;
-            }
-        } elseif (isset($json_config['data']) && is_array($json_config['data'])) {
-            $json_config = $json_config['data'];
-        } elseif (isset($json_config['data']) && is_string($json_config['data'])) {
-            $decoded = json_decode($json_config['data'], true);
-            if (is_array($decoded)) {
-                $json_config = $decoded;
-            }
-        }
-        if (empty($json_config) || ! is_array($json_config) || empty($json_config['inbounds']) || ! is_array($json_config['inbounds'])) {
-            throw new RuntimeException('Не удалось получить текущий core config Marzban для port-map миграции. Ключи ответа API: '.implode(', ', $responseKeys));
+        $realityKeys = $this->getOrGenerateRealityKeys($panel);
+
+        $panel->config_type = Panel::CONFIG_TYPE_MIXED_STEALTH;
+        if ($panel->warp_routing_enabled) {
+            $panel->warp_routing_all = true;
         }
 
-        Log::info('Mixed stealth current inbound tags before port-map', [
-            'panel_id' => $panel_id,
-            'tags' => array_values(array_filter(array_map(static function ($inbound) {
-                return is_array($inbound) ? (string) ($inbound['tag'] ?? '') : '';
-            }, $json_config['inbounds']))),
-            'source' => 'panel',
-        ]);
-
-        $portMapByTag = [
-            'TROJAN-WS' => 22097,
-            'Shadowsocks-TCP' => 28388,
-            'Shadowsocks TCP' => 28388,
-            'VLESS TCP REALITY' => 21443,
-            'VLESS GRPC REALITY' => 22443,
-            'VLESS XHTTP REALITY' => 21444,
-            'VLESS TCP REALITY ALT' => 22083,
-        ];
-        $changed = [];
-        foreach ($json_config['inbounds'] as $idx => $inbound) {
-            if (! is_array($inbound)) {
-                continue;
-            }
-            $tag = (string) ($inbound['tag'] ?? '');
-            $oldPort = (int) ($inbound['port'] ?? 0);
-            $newPort = null;
-            if ($tag !== '' && array_key_exists($tag, $portMapByTag)) {
-                $newPort = (int) $portMapByTag[$tag];
-            } elseif ($oldPort > 0) {
-                $fallbackPortMap = [
-                    2097 => 22097,
-                    8388 => 28388,
-                    8443 => 21443,
-                    9443 => 22443,
-                    8444 => 21444,
-                    2083 => 22083,
-                ];
-                $newPort = $fallbackPortMap[$oldPort] ?? null;
-            }
-            if ($newPort === null) {
-                continue;
-            }
-            $json_config['inbounds'][$idx]['port'] = $newPort;
-            $changed[] = ($tag !== '' ? $tag : ('port '.$oldPort)).': '.$oldPort.' -> '.$newPort;
-        }
-
-        if ($changed === []) {
-            $currentPorts = [];
-            $currentTags = [];
-            foreach ($json_config['inbounds'] as $inbound) {
-                if (is_array($inbound)) {
-                    if (isset($inbound['port'])) {
-                        $currentPorts[] = (int) $inbound['port'];
-                    }
-                    if (isset($inbound['tag'])) {
-                        $currentTags[] = (string) $inbound['tag'];
-                    }
-                }
-            }
-            $targetPorts = [22097, 28388, 21443, 22443, 21444, 22083];
-            if (array_intersect($currentPorts, $targetPorts) !== []) {
-                $panel->config_type = Panel::CONFIG_TYPE_MIXED_STEALTH;
-                $panel->config_updated_at = now();
-                $panel->panel_status = Panel::PANEL_CONFIGURED;
-                $panel->error_message = null;
-                $panel->error_at = null;
-                $panel->save();
-
-                Log::info('Mixed stealth already applied; panel state updated without PUT', [
-                    'panel_id' => $panel_id,
-                    'ports' => $currentPorts,
-                    'source' => 'panel',
-                ]);
-
-                return;
-            }
-
-            $hasOnlyFallbackShadowsocks = count($json_config['inbounds']) === 1
-                && in_array('Shadowsocks TCP', $currentTags, true)
-                && in_array(1080, $currentPorts, true);
-            if ($hasOnlyFallbackShadowsocks) {
-                Log::warning('Mixed stealth current config is incomplete; rebuilding full mixed stealth preset', [
-                    'panel_id' => $panel_id,
-                    'ports' => $currentPorts,
-                    'tags' => $currentTags,
-                    'source' => 'panel',
-                ]);
-
-                $realityKeys = $this->getOrGenerateRealityKeys($panel);
-                $json_config = $this->buildBaseConfig($panel);
-                $json_config['inbounds'] = array_merge(
-                    $this->buildStableBasicInboundsForMixedStealth($panel),
-                    $this->buildMixedRealityStealthInbounds(
-                        $realityKeys['private_key'],
-                        $realityKeys['short_id'],
-                        $realityKeys['grpc_short_id'],
-                        $realityKeys['xhttp_short_id']
-                    )
-                );
-                $changed[] = 'rebuilt full mixed stealth from incomplete Shadowsocks-only config';
-            } else {
-                throw new RuntimeException(
-                    'В текущем core config не найдены ожидаемые inbounds/ports для mixed stealth port-map. '
-                    .'Порты: '.implode(', ', $currentPorts).'. Теги: '.implode(', ', $currentTags).'.'
-                );
-            }
-        }
-
-        Log::info('Mixed stealth port-map prepared from current config', [
-            'panel_id' => $panel_id,
-            'changes' => $changed,
-            'source' => 'panel',
-        ]);
+        $json_config = $this->buildBaseConfig($panel);
+        $json_config['inbounds'] = array_merge(
+            $this->buildStableBasicInboundsForMixedStealth($panel),
+            $this->buildMixedRealityStealthInbounds(
+                $realityKeys['private_key'],
+                $realityKeys['short_id'],
+                $realityKeys['grpc_short_id'],
+                $realityKeys['xhttp_short_id']
+            )
+        );
 
         $this->applyConfiguration($panel, $json_config, Panel::CONFIG_TYPE_MIXED_STEALTH);
     }
