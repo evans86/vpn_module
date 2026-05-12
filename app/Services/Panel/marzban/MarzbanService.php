@@ -3947,6 +3947,30 @@ EOS
         }
 
         if ($changed === []) {
+            $currentPorts = [];
+            foreach ($json_config['inbounds'] as $inbound) {
+                if (is_array($inbound) && isset($inbound['port'])) {
+                    $currentPorts[] = (int) $inbound['port'];
+                }
+            }
+            $targetPorts = [22097, 28388, 21443, 22443, 21444, 22083];
+            if (array_intersect($currentPorts, $targetPorts) !== []) {
+                $panel->config_type = Panel::CONFIG_TYPE_MIXED_STEALTH;
+                $panel->config_updated_at = now();
+                $panel->panel_status = Panel::PANEL_CONFIGURED;
+                $panel->error_message = null;
+                $panel->error_at = null;
+                $panel->save();
+
+                Log::info('Mixed stealth already applied; panel state updated without PUT', [
+                    'panel_id' => $panel_id,
+                    'ports' => $currentPorts,
+                    'source' => 'panel',
+                ]);
+
+                return;
+            }
+
             throw new RuntimeException('В текущем core config не найдены ожидаемые inbounds/ports для mixed stealth port-map. Проверьте логи: Mixed stealth current inbound tags before port-map.');
         }
 
