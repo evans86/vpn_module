@@ -420,7 +420,7 @@ class PersonalController extends Controller
     public function updateVpnInstructions(Request $request)
     {
         if (! $request->has('_token')) {
-            return redirect()->to(UrlHelper::personalRoute('personal.faq'));
+            return $this->redirectToPersonalFaq($request);
         }
 
         $request->validate(['instructions' => 'nullable|string|max:4000']);
@@ -430,7 +430,7 @@ class PersonalController extends Controller
 
         $salesman->botModule->update(['vpn_instructions' => (string) $request->input('instructions', '')]);
 
-        return redirect()->to(UrlHelper::personalRoute('personal.faq'))->with('success', 'Инструкции успешно обновлены!');
+        return $this->redirectToPersonalFaq($request)->with('success', 'Инструкции успешно обновлены!');
     }
 
     /**
@@ -439,7 +439,7 @@ class PersonalController extends Controller
     public function resetVpnInstructions(Request $request)
     {
         if (! $request->has('_token')) {
-            return redirect()->to(UrlHelper::personalRoute('personal.faq'));
+            return $this->redirectToPersonalFaq($request);
         }
 
         $salesman = Auth::guard('salesman')->user();
@@ -449,7 +449,7 @@ class PersonalController extends Controller
             'vpn_instructions' => $this->botModuleService->getDefaultVpnInstructions()
         ]);
 
-        return redirect()->to(UrlHelper::personalRoute('personal.faq'))->with('success', 'Инструкции сброшены к стандартным!');
+        return $this->redirectToPersonalFaq($request)->with('success', 'Инструкции сброшены к стандартным!');
     }
 
     /**
@@ -469,7 +469,7 @@ class PersonalController extends Controller
             'custom_help_text' => (string) $request->input('help_text', '')
         ]);
 
-        return redirect()->to(UrlHelper::personalRoute('personal.faq'))->with('success', 'Текст FAQ успешно обновлен!');
+        return $this->redirectToPersonalFaq($request)->with('success', 'Текст FAQ успешно обновлен!');
     }
 
     /**
@@ -478,7 +478,7 @@ class PersonalController extends Controller
     public function resetFaq(Request $request)
     {
         if (! $request->has('_token')) {
-            return redirect()->to(UrlHelper::personalRoute('personal.faq'));
+            return $this->redirectToPersonalFaq($request);
         }
 
         $salesman = Auth::guard('salesman')->user();
@@ -488,7 +488,14 @@ class PersonalController extends Controller
             'custom_help_text' => null
         ]);
 
-        return redirect()->to(UrlHelper::personalRoute('personal.faq'))->with('success', 'Текст FAQ сброшен к стандартному!');
+        return $this->redirectToPersonalFaq($request)->with('success', 'Текст FAQ сброшен к стандартному!');
+    }
+
+    private function redirectToPersonalFaq(Request $request): RedirectResponse
+    {
+        return redirect()->away(
+            rtrim(UrlHelper::incomingRequestOrigin($request), '/').UrlHelper::personalRoute('personal.faq')
+        );
     }
 
     private function defaultHelpText(): string
