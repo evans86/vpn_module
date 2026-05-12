@@ -3895,11 +3895,24 @@ EOS
 
         $marzbanApi = new MarzbanAPI($panel->api_address);
         $json_config = $marzbanApi->getConfig($panel->auth_token);
+        $responseKeys = is_array($json_config) ? array_keys($json_config) : [];
         if (isset($json_config['config']) && is_array($json_config['config'])) {
             $json_config = $json_config['config'];
+        } elseif (isset($json_config['config']) && is_string($json_config['config'])) {
+            $decoded = json_decode($json_config['config'], true);
+            if (is_array($decoded)) {
+                $json_config = $decoded;
+            }
+        } elseif (isset($json_config['data']) && is_array($json_config['data'])) {
+            $json_config = $json_config['data'];
+        } elseif (isset($json_config['data']) && is_string($json_config['data'])) {
+            $decoded = json_decode($json_config['data'], true);
+            if (is_array($decoded)) {
+                $json_config = $decoded;
+            }
         }
         if (empty($json_config) || ! is_array($json_config) || empty($json_config['inbounds']) || ! is_array($json_config['inbounds'])) {
-            throw new RuntimeException('Не удалось получить текущий core config Marzban для port-map миграции.');
+            throw new RuntimeException('Не удалось получить текущий core config Marzban для port-map миграции. Ключи ответа API: '.implode(', ', $responseKeys));
         }
 
         Log::info('Mixed stealth current inbound tags before port-map', [
@@ -3948,9 +3961,15 @@ EOS
 
         if ($changed === []) {
             $currentPorts = [];
+            $currentTags = [];
             foreach ($json_config['inbounds'] as $inbound) {
-                if (is_array($inbound) && isset($inbound['port'])) {
-                    $currentPorts[] = (int) $inbound['port'];
+                if (is_array($inbound)) {
+                    if (isset($inbound['port'])) {
+                        $currentPorts[] = (int) $inbound['port'];
+                    }
+                    if (isset($inbound['tag'])) {
+                        $currentTags[] = (string) $inbound['tag'];
+                    }
                 }
             }
             $targetPorts = [22097, 28388, 21443, 22443, 21444, 22083];
@@ -3971,7 +3990,10 @@ EOS
                 return;
             }
 
-            throw new RuntimeException('В текущем core config не найдены ожидаемые inbounds/ports для mixed stealth port-map. Проверьте логи: Mixed stealth current inbound tags before port-map.');
+            throw new RuntimeException(
+                'В текущем core config не найдены ожидаемые inbounds/ports для mixed stealth port-map. '
+                .'Порты: '.implode(', ', $currentPorts).'. Теги: '.implode(', ', $currentTags).'.'
+            );
         }
 
         Log::info('Mixed stealth port-map prepared from current config', [
