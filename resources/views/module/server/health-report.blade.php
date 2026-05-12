@@ -403,16 +403,24 @@
                     if (e && (e.name === 'AbortError' || /abort/i.test(String(e.message || '')))) {
                         return 'таймаут ' + Math.round(timeoutMs / 1000) + ' сек';
                     }
+                    var msg = (e && e.message) ? e.message : String(e || 'ошибка запроса');
+                    if (/failed to fetch/i.test(msg)) {
+                        return 'браузерная сетевая ошибка Failed to fetch (запрос не дошёл или был заблокирован браузером/сетью/CORS/прокси)';
+                    }
 
-                    return (e && e.message) ? e.message : String(e || 'ошибка запроса');
+                    return msg;
                 }
 
-                async function measurePingMs(url, trials) {
+                async function measurePingMs(url, trials, setPhase) {
                     var out = [];
                     for (var i = 0; i < trials; i++) {
                         var t0 = performance.now();
+                        var sampleNo = i + 1;
                         try {
                             var u = url + (url.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now() + '_' + i;
+                            if (setPhase) {
+                                setPhase('Этап 1: Laravel ping ' + sampleNo + '/' + trials + ' — GET ' + url + ' (таймаут 4 сек)…');
+                            }
                             var res = await fetchWithTimeout(u, {
                                 cache: 'no-store',
                                 credentials: 'same-origin'
@@ -420,6 +428,9 @@
                             await res.blob();
                             out.push(Math.round(performance.now() - t0));
                         } catch (e) {
+                            if (setPhase) {
+                                setPhase('Этап 1: Laravel ping ' + sampleNo + '/' + trials + ' не ответил: ' + friendlyFetchError(e, 4000) + '. Продолжаем…');
+                            }
                             out.push(null);
                         }
                         await new Promise(function (r) { setTimeout(r, 120); });
@@ -481,6 +492,7 @@
                     try {
                         setPhase('Браузер: запрос внешнего IP и геоподписи (внешние сервисы ограничены коротким таймаутом)…');
                         lines.push('--- IP / Geo ---');
+                        setPhase('Этап 1: внешний IP — GET https://api.ipify.org?format=json (таймаут 3.5 сек)…');
                         var rip = await fetchWithTimeout('https://api.ipify.org?format=json', { cache: 'no-store' }, 3500);
                         if (!rip.ok) {
                             throw new Error('ipify HTTP ' + rip.status);
@@ -488,7 +500,9 @@
                         var jip = await rip.json();
                         lines.push('IPv4/v6 (ipify): ' + (jip.ip || '—'));
                         try {
-                            var rg = await fetchWithTimeout('https://ipwho.is/' + encodeURIComponent(jip.ip), { cache: 'no-store' }, 3500);
+                            var geoUrl = 'https://ipwho.is/' + encodeURIComponent(jip.ip);
+                            setPhase('Этап 1: GeoIP — GET ' + geoUrl + ' (таймаут 3.5 сек, необязательно)…');
+                            var rg = await fetchWithTimeout(geoUrl, { cache: 'no-store' }, 3500);
                             var g = {};
                             try {
                                 g = await rg.json();
@@ -518,20 +532,22 @@
                     }
                     lines.push('');
 
-                    setPhase('Браузер: несколько замеров задержки и скачивание пробного файла до этой админки…');
+                    setPhase('Этап 1: проверяем доступ браузера до Laravel: ping и скачивание payload…');
                     lines.push('--- До хоста панели ---');
-                    var pingTimes = await measurePingMs(pingUrl, 4);
+                    lines.push('Проверка Laravel ping: ' + pingUrl + ' (4 запроса, таймаут 4 сек каждый)');
+                    var pingTimes = await measurePingMs(pingUrl, 4, setPhase);
                     lines.push(pingUrl + ' (мс): ' + pingTimes.map(function (x) {
                         return x == null ? '×' : x;
                     }).join(', ') + ' — среднее: ' + (avg(pingTimes) != null ? avg(pingTimes) + ' мс' : '—'));
                     try {
+                        setPhase('Этап 1: скачивание тестового payload с Laravel — GET ' + payloadUrl + ' (лимит 2 МБ, таймаут 12 сек)…');
                         await measureDownload(payloadUrl, 2 * 1024 * 1024, 'Скачивание ' + payloadUrl, lines);
                     } catch (e) {
-                        lines.push('Скачивание: ' + e.message);
+                        lines.push('Скачивание ' + payloadUrl + ': ' + friendlyFetchError(e, 12000));
                     }
                     lines.push('');
 
-                    setPhase('Браузер: последовательные запросы к Яндекс, Google, Cloudflare, Telegram (оценка задержки)…');
+                    setPhase('Этап 1: внешние точки из браузера — Яндекс, Google, Cloudflare, Telegram…');
                     lines.push('--- Внешние точки ---');
                     var ext = [
                         { label: 'Яндекс', url: 'https://yandex.ru/favicon.ico' },
@@ -541,6 +557,7 @@
                     ];
                     var k = 0;
                     for (; k < ext.length; k++) {
+                        setPhase('Этап 1: внешняя точка ' + (k + 1) + '/' + ext.length + ' — ' + ext[k].label + ' (' + ext[k].url + ', таймаут 5 сек)…');
                         var ms = await measureNoCorsMs(ext[k].url);
                         lines.push(ext[k].label + ': ' + (ms != null ? ms + ' мс' : '—'));
                     }
@@ -731,16 +748,27 @@
                     async function fleetFetchJson(payload, cfRetries524) {
                         cfRetries524 = (cfRetries524 == null) ? 4 : cfRetries524;
                         while (true) {
-                            var res = await fetch(fleetRunUrl, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-CSRF-TOKEN': csrf,
-                                    'Accept': 'application/json',
-                                    'X-Requested-With': 'XMLHttpRequest'
-                                },
-                                body: JSON.stringify(payload)
-                            });
+                            var res;
+                            try {
+                                res = await fetchWithTimeout(fleetRunUrl, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRF-TOKEN': csrf,
+                                        'Accept': 'application/json',
+                                        'X-Requested-With': 'XMLHttpRequest'
+                                    },
+                                    body: JSON.stringify(payload)
+                                }, 90000);
+                            } catch (fetchErr) {
+                                return {
+                                    res: { ok: false, status: 0 },
+                                    j: {
+                                        success: false,
+                                        message: 'Сетевая ошибка запроса к Laravel: POST ' + fleetRunUrl + ' — ' + friendlyFetchError(fetchErr, 90000)
+                                    }
+                                };
+                            }
                             if ((res.status === 524 || res.status === 504) && cfRetries524 > 0) {
                                 cfRetries524--;
                                 setPhase('Прокси (Cloudflare) оборвал долгий ответ с кодом HTTP ' + res.status + '. Повтор того же запроса через 45 секунд — это защита от ошибки «таймаут шлюза».');
@@ -752,6 +780,9 @@
                                 j = await res.json();
                             } catch (parseErr) {
                                 j = {};
+                            }
+                            if (!res.ok && !j.message) {
+                                j.message = 'HTTP ' + res.status + ' от Laravel: POST ' + fleetRunUrl;
                             }
                             return { res: res, j: j };
                         }
