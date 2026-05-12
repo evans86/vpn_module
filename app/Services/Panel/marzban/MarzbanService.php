@@ -1092,7 +1092,11 @@ EOS
             $panel->save();
             if ($applyMixedWarpFullPreset && $enableWarpRouting) {
                 $strategy = new PanelStrategy($panel->panel);
-                $strategy->updateConfigurationMixedWarp((int) $panel->id);
+                if ($panel->config_type === Panel::CONFIG_TYPE_MIXED_STEALTH) {
+                    $strategy->reapplyCurrentConfiguration((int) $panel->id);
+                } else {
+                    $strategy->updateConfigurationMixedWarp((int) $panel->id);
+                }
             } else {
                 (new PanelStrategy($panel->panel))->reapplyCurrentConfiguration($panel->id);
             }
