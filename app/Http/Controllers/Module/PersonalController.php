@@ -403,6 +403,9 @@ class PersonalController extends Controller
         return view('module.personal.faq', [
             'salesman' => $salesman,
             'module' => $module,
+            'currentHelpText' => $salesman->custom_help_text !== null
+                ? (string) $salesman->custom_help_text
+                : $this->defaultHelpText(),
             'currentInstructions' => $module->vpn_instructions ?? $this->botModuleService->getDefaultVpnInstructions(),
             'defaultInstructions' => $this->botModuleService->getDefaultVpnInstructions(),
             'hasModule' => $module !== null,
@@ -420,12 +423,12 @@ class PersonalController extends Controller
             return redirect()->to(UrlHelper::personalRoute('personal.faq'));
         }
 
-        $request->validate(['instructions' => 'required|string']);
+        $request->validate(['instructions' => 'nullable|string|max:4000']);
 
         $salesman = Auth::guard('salesman')->user();
 //        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
-        $salesman->botModule->update(['vpn_instructions' => $request->instructions]);
+        $salesman->botModule->update(['vpn_instructions' => (string) $request->input('instructions', '')]);
 
         return redirect()->to(UrlHelper::personalRoute('personal.faq'))->with('success', 'Инструкции успешно обновлены!');
     }
@@ -456,14 +459,14 @@ class PersonalController extends Controller
     public function updateFaq(Request $request)
     {
         $request->validate([
-            'help_text' => 'required|string|max:4000'
+            'help_text' => 'nullable|string|max:4000'
         ]);
 
         $salesman = Auth::guard('salesman')->user();
 //        $salesman = Salesman::where('telegram_id', 6715142449)->first();
 
         $salesman->update([
-            'custom_help_text' => $request->help_text
+            'custom_help_text' => (string) $request->input('help_text', '')
         ]);
 
         return redirect()->to(UrlHelper::personalRoute('personal.faq'))->with('success', 'Текст FAQ успешно обновлен!');
@@ -486,6 +489,25 @@ class PersonalController extends Controller
         ]);
 
         return redirect()->to(UrlHelper::personalRoute('personal.faq'))->with('success', 'Текст FAQ сброшен к стандартному!');
+    }
+
+    private function defaultHelpText(): string
+    {
+        return "<blockquote><b>❓ Помощь</b></blockquote>\n\n"
+            ."🔹 <b>Активация VPN:</b>\n\n"
+            ."1️⃣ Нажмите '🔑 Активировать'\n"
+            ."2️⃣ Введите полученный ключ\n"
+            ."3️⃣ Скопируйте конфигурацию и следуйте инструкциям для подключения на различных устройствах, представленным ниже\n\n"
+            ."🔹 <b>Проверка статуса:</b>\n\n"
+            ."1️⃣ Нажмите кнопку '📊 Статус'\n"
+            ."2️⃣ Просмотрите информацию о вашем доступе и конфигурации\n\n"
+            ."📁 <b>Инструкции по настройке VPN:</b>\n\n"
+            ."- <a href=\"https://teletype.in/@bott_manager/C0WFg-Bsren\">Android</a> 🤖\n"
+            ."- <a href=\"https://teletype.in/@bott_manager/8jEexiKqjlEWQ\">iOS</a> 🍏\n"
+            ."- <a href=\"https://teletype.in/@bott_manager/kJaChoXUqmZ\">Windows</a> 🪟\n"
+            ."- <a href=\"https://teletype.in/@bott_manager/Q8vOQ-_lnQ_\">MacOS</a> 💻\n"
+            ."- <a href=\"https://teletype.in/@bott_manager/OIc2Dwer6jV\">AndroidTV</a> 📺\n\n"
+            ."👨🏻‍💻 По всем вопросам обращайтесь к <a href=\"ссылка на аккаунт поддержки\">администратору</a> бота.";
     }
 
     /**

@@ -522,8 +522,11 @@ class SalesmanBotController extends AbstractTelegramBot
     protected function actionHelp(): void
     {
         // Если есть кастомный текст помощи, используем его
-        if (!empty($this->salesman->custom_help_text)) {
-            $this->sendMessage($this->salesman->custom_help_text);
+        if ($this->salesman->custom_help_text !== null) {
+            $text = trim((string) $this->salesman->custom_help_text);
+            if ($text !== '') {
+                $this->sendMessage($text);
+            }
             return;
         }
 

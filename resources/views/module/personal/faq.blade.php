@@ -47,28 +47,7 @@
                             </label>
                             <textarea id="help_text" name="help_text" rows="12"
                                       class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                                      placeholder="Введите текст помощи для ваших клиентов..."><blockquote><b>❓ Помощь</b></blockquote>
-
-🔹 <b>Активация VPN:</b>
-
-1️⃣ Нажмите '🔑 Активировать'
-2️⃣ Введите полученный ключ
-3️⃣ Скопируйте конфигурацию и следуйте инструкциям для подключения на различных устройствах, представленным ниже
-
-🔹 <b>Проверка статуса:</b>
-
-1️⃣ Нажмите кнопку '📊 Статус'
-2️⃣ Просмотрите информацию о вашем доступе и конфигурации
-
-📁 <b>Инструкции по настройке VPN:</b>
-
-- <a href="https://teletype.in/@bott_manager/C0WFg-Bsren">Android</a> 🤖
-- <a href="https://teletype.in/@bott_manager/8jEexiKqjlEWQ">iOS</a> 🍏
-- <a href="https://teletype.in/@bott_manager/kJaChoXUqmZ">Windows</a> 🪟
-- <a href="https://teletype.in/@bott_manager/Q8vOQ-_lnQ_">MacOS</a> 💻
-- <a href="https://teletype.in/@bott_manager/OIc2Dwer6jV">AndroidTV</a> 📺
-
-👨🏻‍💻 По всем вопросам обращайтесь к <a href="ссылка на аккаунт поддержки">администратору</a> бота.</textarea>
+                                      placeholder="Введите текст помощи для ваших клиентов...">{{ $currentHelpText }}</textarea>
                             <p class="mt-2 text-sm text-gray-500">
                                 Можно использовать HTML-разметку. Максимальная длина: 4000 символов.
                             </p>
@@ -95,28 +74,7 @@
                         <h4 class="text-md font-medium text-gray-900 mb-2">Предпросмотр</h4>
                         <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                             <div class="vpn-instructions-preview">
-                                <blockquote><b>❓ Помощь</b></blockquote>
-
-                                🔹 <b>Активация VPN:</b>
-
-                                1️⃣ Нажмите '🔑 Активировать'
-                                2️⃣ Введите полученный ключ
-                                3️⃣ Скопируйте конфигурацию и следуйте инструкциям для подключения на различных устройствах, представленным ниже
-
-                                🔹 <b>Проверка статуса:</b>
-
-                                1️⃣ Нажмите кнопку '📊 Статус'
-                                2️⃣ Просмотрите информацию о вашем доступе и конфигурации
-
-                                📁 <b>Инструкции по настройке VPN:</b>
-
-                                - <a href="https://teletype.in/@bott_manager/C0WFg-Bsren">Android</a> 🤖
-                                - <a href="https://teletype.in/@bott_manager/8jEexiKqjlEWQ">iOS</a> 🍏
-                                - <a href="https://teletype.in/@bott_manager/kJaChoXUqmZ">Windows</a> 🪟
-                                - <a href="https://teletype.in/@bott_manager/Q8vOQ-_lnQ_">MacOS</a> 💻
-                                - <a href="https://teletype.in/@bott_manager/OIc2Dwer6jV">AndroidTV</a> 📺
-
-                                👨🏻‍💻 По всем вопросам обращайтесь к <a href="ссылка на аккаунт поддержки">администратору</a> бота.
+                                {!! $currentHelpText !!}
                             </div>
                         </div>
                     </div>
