@@ -3888,23 +3888,49 @@ EOS
     {
         $panel = self::updateMarzbanToken($panel_id);
 
-        Log::info('Updating configuration to mixed stealth high ports', [
+        Log::info('Updating current Marzban configuration ports to mixed stealth', [
             'panel_id' => $panel_id,
             'source' => 'panel',
         ]);
 
-        $realityKeys = $this->getOrGenerateRealityKeys($panel);
+        $marzbanApi = new MarzbanAPI($panel->api_address);
+        $json_config = $marzbanApi->getConfig($panel->auth_token);
+        if (empty($json_config) || ! is_array($json_config) || empty($json_config['inbounds']) || ! is_array($json_config['inbounds'])) {
+            throw new RuntimeException('Не удалось получить текущий core config Marzban для port-map миграции.');
+        }
 
-        $json_config = $this->buildBaseConfig($panel);
-        $json_config['inbounds'] = array_merge(
-            $this->buildStableBasicInboundsForMixedStealth($panel),
-            $this->buildMixedRealityStealthInbounds(
-                $realityKeys['private_key'],
-                $realityKeys['short_id'],
-                $realityKeys['grpc_short_id'],
-                $realityKeys['xhttp_short_id']
-            )
-        );
+        $portMapByTag = [
+            'TROJAN-WS' => 22097,
+            'Shadowsocks-TCP' => 28388,
+            'VLESS TCP REALITY' => 21443,
+            'VLESS GRPC REALITY' => 22443,
+            'VLESS XHTTP REALITY' => 21444,
+            'VLESS TCP REALITY ALT' => 22083,
+        ];
+        $changed = [];
+        foreach ($json_config['inbounds'] as $idx => $inbound) {
+            if (! is_array($inbound)) {
+                continue;
+            }
+            $tag = (string) ($inbound['tag'] ?? '');
+            if ($tag === '' || ! array_key_exists($tag, $portMapByTag)) {
+                continue;
+            }
+            $oldPort = (int) ($inbound['port'] ?? 0);
+            $newPort = (int) $portMapByTag[$tag];
+            $json_config['inbounds'][$idx]['port'] = $newPort;
+            $changed[] = $tag.': '.$oldPort.' -> '.$newPort;
+        }
+
+        if ($changed === []) {
+            throw new RuntimeException('В текущем core config не найдены ожидаемые inbounds для mixed stealth port-map.');
+        }
+
+        Log::info('Mixed stealth port-map prepared from current config', [
+            'panel_id' => $panel_id,
+            'changes' => $changed,
+            'source' => 'panel',
+        ]);
 
         $this->applyConfiguration($panel, $json_config, Panel::CONFIG_TYPE_MIXED_STEALTH);
     }

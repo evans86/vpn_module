@@ -263,7 +263,7 @@
                                                     </form>
                                                 @endif
                                                 <div class="grid grid-cols-2 gap-2">
-                                                    <form action="{{ route('admin.module.panel.update-config-mixed-stealth', $panel) }}" method="POST" class="min-w-0 col-span-2"
+                                                    <form action="{{ url('/admin/module/panel/'.$panel->id.'/update-config-mixed-stealth') }}" method="POST" class="min-w-0 col-span-2"
                                                           onsubmit="return confirm('Применить тестовый пресет «Смешанная stealth» только к панели #{{ $panel->id }}?\n\nНабор протоколов останется как сейчас: Trojan WS, Shadowsocks TCP, 3x VLESS REALITY. Изменятся только порты: 2097→22097, 8388→28388, 8443→21443, 9443→22443, 2083→22083. Сначала проверьте одну тестовую панель.');">
                                                         @csrf
                                                         <button type="submit" class="w-full min-h-[3.25rem] flex flex-col items-center justify-center px-2 py-2 text-xs font-semibold rounded-lg text-white bg-teal-700 hover:bg-teal-800 border border-teal-900">
