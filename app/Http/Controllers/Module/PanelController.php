@@ -424,11 +424,16 @@ class PanelController extends Controller
                 'panel_id' => $panel->id,
             ]);
 
+            $panel->warp_routing_enabled = false;
+            $panel->warp_routing_all = false;
+            $panel->config_type = Panel::CONFIG_TYPE_MIXED_STEALTH;
+            $panel->save();
+
             $strategy = new PanelStrategy($panel->panel);
             $strategy->updateConfigurationMixedStealth($panel->id);
 
             return redirect()->route('admin.module.panel.index')
-                ->with('success', 'Тестовый пресет «Смешанная stealth» применён к одной панели. Набор протоколов сохранён, изменены только порты.');
+                ->with('success', 'Конфигурация «Смешанная HighPort» применена. WARP выключен, набор протоколов сохранён, изменены только порты.');
         } catch (Exception $e) {
             $this->logger->error('Ошибка при обновлении конфигурации панели (mixed stealth)', [
                 'source' => 'panel',
@@ -441,6 +446,58 @@ class PanelController extends Controller
             return redirect()->route('admin.module.panel.index')
                 ->with('error', 'Ошибка при обновлении конфигурации: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Смешанная HighPort + WARP: установка/проверка WARP и применение high-port пресета.
+     */
+    public function updateConfigMixedStealthWarp(Request $request, Panel $panel): RedirectResponse
+    {
+        if ($panel->panel !== Panel::MARZBAN) {
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Автонастройка WARP доступна только для Marzban.');
+        }
+        if (! $panel->server_id) {
+            return redirect()->route('admin.module.panel.index')
+                ->with('error', 'Привяжите к панели сервер с SSH, иначе установка WARP недоступна.');
+        }
+
+        $request->validate([
+            'warp_socks_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+        ]);
+
+        $this->persistMarzbanWarpBootstrapRouting($request, $panel);
+        $panel->config_type = Panel::CONFIG_TYPE_MIXED_STEALTH;
+        $panel->warp_routing_enabled = true;
+        $panel->warp_routing_all = true;
+        $panel->save();
+
+        $raw = $request->input('warp_socks_port');
+        $port = ($raw === null || $raw === '')
+            ? (int) ($panel->warp_socks_port ?? config('panel.warp_default_socks_port', 40000))
+            : (int) $raw;
+        $panelId = (int) $panel->id;
+
+        app()->terminating(function () use ($panelId, $port) {
+            try {
+                app(MarzbanService::class)->installWarpSocksOnNodeAndReapplyConfig($panelId, $port, true, true);
+            } catch (\Throwable $e) {
+                Log::error('HighPort + WARP (фон): ошибка', [
+                    'source' => 'panel',
+                    'panel_id' => $panelId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        });
+
+        $this->logger->info('HighPort + WARP: фон постановка', [
+            'source' => 'panel',
+            'panel_id' => $panelId,
+            'port' => $port,
+        ]);
+
+        return redirect()->route('admin.module.panel.index')
+            ->with('success', 'Конфигурация «Смешанная HighPort + WARP» запущена в фоне. Подождите 2–5 минут и обновите страницу.');
     }
 
     /**

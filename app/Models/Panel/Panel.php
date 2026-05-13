@@ -603,7 +603,7 @@ class Panel extends Model
             case self::CONFIG_TYPE_REALITY_STEALTH:
                 return 'REALITY stealth';
             case self::CONFIG_TYPE_MIXED_STEALTH:
-                return 'Смешанная stealth';
+                return $this->warp_routing_enabled ? 'Смешанная HighPort + WARP' : 'Смешанная HighPort';
             case self::CONFIG_TYPE_MIXED:
                 return 'Смешанная';
             case self::CONFIG_TYPE_MIXED_WARP:

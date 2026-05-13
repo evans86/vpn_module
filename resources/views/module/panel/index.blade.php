@@ -230,54 +230,59 @@
                                         @if($panel->panel === \App\Models\Panel\Panel::MARZBAN)
                                             @php
                                                 $marzbanConfigured = (int) $panel->panel_status === \App\Models\Panel\Panel::PANEL_CONFIGURED;
-                                                $marzbanWarpComplete = $marzbanConfigured
-                                                    && $panel->config_type === \App\Models\Panel\Panel::CONFIG_TYPE_MIXED_WARP
-                                                    && $panel->warp_routing_enabled;
+                                                $marzbanHighPort = $panel->config_type === \App\Models\Panel\Panel::CONFIG_TYPE_MIXED_STEALTH;
+                                                $marzbanHighPortWarp = $marzbanConfigured && $marzbanHighPort && $panel->warp_routing_enabled;
                                                 $marzbanWarpPort = (int) ($panel->warp_socks_port ?? config('panel.warp_default_socks_port', 40000));
                                             @endphp
                                             @if(! $panel->server_id)
                                                 <p class="text-xs text-amber-800 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                                                     Привяжите к панели сервер с SSH.
                                                 </p>
-                                            @elseif($marzbanWarpComplete)
+                                            @elseif($marzbanHighPortWarp)
                                                 <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 flex items-center gap-2.5">
                                                     <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-white text-sm"><i class="fas fa-check"></i></span>
                                                     <div class="min-w-0 flex-1 text-xs text-emerald-950">
-                                                        <p class="font-semibold">Готово: смешанный профиль с WARP</p>
+                                                        <p class="font-semibold">Готово: Смешанная HighPort + WARP</p>
                                                         <p class="text-[11px] opacity-90 mt-0.5">SOCKS-порт {{ $marzbanWarpPort }}@if($panel->config_updated_at) · {{ $panel->config_updated_at->format('d.m.Y H:i') }}@endif</p>
                                                     </div>
                                                 </div>
-                                                <form action="{{ route('admin.module.panel.reapply-marzban-config', $panel) }}" method="POST" class="mt-2">
-                                                    @csrf
-                                                    <button type="submit" class="w-full py-2.5 px-3 text-sm font-medium rounded-lg text-gray-900 bg-white border border-gray-300 hover:bg-gray-50">
-                                                        Переконфигурировать
-                                                    </button>
-                                                </form>
                                                 <form action="{{ url('/admin/module/panel/'.$panel->id.'/update-config-mixed-stealth') }}" method="POST" class="mt-2"
-                                                      onsubmit="return confirm('Вернуть high-port конфиг «Смешанная stealth» с сохранением WARP для панели #{{ $panel->id }}?');">
+                                                      onsubmit="return confirm('Переключить панель #{{ $panel->id }} на «Смешанная HighPort» без WARP?\n\nWARP-маршрутизация будет выключена, high-port набор протоколов останется.');">
                                                     @csrf
                                                     <button type="submit" class="w-full py-2.5 px-3 text-sm font-medium rounded-lg text-white bg-teal-700 border border-teal-900 hover:bg-teal-800">
-                                                        Смешанная stealth + WARP
+                                                        Смешанная HighPort
                                                     </button>
                                                 </form>
                                             @else
+                                                @if($marzbanHighPort)
+                                                    <div class="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2.5 flex items-center gap-2.5">
+                                                        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-teal-700 text-white text-sm"><i class="fas fa-check"></i></span>
+                                                        <div class="min-w-0 flex-1 text-xs text-teal-950">
+                                                            <p class="font-semibold">Готово: Смешанная HighPort</p>
+                                                            <p class="text-[11px] opacity-90 mt-0.5">@if($panel->config_updated_at){{ $panel->config_updated_at->format('d.m.Y H:i') }}@else WARP выключен @endif</p>
+                                                        </div>
+                                                    </div>
+                                                @endif
                                                 <div class="grid grid-cols-1 gap-2">
-                                                    <form action="{{ url('/admin/module/panel/'.$panel->id.'/update-config-mixed-stealth') }}" method="POST" class="min-w-0 col-span-2"
-                                                          onsubmit="return confirm('Применить «Смешанная stealth» к панели #{{ $panel->id }}?\n\nНабор протоколов останется как в смешанном профиле, порты будут переведены на high ports. Если WARP уже включён на панели, он сохранится.');">
-                                                        @csrf
-                                                        <button type="submit" class="w-full min-h-[3.25rem] flex flex-col items-center justify-center px-2 py-2 text-xs font-semibold rounded-lg text-white bg-teal-700 hover:bg-teal-800 border border-teal-900">
-                                                            <span>Смешанная stealth</span>
-                                                            <span class="text-[10px] font-normal opacity-80">тот же набор, high ports</span>
-                                                        </button>
-                                                    </form>
-                                                    @if($marzbanConfigured)
-                                                        <form action="{{ route('admin.module.panel.reapply-marzban-config', $panel) }}" method="POST" title="Повторно отправить в Marzban текущий пресет после обновления кода">
+                                                    @if(! $marzbanHighPort)
+                                                        <form action="{{ url('/admin/module/panel/'.$panel->id.'/update-config-mixed-stealth') }}" method="POST"
+                                                              onsubmit="return confirm('Применить «Смешанная HighPort» к панели #{{ $panel->id }}?\n\nБудет mixed-набор протоколов на high ports без WARP.');">
                                                             @csrf
-                                                            <button type="submit" class="w-full py-2 px-3 text-[11px] font-medium rounded-md text-gray-800 bg-gray-100 border border-gray-200 hover:bg-gray-200">
-                                                                Отправить текущий пресет снова
+                                                            <button type="submit" class="w-full min-h-[3.25rem] flex flex-col items-center justify-center px-2 py-2 text-xs font-semibold rounded-lg text-white bg-teal-700 hover:bg-teal-800 border border-teal-900">
+                                                                <span>Смешанная HighPort</span>
+                                                                <span class="text-[10px] font-normal opacity-80">без WARP</span>
                                                             </button>
                                                         </form>
                                                     @endif
+                                                    <form action="{{ url('/admin/module/panel/'.$panel->id.'/update-config-mixed-stealth-warp') }}" method="POST"
+                                                          onsubmit="return confirm('Применить «Смешанная HighPort + WARP» к панели #{{ $panel->id }}?\n\nWARP будет установлен/проверен по SSH и затем применится high-port конфиг с WARP-маршрутизацией.');">
+                                                        @csrf
+                                                        <input type="hidden" name="warp_socks_port" value="{{ $marzbanWarpPort }}">
+                                                        <button type="submit" class="w-full min-h-[3.25rem] flex flex-col items-center justify-center px-2 py-2 text-xs font-semibold rounded-lg text-white bg-emerald-700 hover:bg-emerald-800 border border-emerald-900">
+                                                            <span>Смешанная HighPort + WARP</span>
+                                                            <span class="text-[10px] font-normal opacity-80">поднять WARP</span>
+                                                        </button>
+                                                    </form>
                                                 </div>
                                             @endif
                                         @endif
