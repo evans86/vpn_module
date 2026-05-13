@@ -119,12 +119,12 @@
                                 <div class="flex items-center justify-between">
                                     <span class="text-sm font-medium text-gray-700">Конфиг:</span>
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                        {{ $panel->config_type_badge_class === 'success' ? 'bg-green-100 text-green-800' : '' }}
+                                        {{ $panel->config_type_badge_class === 'success' ? 'bg-emerald-100 text-emerald-800' : '' }}
                                         {{ $panel->config_type_badge_class === 'info' ? 'bg-blue-100 text-blue-800' : '' }}
                                         {{ $panel->config_type_badge_class === 'secondary' ? 'bg-gray-100 text-gray-800' : '' }}
                                         {{ $panel->config_type_badge_class === 'primary' ? 'bg-indigo-100 text-indigo-800' : '' }}
                                         {{ $panel->config_type_badge_class === 'warning' ? 'bg-amber-100 text-amber-800' : '' }}
-                                        {{ $panel->config_type_badge_class === 'purple' ? 'bg-violet-100 text-violet-800' : '' }}">
+                                        {{ $panel->config_type_badge_class === 'purple' ? 'bg-violet-100 text-violet-800 ring-1 ring-violet-200' : '' }}">
                                         {{ $panel->config_type_label }}
                                     </span>
                                 </div>
