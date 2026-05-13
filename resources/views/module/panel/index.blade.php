@@ -239,9 +239,9 @@
                                                     Привяжите к панели сервер с SSH.
                                                 </p>
                                             @elseif($marzbanHighPortWarp)
-                                                <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 flex items-center gap-2.5">
-                                                    <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-white text-sm"><i class="fas fa-check"></i></span>
-                                                    <div class="min-w-0 flex-1 text-xs text-emerald-950">
+                                                <div class="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2.5 flex items-center gap-2.5">
+                                                    <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-600 text-white text-sm"><i class="fas fa-check"></i></span>
+                                                    <div class="min-w-0 flex-1 text-xs text-violet-950">
                                                         <p class="font-semibold">Готово: Смешанная HighPort + WARP</p>
                                                         <p class="text-[11px] opacity-90 mt-0.5">SOCKS-порт {{ $marzbanWarpPort }}@if($panel->config_updated_at) · {{ $panel->config_updated_at->format('d.m.Y H:i') }}@endif</p>
                                                     </div>
@@ -249,15 +249,15 @@
                                                 <form action="{{ url('/admin/module/panel/'.$panel->id.'/update-config-mixed-stealth') }}" method="POST" class="mt-2"
                                                       onsubmit="return confirm('Переключить панель #{{ $panel->id }} на «Смешанная HighPort» без WARP?\n\nWARP-маршрутизация будет выключена, high-port набор протоколов останется.');">
                                                     @csrf
-                                                    <button type="submit" class="w-full py-2.5 px-3 text-sm font-medium rounded-lg text-white bg-teal-700 border border-teal-900 hover:bg-teal-800">
+                                                    <button type="submit" class="w-full py-2.5 px-3 text-sm font-medium rounded-lg text-white bg-emerald-700 border border-emerald-900 hover:bg-emerald-800">
                                                         Смешанная HighPort
                                                     </button>
                                                 </form>
                                             @else
                                                 @if($marzbanHighPort)
-                                                    <div class="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2.5 flex items-center gap-2.5">
-                                                        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-teal-700 text-white text-sm"><i class="fas fa-check"></i></span>
-                                                        <div class="min-w-0 flex-1 text-xs text-teal-950">
+                                                    <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 flex items-center gap-2.5">
+                                                        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-700 text-white text-sm"><i class="fas fa-check"></i></span>
+                                                        <div class="min-w-0 flex-1 text-xs text-emerald-950">
                                                             <p class="font-semibold">Готово: Смешанная HighPort</p>
                                                             <p class="text-[11px] opacity-90 mt-0.5">@if($panel->config_updated_at){{ $panel->config_updated_at->format('d.m.Y H:i') }}@else WARP выключен @endif</p>
                                                         </div>
@@ -268,7 +268,7 @@
                                                         <form action="{{ url('/admin/module/panel/'.$panel->id.'/update-config-mixed-stealth') }}" method="POST"
                                                               onsubmit="return confirm('Применить «Смешанная HighPort» к панели #{{ $panel->id }}?\n\nБудет mixed-набор протоколов на high ports без WARP.');">
                                                             @csrf
-                                                            <button type="submit" class="w-full min-h-[3.25rem] flex flex-col items-center justify-center px-2 py-2 text-xs font-semibold rounded-lg text-white bg-teal-700 hover:bg-teal-800 border border-teal-900">
+                                                            <button type="submit" class="w-full min-h-[3.25rem] flex flex-col items-center justify-center px-2 py-2 text-xs font-semibold rounded-lg text-white bg-emerald-700 hover:bg-emerald-800 border border-emerald-900">
                                                                 <span>Смешанная HighPort</span>
                                                                 <span class="text-[10px] font-normal opacity-80">без WARP</span>
                                                             </button>
@@ -278,7 +278,7 @@
                                                           onsubmit="return confirm('Применить «Смешанная HighPort + WARP» к панели #{{ $panel->id }}?\n\nWARP будет установлен/проверен по SSH и затем применится high-port конфиг с WARP-маршрутизацией.');">
                                                         @csrf
                                                         <input type="hidden" name="warp_socks_port" value="{{ $marzbanWarpPort }}">
-                                                        <button type="submit" class="w-full min-h-[3.25rem] flex flex-col items-center justify-center px-2 py-2 text-xs font-semibold rounded-lg text-white bg-emerald-700 hover:bg-emerald-800 border border-emerald-900">
+                                                        <button type="submit" class="w-full min-h-[3.25rem] flex flex-col items-center justify-center px-2 py-2 text-xs font-semibold rounded-lg text-white bg-violet-700 hover:bg-violet-800 border border-violet-900">
                                                             <span>Смешанная HighPort + WARP</span>
                                                             <span class="text-[10px] font-normal opacity-80">поднять WARP</span>
                                                         </button>

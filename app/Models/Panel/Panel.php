@@ -632,7 +632,7 @@ class Panel extends Model
             case self::CONFIG_TYPE_REALITY_STEALTH:
                 return 'success';
             case self::CONFIG_TYPE_MIXED_STEALTH:
-                return 'success';
+                return $this->warp_routing_enabled ? 'purple' : 'success';
             case self::CONFIG_TYPE_MIXED:
                 return 'warning';
             case self::CONFIG_TYPE_MIXED_WARP:
@@ -650,6 +650,9 @@ class Panel extends Model
     {
         switch ($this->config_type) {
             case self::CONFIG_TYPE_MIXED_STEALTH:
+                return $this->warp_routing_enabled
+                    ? 'border-violet-500/65 bg-violet-50 text-violet-950 ring-1 ring-violet-400/35'
+                    : 'border-emerald-500/65 bg-emerald-50 text-emerald-950 ring-1 ring-emerald-400/35';
             case self::CONFIG_TYPE_MIXED:
                 return 'border-amber-400/70 bg-amber-50 text-amber-950 ring-1 ring-amber-400/25';
             case self::CONFIG_TYPE_MIXED_WARP:
