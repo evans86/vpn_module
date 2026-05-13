@@ -225,7 +225,6 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
                 Route::get('log-upload-async-reinstall-target-ids', [ServerController::class, 'logUploadAsyncReinstallTargetIds'])
                     ->middleware('throttle:60,1')
                     ->name('log-upload-async-reinstall-target-ids');
-                Route::get('/{server}', [ServerController::class, 'show'])->name('show');
                 Route::post('/', [ServerController::class, 'store'])->name('store');
                 Route::post('/store-manual', [ServerController::class, 'storeManual'])->name('store-manual');
                 Route::post('/bulk-install-speedtest-cli', [ServerController::class, 'bulkInstallSpeedtestCli'])
@@ -261,6 +260,7 @@ Route::prefix('admin')->name('admin.')->middleware('admin.http_basic')->group(fu
                 Route::post('/{server}/enable-log-upload', [ServerController::class, 'enableLogUpload'])->name('enable-log-upload');
                 Route::get('/{server}/check-log-upload-status', [ServerController::class, 'checkLogUploadStatus'])->name('check-log-upload-status');
                 Route::post('/{server}/apply-decoy-stub', [ServerController::class, 'applyDecoyStub'])->name('apply-decoy-stub');
+                Route::get('/{server}', [ServerController::class, 'show'])->name('show');
             });
 
             Route::prefix('server-fleet')->name('server-fleet.')->group(function () {
