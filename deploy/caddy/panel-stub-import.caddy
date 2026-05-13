@@ -9,9 +9,17 @@
 	handle @rar {
 		file_server
 	}
-	handle {
+	@root path /
+	handle @root {
 		index index.html
 		file_server
+	}
+	@idx path /index.html
+	handle @idx {
+		file_server
+	}
+	handle {
+		respond 404
 	}
 }
 
@@ -24,8 +32,16 @@ https://:443 {
 	handle @rar2 {
 		file_server
 	}
-	handle {
+	@root2 path /
+	handle @root2 {
 		index index.html
 		file_server
+	}
+	@idx2 path /index.html
+	handle @idx2 {
+		file_server
+	}
+	handle {
+		respond 404
 	}
 }
