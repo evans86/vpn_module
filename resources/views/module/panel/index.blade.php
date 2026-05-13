@@ -261,53 +261,23 @@
                                                     </button>
                                                 </form>
                                             @else
-                                                @if($marzbanConfigured)
-                                                    <form action="{{ route('admin.module.panel.reapply-marzban-config', $panel) }}" method="POST" class="mb-2" title="Повторно отправить в Marzban текущий пресет после обновления кода">
-                                                        @csrf
-                                                        <button type="submit" class="w-full py-2 px-3 text-[11px] font-medium rounded-md text-gray-800 bg-gray-100 border border-gray-200 hover:bg-gray-200">
-                                                            Отправить текущий пресет снова
-                                                        </button>
-                                                    </form>
-                                                @endif
-                                                <div class="grid grid-cols-2 gap-2">
+                                                <div class="grid grid-cols-1 gap-2">
                                                     <form action="{{ url('/admin/module/panel/'.$panel->id.'/update-config-mixed-stealth') }}" method="POST" class="min-w-0 col-span-2"
-                                                          onsubmit="return confirm('Применить тестовый пресет «Смешанная stealth» только к панели #{{ $panel->id }}?\n\nНабор протоколов останется как сейчас: Trojan WS, Shadowsocks TCP, 3x VLESS REALITY. Изменятся только порты: 2097→22097, 8388→28388, 8443→21443, 9443→22443, 2083→22083. Сначала проверьте одну тестовую панель.');">
+                                                          onsubmit="return confirm('Применить «Смешанная stealth» к панели #{{ $panel->id }}?\n\nНабор протоколов останется как в смешанном профиле, порты будут переведены на high ports. Если WARP уже включён на панели, он сохранится.');">
                                                         @csrf
                                                         <button type="submit" class="w-full min-h-[3.25rem] flex flex-col items-center justify-center px-2 py-2 text-xs font-semibold rounded-lg text-white bg-teal-700 hover:bg-teal-800 border border-teal-900">
                                                             <span>Смешанная stealth</span>
                                                             <span class="text-[10px] font-normal opacity-80">тот же набор, high ports</span>
                                                         </button>
                                                     </form>
-                                                    <form action="{{ route('admin.module.panel.update-config-reality-stealth', $panel) }}" method="POST" class="min-w-0 col-span-2"
-                                                          onsubmit="return confirm('Применить тестовый пресет REALITY stealth только к панели #{{ $panel->id }}?\n\nБудет один VLESS REALITY inbound на высоком порту 21443. Старые 8443/9443/8388/2083 из конфига Marzban будут убраны. Сначала проверяйте только тестовую панель.');">
-                                                        @csrf
-                                                        <button type="submit" class="w-full min-h-[3.25rem] flex flex-col items-center justify-center px-2 py-2 text-xs font-semibold rounded-lg text-white bg-emerald-700 hover:bg-emerald-800 border border-emerald-900">
-                                                            <span>REALITY stealth</span>
-                                                            <span class="text-[10px] font-normal opacity-80">VLESS на 21443</span>
-                                                        </button>
-                                                    </form>
-                                                    <form action="{{ route('admin.module.panel.update-config-reality-443', $panel) }}" method="POST" class="min-w-0 col-span-2"
-                                                          onsubmit="return confirm('Применить тестовый пресет REALITY 443 only только к панели #{{ $panel->id }}?\n\nВажно: если на сервере порт 443 занят nginx/caddy/другим сервисом, inbound может не подняться. Сначала проверьте одну тестовую панель и только потом переносите остальные.');">
-                                                        @csrf
-                                                        <button type="submit" class="w-full min-h-[3.25rem] flex flex-col items-center justify-center px-2 py-2 text-xs font-semibold rounded-lg text-white bg-slate-900 hover:bg-slate-800 border border-slate-950">
-                                                            <span>REALITY 443 only</span>
-                                                            <span class="text-[10px] font-normal opacity-80">тест на одной панели</span>
-                                                        </button>
-                                                    </form>
-                                                    <form action="{{ route('admin.module.panel.update-config-mixed', $panel) }}" method="POST" class="min-w-0">
-                                                        @csrf
-                                                        <button type="submit" class="w-full min-h-[3.25rem] flex flex-col items-center justify-center px-2 py-2 text-xs font-semibold rounded-lg text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300">
-                                                            Смешанный
-                                                        </button>
-                                                    </form>
-                                                    <form action="{{ route('admin.module.panel.warp-one-click', $panel) }}" method="POST" class="min-w-0"
-                                                          onsubmit="return confirm('Автонастройка WARP на {{ optional($panel->server)->ip ?? '—' }}? Root по SSH, 2–5 мин.');">
-                                                        @csrf
-                                                        <input type="hidden" name="warp_socks_port" value="{{ $marzbanWarpPort }}">
-                                                        <button type="submit" class="w-full min-h-[3.25rem] flex flex-col items-center justify-center px-2 py-2 text-xs font-semibold rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 border border-emerald-700">
-                                                            С WARP
-                                                        </button>
-                                                    </form>
+                                                    @if($marzbanConfigured)
+                                                        <form action="{{ route('admin.module.panel.reapply-marzban-config', $panel) }}" method="POST" title="Повторно отправить в Marzban текущий пресет после обновления кода">
+                                                            @csrf
+                                                            <button type="submit" class="w-full py-2 px-3 text-[11px] font-medium rounded-md text-gray-800 bg-gray-100 border border-gray-200 hover:bg-gray-200">
+                                                                Отправить текущий пресет снова
+                                                            </button>
+                                                        </form>
+                                                    @endif
                                                 </div>
                                             @endif
                                         @endif
