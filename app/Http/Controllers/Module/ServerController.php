@@ -797,6 +797,59 @@ BASH;
     }
 
     /**
+     * Массовый read-only аудит портов: пакетами, чтобы один долгий SSH не ронял всю страницу.
+     */
+    public function bulkAuditPorts(Request $request): JsonResponse
+    {
+        $afterId = max(0, (int) $request->input('after_id', 0));
+        $perBatch = min(3, max(1, (int) $request->input('per_batch', 1)));
+
+        $base = Server::query()
+            ->where('server_status', '!=', Server::SERVER_DELETED)
+            ->whereNotNull('ip')
+            ->where('ip', '!=', '')
+            ->orderBy('id');
+
+        $matchedTotal = (clone $base)->count();
+        $slice = (clone $base)->where('id', '>', $afterId)->limit($perBatch)->get();
+
+        $rows = [];
+        foreach ($slice as $server) {
+            /** @var Server $server */
+            try {
+                $response = $this->auditPorts($server);
+                $data = $response->getData(true);
+                $rows[] = is_array($data) ? $data : [
+                    'success' => false,
+                    'message' => 'Не удалось разобрать ответ аудита.',
+                    'server' => ['id' => $server->id, 'name' => $server->name, 'ip' => $server->ip],
+                ];
+            } catch (Exception $e) {
+                $rows[] = [
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                    'server' => ['id' => $server->id, 'name' => $server->name, 'ip' => $server->ip],
+                ];
+            }
+        }
+
+        $nextAfterId = $slice->isEmpty() ? $afterId : (int) $slice->max('id');
+        $hasMore = (clone $base)->where('id', '>', $nextAfterId)->exists();
+
+        return response()->json([
+            'success' => true,
+            'rows' => $rows,
+            'included_count' => $matchedTotal,
+            'batch' => [
+                'after_id' => $afterId,
+                'next_after_id' => $nextAfterId,
+                'has_more' => $hasMore,
+                'per_batch' => $perBatch,
+            ],
+        ]);
+    }
+
+    /**
      * @param Server $server
      * @return JsonResponse
      */

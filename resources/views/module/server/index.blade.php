@@ -142,6 +142,12 @@
                                         <i class="fas fa-mask w-5 text-center text-emerald-600"></i>
                                         <span>Обновить заглушку</span>
                                     </button>
+                                    <button type="button" id="bulkAuditPortsBtn"
+                                            class="server-bulk-action-btn"
+                                            title="Read-only: по SSH проверяет слушающие TCP-порты на всех серверах пакетами. Ничего не закрывает и не меняет.">
+                                        <i class="fas fa-shield-alt w-5 text-center text-slate-700"></i>
+                                        <span>Аудит портов</span>
+                                    </button>
                                 </div>
                                 <label class="inline-flex items-start gap-2.5 px-3 py-2 rounded-lg bg-slate-100/70 border border-slate-200/80 cursor-pointer max-w-xl">
                                     <input type="checkbox" id="bulkApplyDecoyStubInstallHostNginx" class="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" checked title="Общая настройка для массового «Обновить заглушку» (как чекбокс в карточке)">
@@ -809,6 +815,29 @@
                 out.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
 
+            function portAuditText(response) {
+                var s = response.server || {};
+                var lines = [];
+                lines.push('----- #' + (s.id || '') + ' ' + (s.name || '') + ' ' + (s.ip || ''));
+                if (!response.success) {
+                    lines.push('[ERROR] ' + (response.message || 'Ошибка аудита'));
+                    return lines.join('\n');
+                }
+                var open = response.open_ports || [];
+                if (!open.length) {
+                    lines.push('[OK] Открытых портов из проверяемого списка не найдено.');
+                    return lines.join('\n');
+                }
+                var badCount = 0;
+                open.forEach(function (row) {
+                    if (row.status === 'bad') badCount++;
+                    var mark = row.status === 'bad' ? '[BAD] ' : (row.status === 'allowed' ? '[OK]  ' : '[?]   ');
+                    lines.push('  ' + mark + row.port + '  ' + (row.line || ''));
+                });
+                lines.push('Итог: bad=' + badCount + ', open=' + open.length);
+                return lines.join('\n');
+            }
+
             function auditServerPorts(id) {
                 var out = document.getElementById('serverPortAuditOut');
                 if (out) {
@@ -817,7 +846,7 @@
                     out.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
                 $.ajax({
-                    url: '{{ route('admin.module.server.audit-ports', ['server' => ':id']) }}'.replace(':id', id),
+                    url: '{{ url('/admin/module/server') }}/' + id + '/audit-ports',
                     method: 'POST',
                     data: { _token: '{{ csrf_token() }}' },
                     beforeSend: function () {
@@ -841,6 +870,76 @@
                         }
                     }
                 });
+            }
+
+            function bulkAuditPorts() {
+                if (!confirm('Запустить массовый read-only аудит портов по всем серверам?\n\nОперация идёт пакетами по SSH и ничего не меняет на серверах.')) {
+                    return;
+                }
+                var out = document.getElementById('serverPortAuditOut');
+                var btn = $('#bulkAuditPortsBtn');
+                var lines = [
+                    '===== Массовый аудит портов (read-only)',
+                    'Пакеты по 1 серверу. Изменений на серверах нет.',
+                    ''
+                ];
+                var totals = { handled: 0, badServers: 0, errors: 0 };
+                function render() {
+                    if (!out) return;
+                    out.textContent = lines.join('\n');
+                    out.classList.remove('hidden');
+                }
+                function runBatch(afterId) {
+                    btn.prop('disabled', true);
+                    $.ajax({
+                        url: '{{ url('/admin/module/server/bulk-audit-ports') }}',
+                        method: 'POST',
+                        data: {
+                            _token: '{{ csrf_token() }}',
+                            after_id: afterId || 0,
+                            per_batch: 1
+                        },
+                        success: function (response) {
+                            (response.rows || []).forEach(function (row) {
+                                totals.handled++;
+                                if (!row.success) {
+                                    totals.errors++;
+                                }
+                                var hasBad = (row.open_ports || []).some(function (p) { return p.status === 'bad'; });
+                                if (hasBad) {
+                                    totals.badServers++;
+                                }
+                                lines.push(portAuditText(row));
+                                lines.push('');
+                                render();
+                            });
+                            var b = response.batch || {};
+                            lines[1] = 'Обработано: ' + totals.handled + ' из ' + (response.included_count || '?')
+                                + '; серверов с BAD: ' + totals.badServers
+                                + '; ошибок: ' + totals.errors + '.';
+                            render();
+                            if (b.has_more) {
+                                setTimeout(function () {
+                                    runBatch(b.next_after_id || 0);
+                                }, 1200);
+                                return;
+                            }
+                            btn.prop('disabled', false);
+                            toastr.success('Массовый аудит портов завершён');
+                            render();
+                        },
+                        error: function (xhr) {
+                            var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Ошибка массового аудита портов';
+                            lines.push('[ERROR] ' + msg);
+                            render();
+                            btn.prop('disabled', false);
+                            toastr.error(msg);
+                        }
+                    });
+                }
+                render();
+                if (out) out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                runBatch(0);
             }
 
             // Глобальная функция удаления сервера
@@ -925,6 +1024,10 @@
                             btn.prop('disabled', false);
                         }
                     });
+                });
+
+                $('#bulkAuditPortsBtn').on('click', function () {
+                    bulkAuditPorts();
                 });
 
                 // Обработчик создания сервера
