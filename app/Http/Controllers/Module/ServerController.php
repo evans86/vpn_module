@@ -709,10 +709,12 @@ class ServerController extends Controller
 
         $badPorts = [81, 5000, 6443, 7443, 8000, 8001, 8080, 8443, 8880, 9090, 9443, 10086, 30000, 31000, 54321];
         $allowedPorts = [22, 80, 443];
+        $highPorts = [21443, 21444, 22083, 22097, 22443, 28388];
         $scanPorts = array_values(array_unique(array_merge(
             $allowedPorts,
             [992, 994, 1080, 1194, 2022, 2053, 2083, 2087, 2096, 3128, 3389, 4443, 5555, 8388, 9000],
-            $badPorts
+            $badPorts,
+            $highPorts
         )));
         sort($scanPorts);
 
@@ -761,10 +763,23 @@ BASH;
                 if ($port < 1) {
                     continue;
                 }
+                $listenLine = $parts[2] ?? '';
+                $isLocalOnly = (bool) preg_match('/(?:^|\s)(?:127\.0\.0\.1|\[?::1\]?|\[::1\]):'.$port.'\b/', $listenLine);
+                if ($isLocalOnly) {
+                    $status = 'local';
+                } elseif (in_array($port, $badPorts, true)) {
+                    $status = 'bad';
+                } elseif (in_array($port, $allowedPorts, true)) {
+                    $status = 'allowed';
+                } elseif (in_array($port, $highPorts, true)) {
+                    $status = 'high';
+                } else {
+                    $status = 'review';
+                }
                 $open[] = [
                     'port' => $port,
-                    'status' => in_array($port, $badPorts, true) ? 'bad' : (in_array($port, $allowedPorts, true) ? 'allowed' : 'review'),
-                    'line' => $parts[2] ?? '',
+                    'status' => $status,
+                    'line' => $listenLine,
                 ];
             }
 
@@ -778,6 +793,7 @@ BASH;
                 ],
                 'allowed_ports' => $allowedPorts,
                 'bad_ports' => $badPorts,
+                'high_ports' => $highPorts,
                 'open_ports' => $open,
                 'raw' => trim($out),
             ]);

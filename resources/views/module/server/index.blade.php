@@ -794,6 +794,9 @@
                 lines.push('Сервер: #' + (s.id || '') + ' ' + (s.name || '') + ' ' + (s.ip || ''));
                 lines.push('Разрешённые публичные TCP: ' + (response.allowed_ports || []).join(', '));
                 lines.push('Палевные/нежелательные TCP: ' + (response.bad_ports || []).join(', '));
+                if (response.high_ports && response.high_ports.length) {
+                    lines.push('HighPort VPN TCP: ' + response.high_ports.join(', '));
+                }
                 lines.push('');
 
                 var open = response.open_ports || [];
@@ -802,7 +805,10 @@
                 } else {
                     lines.push('Открытые порты:');
                     open.forEach(function (row) {
-                        var mark = row.status === 'bad' ? '[BAD] ' : (row.status === 'allowed' ? '[OK]  ' : '[?]   ');
+                        var mark = row.status === 'bad' ? '[BAD] '
+                            : (row.status === 'allowed' ? '[OK]  '
+                                : (row.status === 'local' ? '[LOCAL]'
+                                    : (row.status === 'high' ? '[HIGH]' : '[?]   ')));
                         lines.push('  ' + mark + row.port + '  ' + (row.line || ''));
                     });
                 }
@@ -829,12 +835,19 @@
                     return lines.join('\n');
                 }
                 var badCount = 0;
+                var localCount = 0;
+                var highCount = 0;
                 open.forEach(function (row) {
                     if (row.status === 'bad') badCount++;
-                    var mark = row.status === 'bad' ? '[BAD] ' : (row.status === 'allowed' ? '[OK]  ' : '[?]   ');
+                    if (row.status === 'local') localCount++;
+                    if (row.status === 'high') highCount++;
+                    var mark = row.status === 'bad' ? '[BAD] '
+                        : (row.status === 'allowed' ? '[OK]  '
+                            : (row.status === 'local' ? '[LOCAL]'
+                                : (row.status === 'high' ? '[HIGH]' : '[?]   ')));
                     lines.push('  ' + mark + row.port + '  ' + (row.line || ''));
                 });
-                lines.push('Итог: bad=' + badCount + ', open=' + open.length);
+                lines.push('Итог: public_bad=' + badCount + ', local_only=' + localCount + ', high=' + highCount + ', open=' + open.length);
                 return lines.join('\n');
             }
 
