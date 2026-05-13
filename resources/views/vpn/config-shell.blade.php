@@ -241,8 +241,8 @@
         $_vpnRefreshUiPath = public_path('js/vpn-config-refresh-ui.js');
         $_vpnRefreshUiVer = is_file($_vpnRefreshUiPath) ? filemtime($_vpnRefreshUiPath) : 1;
     @endphp
-    <script src="{{ asset('js/vpn-config-refresh-ui.js') }}?v={{ $_vpnRefreshUiVer }}"></script>
-    <script src="{{ asset('js/vpn-config-content.js') }}?v={{ $_vpnCfgJsVer }}"></script>
+    <script src="/js/vpn-config-refresh-ui.js?v={{ $_vpnRefreshUiVer }}"></script>
+    <script src="/js/vpn-config-content.js?v={{ $_vpnCfgJsVer }}"></script>
     <script>
     (function(){
         var copyNotificationTimeout, currentQR = null;
@@ -404,7 +404,7 @@
         var contentUrl = @json($contentUrl);
         var refreshUrl = @json($refreshUrl);
         /** База URL страницы конфига (для ссылки на новый ключ после перевыпуска) */
-        var vpnConfigPublicBase = @json(rtrim(url('/config'), '/'));
+        var vpnConfigPublicBase = window.location.origin + '/config';
         var contentEl = document.getElementById('config-content');
         var refreshBar = document.getElementById('config-refresh-bar');
         var progressBar = document.getElementById('config-progress-bar');
