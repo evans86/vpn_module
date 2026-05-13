@@ -4084,9 +4084,23 @@ EOS
             return [$inbounds, $proxies];
         }
 
+        if ($configType === Panel::CONFIG_TYPE_MIXED_STEALTH) {
+            // HighPort mixed: SS tag в Marzban без дефиса.
+            $inbounds = [
+                'vless' => ['VLESS TCP REALITY', 'VLESS GRPC REALITY', 'VLESS TCP REALITY ALT'],
+                'trojan' => ['TROJAN-WS'],
+                'shadowsocks' => ['Shadowsocks TCP'],
+            ];
+            $proxies = [
+                'vless' => ['id' => $vlessId],
+                'trojan' => ['password' => $trojanPassword],
+                'shadowsocks' => ['password' => $ssPassword],
+            ];
+            return [$inbounds, $proxies];
+        }
+
         if ($configType === Panel::CONFIG_TYPE_MIXED
-            || $configType === Panel::CONFIG_TYPE_MIXED_WARP
-            || $configType === Panel::CONFIG_TYPE_MIXED_STEALTH) {
+            || $configType === Panel::CONFIG_TYPE_MIXED_WARP) {
             // SS + Trojan + 3 VLESS REALITY (без VLESS-WS)
             $inbounds = [
                 'vless' => ['VLESS TCP REALITY', 'VLESS GRPC REALITY', 'VLESS TCP REALITY ALT'],
