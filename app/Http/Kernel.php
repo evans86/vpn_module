@@ -75,8 +75,6 @@ class Kernel extends HttpKernel
          * Публичные GET /config/.../content|refresh — без сессии (нет блокировки session file между shell и fetch).
          */
         'config_public' => [
-            EncryptCookies::class,
-            AddQueuedCookiesToResponse::class,
             SubstituteBindings::class,
         ],
 
