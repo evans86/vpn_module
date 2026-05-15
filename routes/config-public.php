@@ -10,3 +10,4 @@ use Illuminate\Support\Facades\Route;
 */
 Route::get('/config/{token}/content', [VpnConfigController::class, 'showConfigContent'])->name('vpn.config.content');
 Route::get('/config/{token}/refresh', [VpnConfigController::class, 'showConfigRefresh'])->name('vpn.config.refresh');
+Route::get('/config/{token}', [VpnConfigController::class, 'show'])->name('vpn.config.show');
