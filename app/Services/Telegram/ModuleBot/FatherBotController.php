@@ -357,11 +357,14 @@ class FatherBotController extends AbstractTelegramBot
     protected function initiateAuth(): void
     {
         try {
-            $salesman = Salesman::where('telegram_id', $this->chatId)->first();
+            $salesman = Salesman::withTrashed()->where('telegram_id', $this->chatId)->first();
 
             if (!$salesman) {
                 $salesman = $this->salesmanService->create($this->chatId, $this->username ?? $this->firstName);
                 $this->sendMessage("👋 Вы были автоматически зарегистрированы как продавец");
+            } elseif (method_exists($salesman, 'trashed') && $salesman->trashed()) {
+                $salesman->restore();
+                $this->sendMessage("👋 Ваш аккаунт продавца восстановлен");
             }
 
             $botDeepLink = $this->generateAuthUrl();
@@ -1502,10 +1505,12 @@ class FatherBotController extends AbstractTelegramBot
     {
         try {
             // Проверяем существование пользователя
-            $existingSalesman = Salesman::where('telegram_id', $this->chatId)->first();
+            $existingSalesman = Salesman::withTrashed()->where('telegram_id', $this->chatId)->first();
 
             if (!$existingSalesman) {
                 $this->salesmanService->create($this->chatId, $this->username == null ? null : $this->firstName);
+            } elseif (method_exists($existingSalesman, 'trashed') && $existingSalesman->trashed()) {
+                $existingSalesman->restore();
             }
 
             $message = "👋 <b>Добро пожаловать в систему управления VPN-доступами!</b>\n\n";

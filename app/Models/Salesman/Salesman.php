@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * @property int $id
@@ -35,7 +36,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class Salesman extends Authenticatable
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $guarded = false;
     protected $table = 'salesman';

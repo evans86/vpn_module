@@ -96,8 +96,20 @@ class SalesmanService
             ]);
 
             // Check if salesman already exists
-            $existingSalesman = $this->salesmanRepository->findByTelegramId($telegram_id);
+            $existingSalesman = Salesman::withTrashed()->where('telegram_id', $telegram_id)->first();
             if ($existingSalesman) {
+                if (method_exists($existingSalesman, 'trashed') && $existingSalesman->trashed()) {
+                    $existingSalesman->restore();
+                    $this->logger->info('Salesman restored instead of duplicated', [
+                        'source' => 'salesman',
+                        'action' => 'restore_success',
+                        'salesman_id' => $existingSalesman->id,
+                        'telegram_id' => $telegram_id,
+                    ]);
+
+                    return SalesmanFactory::fromEntity($existingSalesman);
+                }
+
                 throw new Exception('Salesman with this Telegram ID already exists');
             }
 
